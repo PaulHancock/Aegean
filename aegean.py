@@ -52,7 +52,7 @@ VOBS    =    0.00000000000E+00  /
 BTYPE   = 'intensity'  /
 RMS     =    1        /"""
 
-header="""#Tesla version {0}
+header="""#Aegean version {0}
 # on dataset: {1}
 #isl,src   bkg       err         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags
 #         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   CPES
@@ -766,7 +766,8 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     num_isle=0
 
     sources = []
-    print >>outfile,header.format(version,filename)
+    if outfile:
+        print >>outfile,header.format(version,filename)
     for i,xmin,xmax,ymin,ymax in gen_flood_wrap(data,rmsimg,innerclip,outerclip,expand=False):
         logging.debug("=====")
         logging.debug("Island ({0})".format(num_isle) )
