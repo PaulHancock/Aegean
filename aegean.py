@@ -55,7 +55,7 @@ RMS     =    1        /"""
 header="""#Aegean version {0}
 # on dataset: {1}
 #isl,src   bkg       err         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags
-#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   CPES
+#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   NCPES
 #=============================================================================================== =========================================================================================="""
 
 # Set some bitwise logic for flood routines
@@ -182,7 +182,7 @@ class OutputSource():
                 "{0.ra_str:12s} {0.dec_str:12s} {0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} {0.err_dec: 9.7f} "+\
                 "{0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} {0.err_int_flux: 8.6f} "+\
                 "{0.a:5.2f} {0.err_a:5.2f} {0.b:5.2f} {0.err_b:5.2f} "+\
-                "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:04b}\n"
+                "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:05b}\n"
     #format for kvis .ann files    
     ann_fmt_ellipse= "COLOUR green\nCIRCLE W {0.ra} {0.dec} 0.0083333333\n"
     ann_fmt_fixed= "COLOUR yellow\nCIRCLE W {0.ra} {0.dec} 0.0083333333\n"
@@ -410,22 +410,28 @@ def estimate_parinfo(data,rmsimg,curve,beam,csigma=None):
         logging.error("data and curvature are mismatched")
         logging.error("data:{0} curve:{1}".format(data.shape,curve.shape))
         sys.exit()
-            
-    if(len(data.ravel())) < 6:
+
+    #For small islands we can't do a 6 param fit
+    #Don't count the NaN values as part of the island
+    non_nan_pix=len(data[np.where(data==data)].ravel())
+    if 4<= non_nan_pix and non_nan_pix <= 6:
+        logging.debug("FIXED2PSF")
+        is_flag=FIXED2PSF
+    elif non_nan_pix < 4: 
         logging.debug("FITERRSMALL!")
         is_flag=FITERRSMALL
     else:
         is_flag=0
     logging.debug(" - size {0}".format(len(data.ravel())))
-    
-    if min(data.shape)>2:
-        kappa_sigma=Island( np.where( curve<-1*csigma, np.where(data-5*rmsimg>0, data,-1) ,-1) )
-        summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0,expand=False)
-    else: #if we are looking at a 1d island we only get 1 source.
+
+    if min(data.shape)<=2 or (is_flag & FITERRSMALL):
+        #1d islands or small islands only get one source
         logging.debug("Tiny summit detected")
-        logging.debug("FITTERRSMALL? {0}".format(is_flag & FITERRSMALL))
         logging.debug("{0}".format(data))
         summits=[ [data,0,data.shape[0],0,data.shape[1]] ]
+    else:       
+        kappa_sigma=Island( np.where( curve<-1*csigma, np.where(data-5*rmsimg>0, data,-1) ,-1) )
+        summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0,expand=False)
         
     i=0
     for summit,xmin,xmax,ymin,ymax in summits:
@@ -490,19 +496,19 @@ def estimate_parinfo(data,rmsimg,curve,beam,csigma=None):
                          'limited':[True,True]} )
         #TODO - these flag==FIXED2PSF things need to be reconsidered
         parinfo.append( {'value':dx,
-                         'fixed':flag==FIXED2PSF or dx_min==dx_max,
+                         'fixed': (flag & FIXED2PSF)>0,
                          'parname':'{0}:dx'.format(i),
                          'limits':[dx_min,dx_max],
                          'limited':[True,True],
                          'flags':flag})
         parinfo.append( {'value':dy,
-                         'fixed':flag==FIXED2PSF or dy_min==dy_max,
+                         'fixed': (flag & FIXED2PSF)>0,
                          'parname':'{0}:dy'.format(i),
                          'limits':[dy_min,dy_max],
                          'limited':[True,True],
                          'flags':flag} )
         parinfo.append( {'value':pa,
-                         'fixed':flag==FIXED2PSF,
+                         'fixed': (flag & FIXED2PSF)>0,
                          'parname':'{0}:pa'.format(i),
                          'limits':[-np.pi,np.pi],
                          'limited':[False,False],
@@ -788,14 +794,31 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         # skip islands with too many summits (Gaussians)
         num_summits = len(parinfo) / 6 # there are 6 params per Guassian
         logging.debug("max_summits, num_summits={0},{1}".format(max_summits,num_summits))
+        
+        #extract a flag for the island
+        is_flag=0
+        for src in parinfo:
+            if src['parname'].split(":")[-1] in ['dy','dx','pa']:
+                if src['flags']& FITERRSMALL:
+                    is_flag=src['flags']
+                    break
         if max_summits is not None and num_summits > max_summits:
             logging.info("Island has too many summits ({0}), not fitting anything".format(num_summits))
             #set all the flags to be NOTFIT
             for src in parinfo:
-                if src['parname'].split(":")[-1] in ['dy','dy','pa']:
+                if src['parname'].split(":")[-1] in ['dy','dx','pa']:
                     src['flags']|=NOTFIT
             mp=DummyMP(parinfo=parinfo,perror=None)
             info=parinfo
+        if is_flag & FITERRSMALL:
+            logging.debug("Island is too small for a fit, not fitting anything")
+            #set all the flags to be NOTFIT
+            for src in parinfo:
+                if src['parname'].split(":")[-1] in ['dy','dx','pa']:
+                    src['flags']|=NOTFIT
+            mp=DummyMP(parinfo=parinfo,perror=None)
+            info=parinfo
+            
         else:
             mp,info=multi_gauss(isle.pixels,rms,parinfo)
             
