@@ -472,6 +472,11 @@ def estimate_parinfo(data,rmsimg,curve,beam,csigma=None):
         #if the min/max of either major,minor are equal then use a PSF fit
         if dy_min==dy_max or dx_min==dx_max:
             is_flag|=FIXED2PSF
+            
+        if is_flag & FIXED2PSF:
+            dx=beam.b*fwhm2cc
+            dy=beam.a*fwhm2cc
+            pa=beam.pa
         
         pa=0
         flag=is_flag
