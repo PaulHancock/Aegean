@@ -36,7 +36,8 @@ class FitsImage():
         self.y = self.hdu.header['NAXIS2']
         self.deg_per_pixel_x = self.hdu.header["CDELT1"] # is this always right?
         self.deg_per_pixel_y = self.hdu.header["CDELT2"] # is this always right?
-        if not self.hdu.header.has_key("BPA"): #if the bpa isn't specified add it as zero
+        #if the bpa isn't specified add it as zero
+        if "BPA" not in self.hdu.header:
             bpa=0
         else:
             bpa=self.hdu.header["BPA"]*pi/180
@@ -68,7 +69,7 @@ class FitsImage():
         #do we need to check for blank pixels?
         if float(pyfits.__version__[0:3])<2.3:
             #are there likely to be any blank pixels?
-            if self.hdu.header.has_key("BLANK"):
+            if "BLANK" in self.hdu.header:
                 self.wrangle_nans()
         
         return self._pixels
