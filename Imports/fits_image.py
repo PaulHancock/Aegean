@@ -25,6 +25,11 @@ class FitsImage():
             logging.debug("Loading HDU {0} from {1}".format(hdu_index, filename))
             hdus = pyfits.open(filename)
             self.hdu = hdus[hdu_index]
+            
+        #need to read these headers before we 'touch' the data or they dissappear
+        self.bzero= self.hdu.header["BZERO"]
+        self.bscale=self.hdu.header["BSCALE"]
+        
         self.filename = filename
         self.wcs = pywcs.WCS(self.hdu.header, naxis=2)
         self.x = self.hdu.header['NAXIS1']
@@ -59,7 +64,22 @@ class FitsImage():
                 self._pixels = numpy.nan_to_num(self.hdu.data[0][0])
             else:
                 raise Exception("Can't handle {0} dimensions".format(len(self.hdu.data.shape)))
-        return self._pixels 
+            
+        #do we need to check for blank pixels?
+        if float(pyfits.__version__[0:3])<2.3:
+            #are there likely to be any blank pixels?
+            if self.hdu.header.has_key("BLANK"):
+                self.wrangle_nans()
+        
+        return self._pixels
+
+    def wrangle_nans(self):
+        '''
+        For versions of pyfits <2.3 blank pixels are imported with crazy fluxes
+        These need to be changed into NaN as per pyfits v2.3+
+        '''
+        blank = self.hdu.header["BLANK"]*self.bscale+self.bzero
+        self._pixels[numpy.where(abs(self._pixels-blank)<1e-9)]=numpy.NaN
     
     def get_background_rms(self):
         '''
