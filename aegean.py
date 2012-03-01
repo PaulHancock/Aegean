@@ -469,14 +469,18 @@ def estimate_parinfo(data,rmsimg,curve,beam,csigma=None):
         dy_min,dy_max = beam.a*fwhm2cc,max(dy,(ymax-ymin+1+1)*math.sqrt(2)*fwhm2cc)
         dy_min=min(dy_min,dy_max)
 
+        #if the min/max of either major,minor are equal then use a PSF fit
+        if dy_min==dy_max or dx_min==dx_max:
+            is_flag|=FIXED2PSF
         
         pa=0
         flag=is_flag
+        logging.debug(" - var val min max | min max")
         logging.debug(" - amp {0} {1} {2} ".format(amp,amp_min,amp_max))
         logging.debug(" - xo {0} {1} {2} ".format(xo,xo_min,xo_max))
         logging.debug(" - yo {0} {1} {2} ".format(yo,yo_min,yo_max))
-        logging.debug(" - dx {0} {1} {2} {3} {4}".format(dx,dx_min,dx_max,dx_min/fwhm2cc,dx_max/fwhm2cc))
-        logging.debug(" - dy {0} {1} {2} {3} {4}".format(dy,dy_min,dy_max,dy_min/fwhm2cc,dy_max/fwhm2cc))
+        logging.debug(" - dx {0} {1} {2} | {3} {4}".format(dx,dx_min,dx_max,dx_min/fwhm2cc,dx_max/fwhm2cc))
+        logging.debug(" - dy {0} {1} {2} | {3} {4}".format(dy,dy_min,dy_max,dy_min/fwhm2cc,dy_max/fwhm2cc))
         logging.debug(" - pa {0} {1} {2}".format(pa,-np.pi,np.pi))
         logging.debug(" - flags {0}".format(flag))
         parinfo.append( {'value':amp,
