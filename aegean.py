@@ -360,7 +360,7 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=True):
     peaks.sort(reverse=True)
     peaks=map(lambda x:x[1:],peaks)
     logging.debug("Brightest Peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[0]],rmsimg[peaks[0]]))
-    logging.debug("Faintest Peak {0}, SNR={0}/{1}".format(data.pixels[peaks[-1]],rmsimg[peaks[-1]]))
+    logging.debug("Faintest Peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[-1]],rmsimg[peaks[-1]]))
     bounds=(data.pixels.shape[0]-1,data.pixels.shape[1]-1)
     
     # starting image segmentation
@@ -435,7 +435,9 @@ def estimate_parinfo(data,rmsimg,curve,beam,csigma=None):
         
     i=0
     for summit,xmin,xmax,ymin,ymax in summits:
-        logging.debug("Summit({5}) - {0} {1} {2} {3} {4}".format(summit.shape,xmin,xmax,ymin,ymax,i))
+        
+        summit_flag = is_flag
+        logging.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape,xmin,xmax,ymin,ymax,i))
         amp=summit[np.where(summit==summit)].max()#HAXORZ!! stupid NaNs break all my things
         logging.debug(" - max is {0}".format(amp))
         (xo,yo)=np.where(summit==amp)
@@ -471,15 +473,15 @@ def estimate_parinfo(data,rmsimg,curve,beam,csigma=None):
 
         #if the min/max of either major,minor are equal then use a PSF fit
         if dy_min==dy_max or dx_min==dx_max:
-            is_flag|=FIXED2PSF
+            summit_flag|=FIXED2PSF
             
-        if is_flag & FIXED2PSF:
+        if summit_flag & FIXED2PSF:
             dx=beam.b*fwhm2cc
             dy=beam.a*fwhm2cc
             pa=beam.pa
         
         pa=0
-        flag=is_flag
+        flag=summit_flag
         logging.debug(" - var val min max | min max")
         logging.debug(" - amp {0} {1} {2} ".format(amp,amp_min,amp_max))
         logging.debug(" - xo {0} {1} {2} ".format(xo,xo_min,xo_max))
@@ -660,7 +662,6 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     logging.debug("image size x,y:{0},{1}".format(img_x,img_y))
     logging.debug("mesh width (pix) x,y: {0},{1}".format(width_x,width_y))
 
-    #TODO: this breaks when the image is smaller than the mesh size - fix it
     #box centered at image center then tilling outwards
     xstart=(xcen-width_x/2)%width_x #the starting point of the first "full" box
     ystart=(ycen-width_y/2)%width_y
@@ -684,6 +685,13 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     ymaxs.extend(range(ystart+width_y,yend+1,width_y))
     ymaxs.append(img_y)
 
+    #if the image is smaller than our ideal mesh size, just use the whole image instead
+    if width_x >=img_x:
+        xmins=[0]
+        xmaxs=[img_x]
+    if width_y >=img_y:
+        ymins=[0]
+        ymaxs=[img_y]
     
     for xmin,xmax in zip(xmins,xmaxs):
         for ymin,ymax in zip(ymins,ymaxs):
@@ -701,14 +709,14 @@ def within(x,xm,xx):
 
 def rms_from_iqr(data):
     """Calculate the rms from the interquartile range"""
-    p25 = stats.scoreatpercentile(data.ravel(), 25)
-    p75 = stats.scoreatpercentile(data.ravel(), 75)
+    p25 = stats.scoreatpercentile(data[np.where(data==data)].ravel(), 25)
+    p75 = stats.scoreatpercentile(data[np.where(data==data)].ravel(), 75)
     iqr = p75 - p25
     return iqr / 1.34896
 
 def bkg_from_middle(data):
     """Calculate the background level as the middle score"""
-    mid = np.median(data.ravel())
+    mid = np.median(data[np.where(data==data)].ravel())
     return mid
 
 def curvature(data,aspect=1.0):
@@ -784,11 +792,11 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     if outfile:
         print >>outfile,header.format(version,filename)
     for i,xmin,xmax,ymin,ymax in gen_flood_wrap(data,rmsimg,innerclip,outerclip,expand=False):
-        logging.debug("=====")
-        logging.debug("Island ({0})".format(num_isle) )
         if len(i)<=1:
             #empty islands have length 1
             continue 
+        logging.debug("=====")
+        logging.debug("Island ({0})".format(num_isle) )
         num_isle+=1
         isle=Island(i)
         icurve = dcurve[xmin:xmax+1,ymin:ymax+1]
