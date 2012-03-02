@@ -29,7 +29,7 @@ from Imports.convert import ra2dec, dec2dec, dec2hms, dec2dms
 from scipy import ndimage as ndi
 from scipy import stats
 
-version='1.3b'
+version='$Revision$'
 
 #default header for all .fits images that I create
 default_header="""BSCALE  =    1.00000000000E+00  /
@@ -951,13 +951,20 @@ if __name__=="__main__":
                      help='The clipping value (in sigmas) for seeding islands. Default=5')
     parser.add_option('--floodclip',dest='outerclip',type='float',
                       help='The clipping value (in sigmas) for growing islands. Default=4')
-    parser.set_defaults(debug=False,hdu_index=0,outfile=sys.stdout,rms=None,max_summits=None,csigma=None,innerclip=5,outerclip=4)
+    parser.add_option('--file_version',dest='file_version',action="store_true",
+                      help='show the versions of each file')
+    parser.set_defaults(debug=False,hdu_index=0,outfile=sys.stdout,rms=None,max_summits=None,csigma=None,innerclip=5,outerclip=4,file_version=False)
     (options, args) = parser.parse_args()
 
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logging.basicConfig(level=logging_level)
-    logging.info("This is Aegean v{0}".format(version))
+    logging.info("This is Aegean {0}".format(version))
+    if options.file_version:
+        logging.info("Using aegean.py {0}".format(version))
+        logging.info("Using fits_image.py {0}".format(FitsImage.version))
+        sys.exit()
+        
     if len(args)==0:
         parser.print_help()
         sys.exit()

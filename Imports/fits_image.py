@@ -12,6 +12,7 @@ import logging
 from math import pi
 
 class FitsImage():
+    version='$Revision$'
     def __init__(self, filename, hdu_index=0, hdu=None):
         """
         filename: the name of the fits image file
@@ -47,12 +48,19 @@ class FitsImage():
             bpa=0
         else:
             bpa=self.hdu.header["BPA"]*pi/180
+        #if the major/minor axes are not specified, set them to 3 pixels
+        if "BMAJ" not in self.hdu.header:
+            bmaj=3
+        else:
+            bmaj = abs(self.hdu.header["BMAJ"]/self.deg_per_pixel_y)
+        if "BMIN" not in self.hdu.header:
+            bmin=3
+        else:
+            bmin=abs(self.hdu.header["BMIN"]/self.deg_per_pixel_x)
         # TODO: handle non-square pixels and elliptical beam
         ## for now: elliptical beams are replacedwith a circular beam the size of the minor axis.
-        self.beam=Beam(abs(self.hdu.header["BMAJ"]/self.deg_per_pixel_y),
-                       abs(self.hdu.header["BMIN"]/self.deg_per_pixel_x),
-                       bpa)
-        self.pixels_per_beam=min(self.beam.a,self.beam.b)
+        self.beam=Beam(bmaj, bmin, bpa)
+        self.pixels_per_beam=min(self.beam.a, self.beam.b)
         self._pixels = None
         self._rms = None
         
