@@ -27,9 +27,15 @@ class FitsImage():
             self.hdu = hdus[hdu_index]
             
         #need to read these headers before we 'touch' the data or they dissappear
-        self.bzero= self.hdu.header["BZERO"]
-        self.bscale=self.hdu.header["BSCALE"]
-        
+        if "BZERO" in self.hdu.header:
+            self.bzero= self.hdu.header["BZERO"]
+        else:
+            self.bzero=0
+        if "BSCALE" in self.hdu.header:
+            self.bscale=self.hdu.header["BSCALE"]
+        else:
+            self.bscale=1
+            
         self.filename = filename
         self.wcs = pywcs.WCS(self.hdu.header, naxis=2)
         self.x = self.hdu.header['NAXIS1']
