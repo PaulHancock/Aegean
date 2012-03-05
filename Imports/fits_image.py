@@ -45,15 +45,18 @@ class FitsImage():
         self.deg_per_pixel_y = self.hdu.header["CDELT2"] # is this always right?
         #if the bpa isn't specified add it as zero
         if "BPA" not in self.hdu.header:
+            logging.info("BPA not present in fits header, using 0")
             bpa=0
         else:
             bpa=self.hdu.header["BPA"]*pi/180
         #if the major/minor axes are not specified, set them to 3 pixels
         if "BMAJ" not in self.hdu.header:
+            logging.info("BMAJ not present in fits header, using 3 pixels")
             bmaj=3
         else:
             bmaj = abs(self.hdu.header["BMAJ"]/self.deg_per_pixel_y)
         if "BMIN" not in self.hdu.header:
+            logging.info("BMIN not present in fits header, using 3 pixels")
             bmin=3
         else:
             bmin=abs(self.hdu.header["BMIN"]/self.deg_per_pixel_x)
