@@ -54,9 +54,9 @@ RMS     =    1        /"""
 
 header="""#Aegean version {0}
 # on dataset: {1}
-#isl,src   bkg       err         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags
+#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags
 #         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   NCPES
-#=============================================================================================== =========================================================================================="""
+#=========================================================================================================================================================================================="""
 
 # Set some bitwise logic for flood routines
 PEAKED = 1    # 001
@@ -156,8 +156,7 @@ class OutputSource():
     """
     island = None # island number
     source = None # source number
-    background = None # local background RMS (Jy/beam)
-    err_background = None # error in local background (Jy/beam)
+    background = None # local background zero point
     local_rms= None #local image rms
     ra_str = None #str
     ra = None # degrees
@@ -178,7 +177,7 @@ class OutputSource():
     flags = None
     
     #formatting strings for making nice output
-    formatter = "({0.island:04d},{0.source:d}) {0.background: 8.6f} {0.err_background: 8.6f} "+\
+    formatter = "({0.island:04d},{0.source:d}) {0.background: 8.6f} {0.local_rms: 8.6f} "+\
                 "{0.ra_str:12s} {0.dec_str:12s} {0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} {0.err_dec: 9.7f} "+\
                 "{0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} {0.err_int_flux: 8.6f} "+\
                 "{0.a:5.2f} {0.err_a:5.2f} {0.b:5.2f} {0.err_b:5.2f} "+\
@@ -193,7 +192,7 @@ class OutputSource():
     
     def as_list(self):
         """Return a list of all the parameters that are stored in this Source"""
-        return [self.island,self.source,self.background,self.err_background,
+        return [self.island,self.source,self.background,self.local_rms,
                 self.ra_str, self.dec_str, self.ra,self.err_ra,self.dec,self.err_dec,
                 self.peak_flux, self.err_peak_flux, self.int_flux, self.err_int_flux,
                 self.a,self.err_a,self.b,self.err_b,
@@ -895,7 +894,6 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
             # flux values
             #the background is taken from background map
             source.background=bkgimg[int(mp.params[j*6+1]),int(mp.params[j*6+2])]
-            source.err_background= -1 # not needed
             source.local_rms=rmsimg[int(mp.params[j*6+1]),int(mp.params[j*6+2])]
             source.peak_flux = mp.params[j*6]
             source.err_peak_flux = mp.perror[j*6]
