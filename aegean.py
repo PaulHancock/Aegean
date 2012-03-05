@@ -756,14 +756,27 @@ def test_curvature(data_file,temp_dir):
 ######################################### THE MAIN DRIVING FUNCTION ###############
     
 def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None,innerclip=5,outerclip=4):
-    '''
-    Run the source finder on the entire image.
-    Prints each source to outfile (an open file) if specified.
-     hdu_index - the index of the FITS HDU (extension)
-     max_summits - ignore any islands with more summits than this (None means no limit)
-     rms - ignored
-    Return a list of OutputSource objects.
-    '''
+    """
+    Run the Aegean source finder.
+    Inputs:
+    filename    - the name of the input file (FITS only)
+    hdu_index   - the index of the FITS HDU (extension)
+                   Default = 0
+    outfile     - print the resulting catalogue to this file
+                   Default = None = don't print to a file
+    rms         - use this rms for the entire image (will also assume that background is 0)
+                   default = None = calculate rms and background values
+    max_summits - ignore any islands with more summits than this
+                   Default = None = no limit
+    csigma      - use this as the clipping limit for the curvature map
+                   Default = None = calculate the curvature rms and use 1sigma
+    innerclip   - the seeding clip, in sigmas, for seeding islands of pixels
+                   Default = 5
+    outerclip   - the flood clip in sigmas, used for flooding islands
+                   Default = 4
+    Return:
+    a list of OutputSource objects
+    """
     img = FitsImage(filename, hdu_index=hdu_index)
     data = Island(img.get_pixels())
     dcurve=curvature(img.get_pixels())    
