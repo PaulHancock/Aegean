@@ -77,11 +77,15 @@ class FitsImage():
         # dimensions of length 1
         if self._pixels is None:
             if len(self.hdu.data.shape) == 2:
-                self._pixels = numpy.nan_to_num(self.hdu.data)
+                self._pixels = self.hdu.data
+            elif len(self.hdu.data.shape) == 3:
+                
+                self._pixels = self.hdu.data[0]
             elif len(self.hdu.data.shape) == 4:
-                self._pixels = numpy.nan_to_num(self.hdu.data[0][0])
+                self._pixels = self.hdu.data[0][0]
             else:
                 raise Exception("Can't handle {0} dimensions".format(len(self.hdu.data.shape)))
+            logging.debug("Using axes {0} and {1}".format(self.hdu.header['CTYPE1'],self.hdu.header['CTYPE2']))
             
         #do we need to check for blank pixels?
         if float(pyfits.__version__[0:3])<2.3:
