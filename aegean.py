@@ -893,8 +893,8 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
 
             # flux values
             #the background is taken from background map
-            source.background=bkgimg[int(mp.params[j*6+1]),int(mp.params[j*6+2])]
-            source.local_rms=rmsimg[int(mp.params[j*6+1]),int(mp.params[j*6+2])]
+            source.background=bkgimg[int(ra_pix),int(dec_pix)]
+            source.local_rms=rmsimg[int(ra_pix),int(dec_pix)]
             source.peak_flux = mp.params[j*6]
             source.err_peak_flux = mp.perror[j*6]
             
