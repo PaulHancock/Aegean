@@ -946,7 +946,22 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
             logging.debug(source.formatter.format(source)[:-1])
     return sources
     
-
+def save_background_files(image_filename, hdu_index=0):
+    '''
+    Generate and save the background and RMS maps as FITS files.
+    They are saved in the current directly as aegean-background.fits and aegean-rms.fits.
+    '''
+    logging.info("Saving background / RMS maps")
+    img = FitsImage(image_filename, hdu_index=hdu_index)
+    data = img.get_pixels()
+    beam=img.beam
+    bkgimg,rmsimg = make_bkg_rms_image(data,beam,mesh_size=20)
+    bkg_hdu = pyfits.PrimaryHDU(bkgimg)
+    bkg_hdu.writeto("aegean-background.fits", clobber=True)
+    rms_hdu = pyfits.PrimaryHDU(rmsimg)
+    rms_hdu.writeto("aegean-rms.fits", clobber=True)
+    logging.info("Saved aegean-background.fits and aegean-rms.fits")
+    
 if __name__=="__main__":
     usage="usage: %prog [options] FileName.fits"
     parser = OptionParser(usage=usage)
@@ -968,6 +983,8 @@ if __name__=="__main__":
                       help='The clipping value (in sigmas) for growing islands. Default=4')
     parser.add_option('--file_version',dest='file_version',action="store_true",
                       help='show the versions of each file')
+    parser.add_option('--save_background', dest='save_background', action="store_true",
+                      help='save the background/rms maps to aegean-background.fits, aegean-rms.fits and exit')
     parser.set_defaults(debug=False,hdu_index=0,outfile=sys.stdout,rms=None,max_summits=None,csigma=None,innerclip=5,outerclip=4,file_version=False)
     (options, args) = parser.parse_args()
 
@@ -990,6 +1007,12 @@ if __name__=="__main__":
     hdu_index = options.hdu_index
     if hdu_index > 0:
         logging.info( "Using hdu index {0}".format(hdu_index))
+        
+    # Generate and save the background FITS files and exit if requested
+    if options.save_background:
+        save_background_files(filename, hdu_index=hdu_index)
+        sys.exit()
+        
     #Open the outfile
     if options.outfile is not sys.stdout:
         options.outfile=open(os.path.expanduser(options.outfile),'w')
