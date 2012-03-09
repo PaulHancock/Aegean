@@ -653,12 +653,13 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     xcen=int(img_x/2)
     ycen=int(img_y/2)
 
-    width_x = mesh_size*int(math.cos(beam.pa)*beam.b + math.sin(beam.pa)*beam.a)
-    width_y = mesh_size*int(math.sin(beam.pa)*beam.b + math.cos(beam.pa)*beam.a)
+    width_x = mesh_size*int(max(abs(math.cos(beam.pa)*beam.b), abs(math.sin(beam.pa)*beam.a)))
+    width_y = mesh_size*int(max(abs(math.sin(beam.pa)*beam.b), abs(math.cos(beam.pa)*beam.a)))
     
     rmsimg = np.zeros(data.shape)
     bkgimg = np.zeros(data.shape)
     logging.debug("image size x,y:{0},{1}".format(img_x,img_y))
+    logging.debug("beam: {0}".format(beam))
     logging.debug("mesh width (pix) x,y: {0},{1}".format(width_x,width_y))
 
     #box centered at image center then tilling outwards
