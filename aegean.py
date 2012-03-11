@@ -624,28 +624,6 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     bkgimg - np.ndarray of background offsets
     rmsimg - np.ndarray of 1 sigma levels
     """
-    
-    def arr_fill(arr,xmin,xmax,ymin,ymax,val):
-        """
-        Fill a region of an array with a single value
-        Seems hacky to me but I didn't see a better solution - PJH
-
-        input:
-        arr - array ro fill
-        xmin,xmax,ymin,ymax - edges of slice
-        val - value to insert
-
-        return: nothing
-        """
-        xx,yx=arr.shape
-        xmin=within(0,xx,xmin)
-        xmax=within(0,xx,xmax)
-        ymin=within(0,yx,ymin)
-        ymax=within(0,yx,ymax)
-        for i in range(xmin,xmax):
-            for j in range(ymin,ymax):
-                arr[i,j]=val
-
     if forced_rms:
         return np.zeros(data.shape),np.ones(data.shape)*forced_rms
     
@@ -695,10 +673,10 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     
     for xmin,xmax in zip(xmins,xmaxs):
         for ymin,ymax in zip(ymins,ymaxs):
-            rms =    rms_from_iqr(data[xmin:xmax,ymin:ymax])
-            bkg = bkg_from_middle(data[xmin:xmax,ymin:ymax])
-            arr_fill(rmsimg,xmin,xmax,ymin,ymax,rms)
-            arr_fill(bkgimg,xmin,xmax,ymin,ymax,bkg)
+            rms =    rms_from_iqr(data[ymin:ymax,xmin:xmax])
+            bkg = bkg_from_middle(data[ymin:ymax,xmin:xmax])
+            rmsimg[ymin:ymax,xmin:xmax] = rms
+            bkgimg[ymin:ymax,xmin:xmax] = bkg
   
     return bkgimg,rmsimg
 
