@@ -934,10 +934,16 @@ def save_background_files(image_filename, hdu_index=0):
     data = img.get_pixels()
     beam=img.beam
     bkgimg,rmsimg = make_bkg_rms_image(data,beam,mesh_size=20)
-    bkg_hdu = pyfits.PrimaryHDU(bkgimg)
-    bkg_hdu.writeto("aegean-background.fits", clobber=True)
-    rms_hdu = pyfits.PrimaryHDU(rmsimg)
-    rms_hdu.writeto("aegean-rms.fits", clobber=True)
+    
+    # Generate the new FITS files by copying the existing HDU and assigning new data.
+    # This gives the new files the same WCS projection and other header fields. 
+    new_hdu = img.hdu
+    # Set the ORIGIN to indicate Aegean made this file
+    new_hdu.header.update("ORIGIN", "Aegean {0}".format(version))
+    new_hdu.data = bkgimg
+    new_hdu.writeto("aegean-background.fits", clobber=True)
+    new_hdu.data = rmsimg
+    new_hdu.writeto("aegean-rms.fits", clobber=True)
     logging.info("Saved aegean-background.fits and aegean-rms.fits")
     
 if __name__=="__main__":
