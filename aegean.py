@@ -627,7 +627,7 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     if forced_rms:
         return np.zeros(data.shape),np.ones(data.shape)*forced_rms
     
-    img_x,img_y = data.shape
+    img_y,img_x = data.shape
     xcen=int(img_x/2)
     ycen=int(img_y/2)
 
