@@ -886,8 +886,8 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
             # flux values
             #the background is taken from background map
             # Clamp the pixel location to the edge of the background map (see Trac #51)
-            x = min(int(round(ra_pix)), bkgimg.shape[1]-1)
-            y = min(int(round(dec_pix)), bkgimg.shape[0]-1)
+            x = max(min(int(round(ra_pix)), bkgimg.shape[1]-1),0)
+            y = max(min(int(round(dec_pix)), bkgimg.shape[0]-1),0)
             source.background=bkgimg[y,x]
             source.local_rms=rmsimg[y,x]
             source.peak_flux = mp.params[j*6]
