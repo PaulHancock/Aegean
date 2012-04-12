@@ -550,7 +550,7 @@ def ntwodgaussian(inpars):
     s2t=[math.sin(2*p) for p in pa]
     a = [ (ct[i]/dx[i]**2 + st[i]/dy[i]**2)/2 for i in range(len(amp))]
     bb= [ s2t[i]/4 *(1/dy[i]**2-1/dx[i]**2) for i in range(len(amp))]
-    c = [ (st[i]/dx[i]**2 + ct[i]/dx[i]**2)/2 for i in range(len(amp))]
+    c = [ (st[i]/dx[i]**2 + ct[i]/dy[i]**2)/2 for i in range(len(amp))]
 
     def rfunc(x,y):
         ans=0
