@@ -479,7 +479,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,csigma=None):
             dy=beam.a*fwhm2cc
             pa=beam.pa
         
-        pa=0
+        pa=beam.pa
         flag=summit_flag
         logging.debug(" - var val min max | min max")
         logging.debug(" - amp {0} {1} {2} ".format(amp,amp_min,amp_max))
