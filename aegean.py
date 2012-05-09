@@ -439,10 +439,10 @@ def estimate_parinfo(data,rmsimg,curve,beam,csigma=None):
         logging.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape,xmin,xmax,ymin,ymax,i))
         amp=summit[np.where(summit==summit)].max()#HAXORZ!! stupid NaNs break all my things
         logging.debug(" - max is {0}".format(amp))
-        (xo,yo)=np.where(summit==amp)
-        logging.debug(" - peak at {0},{1}".format(xo,yo))
-        xo+=xmin
-        yo+=ymin
+        (xpeak,ypeak)=np.where(summit==amp)
+        logging.debug(" - peak at {0},{1}".format(xpeak,ypeak))
+        xo = xpeak[0]+xmin
+        yo = ypeak[0]+ymin
         #allow amp to be 5% or 3sigma higher
         #TODO: the 5% should depend on the beam sampling
         amp_min,amp_max= float(4*rmsimg[xo,yo]), float(amp*1.05+3*rmsimg[xo,yo])
