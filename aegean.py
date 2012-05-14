@@ -687,8 +687,11 @@ def within(x,xm,xx):
 
 def rms_from_iqr(data):
     """Calculate the rms from the interquartile range"""
-    p25 = stats.scoreatpercentile(data[np.where(data==data)].ravel(), 25)
-    p75 = stats.scoreatpercentile(data[np.where(data==data)].ravel(), 75)
+    # First get rid of any NaNs
+    pixels = np.extract(data==data, data).ravel()
+    pixels.sort()
+    p25 = pixels[pixels.size/4]
+    p75 = pixels[pixels.size/4*3]
     iqr = p75 - p25
     return iqr / 1.34896
 
