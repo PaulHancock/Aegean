@@ -670,11 +670,10 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     if width_y >=img_y:
         ymins=[0]
         ymaxs=[img_y]
-    
+
     for xmin,xmax in zip(xmins,xmaxs):
         for ymin,ymax in zip(ymins,ymaxs):
-            rms =    rms_from_iqr(data[ymin:ymax,xmin:xmax])
-            bkg = bkg_from_middle(data[ymin:ymax,xmin:xmax])
+            bkg, rms = estimate_background(data[ymin:ymax,xmin:xmax])
             rmsimg[ymin:ymax,xmin:xmax] = rms
             bkgimg[ymin:ymax,xmin:xmax] = bkg
   
@@ -685,21 +684,24 @@ def within(x,xm,xx):
     """Enforce xm<= x <=xx"""
     return min(max(x,xm),xx)
 
-def rms_from_iqr(data):
-    """Calculate the rms from the interquartile range"""
-    # First get rid of any NaNs
+def estimate_background(data):
+    '''
+    Estimate the background noise mean and RMS.
+    The mean is estimated as the median of data.
+    The RMS is estimated as the IQR of data / 1.34896.
+    Returns (bkg, rms).
+    Returns (NaN, NaN) if data contains fewer than 4 values.
+    '''
     pixels = np.extract(data==data, data).ravel()
+    if len(pixels) < 4:
+        return np.NaN, np.NaN
     pixels.sort()
     p25 = pixels[pixels.size/4]
+    p50 = pixels[pixels.size/2]
     p75 = pixels[pixels.size/4*3]
     iqr = p75 - p25
-    return iqr / 1.34896
-
-def bkg_from_middle(data):
-    """Calculate the background level as the middle score"""
-    mid = np.median(data[np.where(data==data)].ravel())
-    return mid
-
+    return p50, iqr / 1.34896
+    
 def curvature(data,aspect=1.0):
     """Use a Lapacian kernal to figure the curvature map."""
     kern=np.array( [[1,1,1],[1,-8,1],[1,1,1]])
@@ -768,7 +770,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     bkgimg,rmsimg = make_bkg_rms_image(data.pixels,beam,mesh_size=20,forced_rms=rms)
     
     if csigma is None:
-        csigma=rms_from_iqr(dcurve)
+        cbkg, csigma = estimate_background(dcurve)
     
     #TODO: don't assume square pixels. This will definately mean the source
     # parameters are a bit wrong for images where degrees-per-pixel is not equal in X and Y
