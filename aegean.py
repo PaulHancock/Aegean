@@ -353,7 +353,7 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=True):
     ax,ay=np.where(data.pixels/rmsimg>innerclip)
     peaks=[(data.pixels[ax[i],ay[i]],ax[i],ay[i]) for i in range(len(ax))]
     if len(peaks)==0:
-        logging.info( "There are no pixels above the clipping limit")
+        logging.debug("There are no pixels above the clipping limit")
         return
     # sorting pixel list
     peaks.sort(reverse=True)
@@ -807,7 +807,12 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         # skip islands with too many summits (Gaussians)
         num_summits = len(parinfo) / 6 # there are 6 params per Guassian
         logging.debug("max_summits, num_summits={0},{1}".format(max_summits,num_summits))
-        
+
+        # Islands may have no summits if the curvature is not steep enough.
+        if num_summits < 1:
+            logging.debug("Island has no summits, ignoring")
+            continue
+                
         #extract a flag for the island
         is_flag=0
         for src in parinfo:
@@ -1007,4 +1012,6 @@ if __name__=="__main__":
         options.outfile=open(os.path.expanduser(options.outfile),'w')
     
     sources = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,rms=options.rms,max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,outerclip=options.outerclip)
+    if len(sources) == 0:
+        logging.info("No sources found in image")
 
