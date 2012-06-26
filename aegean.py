@@ -378,7 +378,7 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=True):
 
    
 ##parameter estimates
-def estimate_parinfo(data,rmsimg,curve,beam,csigma=None):
+def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
     """Estimates the number of sources in an island and returns initial parameters for the fit as well as
     limits on those parameters.
 
@@ -387,6 +387,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,csigma=None):
     rmsimg - np.ndarray of 1sigmas values
     curve  - np.ndarray of curvature values
     beam   - beam object
+    innerclip - the inner clipping level for flux data, in sigmas
     csigma - 1sigma value of the curvature map
              None => zero (default)
 
@@ -429,7 +430,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,csigma=None):
         logging.debug("{0}".format(data))
         summits=[ [data,0,data.shape[0],0,data.shape[1]] ]
     else:       
-        kappa_sigma=Island( np.where( curve<-1*csigma, np.where(data-5*rmsimg>0, data,-1) ,-1) )
+        kappa_sigma=Island( np.where( curve<-1*csigma, np.where(data-innerclip*rmsimg>0, data,-1) ,-1) )
         summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0,expand=False)
         
     i=0
@@ -798,7 +799,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         icurve = dcurve[xmin:xmax+1,ymin:ymax+1]
         rms=rmsimg[xmin:xmax+1,ymin:ymax+1]
         bkg=bkgimg[xmin:xmax+1,ymin:ymax+1]
-        parinfo= estimate_parinfo(isle.pixels,rms,icurve,beam,csigma)
+        parinfo= estimate_parinfo(isle.pixels,rms,icurve,beam,innerclip,csigma=csigma)
 
         logging.debug("Rms is {0}".format(np.shape(rms)) )
         logging.debug("Isle is {0}".format(np.shape(isle.pixels)) )
