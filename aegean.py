@@ -945,6 +945,7 @@ def save_background_files(image_filename, hdu_index=0):
     data = img.get_pixels()
     beam=img.beam
     bkgimg,rmsimg = make_bkg_rms_image(data,beam,mesh_size=20)
+    dcurve= curvature(data)
     
     # Generate the new FITS files by copying the existing HDU and assigning new data.
     # This gives the new files the same WCS projection and other header fields. 
@@ -955,7 +956,9 @@ def save_background_files(image_filename, hdu_index=0):
     new_hdu.writeto("aegean-background.fits", clobber=True)
     new_hdu.data = rmsimg
     new_hdu.writeto("aegean-rms.fits", clobber=True)
-    logging.info("Saved aegean-background.fits and aegean-rms.fits")
+    new_hdu.data = dcurve
+    new_hdu.writeto("aegean-curvature.fits",clobber=True)
+    logging.info("Saved aegean-background.fits, aegean-rms.fits and aegean-curvature.fits")
     
 if __name__=="__main__":
     usage="usage: %prog [options] FileName.fits"
@@ -979,7 +982,7 @@ if __name__=="__main__":
     parser.add_option('--file_version',dest='file_version',action="store_true",
                       help='show the versions of each file')
     parser.add_option('--save_background', dest='save_background', action="store_true",
-                      help='save the background/rms maps to aegean-background.fits, aegean-rms.fits and exit')
+                      help='save the background/rms/curvature maps to aegean-background.fits, aegean-rms.fits, aegean-curvature.fits and exit')
     parser.set_defaults(debug=False,hdu_index=0,outfile=sys.stdout,rms=None,max_summits=None,csigma=None,innerclip=5,outerclip=4,file_version=False)
     (options, args) = parser.parse_args()
 
