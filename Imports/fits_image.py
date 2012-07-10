@@ -139,6 +139,7 @@ class Beam():
         self.a=abs(a)
         self.b=abs(b)
         self.pa=pa
+        self.aspect=abs(a)/abs(b)
     
     def __str__(self):
         return "a={0} b={1} pa={2}".format(self.a, self.b, self.pa)
