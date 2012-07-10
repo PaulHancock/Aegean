@@ -703,12 +703,23 @@ def estimate_background(data):
     iqr = p75 - p25
     return p50, iqr / 1.34896
     
-def curvature(data,aspect=1.0):
+def curvature(data,aspect=None):
     """Use a Lapacian kernal to figure the curvature map."""
-    kern=np.array( [[1,1,1],[1,-8,1],[1,1,1]])
-    #TODO: fiddle the weights of the above if we have a pixel aspect ratio that is not 1:1
+    if not aspect:
+        kern=np.array( [[1,1,1],[1,-8,1],[1,1,1]])
+    else:
+        #TODO: test that this actually works as intended
+        a = 1.0/aspect
+        b = 1.0/math.sqrt(1+aspect**2)
+        c = -2.0*(1+a+2*b)
+        kern = 0.25*np.array( [[b,a,b],[1,c,1],[b,a,b]])
     return ndi.convolve(data,kern)
 
+def gradient(data,aspect=1.0):
+    """Use a kernal to figure out the gradient map."""
+    gx = np.array( [[-1, 0, 1],[-2,0,2],[-1,0,1]])
+    gy = np.array( [[-1,-2,-1],[0,0,0],[1,2,1]])
+    return np.sqrt(ndi.convolve(data,gx)**2 + ndi.convolve(data,gy)**2)
 
 ########################################## TESTING ################################
 # These were created at the same time as the parent functions but not updated
@@ -728,7 +739,7 @@ def test_bkg_rms(data_file,temp_dir):
 def test_curvature(data_file,temp_dir):
     print "TESTING CURVATURE"
     data=load_pixels(data_file)
-    curve=curvature(data)
+    curve=curvature(data,aspect=1.0)
     save(data,'{0}/tc_data'.format(temp_dir))
     save(curve,'{0}/tc_aplace'.format(temp_dir))
     save(d2x(data),'{0}/tc_d2x'.format(temp_dir))
@@ -763,10 +774,9 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     a list of OutputSource objects
     """
     img = FitsImage(filename, hdu_index=hdu_index)
+    beam=img.beam    
     data = Island(img.get_pixels())
-    dcurve=curvature(img.get_pixels())    
-
-    beam=img.beam
+    dcurve=curvature(img.get_pixels(),aspect=beam.aspect)    
 
     bkgimg,rmsimg = make_bkg_rms_image(data.pixels,beam,mesh_size=20,forced_rms=rms)
     
@@ -945,7 +955,8 @@ def save_background_files(image_filename, hdu_index=0):
     data = img.get_pixels()
     beam=img.beam
     bkgimg,rmsimg = make_bkg_rms_image(data,beam,mesh_size=20)
-    dcurve= curvature(data)
+    dcurve= curvature(data,aspect=beam.aspect) #scaled version of the curvature 
+    #grad = gradient(data)
     
     # Generate the new FITS files by copying the existing HDU and assigning new data.
     # This gives the new files the same WCS projection and other header fields. 
@@ -958,6 +969,8 @@ def save_background_files(image_filename, hdu_index=0):
     new_hdu.writeto("aegean-rms.fits", clobber=True)
     new_hdu.data = dcurve
     new_hdu.writeto("aegean-curvature.fits",clobber=True)
+    #new_hdu.data = grad
+    #new_hdu.writeto("aegean-grad.fits",clobber=True)
     logging.info("Saved aegean-background.fits, aegean-rms.fits and aegean-curvature.fits")
     
 if __name__=="__main__":
