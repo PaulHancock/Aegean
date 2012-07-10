@@ -829,7 +829,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
                     src['flags']|=NOTFIT
             mp=DummyMP(parinfo=parinfo,perror=None)
             info=parinfo
-        if is_flag & FITERRSMALL:
+        elif is_flag & FITERRSMALL:
             logging.debug("Island is too small for a fit, not fitting anything")
             #set all the flags to be NOTFIT
             for src in parinfo:
