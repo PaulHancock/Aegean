@@ -12,7 +12,8 @@ eg
 
 '''
 
-from math import sin,cos,pi, acos,asin,atan, floor
+import math
+#from math import sin,cos,pi, acos,asin,atan, floor
 
 def sgn(x):
 	return [-1,1][x>0]
@@ -20,31 +21,31 @@ def sgn(x):
 ################## Silly helper functions for working in degrees ############
 def rad_to_dec(x):
 	"""Convert radians to degrees."""
-	return x*180/pi
+	return x*180/math.pi
 
 def dec_to_rad(x):
 	"""Convert degrees to radians."""
-	return x*pi/180
+	return x*math.pi/180
 
 def cosd(x):
 	"""Return cosine of x, when x is assumed to be in degrees."""
-	return cos(rad_to_dec(x))
+	return math.cos(rad_to_dec(x))
 
 def acosd(x):
 	"""Return arc-cosine of x in degrees."""
-	return rad_to_dec(acos(x))
+	return rad_to_dec(math.acos(x))
 	
 def sind(x):
 	"""Return sine of x, when x is assumed to be in radians."""
-	return sin(rad_to_dec(x))
+	return math.sin(rad_to_dec(x))
 	
 def asind(x):
 	"""Return arcsine of x in degrees."""
-	return rad_to_dec(asin(x))
+	return rad_to_dec(math.asin(x))
 
 def atand(x):
 	"""return arctan of x in degrees."""
-	return rad_to_dec(atan(x))
+	return rad_to_dec(math.atan(x))
 
 ############ More general conversion functions. #############################
 def ra2dec(ra):
@@ -75,8 +76,8 @@ def dec2dms(x):
 	else:
 		sign='+'
 	x=abs(x)
-	d=int(floor(x))
-	m=int(floor((x-d)*60))
+	d=int(math.floor(x))
+	m=int(math.floor((x-d)*60))
 	s=float(( (x-d)*60-m)*60)
 	return '{0}{1:02d}:{2:02d}:{3:05.2f}'.format(sign,d,m,s)
 
