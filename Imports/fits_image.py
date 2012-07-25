@@ -126,6 +126,10 @@ class FitsImage():
         skybox = self.wcs.wcs_pix2sky(pixbox, 1)
         return [float(skybox[0][0]), float(skybox[0][1])]
 
+    def get_hdu_header(self):
+        return self.hdu.header
+            
+        
     def sky2pix(self, skypos):
         '''Get the pixel coordinates [x,y] (floats) given skypos [ra,dec] (degrees)'''
         skybox = [skypos, skypos]

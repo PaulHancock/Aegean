@@ -25,6 +25,10 @@ from optparse import OptionParser
 from Imports.fits_image import FitsImage
 from Imports.mpfit import mpfit
 from Imports.convert import ra2dec, dec2dec, dec2hms, dec2dms
+import Imports.flags as flags
+import Imports.pprocess as pprocess
+import pywcs
+import multiprocessing
 
 from scipy import ndimage as ndi
 from scipy import stats
@@ -58,19 +62,20 @@ header="""#Aegean version {0}
 #         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   NCPES
 #=========================================================================================================================================================================================="""
 
-# Set some bitwise logic for flood routines
-PEAKED = 1    # 001
-QUEUED = 2    # 010
-VISITED = 4   # 100
-
-# Err Flags for fitting routines
-FITERRSMALL   = 1 #00001
-FITERR        = 2 #00010
-FIXED2PSF     = 4 #00100
-FIXEDCIRCULAR = 8 #01000
-NOTFIT        =16 #10000
-
-####################################### CLASSES ##########################################
+#Note this is now done in Imports.flags but repeated here for reference
+## Set some bitwise logic for flood routines
+#PEAKED = 1    # 001
+#QUEUED = 2    # 010
+#VISITED = 4   # 100
+#
+## Err Flags for fitting routines
+#FITERRSMALL   = 1 #00001
+#FITERR        = 2 #00010
+#FIXED2PSF     = 4 #00100
+#FIXEDCIRCULAR = 8 #01000
+#NOTFIT        =16 #10000
+####################################### CLASSES ################################
+##########
 
 class Island():
     """
@@ -81,7 +86,8 @@ class Island():
     Island(pixels,pixlist)
     pixels = an np.array of pixels that make up this island
     pixlist = a list of [(x,y,flux),... ] pixel values that make up this island
-              This allows for non rectangular islands to be used. Pixels not listed
+              This allows for non rectangular islands to be used. Pixels not lis
+ted
               are set to np.NaN and are ignored by Aegean.
     """
     def __init__(self,pixels=None,pixlist=None):
@@ -198,6 +204,37 @@ class OutputSource():
                 self.a,self.err_a,self.b,self.err_b,
                 self.pa,self.err_pa,self.flags]
     
+class GlobalFittingData:
+    '''
+    The global data used for fitting. Read-only once created. Used by island fitting subprocesses.
+    '''
+    dcurve = None
+    rmsimg = None
+    bkgimg = None
+    hdu_header = None
+    beam = None
+    
+class IslandFittingData:
+    '''
+    All the data required to fit a single island.
+    Instances are pickled and passed to the fitting subprocesses
+    
+    isle_num = island number (int)
+    i = the pixel island (a 2D numpy array of pixel values)
+    scalars=(innerclip,outerclip,csigma,max_summits,cc2arcsec,pix2arcsec)
+    offsets=(xmin,xmax,ymin,ymax)
+    '''
+    isle_num = 0
+    i = None
+    scalars = []
+    offsets = []
+
+    def __init__(self, isle_num, i, scalars, offsets):
+        self.isle_num = isle_num
+        self.i = i
+        self.scalars = scalars
+        self.offsets = offsets
+        
 class DummyMP():
     """
     A dummy copy of the mpfit class that just holds the parinfo variables
@@ -279,27 +316,27 @@ def explore(data, rmsimg, status, queue, bounds, cutoffratio, pixel):
 
     if x > 0:
         new = (x - 1, y)
-        if not status[new] & QUEUED and data[new]/rmsimg[new] >= cutoffratio:
+        if not status[new] & flags.QUEUED and data[new]/rmsimg[new] >= cutoffratio:
             queue.append(new)
-            status[new] |= QUEUED
+            status[new] |= flags.QUEUED
 
     if x < bounds[0]:
         new = (x + 1, y)
-        if not status[new] & QUEUED and data[new]/rmsimg[new] >= cutoffratio:
+        if not status[new] & flags.QUEUED and data[new]/rmsimg[new] >= cutoffratio:
             queue.append(new)
-            status[new] |= QUEUED
+            status[new] |= flags.QUEUED
 
     if y > 0:
         new = (x, y - 1)
-        if not status[new] & QUEUED and data[new]/rmsimg[new] >= cutoffratio:
+        if not status[new] & flags.QUEUED and data[new]/rmsimg[new] >= cutoffratio:
             queue.append(new)
-            status[new] |= QUEUED
+            status[new] |= flags.QUEUED
 
     if y < bounds[1]:
         new = (x, y + 1)
-        if not status[new] & QUEUED and data[new]/rmsimg[new] >= cutoffratio:
+        if not status[new] & flags.QUEUED and data[new]/rmsimg[new] >= cutoffratio:
             queue.append(new)
-            status[new] |= QUEUED
+            status[new] |= flags.QUEUED
 
 def flood(data, rmsimg, status, bounds, peak, cutoffratio):
     """
@@ -310,18 +347,18 @@ def flood(data, rmsimg, status, bounds, peak, cutoffratio):
 
     This version requires an rms image - PJH
     """
-    if status[peak] & VISITED:
+    if status[peak] & flags.VISITED:
         return []
 
     blob = []
     queue = [peak]
-    status[peak] |= QUEUED
+    status[peak] |= flags.QUEUED
 
     for pixel in queue:
-        if status[pixel] & VISITED:
+        if status[pixel] & flags.VISITED:
             continue
     
-        status[pixel] |= VISITED
+        status[pixel] |= flags.VISITED
 
         blob.append(pixel)
         explore(data, rmsimg, status, queue, bounds, cutoffratio, pixel)
@@ -346,7 +383,7 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=True):
     # Selecting PEAKED pixels
     logging.debug("InnerClip: {0}".format(innerclip))
 
-    status += np.where(data.pixels/rmsimg>innerclip,PEAKED,0)
+    status += np.where(data.pixels/rmsimg>innerclip,flags.PEAKED,0)
     #logging.debug("status: {0}".format(status[1:5,1:5]))
     logging.debug("Peaked pixels: {0}/{1}".format(np.sum(status),len(data.pixels.ravel())))
     # making pixel list
@@ -416,15 +453,15 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
     non_nan_pix=len(data[np.where(data==data)].ravel())
     if 4<= non_nan_pix and non_nan_pix <= 6:
         logging.debug("FIXED2PSF")
-        is_flag=FIXED2PSF
+        is_flag=flags.FIXED2PSF
     elif non_nan_pix < 4: 
         logging.debug("FITERRSMALL!")
-        is_flag=FITERRSMALL
+        is_flag=flags.FITERRSMALL
     else:
         is_flag=0
     logging.debug(" - size {0}".format(len(data.ravel())))
 
-    if min(data.shape)<=2 or (is_flag & FITERRSMALL):
+    if min(data.shape)<=2 or (is_flag & flags.FITERRSMALL):
         #1d islands or small islands only get one source
         logging.debug("Tiny summit detected")
         logging.debug("{0}".format(data))
@@ -473,9 +510,9 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
 
         #if the min/max of either major,minor are equal then use a PSF fit
         if dy_min==dy_max or dx_min==dx_max:
-            summit_flag|=FIXED2PSF
+            summit_flag|=flags.FIXED2PSF
             
-        if summit_flag & FIXED2PSF:
+        if summit_flag & flags.FIXED2PSF:
             dx=beam.b*fwhm2cc
             dy=beam.a*fwhm2cc
             pa=beam.pa
@@ -507,19 +544,19 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
                          'limited':[True,True]} )
         #TODO - these flag==FIXED2PSF things need to be reconsidered
         parinfo.append( {'value':dx,
-                         'fixed': (flag & FIXED2PSF)>0,
+                         'fixed': (flag & flags.FIXED2PSF)>0,
                          'parname':'{0}:dx'.format(i),
                          'limits':[dx_min,dx_max],
                          'limited':[True,True],
                          'flags':flag})
         parinfo.append( {'value':dy,
-                         'fixed': (flag & FIXED2PSF)>0,
+                         'fixed': (flag & flags.FIXED2PSF)>0,
                          'parname':'{0}:dy'.format(i),
                          'limits':[dy_min,dy_max],
                          'limited':[True,True],
                          'flags':flag} )
         parinfo.append( {'value':pa,
-                         'fixed': (flag & FIXED2PSF)>0,
+                         'fixed': (flag & flags.FIXED2PSF)>0,
                          'parname':'{0}:pa'.format(i),
                          'limits':[-np.pi,np.pi],
                          'limited':[False,False],
@@ -749,9 +786,191 @@ def test_curvature(data_file,temp_dir):
     save(lmask,'{0}/tc_lmask'.format(temp_dir))
     save(dmask,'{0}/tc_dmask'.format(temp_dir))
 
-######################################### THE MAIN DRIVING FUNCTION ###############
+######################################### THE MAIN DRIVING FUNCTIONS ###############
+
+def fit_island(island_data):
+    """
+    Take an Island and do all the parameter estimation and fitting.
+      island_data - an IslandFittingData object
+    Return a list of sources that are within the island.
+    None = no sources found in the island.
+    """
+    global global_data
+
+    # global data
+    hdu_header = global_data.hdu_header
+    dcurve = global_data.dcurve
+    rmsimg = global_data.rmsimg
+    bkgimg = global_data.bkgimg
+    beam = global_data.beam
     
-def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None,innerclip=5,outerclip=4):
+    # island data
+    isle_num = island_data.isle_num
+    i = island_data.i        
+    innerclip,outerclip,csigma,max_summits,cc2arcsec,pix2arcsec=island_data.scalars
+    xmin,xmax,ymin,ymax=island_data.offsets
+
+    wcs=pywcs.WCS(hdu_header, naxis=2)
+    def pix2sky(pixel):
+        pixbox = np.array([pixel, pixel])
+        skybox = wcs.wcs_pix2sky(pixbox, 1)
+        return [float(skybox[0][0]), float(skybox[0][1])]
+
+    isle=Island(i)
+    icurve = dcurve[xmin:xmax+1,ymin:ymax+1]
+    rms=rmsimg[xmin:xmax+1,ymin:ymax+1]
+    bkg=bkgimg[xmin:xmax+1,ymin:ymax+1]
+    
+    logging.debug("=====")
+    logging.debug("Island ({0})".format(isle_num) )
+
+    parinfo= estimate_parinfo(isle.pixels,rms,icurve,beam,innerclip,csigma=csigma)
+
+    logging.debug("Rms is {0}".format(np.shape(rms)) )
+    logging.debug("Isle is {0}".format(np.shape(isle.pixels)) )
+    logging.debug(" of which {0} are masked".format(sum(np.isnan(isle.pixels).ravel()*1)))
+
+    # skip islands with too many summits (Gaussians)
+    num_summits = len(parinfo) / 6 # there are 6 params per Guassian
+    logging.debug("max_summits, num_summits={0},{1}".format(max_summits,num_summits))
+
+    # Islands may have no summits if the curvature is not steep enough.
+    if num_summits < 1:
+        logging.debug("Island {0} has no summits!".format(isle_num))
+        return []
+
+    #extract a flag for the island
+    is_flag=0
+    for src in parinfo:
+        if src['parname'].split(":")[-1] in ['dy','dx','pa']:
+            if src['flags'] & flags.FITERRSMALL:
+                is_flag=src['flags']
+                break
+    if max_summits is not None and num_summits > max_summits:
+        logging.info("Island has too many summits ({0}), not fitting anything".format(num_summits))
+        #set all the flags to be NOTFIT
+        for src in parinfo:
+            if src['parname'].split(":")[-1] in ['dy','dx','pa']:
+                src['flags']|=flags.NOTFIT
+        mp=DummyMP(parinfo=parinfo,perror=None)
+        info=parinfo
+    elif is_flag & flags.FITERRSMALL:
+        logging.debug("Island is too small for a fit, not fitting anything")
+        #set all the flags to be NOTFIT
+        for src in parinfo:
+            if src['parname'].split(":")[-1] in ['dy','dx','pa']:
+                src['flags']|=flags.NOTFIT
+        mp=DummyMP(parinfo=parinfo,perror=None)
+        info=parinfo
+
+    else:
+        mp,info=multi_gauss(isle.pixels,rms,parinfo)
+
+    params=mp.params
+    #report the source parameters
+    err=False
+    sources=[]
+    
+    for j in range(len(params)/6):
+        source = OutputSource()
+        source.island = isle_num
+        source.source = j
+
+        src_flags=0
+        if mp.perror is None:
+            mp.perror = [0 for a in mp.params]
+            err=True
+            logging.debug("FitError: {0}".format(mp.errmsg))
+
+            logging.debug("info = {0}".format(info))
+        for k in range(len(mp.perror)):
+            if mp.perror[k]==0.0:
+                mp.perror[k]=-1
+        if err:
+            src_flags|=flags.FITERR
+        #read the flag information from the 'pa'
+        src_flags|= info[j*6+5]['flags']
+
+        #np.float32 has some stupid problem with str.format so i have to cast everything to a float64
+        mp.params=[np.float64(a) for a in mp.params]
+
+        #params = [amp,x0,y0,dx,dy,pa]{n}
+        #pixel pos within island + 
+        # island offset within region +
+        # region offset within image +
+        # 1 for luck
+        # (pyfits->miriad conversion = luck)
+        dec_pix=mp.params[j*6+1] + xmin + 1
+        ra_pix =mp.params[j*6+2] + ymin + 1
+        coords = pix2sky([ra_pix, dec_pix])
+        source.ra = coords[0]
+        source.dec = coords[1]
+        source.ra_str= dec2hms(source.ra)
+        source.dec_str= dec2dms(source.dec)
+
+        #calculate ra,dec errors from the pixel error
+        if mp.perror[j*6+1]<0:
+            source.err_ra =-1
+            source.err_dec=-1
+        else:
+            #really big errors cause problems
+            #limit the errors to be the width of the island
+            dec_err_pix=dec_pix + within(mp.perror[j*6+1],-1,isle.pixels.shape[1])
+            ra_err_pix =ra_pix + within(mp.perror[j*6+2],-1,isle.pixels.shape[0])
+            err_coords = pix2sky([ra_err_pix, dec_err_pix])
+            source.err_ra = abs(source.ra - err_coords[0])
+            source.err_dec = abs(source.dec - err_coords[1])
+
+        # flux values
+        #the background is taken from background map
+        # Clamp the pixel location to the edge of the background map (see Trac #51)
+        ## This seems to be the reverse of the x/y ra/dec_pix definition from above.
+        x = max(min(int(round(ra_pix-ymin)), bkg.shape[1]-1),0)
+        y = max(min(int(round(dec_pix-xmin)), bkg.shape[0]-1),0)
+        source.background=bkg[y,x]
+        source.local_rms=rms[y,x]
+        source.peak_flux = mp.params[j*6]
+        source.err_peak_flux = mp.perror[j*6]
+
+        # major/minor axis and position angle
+        source.a = mp.params[j*6+3]*cc2arcsec
+        source.err_a = mp.perror[j*6+3]
+        if source.err_a>0:
+            source.err_a*=cc2arcsec
+        source.b = mp.params[j*6+4]*cc2arcsec
+        source.err_b = mp.perror[j*6+4]
+        if source.err_b>0:
+            source.err_b*=cc2arcsec
+        source.pa = mp.params[j*6+5]*180/np.pi
+        source.err_pa = mp.perror[j*6+5]
+        if source.err_pa>0:
+            source.err_pa*=180/np.pi
+        source.flags = src_flags
+
+        #integrated flux is calculated not fit or measured
+        source.int_flux=source.peak_flux*source.a*source.b/(beam.a*beam.b*pix2arcsec**2)
+        source.err_int_flux=source.int_flux*math.sqrt( (source.err_peak_flux/source.peak_flux)**2
+                                                     +(source.err_a/source.a)**2
+                                                     +(source.err_b/source.b)**2)
+        sources.append(source)
+        logging.debug(source.formatter.format(source)[:-1])
+    return sources
+
+def fit_islands(islands):
+    '''
+    Execute fitting on a list of islands.
+      islands - a list of IslandFittingData objects
+    Returns a list of OutputSources
+    '''
+    logging.debug("Fitting group of {0} islands".format(len(islands)))
+    sources = []
+    for island in islands:
+        res = fit_island(island)
+        sources.extend(res)
+    return sources
+    
+def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None,
+                          innerclip=5, outerclip=4, cores=None):
     """
     Run the Aegean source finder.
     Inputs:
@@ -770,10 +989,17 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
                    Default = 5
     outerclip   - the flood clip in sigmas, used for flooding islands
                    Default = 4
+    cores       - number of CPU cores to use. None means all cores.
     Return:
     a list of OutputSource objects
     """
+    if cores is not None:
+        assert(cores >= 1)
+        
+    global global_data
+    
     img = FitsImage(filename, hdu_index=hdu_index)
+    hdu_header = img.get_hdu_header()
     beam=img.beam    
     data = Island(img.get_pixels())
     dcurve=curvature(img.get_pixels(),aspect=beam.aspect)    
@@ -782,6 +1008,14 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     
     if csigma is None:
         cbkg, csigma = estimate_background(dcurve)
+
+    # Save global data for use by fitting subprocesses    
+    global_data = GlobalFittingData()
+    global_data.beam = beam
+    global_data.bkgimg = bkgimg
+    global_data.rmsimg = rmsimg
+    global_data.dcurve = dcurve
+    global_data.hdu_header = hdu_header
     
     #TODO: don't assume square pixels. This will definately mean the source
     # parameters are a bit wrong for images where degrees-per-pixel is not equal in X and Y
@@ -793,156 +1027,58 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     cc2fwhm = (2*math.sqrt(2*math.log(2)))
     cc2arcsec=cc2fwhm*pix2arcsec
     
-    num_isle=0
+    isle_num=0
 
+    if cores == 1: #single-threaded, no parallel processing
+        queue = []
+    else:
+        if cores is None:
+            cores=multiprocessing.cpu_count()
+            logging.info("Found {0} cores".format(cores))
+        else:
+            logging.info("Using {0} subprocesses".format(cores))
+        queue = pprocess.Queue(limit=cores,reuse=1)
+        fit_parallel = queue.manage(pprocess.MakeReusable(fit_islands))
+    
     sources = []
+
     if outfile:
         print >>outfile,header.format(version,filename)
+    island_group = []
+    group_size = 20
     for i,xmin,xmax,ymin,ymax in gen_flood_wrap(data,rmsimg,innerclip,outerclip,expand=False):
         if len(i)<=1:
             #empty islands have length 1
             continue 
-        logging.debug("=====")
-        logging.debug("Island ({0})".format(num_isle) )
-        num_isle+=1
-        isle=Island(i)
-        icurve = dcurve[xmin:xmax+1,ymin:ymax+1]
-        rms=rmsimg[xmin:xmax+1,ymin:ymax+1]
-        bkg=bkgimg[xmin:xmax+1,ymin:ymax+1]
-        parinfo= estimate_parinfo(isle.pixels,rms,icurve,beam,innerclip,csigma=csigma)
-
-        logging.debug("Rms is {0}".format(np.shape(rms)) )
-        logging.debug("Isle is {0}".format(np.shape(isle.pixels)) )
-        logging.debug(" of which {0} are masked".format(sum(np.isnan(isle.pixels).ravel()*1)))
-        
-        # skip islands with too many summits (Gaussians)
-        num_summits = len(parinfo) / 6 # there are 6 params per Guassian
-        logging.debug("max_summits, num_summits={0},{1}".format(max_summits,num_summits))
-
-        # Islands may have no summits if the curvature is not steep enough.
-        if num_summits < 1:
-            logging.debug("Island has no summits, ignoring")
-            continue
-                
-        #extract a flag for the island
-        is_flag=0
-        for src in parinfo:
-            if src['parname'].split(":")[-1] in ['dy','dx','pa']:
-                if src['flags']& FITERRSMALL:
-                    is_flag=src['flags']
-                    break
-        if max_summits is not None and num_summits > max_summits:
-            logging.info("Island has too many summits ({0}), not fitting anything".format(num_summits))
-            #set all the flags to be NOTFIT
-            for src in parinfo:
-                if src['parname'].split(":")[-1] in ['dy','dx','pa']:
-                    src['flags']|=NOTFIT
-            mp=DummyMP(parinfo=parinfo,perror=None)
-            info=parinfo
-        elif is_flag & FITERRSMALL:
-            logging.debug("Island is too small for a fit, not fitting anything")
-            #set all the flags to be NOTFIT
-            for src in parinfo:
-                if src['parname'].split(":")[-1] in ['dy','dx','pa']:
-                    src['flags']|=NOTFIT
-            mp=DummyMP(parinfo=parinfo,perror=None)
-            info=parinfo
-            
+        isle_num+=1
+        scalars=(innerclip,outerclip,csigma,max_summits,cc2arcsec,pix2arcsec)
+        offsets=(xmin,xmax,ymin,ymax)
+        island_data = IslandFittingData(isle_num, i, scalars, offsets)
+        # If cores==1 run fitting in main process. Otherwise build up groups of islands
+        # and submit to queue for subprocesses. Passing a group of islands is more
+        # efficient than passing single islands to the subprocesses.
+        if cores == 1:
+            res = fit_island(island_data)
+            queue.append(res)
         else:
-            mp,info=multi_gauss(isle.pixels,rms,parinfo)
-            
-        params=mp.params
-        #report the source parameters
-        err=False
-        for j in range(len(params)/6):
-            source = OutputSource()
-            source.island = num_isle
-            source.source = j
-            
-            flags=0
-            if mp.perror is None:
-                mp.perror = [0 for a in mp.params]
-                err=True
-                logging.debug("FitError: {0}".format(mp.errmsg))
-                
-                logging.debug("info = {0}".format(info))
-            for k in range(len(mp.perror)):
-                if mp.perror[k]==0.0:
-                    mp.perror[k]=-1
-            if err:
-                flags|=FITERR
-            #read the flag information from the 'pa'
-            flags|= info[j*6+5]['flags']
-            
-            #np.float32 has some stupid problem with str.format so i have to cast everything to a float64
-            mp.params=[np.float64(a) for a in mp.params]
-            
-            #params = [amp,x0,y0,dx,dy,pa]{n}
-            #pixel pos within island + 
-            # island offset within region +
-            # region offset within image +
-            # 1 for luck
-            # (pyfits->miriad conversion = luck)
-            dec_pix=mp.params[j*6+1] + xmin + 1
-            ra_pix =mp.params[j*6+2] + ymin + 1
-            coords = img.pix2sky([ra_pix, dec_pix])
-            source.ra = coords[0]
-            source.dec = coords[1]
-            source.ra_str= dec2hms(source.ra)
-            source.dec_str= dec2dms(source.dec)
-            
-            #calculate ra,dec errors from the pixel error
-            if mp.perror[j*6+1]<0:
-                source.err_ra =-1
-                source.err_dec=-1
-            else:
-                #really big errors cause problems
-                #limit the errors to be the width of the island
-                dec_err_pix=dec_pix + within(mp.perror[j*6+1],-1,i.shape[1])
-                ra_err_pix =ra_pix + within(mp.perror[j*6+2],-1,i.shape[0])
-                err_coords = img.pix2sky([ra_err_pix, dec_err_pix])
-                source.err_ra = abs(source.ra - err_coords[0])
-                source.err_dec = abs(source.dec - err_coords[1])
+            island_group.append(island_data)
+            # If the island group is full queue it for the subprocesses to fit
+            if len(island_group) >= group_size:
+                fit_parallel(island_group)
+                island_group = []
+    
+    # The last partially-filled island group also needs to be queued for fitting
+    if len(island_group) > 0:
+        fit_parallel(island_group) 
+        
+    for src in queue:
+        if src:# ignore src==None
+            sources.extend(src)
+    if outfile:
+        for source in sorted(sources, key=lambda x: "({0.island:04d},{0.source:02d})".format(x)):
+            outfile.write(source.formatter.format(source)[:-1])
+            outfile.write("\n")
 
-            # flux values
-            #the background is taken from background map
-            # Clamp the pixel location to the edge of the background map (see Trac #51)
-            x = max(min(int(round(ra_pix)), bkgimg.shape[1]-1),0)
-            y = max(min(int(round(dec_pix)), bkgimg.shape[0]-1),0)
-            source.background=bkgimg[y,x]
-            source.local_rms=rmsimg[y,x]
-            source.peak_flux = mp.params[j*6]
-            source.err_peak_flux = mp.perror[j*6]
-            
-            # major/minor axis and position angle
-            source.a = mp.params[j*6+3]*cc2arcsec
-            source.err_a = mp.perror[j*6+3]
-            if source.err_a>0:
-                source.err_a*=cc2arcsec
-            source.b = mp.params[j*6+4]*cc2arcsec
-            source.err_b = mp.perror[j*6+4]
-            if source.err_b>0:
-                source.err_b*=cc2arcsec
-            source.pa = mp.params[j*6+5]*180/np.pi
-            source.err_pa = mp.perror[j*6+5]
-            if source.err_pa>0:
-                source.err_pa*=180/np.pi
-            source.flags = flags
-
-            #integrated flux is calculated not fit or measured
-            source.int_flux=source.peak_flux*source.a*source.b/(beam.a*beam.b*pix2arcsec**2)
-            source.err_int_flux=source.int_flux*math.sqrt( (source.err_peak_flux/source.peak_flux)**2
-                                                         +(source.err_a/source.a)**2
-                                                         +(source.err_b/source.b)**2)
-            
-            
-            sources.append(source)
-            
-            if outfile:
-                outfile.write(source.formatter.format(source)[:-1])
-                outfile.write("\n")
-
-            logging.debug(source.formatter.format(source)[:-1])
     return sources
     
 def save_background_files(image_filename, hdu_index=0):
@@ -976,6 +1112,8 @@ def save_background_files(image_filename, hdu_index=0):
 if __name__=="__main__":
     usage="usage: %prog [options] FileName.fits"
     parser = OptionParser(usage=usage)
+    parser.add_option("--cores", dest="cores", type="int",
+                      help="Number of CPU cores to use for processing [default: all cores]")
     parser.add_option("--debug", dest="debug", action="store_true",
                       help="Enable debug log output")
     parser.add_option("--hdu", dest="hdu_index", type="int",
@@ -1001,7 +1139,7 @@ if __name__=="__main__":
 
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
-    logging.basicConfig(level=logging_level)
+    logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is Aegean {0}".format(version))
     if options.file_version:
         logging.info("Using aegean.py {0}".format(version))
@@ -1028,7 +1166,9 @@ if __name__=="__main__":
     if options.outfile is not sys.stdout:
         options.outfile=open(os.path.expanduser(options.outfile),'w')
     
-    sources = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,rms=options.rms,max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,outerclip=options.outerclip)
+    sources = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,rms=options.rms,
+                                    max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,
+                                    outerclip=options.outerclip, cores=options.cores)
     if len(sources) == 0:
         logging.info("No sources found in image")
 
