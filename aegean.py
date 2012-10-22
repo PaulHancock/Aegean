@@ -87,7 +87,7 @@ class Island():
     pixels = an np.array of pixels that make up this island
     pixlist = a list of [(x,y,flux),... ] pixel values that make up this island
               This allows for non rectangular islands to be used. Pixels not lis
-ted
+              ted
               are set to np.NaN and are ignored by Aegean.
     """
     def __init__(self,pixels=None,pixlist=None):
@@ -413,7 +413,6 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=True):
                 yield new_isle,xmin,xmax,ymin,ymax
     
 
-   
 ##parameter estimates
 def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
     """Estimates the number of sources in an island and returns initial parameters for the fit as well as
@@ -499,23 +498,22 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
         #dx,dy are actually minor/major axes.
         #for a pa~0 dx lies along the x-axis and dy along the y-axis
         #initial shape is based on the size of the summit
-        dx=max(beam.b,(xmax-xmin+1)*math.sqrt(2))*fwhm2cc
+        dy=max(beam.b,(xmax-xmin+1)*math.sqrt(2))*fwhm2cc
         #allow +1pix maximum size
-        dx_min,dx_max = beam.b*fwhm2cc,max(dx,(xmax-xmin+1+1)*math.sqrt(2)*fwhm2cc) 
-        dx_min=min(dx_min,dx_max) 
+        dy_min,dy_max = beam.b*fwhm2cc,max(dy,(xmax-xmin+1+1)*math.sqrt(2)*fwhm2cc) 
+        dy_min=min(dy_min,dy_max) 
         
-        dy=max(beam.a,(ymax-ymin+1)*math.sqrt(2))*fwhm2cc
-        dy_min,dy_max = beam.a*fwhm2cc,max(dy,(ymax-ymin+1+1)*math.sqrt(2)*fwhm2cc)
-        dy_min=min(dy_min,dy_max)
+        dx=max(beam.a,(ymax-ymin+1)*math.sqrt(2))*fwhm2cc
+        dx_min,dx_max = beam.a*fwhm2cc,max(dx,(ymax-ymin+1+1)*math.sqrt(2)*fwhm2cc)
+        dx_min=min(dx_min,dx_max)
 
         #if the min/max of either major,minor are equal then use a PSF fit
         if dy_min==dy_max or dx_min==dx_max:
             summit_flag|=flags.FIXED2PSF
             
         if summit_flag & flags.FIXED2PSF:
-            dx=beam.b*fwhm2cc
-            dy=beam.a*fwhm2cc
-            pa=beam.pa
+            dy=beam.b*fwhm2cc
+            dx=beam.a*fwhm2cc
         
         pa=beam.pa
         flag=summit_flag
