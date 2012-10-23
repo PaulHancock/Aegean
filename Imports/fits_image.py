@@ -9,7 +9,7 @@ import numpy
 import pywcs
 import scipy.stats
 import logging
-from math import pi
+from math import pi,cos,sin,sqrt
 
 class FitsImage():
     version='$Revision$'
@@ -49,19 +49,22 @@ class FitsImage():
             bpa=0
         else:
             bpa=self.hdu.header["BPA"]*pi/180
-        #if the major/minor axes are not specified, set them to 3 pixels
         if "BMAJ" not in self.hdu.header:
             logging.info("BMAJ not present in fits header, using 3 pixels")
             bmaj=3
         else:
-            bmaj = abs(self.hdu.header["BMAJ"]/self.deg_per_pixel_y)
+            bmaj = sqrt((self.hdu.header["BMAJ"]*sin(bpa)/self.deg_per_pixel_x)**2 +
+                   (self.hdu.header["BMAJ"]*cos(bpa)/self.deg_per_pixel_y)**2)
+            #bmaj = abs(self.hdu.header["BMAJ"]/self.deg_per_pixel_y)
         if "BMIN" not in self.hdu.header:
             logging.info("BMIN not present in fits header, using 3 pixels")
             bmin=3
         else:
-            bmin=abs(self.hdu.header["BMIN"]/self.deg_per_pixel_x)
+            bmin = sqrt((self.hdu.header["BMIN"]*cos(bpa)/self.deg_per_pixel_x)**2 +
+                   (self.hdu.header["BMIN"]*sin(bpa)/self.deg_per_pixel_y)**2)
+            #bmin=abs(self.hdu.header["BMIN"]/self.deg_per_pixel_x)
+            
         # TODO: handle non-square pixels and elliptical beam
-        ## for now: elliptical beams are replacedwith a circular beam the size of the minor axis.
         self.beam=Beam(bmaj, bmin, bpa)
         self.pixels_per_beam=min(self.beam.a, self.beam.b)
         self._pixels = None
@@ -138,7 +141,11 @@ class FitsImage():
 
 
 class Beam():
-    """Small class to hold the properties of the primary beam"""
+    """
+    Small class to hold the properties of the primary beam
+    major/minor axies should be in pixels
+    pa should be in radians
+    """
     def __init__(self,a,b,pa):
         self.a=abs(a)
         self.b=abs(b)
