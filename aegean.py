@@ -153,7 +153,6 @@ class Island():
     def get_pixels(self):
         return self.pixels
 
-
 class OutputSource():
     """
     Each source that is fit by Aegean is cast to this type.
@@ -234,7 +233,7 @@ class IslandFittingData:
         self.i = i
         self.scalars = scalars
         self.offsets = offsets
-        
+
 class DummyMP():
     """
     A dummy copy of the mpfit class that just holds the parinfo variables
@@ -412,7 +411,6 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=True):
             if new_isle is not None:
                 yield new_isle,xmin,xmax,ymin,ymax
     
-
 ##parameter estimates
 def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
     """Estimates the number of sources in an island and returns initial parameters for the fit as well as
@@ -492,28 +490,28 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
         if xo_min==xo_max: #if we have a 1d summit then allow the position to vary by +/-0.5pix
             xo_min,xo_max=xo_min-0.5,xo_max+0.5
 
-        #TODO: The limits on dx,dy work well for circular beams or unresolved sources
+        #TODO: The limits on major,minor work well for circular beams or unresolved sources
         #for elliptical beams *and* resolved sources this isn't good and should be redone
-
-        #dx,dy are actually minor/major axes.
-        #for a pa~0 dx lies along the x-axis and dy along the y-axis
-        #initial shape is based on the size of the summit
-        dy=max(beam.b,(xmax-xmin+1)*math.sqrt(2))*fwhm2cc
-        #allow +1pix maximum size
-        dy_min,dy_max = beam.b*fwhm2cc,max(dy,(xmax-xmin+1+1)*math.sqrt(2)*fwhm2cc) 
-        dy_min=min(dy_min,dy_max) 
         
-        dx=max(beam.a,(ymax-ymin+1)*math.sqrt(2))*fwhm2cc
-        dx_min,dx_max = beam.a*fwhm2cc,max(dx,(ymax-ymin+1+1)*math.sqrt(2)*fwhm2cc)
-        dx_min=min(dx_min,dx_max)
+        xsize=xmax-xmin+1
+        ysize=ymax-ymin+1
+        #initial shape is based on the size of the summit        
+        major=max(beam.a, ysize*math.sqrt(2) )*fwhm2cc
+        major_min,major_max = beam.a*fwhm2cc,max(major,(ysize+1)*math.sqrt(2)*fwhm2cc)
+        major_min=min(major_min,major_max)
+        
+        minor=max(beam.b,xsize)*math.sqrt(2)*fwhm2cc
+        minor_min,minor_max = beam.b*fwhm2cc,max(minor, (xsize+1)*math.sqrt(2)*fwhm2cc) 
+        minor_min=min(minor_min,minor_max) 
 
+        #TODO: update this to fit a psf for things that are "close" to a psf.
         #if the min/max of either major,minor are equal then use a PSF fit
-        if dy_min==dy_max or dx_min==dx_max:
+        if minor_min==minor_max or major_min==major_max:
             summit_flag|=flags.FIXED2PSF
             
         if summit_flag & flags.FIXED2PSF:
-            dy=beam.b*fwhm2cc
-            dx=beam.a*fwhm2cc
+            minor=beam.b*fwhm2cc
+            major=beam.a*fwhm2cc
         
         pa=beam.pa
         flag=summit_flag
@@ -521,8 +519,8 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
         logging.debug(" - amp {0} {1} {2} ".format(amp,amp_min,amp_max))
         logging.debug(" - xo {0} {1} {2} ".format(xo,xo_min,xo_max))
         logging.debug(" - yo {0} {1} {2} ".format(yo,yo_min,yo_max))
-        logging.debug(" - dx {0} {1} {2} | {3} {4}".format(dx,dx_min,dx_max,dx_min/fwhm2cc,dx_max/fwhm2cc))
-        logging.debug(" - dy {0} {1} {2} | {3} {4}".format(dy,dy_min,dy_max,dy_min/fwhm2cc,dy_max/fwhm2cc))
+        logging.debug(" - major {0} {1} {2} | {3} {4}".format(major,major_min,major_max,major_min/fwhm2cc,major_max/fwhm2cc))
+        logging.debug(" - minor {0} {1} {2} | {3} {4}".format(minor,minor_min,minor_max,minor_min/fwhm2cc,minor_max/fwhm2cc))
         logging.debug(" - pa {0} {1} {2}".format(pa,-np.pi,np.pi))
         logging.debug(" - flags {0}".format(flag))
         parinfo.append( {'value':amp,
@@ -540,17 +538,16 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
                          'parname':'{0}:yo'.format(i),
                          'limits':[yo_min,yo_max],
                          'limited':[True,True]} )
-        #TODO - these flag==FIXED2PSF things need to be reconsidered
-        parinfo.append( {'value':dx,
+        parinfo.append( {'value':major,
                          'fixed': (flag & flags.FIXED2PSF)>0,
-                         'parname':'{0}:dx'.format(i),
-                         'limits':[dx_min,dx_max],
+                         'parname':'{0}:major'.format(i),
+                         'limits':[major_min,major_max],
                          'limited':[True,True],
                          'flags':flag})
-        parinfo.append( {'value':dy,
+        parinfo.append( {'value':minor,
                          'fixed': (flag & flags.FIXED2PSF)>0,
-                         'parname':'{0}:dy'.format(i),
-                         'limits':[dy_min,dy_max],
+                         'parname':'{0}:minor'.format(i),
+                         'limits':[minor_min,minor_max],
                          'limited':[True,True],
                          'flags':flag} )
         parinfo.append( {'value':pa,
@@ -566,7 +563,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
 def ntwodgaussian(inpars):
     """
     Return an array of values represented by multiple Gaussians as parameterized
-    by params = [amp,x0,y0,dx,dy,pa]{n}
+    by params = [amp,x0,y0,major,minor,pa]{n}
     
     A rewrite of gausfitter.twodgaussian to be faster or at least scale better.
     """
@@ -577,16 +574,16 @@ def ntwodgaussian(inpars):
     amp=[a[0] for a in pars]
     xo=[ a[1] for a in pars]
     yo=[ a[2] for a in pars]
-    dx=[ a[3] for a in pars]
-    dy=[ a[4] for a in pars]
+    major=[ a[3] for a in pars]
+    minor=[ a[4] for a in pars]
     #add pi/2 so that we are now East of North instead of South of East
     pa=[ a[5]+np.pi/2 for a in pars] 
     st=[ math.sin(p)**2 for p in pa]
     ct=[ math.cos(p)**2 for p in pa]
     s2t=[math.sin(2*p) for p in pa]
-    a = [ (ct[i]/dx[i]**2 + st[i]/dy[i]**2)/2 for i in range(len(amp))]
-    bb= [ s2t[i]/4 *(1/dy[i]**2-1/dx[i]**2) for i in range(len(amp))]
-    c = [ (st[i]/dx[i]**2 + ct[i]/dy[i]**2)/2 for i in range(len(amp))]
+    a = [ (ct[i]/major[i]**2 + st[i]/minor[i]**2)/2 for i in range(len(amp))]
+    bb= [ s2t[i]/4 *(1/minor[i]**2-1/major[i]**2) for i in range(len(amp))]
+    c = [ (st[i]/major[i]**2 + ct[i]/minor[i]**2)/2 for i in range(len(amp))]
 
     def rfunc(x,y):
         ans=0
@@ -619,30 +616,8 @@ def multi_gauss(data,rmsimg,parinfo):
     
     mp=mpfit(erfunc,parinfo=parinfo,quiet=True)
 
-    #fix the major/minor axes so that maj>=min and correct the pa if needed
-    for i in range(len(mp.params) /6):
-        #fix the position angle so that it is East of North instead of South of East
-        mp.params[i*6+5]+=np.pi/2        
-        if mp.params[i*6+3]<mp.params[i*6+4]: # a<b
-            #swap the major an minor axes (and the errors)
-            bla=mp.params[i*6+4] 
-            mp.params[i*6+4]=mp.params[i*6+3]
-            mp.params[i*6+3]=bla
-            if not(mp.perror is None):
-                bla=mp.perror[i*6+4]
-                mp.perror[i*6+4]=mp.perror[i*6+3]
-                mp.perror[i*6+3]=bla
-            #change the position angle
-            mp.params[i*6+5]=mp.params[i*6+5]-np.pi/2
-        #limit the range of pa from 0 to 2pi
-        mp.params[i*6+5]-= int(mp.params[i*6+5]/(2*np.pi)) * 2*np.pi
-        #now limit it to -pi to pi 
-        if mp.params[i*6+5]>np.pi:
-            mp.params[i*6+5]-=np.pi    
-    
     return mp,parinfo
     
-
 def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     """
     Calculate an rms image and a bkg image
@@ -756,6 +731,31 @@ def gradient(data,aspect=1.0):
     gy = np.array( [[-1,-2,-1],[0,0,0],[1,2,1]])
     return np.sqrt(ndi.convolve(data,gx)**2 + ndi.convolve(data,gy)**2)
 
+def fix_shape(mp):
+    """
+    Ensure that a>=b and -pi<pa<=pi
+    """
+    #params = [amp,xo,yo,major,minor,pa [, ... ]]
+    for i in range(len(mp.params) /6):
+        #fix the position angle so that it is East of North instead of South of East
+        #mp.params[i*6+5]+=np.pi/2
+        if mp.params[i*6+3]<mp.params[i*6+4]: # a<b
+            #swap the major an minor axes (and the errors)
+            bla=mp.params[i*6+4] 
+            mp.params[i*6+4]=mp.params[i*6+3]
+            mp.params[i*6+3]=bla
+            if not(mp.perror is None):
+                bla=mp.perror[i*6+4]
+                mp.perror[i*6+4]=mp.perror[i*6+3]
+                mp.perror[i*6+3]=bla
+            #change the position angle
+            mp.params[i*6+5]=mp.params[i*6+5]-np.pi/2
+        #limit the range of pa from 0 to 2pi
+        mp.params[i*6+5]-= int(mp.params[i*6+5]/(2*np.pi)) * 2*np.pi
+        #now limit it to -pi to pi 
+        if mp.params[i*6+5]>np.pi:
+            mp.params[i*6+5]-=np.pi 
+    return mp
 ########################################## TESTING ################################
 # These were created at the same time as the parent functions but not updated
 # they may therefore not work
@@ -840,7 +840,7 @@ def fit_island(island_data):
     #extract a flag for the island
     is_flag=0
     for src in parinfo:
-        if src['parname'].split(":")[-1] in ['dy','dx','pa']:
+        if src['parname'].split(":")[-1] in ['minor','major','pa']:
             if src['flags'] & flags.FITERRSMALL:
                 is_flag=src['flags']
                 break
@@ -848,7 +848,7 @@ def fit_island(island_data):
         logging.info("Island has too many summits ({0}), not fitting anything".format(num_summits))
         #set all the flags to be NOTFIT
         for src in parinfo:
-            if src['parname'].split(":")[-1] in ['dy','dx','pa']:
+            if src['parname'].split(":")[-1] in ['minor','major','pa']:
                 src['flags']|=flags.NOTFIT
         mp=DummyMP(parinfo=parinfo,perror=None)
         info=parinfo
@@ -856,14 +856,19 @@ def fit_island(island_data):
         logging.debug("Island is too small for a fit, not fitting anything")
         #set all the flags to be NOTFIT
         for src in parinfo:
-            if src['parname'].split(":")[-1] in ['dy','dx','pa']:
+            if src['parname'].split(":")[-1] in ['minor','major','pa']:
                 src['flags']|=flags.NOTFIT
         mp=DummyMP(parinfo=parinfo,perror=None)
         info=parinfo
-
     else:
         mp,info=multi_gauss(isle.pixels,rms,parinfo)
 
+    logging.debug("Source 0 pa={0}".format(mp.params[5]))
+    #fix the major/minor axis
+    logging.debug("'fixing' the major/minor/pa of all sources")
+    mp=fix_shape(mp)
+    logging.debug("Source 0 pa={0}".format(mp.params[5]))
+    
     params=mp.params
     #report the source parameters
     err=False
@@ -879,8 +884,9 @@ def fit_island(island_data):
             mp.perror = [0 for a in mp.params]
             err=True
             logging.debug("FitError: {0}".format(mp.errmsg))
-
-            logging.debug("info = {0}".format(info))
+            logging.debug("info:")
+            for i in info:
+                logging.debug("{0}".format(i))
         for k in range(len(mp.perror)):
             if mp.perror[k]==0.0:
                 mp.perror[k]=-1
@@ -892,7 +898,7 @@ def fit_island(island_data):
         #np.float32 has some stupid problem with str.format so i have to cast everything to a float64
         mp.params=[np.float64(a) for a in mp.params]
 
-        #params = [amp,x0,y0,dx,dy,pa]{n}
+        #params = [amp,x0,y0,major,minor,pa]{n}
         #pixel pos within island + 
         # island offset within region +
         # region offset within image +
@@ -930,6 +936,7 @@ def fit_island(island_data):
         source.peak_flux = mp.params[j*6]
         source.err_peak_flux = mp.perror[j*6]
 
+
         # major/minor axis and position angle
         source.a = mp.params[j*6+3]*cc2arcsec
         source.err_a = mp.perror[j*6+3]
@@ -944,12 +951,15 @@ def fit_island(island_data):
         if source.err_pa>0:
             source.err_pa*=180/np.pi
         source.flags = src_flags
-
+        
         #integrated flux is calculated not fit or measured
         source.int_flux=source.peak_flux*source.a*source.b/(beam.a*beam.b*pix2arcsec**2)
-        source.err_int_flux=source.int_flux*math.sqrt( (source.err_peak_flux/source.peak_flux)**2
-                                                     +(source.err_a/source.a)**2
-                                                     +(source.err_b/source.b)**2)
+        if -1 in [source.err_peak_flux,source.err_a,source.err_b,source.err_pa]:
+            source.err_int_flux=-1
+        else:
+            source.err_int_flux=source.int_flux*math.sqrt( (source.err_peak_flux/source.peak_flux)**2
+                                                          +(source.err_a/source.a)**2
+                                                          +(source.err_b/source.b)**2)
         sources.append(source)
         logging.debug(source.formatter.format(source)[:-1])
     return sources
@@ -1018,7 +1028,9 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     #TODO: don't assume square pixels. This will definately mean the source
     # parameters are a bit wrong for images where degrees-per-pixel is not equal in X and Y
     pix2arcsec = abs(img.deg_per_pixel_x) * 3600
-    logging.info("pix2arcsec={0} beam={1.a:5.2f}x{1.b:5.2f}, {1.pa:5.2e}".format(pix2arcsec, beam))
+    logging.info("beam={1.a:5.2f}pix by {1.b:5.2f}pix, {1.pa:5.2e}rad".format(pix2arcsec, beam))
+    logging.info("pix2arcsec={0}".format(pix2arcsec))
+    logging.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a*pix2arcsec,beam.b*pix2arcsec,beam.pa*180/np.pi))
     logging.info("csigma={0}".format(csigma))
     logging.info("seedclip={0}".format(innerclip))
     logging.info("floodclip={0}".format(outerclip))
