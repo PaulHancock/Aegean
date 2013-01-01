@@ -164,9 +164,9 @@ class OutputSource():
     background = None # local background zero point
     local_rms= None #local image rms
     ra_str = None #str
+    dec_str = None #str
     ra = None # degrees
     err_ra = None # degrees
-    dec_str = None #str
     dec = None # degrees
     err_dec = None
     peak_flux = None # Jy/beam
