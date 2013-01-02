@@ -617,7 +617,26 @@ def multi_gauss(data,rmsimg,parinfo):
     mp=mpfit(erfunc,parinfo=parinfo,quiet=True)
 
     return mp,parinfo
-    
+
+def load_bkg_rms_image(image,bkgfile,rmsfile):
+    """
+    Load an rms and bkg image from a fits file
+    Check that the dimensions of each are consistent with the main image
+    """
+    bkgimg = FitsImage(bkgfile).get_pixels()
+    rmsimg = FitsImage(rmsfile).get_pixels()
+    if bkgimg.shape !=image.get_pixels().shape:
+        logging.error("background map is not the same size as the image map")
+        logging.error("bkgimag = {0}, data = {1}".format(bkgimg.shape,image.get_pixels().shape))
+        bkgimg=None
+    if rmsimg.shape !=image.get_pixels().shape:
+        logging.error("rms map is not the same size as the image map")
+        logging.error("rmsimag = {0}, data ={1}".format(rmsimg.shame,image.get_pixels().shape))
+        rmsimg=None
+    if bkgimg is None or rmsimg is None:
+        sys.exit()
+    return bkgimg,rmsimg
+
 def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     """
     Calculate an rms image and a bkg image
@@ -978,7 +997,7 @@ def fit_islands(islands):
     return sources
     
 def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None,
-                          innerclip=5, outerclip=4, cores=None):
+                          innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None):
     """
     Run the Aegean source finder.
     Inputs:
@@ -1011,10 +1030,17 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     beam=img.beam    
     data = Island(img.get_pixels())
     dcurve=curvature(img.get_pixels(),aspect=beam.aspect)    
-
-    bkgimg,rmsimg = make_bkg_rms_image(data.pixels,beam,mesh_size=20,forced_rms=rms)
+    
+    if bkgin and rmsin:
+        logging.info("Loading background and rms data from files {0},{1}".format(bkgin,rmsin))
+        bkgimg,rmsimg = load_bkg_rms_image(img,bkgin,rmsin)
+    else:
+        logging.info("Calculating background and rms data")
+        bkgimg,rmsimg = make_bkg_rms_image(data.pixels,beam,mesh_size=20,forced_rms=rms)
+    
     
     if csigma is None:
+        logging.info("Calculating curvature data")
         cbkg, csigma = estimate_background(dcurve)
 
     # Save global data for use by fitting subprocesses    
@@ -1132,6 +1158,10 @@ if __name__=="__main__":
                       help="Destination of catalog output, default=stdout")
     parser.add_option("--rms",dest='rms',type='float',
                       help="Assume a single image noise of rms, default is to calculate a rms over regions of 20x20 beams")
+    parser.add_option("--rmsin",dest='rmsinfile',
+                      help="A .fits file that represents the image rms, usually created from --save_background.")
+    parser.add_option('--bkgin',dest='bkginfile',
+                      help="A .fits file that represents the background level, usually created from --save_background.")
     parser.add_option("--maxsummits",dest='max_summits',type='float',
                       help="If more than *maxsummits* summits are detected in an island, no fitting is done, only estimation. Default is None = always fit")
     parser.add_option("--csigma",dest='csigma',type='float',
@@ -1144,7 +1174,8 @@ if __name__=="__main__":
                       help='show the versions of each file')
     parser.add_option('--save_background', dest='save_background', action="store_true",
                       help='save the background/rms/curvature maps to aegean-background.fits, aegean-rms.fits, aegean-curvature.fits and exit')
-    parser.set_defaults(debug=False,hdu_index=0,outfile=sys.stdout,rms=None,max_summits=None,csigma=None,innerclip=5,outerclip=4,file_version=False)
+    parser.set_defaults(debug=False,hdu_index=0,outfile=sys.stdout,rms=None,rmsinfile=None,bgkinfile=None,
+                        max_summits=None,csigma=None,innerclip=5,outerclip=4,file_version=False)
     (options, args) = parser.parse_args()
 
     # configure logging
@@ -1176,9 +1207,20 @@ if __name__=="__main__":
     if options.outfile is not sys.stdout:
         options.outfile=open(os.path.expanduser(options.outfile),'w')
     
+    if options.bkginfile or options.rmsinfile:
+        if not (options.bkginfile and options.rmsinfile):
+            logging.error("rmsinfile and bkginfile are both required whereas you only supplied one")
+            sys.exit()
+        if not os.path.exists(options.bkginfile):
+            logging.error("{0} not found".format(options.bkginfile))
+            sys.exit()
+        if not os.path.exists(options.rmsinfile):
+            logging.error("{0} not found".format(options.rmsinfile))
+            sys.exit()
+    
     sources = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,rms=options.rms,
                                     max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,
-                                    outerclip=options.outerclip, cores=options.cores)
+                                    outerclip=options.outerclip, cores=options.cores, rmsin=options.rmsinfile, bkgin=options.bkginfile)
     if len(sources) == 0:
         logging.info("No sources found in image")
 
