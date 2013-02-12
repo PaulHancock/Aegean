@@ -826,8 +826,12 @@ def fit_island(island_data):
     i = island_data.i        
     innerclip,outerclip,csigma,max_summits,cc2arcsec,pix2arcsec=island_data.scalars
     xmin,xmax,ymin,ymax=island_data.offsets
-
-    wcs=pywcs.WCS(hdu_header, naxis=2)
+    #avoids some problems with miriad generated fits files - HT John Morgan
+    try:
+        wcs=pywcs.WCS(hdu_header, naxis=2)
+    except:
+        wcs=pywcs.WCS(str(hdu_header),naxis=2)
+        
     def pix2sky(pixel):
         pixbox = np.array([pixel, pixel])
         skybox = wcs.wcs_pix2sky(pixbox, 1)
@@ -863,7 +867,7 @@ def fit_island(island_data):
             if src['flags'] & flags.FITERRSMALL:
                 is_flag=src['flags']
                 break
-    if max_summits is not None and num_summits > max_summits:
+    if (max_summits is not None) and (num_summits > max_summits):
         logging.info("Island has too many summits ({0}), not fitting anything".format(num_summits))
         #set all the flags to be NOTFIT
         for src in parinfo:
