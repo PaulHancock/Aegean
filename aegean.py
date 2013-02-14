@@ -203,6 +203,23 @@ class OutputSource():
                 self.a,self.err_a,self.b,self.err_b,
                 self.pa,self.err_pa,self.flags]
     
+    def __cmp__(self,other):
+        """
+        sort order is firstly by island then by source
+        both in ascending order
+        """
+        if self.island>other.island:
+            return 1
+        elif self.island<other.island:
+            return -1
+        else:
+            if self.source>other.source:
+                return 1
+            elif self.source<other.source:
+                return -1
+            else:
+                return 0  
+    
 class GlobalFittingData:
     '''
     The global data used for fitting. Read-only once created. Used by island fitting subprocesses.
@@ -1115,7 +1132,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         if src:# ignore src==None
             sources.extend(src)
     if outfile:
-        for source in sorted(sources, key=lambda x: "({0.island:04d},{0.source:02d})".format(x)):
+        for source in sorted(sources):#, key=lambda x: "({0.island:04d},{0.source:02d})".format(x)):
             outfile.write(source.formatter.format(source)[:-1])
             outfile.write("\n")
 
