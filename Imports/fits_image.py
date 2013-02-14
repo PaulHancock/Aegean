@@ -38,7 +38,12 @@ class FitsImage():
             self.bscale=1
             
         self.filename = filename
-        self.wcs = pywcs.WCS(self.hdu.header, naxis=2)
+        #fix possible problems with miriad generated fits files % HT John Morgan.
+        try:
+            self.wcs = pywcs.WCS(self.hdu.header, naxis=2)
+        except:
+            self.wcs = pywcs.WCS(str(self.hdu.header),naxis=2)
+            
         self.x = self.hdu.header['NAXIS1']
         self.y = self.hdu.header['NAXIS2']
         self.deg_per_pixel_x = self.hdu.header["CDELT1"] # is this always right?
