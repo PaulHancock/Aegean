@@ -689,13 +689,13 @@ def load_catalog(filename,fmt='csv'):
     returns [(ra,dec),...]
     '''
     if fmt=='csv':
-        lines==[a.strip().split(',') for a in open(filename,'r').readlines() if not a.startswith('#') ]
-        catalog=[ (float(a[0]),float(a[1])) for a in lines]
-        
-    if fmt=='cat':
+        lines=[a.strip().split(',') for a in open(filename,'r').readlines() if not a.startswith('#') ]
+        catalog=[ (float(a[0]),float(a[1])) for a in lines]      
+    elif fmt=='cat':
         lines = [a.strip().split() for a in open(filename,'r').readlines() if not a.startswith('#') ]
         catalog = [ (float(a[5]),float(a[7])) for a in lines]
     else:
+        logging.error("Catalog file {0} not loaded".format(filename))
         catalog=None
         
     return catalog
@@ -1273,11 +1273,14 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
     
     #load catalog
     if catfile.split('.')[-1]=='cat':
-        logging.debug("Autodetected catalog format as Aegean default")
+        logging.debug("Using Aegean catalog file format")
         fmt='cat'
-    else:
+    elif catfile.split('.')[-1]=='csv':
         logging.debug("Using csv file format")
         fmt='csv'
+    else:
+        logging.error("Unkonwn file format")
+        sys.exit()
     radec= load_catalog(catfile,fmt=fmt)
     #measure fluxes
     sources = force_measure_flux(img,radec)
