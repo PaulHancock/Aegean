@@ -610,6 +610,31 @@ def ntwodgaussian(inpars):
         return ans
     return rfunc
 
+def twodgaussian(params, shape):
+    '''
+    Build a 2D Gaussian ellipse as parameterised by "params" for a region with "shape"
+        params - [amp, xo, yo, cx, cy, pa] where:
+                amp - amplitude
+                xo  - centre of Gaussian in X
+                yo  - centre of Gaussian in Y
+                cx  - width of Gaussian in X (sigma or c, not FWHM)
+                cy  - width of Gaussian in Y (sigma or c, not FWHM)
+                pa  - position angle of Gaussian, aka theta (radians clockwise)
+        shape - (y, x) dimensions of region
+    Returns a 2D numpy array with shape="shape" 
+    '''
+    assert(len(shape) == 2)
+    amp, xo, yo, cx, cy, pa = params
+    y, x = np.indices(shape)
+    st = math.sin(pa)**2
+    ct = math.cos(pa)**2
+    s2t = math.sin(2*pa)
+    a = (ct/cx**2 + st/cy**2)/2
+    b = s2t/4 *(1/cy**2-1/cx**2)
+    c = (st/cx**2 + ct/cy**2)/2
+    v = amp*np.exp(-1*(a*(x-xo)**2 + 2*b*(x-xo)*(y-yo) + c*(y-yo)**2))
+    return v
+
 def multi_gauss(data,rmsimg,parinfo):
     """
     Fit multiple gaussian components to data using the information provided by parinfo.
@@ -635,6 +660,7 @@ def multi_gauss(data,rmsimg,parinfo):
 
     return mp,parinfo
 
+#load and save external files
 def load_bkg_rms_image(image,bkgfile,rmsfile):
     """
     Load an rms and bkg image from a fits file
@@ -654,6 +680,27 @@ def load_bkg_rms_image(image,bkgfile,rmsfile):
         sys.exit()
     return bkgimg,rmsimg
 
+def load_catalog(filename,fmt='csv'):
+    '''
+    load a catalog and extract the source positions
+    acceptable formats are:
+    csv - ra, dec as decimal degrees in FIRST two columns
+    cat - format created by Aegean
+    returns [(ra,dec),...]
+    '''
+    if fmt=='csv':
+        lines==[a.strip().split(',') for a in open(filename,'r').readlines() if not a.startswith('#') ]
+        catalog=[ (float(a[0]),float(a[1])) for a in lines]
+        
+    if fmt=='cat':
+        lines = [a.strip().split() for a in open(filename,'r').readlines() if not a.startswith('#') ]
+        catalog = [ (float(a[5]),float(a[7])) for a in lines]
+    else:
+        catalog=None
+        
+    return catalog
+
+#image manipulation
 def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     """
     Calculate an rms image and a bkg image
@@ -726,11 +773,6 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
   
     return bkgimg,rmsimg
 
-##Nifty helpers
-def within(x,xm,xx):
-    """Enforce xm<= x <=xx"""
-    return min(max(x,xm),xx)
-
 def estimate_background(data):
     '''
     Estimate the background noise mean and RMS.
@@ -767,6 +809,11 @@ def gradient(data,aspect=1.0):
     gy = np.array( [[-1,-2,-1],[0,0,0],[1,2,1]])
     return np.sqrt(ndi.convolve(data,gx)**2 + ndi.convolve(data,gy)**2)
 
+##Nifty helpers
+def within(x,xm,xx):
+    """Enforce xm<= x <=xx"""
+    return min(max(x,xm),xx)
+
 def fix_shape(mp):
     """
     Ensure that a>=b and -pi<pa<=pi
@@ -792,6 +839,9 @@ def fix_shape(mp):
         if mp.params[i*6+5]>np.pi:
             mp.params[i*6+5]-=np.pi 
     return mp
+
+
+
 ########################################## TESTING ################################
 # These were created at the same time as the parent functions but not updated
 # they may therefore not work
@@ -822,6 +872,7 @@ def test_curvature(data_file,temp_dir):
 
 ######################################### THE MAIN DRIVING FUNCTIONS ###############
 
+#source finding and fitting
 def fit_island(island_data):
     """
     Take an Island and do all the parameter estimation and fitting.
@@ -1137,7 +1188,115 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
             outfile.write("\n")
 
     return sources
+
+#just flux measuring
+def force_measure_flux(img,radec):
+    '''
+    Measure the flux of a point source at each of the specified locations
+    Not fitting is done, just forced measurements
+    returns:
+    [(flux,err),...]
+    '''
+    catalog = []
+    # The beam in pixel terms
+    bmaj, bmin, bpa = (img.beam.a,img.beam.b,img.beam.pa)
+    ywidth = bmaj*bmin / ( (bmin*math.cos(bpa))**2 + (bmaj*math.sin(bpa))**2) #height
+    xwidth = bmaj*bmin / ( (bmin*math.sin(bpa))**2 + (bmaj*math.cos(bpa))**2) #width
     
+    #round to an int and add 1
+    ywidth=int(round(ywidth))+1
+    xwidth=int(round(xwidth))+1
+    
+    for ra,dec in radec:
+        #find the right pixels from the ra/dec
+        source_x, source_y = img.sky2pix([ra, dec])
+        source_x -= 1 # convert to 0-based
+        source_y -= 1 # convert to 0-based
+        x = int(round(source_x))
+        y = int(round(source_y))
+        
+        #cut out an image of this size
+        xmin = max(0, x - xwidth/2)
+        ymin = max(0, y - ywidth/2)
+        xmax = min(img.x-1, x + xwidth/2 + 1)
+        ymax = min(img.y-1, y + ywidth/2 + 1)
+        data = img.get_pixels()[ymin:ymax, xmin:xmax]
+        
+        # Make a Gaussian equal to the beam with amplitude 1.0 at the position of the source
+        # in terms of the pixel region.
+        amp = 1.0
+        xo = source_x - xmin
+        yo = source_y - ymin
+        cx = bmin / (2*math.sqrt(2*math.log(2))) # convert FWHM to "c"
+        cy = bmaj / (2*math.sqrt(2*math.log(2))) # convert FWHM to "c"
+        # Convert the position angle from anti-clockwise in the image plane (East-of-North)
+        # to clockwise in the data array domain because the Y axis (Dec) is inverted.
+        pa = -bpa
+        params = [amp, xo, yo, cx, cy, pa]
+        gaussian_data = twodgaussian(params, data.shape)
+        
+        # Calculate the "best fit" amplitude as the average of the implied amplitude
+        # for each pixel. Error is stddev.
+        # Only use pixels within the FWHM, ie value>=0.5. Set the others to NaN
+        ratios = np.where(gaussian_data>=0.5, data/gaussian_data, np.nan)
+        ratios_no_nans = np.extract(ratios==ratios, ratios) # get rid of NaNs
+        flux = np.average(ratios_no_nans)
+        error = np.std(ratios_no_nans)
+        catalog.append((ra,dec,flux,error))
+    return catalog
+
+def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=None):
+    '''
+    Measure the flux at a given set of locations, assuming point sources.
+    
+    Accept:
+    filename = a catalog of source positions (ra,dec) and an image
+    hdu_index
+    outfile
+    cores [not used]
+    rmsin
+    bkgin
+    '''
+    #load fitsfile
+    img = FitsImage(filename, hdu_index=hdu_index)
+    #hdu_header = img.get_hdu_header()
+    beam=img.beam    
+    data = Island(img.get_pixels())
+    if bkgin:
+        logging.info("Loading background data from file {0}".format(bkgin))
+        bkgimg,junk = load_bkg_rms_image(img,bkgin,bkgin)
+    else:
+        logging.info("Calculating background data")
+        bkgimg,junk = make_bkg_rms_image(data.pixels,beam,mesh_size=20,forced_rms=1)
+    #we don't need rms data so delete it to save memory
+    del junk
+    
+    #load catalog
+    if catfile.split('.')[-1]=='cat':
+        logging.debug("Autodetected catalog format as Aegean default")
+        fmt='cat'
+    else:
+        logging.debug("Using csv file format")
+        fmt='csv'
+    radec= load_catalog(catfile,fmt=fmt)
+    #measure fluxes
+    sources = force_measure_flux(img,radec)
+
+    #write output
+    formatter = "{0:11.7f} {1:11.7f} {2: 8.6f} {3: 8.6f}"
+    formatter = "{0:11.7f} {1:11.7f} {2: 8.6f} {3: 8.6f}"
+    header="""#Aegean version {0}
+# on dataset: {1}
+# in mode: Input Catalog
+#RA           DEC          Flux      err
+#                        Jy/beam   Jy/beam
+#==========================================="""
+    print >>outfile, header.format(version,filename)
+    for ra,dec,flux,error in sources:
+        print >>outfile, formatter.format(ra,dec,flux,error)
+    return
+
+#secondary capabilities
 def save_background_files(image_filename, hdu_index=0):
     '''
     Generate and save the background and RMS maps as FITS files.
@@ -1195,8 +1354,11 @@ if __name__=="__main__":
                       help='show the versions of each file')
     parser.add_option('--save_background', dest='save_background', action="store_true",
                       help='save the background/rms/curvature maps to aegean-background.fits, aegean-rms.fits, aegean-curvature.fits and exit')
+    parser.add_option('--catalog',dest='catfile',
+                      help='Catalog of locations at which fluxes will be measured. No source fitting is done. Many other options are ignored.')
     parser.set_defaults(debug=False,hdu_index=0,outfile=sys.stdout,rms=None,rmsinfile=None,bgkinfile=None,
-                        max_summits=None,csigma=None,innerclip=5,outerclip=4,file_version=False)
+                        max_summits=None,csigma=None,innerclip=5,outerclip=4,file_version=False,save_background=False,
+                        catfile=None)
     (options, args) = parser.parse_args()
 
     # configure logging
@@ -1223,11 +1385,17 @@ if __name__=="__main__":
     if options.save_background:
         save_background_files(filename, hdu_index=hdu_index)
         sys.exit()
+
+    if options.catfile and not os.path.exists(options.catfile):
+        logging.error( "{0} does not exist".format(options.catfile))
+        sys.exit()
         
     #Open the outfile
     if options.outfile is not sys.stdout:
         options.outfile=open(os.path.expanduser(options.outfile),'w')
     
+
+        
     if options.bkginfile or options.rmsinfile:
         if not (options.bkginfile and options.rmsinfile):
             logging.error("rmsinfile and bkginfile are both required whereas you only supplied one")
@@ -1238,7 +1406,12 @@ if __name__=="__main__":
         if not os.path.exists(options.rmsinfile):
             logging.error("{0} not found".format(options.rmsinfile))
             sys.exit()
-    
+            
+    if options.catfile:
+        measure_catalog_fluxes(filename, catfile=options.catfile, hdu_index=options.hdu_index,
+                               outfile=options.outfile, bkgin=options.bkginfile)
+        sys.exit()
+        
     sources = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,rms=options.rms,
                                     max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,
                                     outerclip=options.outerclip, cores=options.cores, rmsin=options.rmsinfile, bkgin=options.bkginfile)
