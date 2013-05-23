@@ -186,13 +186,22 @@ class OutputSource():
                 "{0.ra_str:12s} {0.dec_str:12s} {0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} {0.err_dec: 9.7f} "+\
                 "{0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} {0.err_int_flux: 8.6f} "+\
                 "{0.a:5.2f} {0.err_a:5.2f} {0.b:5.2f} {0.err_b:5.2f} "+\
-                "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:05b}\n"
+                "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:05b}"
     #format for kvis .ann files    
     ann_fmt_ellipse= "COLOUR green\nCIRCLE W {0.ra} {0.dec} 0.0083333333\n"
     ann_fmt_fixed= "COLOUR yellow\nCIRCLE W {0.ra} {0.dec} 0.0083333333\n"
     ann_fmt_fail= "COLOUR red\nCIRCLE W {0.ra} {0.dec} 0.0083333333\n"
     
+    def sanitise(self):
+        '''
+        Convert np.float32 -> np.float64 so that they will print properly
+        '''
+        for k in self.__dict__:
+            if type(self.__dict__[k])==np.float32:
+                self.__dict__[k]=np.float64(self.__dict__[k])
+    
     def __str__(self):
+        self.sanitise()
         return self.formatter.format(self)
     
     def as_list(self):
@@ -1052,7 +1061,7 @@ def fit_island(island_data):
                                                           +(source.err_a/source.a)**2
                                                           +(source.err_b/source.b)**2)
         sources.append(source)
-        logging.debug(source.formatter.format(source)[:-1])
+        logging.debug(source)
     return sources
 
 def fit_islands(islands):
@@ -1184,7 +1193,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
             sources.extend(src)
     if outfile:
         for source in sorted(sources):#, key=lambda x: "({0.island:04d},{0.source:02d})".format(x)):
-            outfile.write(source.formatter.format(source)[:-1])
+            outfile.write(str(source))
             outfile.write("\n")
 
     return sources
