@@ -57,10 +57,7 @@ BTYPE   = 'intensity'  /
 RMS     =    1        /"""
 
 header="""#Aegean version {0}
-# on dataset: {1}
-#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags
-#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   NCPES
-#=========================================================================================================================================================================================="""
+# on dataset: {1}"""
 
 #Note this is now done in Imports.flags but repeated here for reference
 ## Set some bitwise logic for flood routines
@@ -153,7 +150,40 @@ class Island():
     def get_pixels(self):
         return self.pixels
 
-class OutputSource():
+class SimpleSource():
+    """
+    A measurement of flux at a desired location
+    """
+    background = None
+    local_rms = None
+    ra = None
+    dec = None
+    peak_flux = None
+    err_peak_flux = None
+    
+    header ="""#RA           DEC          Flux      err
+#                        Jy/beam   Jy/beam
+#==========================================="""
+
+    formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f}"
+    
+    def sanitise(self):
+        '''
+        Convert np.float32 -> np.float64 so that they will print properly
+        '''
+        for k in self.__dict__:
+            if type(self.__dict__[k])==np.float32:
+                self.__dict__[k]=np.float64(self.__dict__[k])
+                
+    def __str__(self):
+        '''
+        convert to string
+        '''
+        self.sanitise()
+        return self.formatter.format(self)
+        
+
+class OutputSource(SimpleSource):
     """
     Each source that is fit by Aegean is cast to this type.
     The parameters of the source are stored, along with a string
@@ -161,16 +191,16 @@ class OutputSource():
     """
     island = None # island number
     source = None # source number
-    background = None # local background zero point
-    local_rms= None #local image rms
+    #background = None # local background zero point
+    #local_rms= None #local image rms
     ra_str = None #str
     dec_str = None #str
-    ra = None # degrees
+    #ra = None # degrees
     err_ra = None # degrees
-    dec = None # degrees
+    #dec = None # degrees
     err_dec = None
-    peak_flux = None # Jy/beam
-    err_peak_flux = None # Jy/beam
+    #peak_flux = None # Jy/beam
+    #err_peak_flux = None # Jy/beam
     int_flux = None #Jy
     err_int_flux= None #Jy
     a = None # major axis (arcsecs)
@@ -181,6 +211,11 @@ class OutputSource():
     err_pa = None # degrees
     flags = None
     
+    #header for the following format    
+    header="""#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags
+#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   NCPES
+#=========================================================================================================================================================================================="""
+
     #formatting strings for making nice output
     formatter = "({0.island:04d},{0.source:d}) {0.background: 8.6f} {0.local_rms: 8.6f} "+\
                 "{0.ra_str:12s} {0.dec_str:12s} {0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} {0.err_dec: 9.7f} "+\
@@ -192,14 +227,7 @@ class OutputSource():
     ann_fmt_fixed= "COLOUR yellow\nCIRCLE W {0.ra} {0.dec} 0.0083333333\n"
     ann_fmt_fail= "COLOUR red\nCIRCLE W {0.ra} {0.dec} 0.0083333333\n"
     
-    def sanitise(self):
-        '''
-        Convert np.float32 -> np.float64 so that they will print properly
-        '''
-        for k in self.__dict__:
-            if type(self.__dict__[k])==np.float32:
-                self.__dict__[k]=np.float64(self.__dict__[k])
-    
+   
     def __str__(self):
         self.sanitise()
         return self.formatter.format(self)
@@ -709,6 +737,12 @@ def load_catalog(filename,fmt='csv'):
         
     return catalog
 
+def save_catalog(filename,catalog,cattype=None):
+    '''
+    take a list of sources (OutputSources or SimpleSources)
+    '''
+    return
+
 #image manipulation
 def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     """
@@ -849,8 +883,6 @@ def fix_shape(mp):
             mp.params[i*6+5]-=np.pi 
     return mp
 
-
-
 ########################################## TESTING ################################
 # These were created at the same time as the parent functions but not updated
 # they may therefore not work
@@ -885,7 +917,7 @@ def test_curvature(data_file,temp_dir):
 def fit_island(island_data):
     """
     Take an Island and do all the parameter estimation and fitting.
-      island_data - an IslandFittingData object
+    island_data - an IslandFittingData object
     Return a list of sources that are within the island.
     None = no sources found in the island.
     """
@@ -1161,6 +1193,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
 
     if outfile:
         print >>outfile,header.format(version,filename)
+        print >>outfile,OutputSource.header
     island_group = []
     group_size = 20
     for i,xmin,xmax,ymin,ymax in gen_flood_wrap(data,rmsimg,innerclip,outerclip,expand=False):
@@ -1251,7 +1284,12 @@ def force_measure_flux(img,radec):
         ratios_no_nans = np.extract(ratios==ratios, ratios) # get rid of NaNs
         flux = np.average(ratios_no_nans)
         error = np.std(ratios_no_nans)
-        catalog.append((ra,dec,flux,error))
+        source = SimpleSource()
+        source.ra=ra
+        source.dec=dec
+        source.peak_flux=flux
+        source.err_peak_flux=error
+        catalog.append(source)
     return catalog
 
 def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=None):
@@ -1295,17 +1333,10 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
     sources = force_measure_flux(img,radec)
 
     #write output
-    formatter = "{0:11.7f} {1:11.7f} {2: 8.6f} {3: 8.6f}"
-    formatter = "{0:11.7f} {1:11.7f} {2: 8.6f} {3: 8.6f}"
-    header="""#Aegean version {0}
-# on dataset: {1}
-# in mode: Input Catalog
-#RA           DEC          Flux      err
-#                        Jy/beam   Jy/beam
-#==========================================="""
     print >>outfile, header.format(version,filename)
-    for ra,dec,flux,error in sources:
-        print >>outfile, formatter.format(ra,dec,flux,error)
+    print >>outfile, SimpleSource.header
+    for source in sources:
+        print >>outfile, str(source)
     return
 
 #secondary capabilities
