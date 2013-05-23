@@ -161,6 +161,19 @@ class SimpleSource():
     peak_flux = None
     err_peak_flux = None
     
+    #names = {'background':'BackgroundFlux',
+    #    'local_rms':'LocalRms',
+    #    'ra':'RAJ2000',
+    #    'dec':'DECJ2000',
+    #    'peak_flux':'Flux',
+    #    'err_peak_flux':'Flux Err'}
+    #units={'background':'Jy/beam',
+    #       'local_rms':'Jy/beam',
+    #       'ra':'degrees',
+    #       'dec':'degrees',
+    #       'peak_flux':'Jy/beam',
+    #       'err_peak_flux':'Jy/beam'}
+    
     header ="""#RA           DEC          Flux      err
 #                        Jy/beam   Jy/beam
 #==========================================="""
@@ -181,8 +194,7 @@ class SimpleSource():
         '''
         self.sanitise()
         return self.formatter.format(self)
-        
-
+   
 class OutputSource(SimpleSource):
     """
     Each source that is fit by Aegean is cast to this type.
@@ -305,7 +317,6 @@ class DummyMP():
             self.params.append(val)
         self.perror=perror
         self.errmsg="There is no error, I just didn't bother fitting anything!"
-
 
 ######################################### FUNCTIONS ###############################
 
@@ -737,10 +748,27 @@ def load_catalog(filename,fmt='csv'):
         
     return catalog
 
-def save_catalog(filename,catalog,cattype=None):
+def save_catalog(filename,catalog):
     '''
     take a list of sources (OutputSources or SimpleSources)
     '''
+    try:
+        import atpy
+    except ImportError as e:
+        logging.error("In order to save in formats other than Aegean default you need to be able to import atpy")
+        logging.error(e.strerror)
+        logging.warning("File not saved")
+        return
+    t=atpy.Table()
+    columns = catalog[0].__dict__.keys()
+    
+    for c in columns:
+        data = [getattr(a,c) for a in catalog]
+        t.add_column(c,data)
+    if os.path.exists(filename):
+        os.popen('rm {0}'.format(filename))
+    t.write(filename)
+    logging.info("wrote {0}".format(filename))
     return
 
 #image manipulation
@@ -1337,7 +1365,7 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
     print >>outfile, SimpleSource.header
     for source in sources:
         print >>outfile, str(source)
-    return
+    return sources
 
 #secondary capabilities
 def save_background_files(image_filename, hdu_index=0):
@@ -1379,6 +1407,8 @@ if __name__=="__main__":
                       help="HDU index (0-based) for cubes with multiple images in extensions")
     parser.add_option("--outfile",dest='outfile',
                       help="Destination of catalog output, default=stdout")
+    parser.add_option("--table",dest='out_table',
+                      help="Destination of catalog table output. Format infered from extension. default=None")
     parser.add_option("--rms",dest='rms',type='float',
                       help="Assume a single image noise of rms, default is to calculate a rms over regions of 20x20 beams")
     parser.add_option("--rmsin",dest='rmsinfile',
@@ -1399,7 +1429,7 @@ if __name__=="__main__":
                       help='save the background/rms/curvature maps to aegean-background.fits, aegean-rms.fits, aegean-curvature.fits and exit')
     parser.add_option('--catalog',dest='catfile',
                       help='Catalog of locations at which fluxes will be measured. No source fitting is done. Many other options are ignored.')
-    parser.set_defaults(debug=False,hdu_index=0,outfile=sys.stdout,rms=None,rmsinfile=None,bgkinfile=None,
+    parser.set_defaults(debug=False,hdu_index=0,outfile=sys.stdout,out_table=None,rms=None,rmsinfile=None,bgkinfile=None,
                         max_summits=None,csigma=None,innerclip=5,outerclip=4,file_version=False,save_background=False,
                         catfile=None)
     (options, args) = parser.parse_args()
@@ -1451,13 +1481,14 @@ if __name__=="__main__":
             sys.exit()
             
     if options.catfile:
-        measure_catalog_fluxes(filename, catfile=options.catfile, hdu_index=options.hdu_index,
+        sources = measure_catalog_fluxes(filename, catfile=options.catfile, hdu_index=options.hdu_index,
                                outfile=options.outfile, bkgin=options.bkginfile)
-        sys.exit()
-        
-    sources = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,rms=options.rms,
+    else:        
+        sources = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,rms=options.rms,
                                     max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,
                                     outerclip=options.outerclip, cores=options.cores, rmsin=options.rmsinfile, bkgin=options.bkginfile)
+    if options.out_table:
+        save_catalog(options.out_table,sources)
     if len(sources) == 0:
         logging.info("No sources found in image")
 
