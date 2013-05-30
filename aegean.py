@@ -22,11 +22,11 @@ import logging
 from optparse import OptionParser
 
 #external programs
-from Imports.fits_image import FitsImage
-from Imports.mpfit import mpfit
-from Imports.convert import ra2dec, dec2dec, dec2hms, dec2dms
-import Imports.flags as flags
-import Imports.pprocess as pprocess
+from AegeanTools.fits_image import FitsImage
+from AegeanTools.mpfit import mpfit
+from AegeanTools.convert import ra2dec, dec2dec, dec2hms, dec2dms
+import AegeanTools.flags as flags
+import AegeanTools.pprocess as pprocess
 import pywcs
 import multiprocessing
 
@@ -154,31 +154,38 @@ class SimpleSource():
     """
     A measurement of flux at a desired location
     """
-    background = None
-    local_rms = None
-    ra = None
-    dec = None
-    peak_flux = None
-    err_peak_flux = None
+    names = {'background':'BackgroundFlux',
+        'local_rms':'LocalRms',
+        'ra':'RAJ2000',
+        'dec':'DECJ2000',
+        'peak_flux':'Flux',
+        'err_peak_flux':'Flux error'}
     
-    #names = {'background':'BackgroundFlux',
-    #    'local_rms':'LocalRms',
-    #    'ra':'RAJ2000',
-    #    'dec':'DECJ2000',
-    #    'peak_flux':'Flux',
-    #    'err_peak_flux':'Flux Err'}
-    #units={'background':'Jy/beam',
-    #       'local_rms':'Jy/beam',
-    #       'ra':'degrees',
-    #       'dec':'degrees',
-    #       'peak_flux':'Jy/beam',
-    #       'err_peak_flux':'Jy/beam'}
+    units={'background':'Jy/beam',
+        'local_rms':'Jy/beam',
+        'ra':'degrees',
+        'dec':'degrees',
+        'peak_flux':'Jy/beam',
+        'err_peak_flux':'Jy/beam'}
     
+    dtypes =dict([(a,np.float64) for a in ['background','local_rms','ra','dec','peak_flux','err_peak_flux']])
+    meta={'name':names,'unit':units,'type':dtypes}
+        
     header ="""#RA           DEC          Flux      err
 #                        Jy/beam   Jy/beam
 #==========================================="""
 
     formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f}"
+    
+    def __init__(self):
+        self.background = None
+        self.local_rms = None
+        self.ra = None
+        self.dec = None
+        self.peak_flux = None
+        self.err_peak_flux = None
+        
+
     
     def sanitise(self):
         '''
@@ -201,29 +208,7 @@ class OutputSource(SimpleSource):
     The parameters of the source are stored, along with a string
     formatter that makes printing easy. (as does OutputSource.__str__)
     """
-    island = None # island number
-    source = None # source number
-    #background = None # local background zero point
-    #local_rms= None #local image rms
-    ra_str = None #str
-    dec_str = None #str
-    #ra = None # degrees
-    err_ra = None # degrees
-    #dec = None # degrees
-    err_dec = None
-    #peak_flux = None # Jy/beam
-    #err_peak_flux = None # Jy/beam
-    int_flux = None #Jy
-    err_int_flux= None #Jy
-    a = None # major axis (arcsecs)
-    err_a = None # arcsecs
-    b = None # minor axis (arcsecs)
-    err_b = None # arcsecs
-    pa = None # position angle (degrees - WHAT??)
-    err_pa = None # degrees
-    flags = None
-    
-    #header for the following format    
+     #header for the output   
     header="""#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags
 #         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   NCPES
 #=========================================================================================================================================================================================="""
@@ -239,7 +224,73 @@ class OutputSource(SimpleSource):
     ann_fmt_fixed= "COLOUR yellow\nCIRCLE W {0.ra} {0.dec} 0.0083333333\n"
     ann_fmt_fail= "COLOUR red\nCIRCLE W {0.ra} {0.dec} 0.0083333333\n"
     
-   
+    names = SimpleSource.names
+    names.update({"island":"Island",
+        "source":"component",
+        "ra_str":"RAJ2000",
+        "dec_str":"DECJ2000",
+        "err_ra":"RA error",
+        "err_dec":"DEC error",
+        "int_flux":"Integrated Flux",
+        "err_int_flux":"Integrated Flux error",
+        "a":"Major Axis",
+        "err_a":"Major Axis error",
+        "b":"Minor Axis",
+        "err_b":"Minor Axis error",
+        "pa":"Position Angle",
+        "err_pa":"Position Angle error",
+        "flags":"Fitting Flags"})
+    units=SimpleSource.units
+    units.update({"island":"Number",
+        "source":"Number",
+        "ra_str":"HMS",
+        "dec_str":"DMS",
+        "err_ra":"degrees",
+        "err_dec":"degrees",
+        "int_flux":"Jy",
+        "err_int_flux":"Jy",
+        "a":"arcsec",
+        "err_a":"arcsec",
+        "b":"arcsec",
+        "err_b":"arcsec",
+        "pa":"degrees",
+        "err_pa":"degrees",
+        "flags":"string"})
+    
+    dtypes=SimpleSource.dtypes
+    dtypes.update({"island":int,
+        "source":int,
+        "ra_str":str,
+        "dec_str":str,
+        'flags':str})
+    dtypes.update(dict([(a,np.float64) for a in ["err_ra","err_dec","int_flux","err_int_flux","a","err_a","b","err_b",'pa','err_pa']]))
+    
+    meta={'name':names,'unit':units,'type':dtypes}
+    
+    def __init__(self):
+        self.island = None # island number
+        self.source = None # source number
+        #background = None # local background zero point
+        #local_rms= None #local image rms
+        self.ra_str = None #str
+        self.dec_str = None #str
+        #ra = None # degrees
+        self.err_ra = None # degrees
+        #dec = None # degrees
+        self.err_dec = None
+        #peak_flux = None # Jy/beam
+        #err_peak_flux = None # Jy/beam
+        self.int_flux = None #Jy
+        self.err_int_flux= None #Jy
+        self.a = None # major axis (arcsecs)
+        self.err_a = None # arcsecs
+        self.b = None # minor axis (arcsecs)
+        self.err_b = None # arcsecs
+        self.pa = None # position angle (degrees - WHAT??)
+        self.err_pa = None # degrees
+        self.flags = None
+    
+
     def __str__(self):
         self.sanitise()
         return self.formatter.format(self)
@@ -709,23 +760,28 @@ def multi_gauss(data,rmsimg,parinfo):
     return mp,parinfo
 
 #load and save external files
+def load_aux_image(image,auxfile):
+    """
+    Load a fits file (bkg/rms/curve) and make sure that
+    it is the same shape as the main image.
+    image = main image
+    auxfile = filename of auxiliary file
+    """
+    auximg=FitsImage(auxfile).get_pixels()
+    if auximg.shape != image.get_pixels().shape:
+        logging.error("file {0} is not the same size as the image map".format(auxfile))
+        logging.error("{0}= {1}, image = {2}".format(auxfile,auximg.shape, image.get_pixels().shape))
+        sys.exit()
+    return auximg
+        
 def load_bkg_rms_image(image,bkgfile,rmsfile):
     """
-    Load an rms and bkg image from a fits file
-    Check that the dimensions of each are consistent with the main image
+    Load the background and rms images.
+    Deprecation iminent:
+      use load_aux_image on individual images
     """
-    bkgimg = FitsImage(bkgfile).get_pixels()
-    rmsimg = FitsImage(rmsfile).get_pixels()
-    if bkgimg.shape !=image.get_pixels().shape:
-        logging.error("background map is not the same size as the image map")
-        logging.error("bkgimag = {0}, data = {1}".format(bkgimg.shape,image.get_pixels().shape))
-        bkgimg=None
-    if rmsimg.shape !=image.get_pixels().shape:
-        logging.error("rms map is not the same size as the image map")
-        logging.error("rmsimag = {0}, data ={1}".format(rmsimg.shame,image.get_pixels().shape))
-        rmsimg=None
-    if bkgimg is None or rmsimg is None:
-        sys.exit()
+    bkgimg = load_aux_image(image,bkgfile)
+    rmsimg = load_aux_image(image,rmsfile)
     return bkgimg,rmsimg
 
 def load_catalog(filename,fmt='csv'):
@@ -759,12 +815,16 @@ def save_catalog(filename,catalog):
         logging.error(e.strerror)
         logging.warning("File not saved")
         return
+    
     t=atpy.Table()
+    t.table_name="Aegean Source Catalog"
+    t.add_comment="Created by Aegean {0}".format(version)
+    
     columns = catalog[0].__dict__.keys()
     
     for c in columns:
         data = [getattr(a,c) for a in catalog]
-        t.add_column(c,data)
+        t.add_column(c,data,description=a.meta['name'][c],unit=a.meta['unit'][c],dtype=a.meta['type'][c])
     if os.path.exists(filename):
         os.popen('rm {0}'.format(filename))
     t.write(filename)
@@ -1170,16 +1230,22 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     hdu_header = img.get_hdu_header()
     beam=img.beam    
     data = Island(img.get_pixels())
-    dcurve=curvature(img.get_pixels(),aspect=beam.aspect)    
-    
-    if bkgin and rmsin:
-        logging.info("Loading background and rms data from files {0},{1}".format(bkgin,rmsin))
-        bkgimg,rmsimg = load_bkg_rms_image(img,bkgin,rmsin)
-    else:
+    dcurve=curvature(img.get_pixels(),aspect=beam.aspect)
+
+    #if either of rms or bkg images are not supplied then caclucate them both
+    if not (rmsin or bkgin):
         logging.info("Calculating background and rms data")
         bkgimg,rmsimg = make_bkg_rms_image(data.pixels,beam,mesh_size=20,forced_rms=rms)
+
+    #replace the calculated images with input versions, if the user has supplied them.
+    if bkgin:
+        logging.info("loading background data from file {0}".format(bkgin))
+        bkgimg = load_aux_image(image,bkgin)        
+    if rmsin:
+        logging.info("Loading rms data from file {0}".format(rmsin))
+        rmsimg = load_aux_image(image,rmsin)
     
-    
+    #the curvature images is always calculated
     if csigma is None:
         logging.info("Calculating curvature data")
         cbkg, csigma = estimate_background(dcurve)
@@ -1260,7 +1326,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     return sources
 
 #just flux measuring
-def force_measure_flux(img,radec):
+def force_measure_flux(img,bkgimg,radec,rmsimg=None):
     '''
     Measure the flux of a point source at each of the specified locations
     Not fitting is done, just forced measurements
@@ -1317,6 +1383,9 @@ def force_measure_flux(img,radec):
         source.dec=dec
         source.peak_flux=flux
         source.err_peak_flux=error
+        source.background=bkgimg[y,x]
+        if rmsimg:
+            source.local_rms =rmsimg[y,x]
         catalog.append(source)
     return catalog
 
@@ -1326,10 +1395,9 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
     
     Accept:
     filename = a catalog of source positions (ra,dec) and an image
+    catfile
     hdu_index
     outfile
-    cores [not used]
-    rmsin
     bkgin
     '''
     #load fitsfile
@@ -1339,12 +1407,10 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
     data = Island(img.get_pixels())
     if bkgin:
         logging.info("Loading background data from file {0}".format(bkgin))
-        bkgimg,junk = load_bkg_rms_image(img,bkgin,bkgin)
+        bkgimg = load_aux_image(img,bkgin)
     else:
         logging.info("Calculating background data")
-        bkgimg,junk = make_bkg_rms_image(data.pixels,beam,mesh_size=20,forced_rms=1)
-    #we don't need rms data so delete it to save memory
-    del junk
+        bkgimg = make_bkg_rms_image(data.pixels,beam,mesh_size=20,forced_rms=1)[0]
     
     #load catalog
     if catfile.split('.')[-1]=='cat':
@@ -1354,11 +1420,11 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
         logging.debug("Using csv file format")
         fmt='csv'
     else:
-        logging.error("Unkonwn file format")
+        logging.error("Unkonwn file format for {0}".format(catfile))
         sys.exit()
     radec= load_catalog(catfile,fmt=fmt)
     #measure fluxes
-    sources = force_measure_flux(img,radec)
+    sources = force_measure_flux(img,bkgimg,radec)
 
     #write output
     print >>outfile, header.format(version,filename)
@@ -1469,16 +1535,12 @@ if __name__=="__main__":
     
 
         
-    if options.bkginfile or options.rmsinfile:
-        if not (options.bkginfile and options.rmsinfile):
-            logging.error("rmsinfile and bkginfile are both required whereas you only supplied one")
-            sys.exit()
-        if not os.path.exists(options.bkginfile):
-            logging.error("{0} not found".format(options.bkginfile))
-            sys.exit()
-        if not os.path.exists(options.rmsinfile):
-            logging.error("{0} not found".format(options.rmsinfile))
-            sys.exit()
+    if options.bkginfile and not os.path.exists(options.bkginfile):
+        logging.error("{0} not found".format(options.bkginfile))
+        sys.exit()
+    if options.rmsinfile and not os.path.exists(options.rmsinfile):
+        logging.error("{0} not found".format(options.rmsinfile))
+        sys.exit()
             
     if options.catfile:
         sources = measure_catalog_fluxes(filename, catfile=options.catfile, hdu_index=options.hdu_index,
