@@ -189,10 +189,10 @@ class SimpleSource():
     
     def sanitise(self):
         '''
-        Convert np.float32 -> np.float64 so that they will print properly
+        Convert various numpy types to np.float64 so that they will print properly
         '''
         for k in self.__dict__:
-            if type(self.__dict__[k])==np.float32:
+            if type(self.__dict__[k])in[np.float32,np.int16,np.int32,np.int64]:
                 self.__dict__[k]=np.float64(self.__dict__[k])
                 
     def __str__(self):
@@ -1233,17 +1233,17 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     dcurve=curvature(img.get_pixels(),aspect=beam.aspect)
 
     #if either of rms or bkg images are not supplied then caclucate them both
-    if not (rmsin or bkgin):
+    if not (rmsin and bkgin):
         logging.info("Calculating background and rms data")
         bkgimg,rmsimg = make_bkg_rms_image(data.pixels,beam,mesh_size=20,forced_rms=rms)
 
     #replace the calculated images with input versions, if the user has supplied them.
     if bkgin:
         logging.info("loading background data from file {0}".format(bkgin))
-        bkgimg = load_aux_image(image,bkgin)        
+        bkgimg = load_aux_image(img,bkgin)        
     if rmsin:
         logging.info("Loading rms data from file {0}".format(rmsin))
-        rmsimg = load_aux_image(image,rmsin)
+        rmsimg = load_aux_image(img,rmsin)
     
     #the curvature images is always calculated
     if csigma is None:
