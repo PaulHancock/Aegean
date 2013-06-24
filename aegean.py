@@ -811,11 +811,8 @@ def save_catalog(filename,catalog):
     '''
     #.ann and .reg are handled by me
     extension=os.path.basename(filename).split('.')[-1]
-    if extension =='ann':
-        writeAnn(filename,catalog)
-    elif extension =='reg':
-        print ".reg files not yet implemented"
-        #writeReg(filename,catalog)
+    if extension in ['ann','reg']:
+        writeAnn(filename,catalog,extension)
     else:    #the remaining extensions are handeled by atpy
         try:
             import atpy
@@ -840,8 +837,8 @@ def save_catalog(filename,catalog):
     logging.info("wrote {0}".format(filename))
     return
 
-def writeAnn(filename,catalog):
-    """Write an annotation file that can be read by Kvis.
+def writeAnn(filename,catalog,fmt):
+    """Write an annotation file that can be read by Kvis (.ann) or DS9 (.reg).
     Uses ra/dec from catalog.
     Draws ellipses if bmaj/bmin/pa are in catalog 
     Draws 30" circles otherwise
@@ -858,11 +855,25 @@ def writeAnn(filename,catalog):
         bmins = [a.b/3600.0 for a in catalog]
         pas = [a.pa for a in catalog]
     
-    print >>out,"COLOR YELLOW"
+    
+    if fmt=='ann':
+        formatter="ellipse {} {} {} {} {}"
+    elif fmt=='reg':
+        print >>out,"fk5"
+        formatter='ellipse {} {} {}d {}d {}d'
+        
     for ra,dec,bmaj,bmin,pa in zip(ras,decs,bmajs,bmins,pas):
-        print >>out,"ellipse {} {} {} {} {}".format(ra,dec,bmaj,bmin,pa)
+        print >>out,formatter.format(ra,dec,bmaj,bmin,pa)
     out.close()
     return
+    
+def writeReg(filename,catalog):
+    """Write a region file that canbe read by DS9.
+    Uses ra/dec from catalog.
+    Draws ellipses if bmaj/bmin/pa are in catalog
+    Draws 30" circles otherwise
+    """
+    out=open(filename,'w')
     
 #image manipulation
 def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
