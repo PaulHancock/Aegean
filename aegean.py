@@ -22,7 +22,7 @@ import logging
 from optparse import OptionParser
 
 #external programs
-from AegeanTools.fits_image import FitsImage
+from AegeanTools.fits_image import FitsImage, Beam
 from AegeanTools.mpfit import mpfit
 from AegeanTools.convert import ra2dec, dec2dec, dec2hms, dec2dms
 import AegeanTools.flags as flags
@@ -1231,7 +1231,7 @@ def fit_islands(islands):
     return sources
     
 def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None,
-                          innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None):
+                          innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None):
     """
     Run the Aegean source finder.
     Inputs:
@@ -1259,7 +1259,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         
     global global_data
     
-    img = FitsImage(filename, hdu_index=hdu_index)
+    img = FitsImage(filename, hdu_index=hdu_index,beam=beam)
     hdu_header = img.get_hdu_header()
     beam=img.beam    
     data = Island(img.get_pixels())
@@ -1422,7 +1422,7 @@ def force_measure_flux(img,bkgimg,radec,rmsimg=None):
         catalog.append(source)
     return catalog
 
-def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=None):
+def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=None, beam=None):
     '''
     Measure the flux at a given set of locations, assuming point sources.
     
@@ -1434,7 +1434,7 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
     bkgin
     '''
     #load fitsfile
-    img = FitsImage(filename, hdu_index=hdu_index)
+    img = FitsImage(filename, hdu_index=hdu_index,beam=beam)
     #hdu_header = img.get_hdu_header()
     beam=img.beam    
     data = Island(img.get_pixels())
@@ -1522,6 +1522,8 @@ if __name__=="__main__":
                      help='The clipping value (in sigmas) for seeding islands. Default=5')
     parser.add_option('--floodclip',dest='outerclip',type='float',
                       help='The clipping value (in sigmas) for growing islands. Default=4')
+    parser.add_option('--beam',dest='beam',type='float', nargs=3,
+                      help='The beam parameters to be used is "--beam major minor pa" in (pixels,pixels,degrees). Default is to read from FITS header.')
     parser.add_option('--file_version',dest='file_version',action="store_true",
                       help='show the versions of each file')
     parser.add_option('--save_background', dest='save_background', action="store_true",
@@ -1530,7 +1532,7 @@ if __name__=="__main__":
                       help='Catalog of locations at which fluxes will be measured. No source fitting is done. Many other options are ignored.')
     parser.set_defaults(debug=False,hdu_index=0,outfile=sys.stdout,out_table=None,rms=None,rmsinfile=None,bgkinfile=None,
                         max_summits=None,csigma=None,innerclip=5,outerclip=4,file_version=False,save_background=False,
-                        catfile=None)
+                        catfile=None,beam=None)
     (options, args) = parser.parse_args()
 
     # configure logging
@@ -1552,6 +1554,14 @@ if __name__=="__main__":
     hdu_index = options.hdu_index
     if hdu_index > 0:
         logging.info( "Using hdu index {0}".format(hdu_index))
+    
+    #create a beam object from user input
+    if options.beam is not None:
+        beam=options.beam
+        if len(beam)!=3:
+            print "Beam requires 3 args. You supplied {}".format(beam)
+            sys.exit()
+        options.beam=Beam(beam[0],beam[1],beam[2]*math.pi/180)
         
     # Generate and save the background FITS files and exit if requested
     if options.save_background:
@@ -1577,11 +1587,11 @@ if __name__=="__main__":
             
     if options.catfile:
         sources = measure_catalog_fluxes(filename, catfile=options.catfile, hdu_index=options.hdu_index,
-                               outfile=options.outfile, bkgin=options.bkginfile)
+                               outfile=options.outfile, bkgin=options.bkginfile,beam=options.beam)
     else:        
         sources = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,rms=options.rms,
                                     max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,
-                                    outerclip=options.outerclip, cores=options.cores, rmsin=options.rmsinfile, bkgin=options.bkginfile)
+                                    outerclip=options.outerclip, cores=options.cores, rmsin=options.rmsinfile, bkgin=options.bkginfile,beam=options.beam)
     if options.out_table:
         save_catalog(options.out_table,sources)
     if len(sources) == 0:
