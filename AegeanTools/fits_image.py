@@ -13,7 +13,7 @@ from math import pi,cos,sin,sqrt
 
 class FitsImage():
     version='$Revision$'
-    def __init__(self, filename, hdu_index=0, hdu=None):
+    def __init__(self, filename, hdu_index=0, hdu=None, beam=None):
         """
         filename: the name of the fits image file
         hdu_index = index of FITS HDU when extensions are used (0 is primary HDU)
@@ -48,29 +48,33 @@ class FitsImage():
         self.y = self.hdu.header['NAXIS2']
         self.deg_per_pixel_x = self.hdu.header["CDELT1"] # is this always right?
         self.deg_per_pixel_y = self.hdu.header["CDELT2"] # is this always right?
-        #if the bpa isn't specified add it as zero
-        if "BPA" not in self.hdu.header:
-            logging.info("BPA not present in fits header, using 0")
-            bpa=0
-        else:
-            bpa=self.hdu.header["BPA"]*pi/180
-        if "BMAJ" not in self.hdu.header:
-            logging.info("BMAJ not present in fits header, using 3 pixels")
-            bmaj=3
-        else:
-            bmaj = sqrt((self.hdu.header["BMAJ"]*sin(bpa)/self.deg_per_pixel_x)**2 +
-                   (self.hdu.header["BMAJ"]*cos(bpa)/self.deg_per_pixel_y)**2)
-            #bmaj = abs(self.hdu.header["BMAJ"]/self.deg_per_pixel_y)
-        if "BMIN" not in self.hdu.header:
-            logging.info("BMIN not present in fits header, using 3 pixels")
-            bmin=3
-        else:
-            bmin = sqrt((self.hdu.header["BMIN"]*cos(bpa)/self.deg_per_pixel_x)**2 +
-                   (self.hdu.header["BMIN"]*sin(bpa)/self.deg_per_pixel_y)**2)
-            #bmin=abs(self.hdu.header["BMIN"]/self.deg_per_pixel_x)
-            
-        # TODO: handle non-square pixels and elliptical beam
-        self.beam=Beam(bmaj, bmin, bpa)
+        
+        if beam is None:
+            #if the bpa isn't specified add it as zero
+            if "BPA" not in self.hdu.header:
+                logging.info("BPA not present in fits header, using 0")
+                bpa=0
+            else:
+                bpa=self.hdu.header["BPA"]*pi/180
+            if "BMAJ" not in self.hdu.header:
+                logging.info("BMAJ not present in fits header, using 3 pixels")
+                bmaj=3
+            else:
+                bmaj = sqrt((self.hdu.header["BMAJ"]*sin(bpa)/self.deg_per_pixel_x)**2 +
+                       (self.hdu.header["BMAJ"]*cos(bpa)/self.deg_per_pixel_y)**2)
+                #bmaj = abs(self.hdu.header["BMAJ"]/self.deg_per_pixel_y)
+            if "BMIN" not in self.hdu.header:
+                logging.info("BMIN not present in fits header, using 3 pixels")
+                bmin=3
+            else:
+                bmin = sqrt((self.hdu.header["BMIN"]*cos(bpa)/self.deg_per_pixel_x)**2 +
+                       (self.hdu.header["BMIN"]*sin(bpa)/self.deg_per_pixel_y)**2)
+                #bmin=abs(self.hdu.header["BMIN"]/self.deg_per_pixel_x)
+                
+            # TODO: handle non-square pixels and elliptical beam
+            self.beam=Beam(bmaj, bmin, bpa)
+        else: #use the supplied beam
+            self.beam=beam
         self.pixels_per_beam=min(self.beam.a, self.beam.b)
         self._pixels = None
         self._rms = None
