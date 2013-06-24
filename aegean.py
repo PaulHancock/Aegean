@@ -807,30 +807,63 @@ def load_catalog(filename,fmt='csv'):
 def save_catalog(filename,catalog):
     '''
     take a list of sources (OutputSources or SimpleSources)
+    and save the catalog as a table with format determined by the file extension
     '''
-    try:
-        import atpy
-    except ImportError as e:
-        logging.error("In order to save in formats other than Aegean default you need to be able to import atpy")
-        logging.error(e.strerror)
-        logging.warning("File not saved")
-        return
-    
-    t=atpy.Table()
-    t.table_name="Aegean Source Catalog"
-    t.add_comment="Created by Aegean {0}".format(version)
-    
-    columns = catalog[0].__dict__.keys()
-    
-    for c in columns:
-        data = [getattr(a,c) for a in catalog]
-        t.add_column(c,data,description=a.meta['name'][c],unit=a.meta['unit'][c],dtype=a.meta['type'][c])
-    if os.path.exists(filename):
-        os.popen('rm {0}'.format(filename))
-    t.write(filename)
+    #.ann and .reg are handled by me
+    extension=os.path.basename(filename).split('.')[-1]
+    if extension =='ann':
+        writeAnn(filename,catalog)
+    elif extension =='reg':
+        print ".reg files not yet implemented"
+        #writeReg(filename,catalog)
+    else:    #the remaining extensions are handeled by atpy
+        try:
+            import atpy
+        except ImportError as e:
+            logging.error("In order to save in formats other than Aegean default you need to be able to import atpy")
+            logging.error(e.message)
+            logging.warning("File not saved")
+            return
+        
+        t=atpy.Table()
+        t.table_name="Aegean Source Catalog"
+        t.add_comment="Created by Aegean {0}".format(version)
+        
+        columns = catalog[0].__dict__.keys()
+        
+        for c in columns:
+            data = [getattr(a,c) for a in catalog]
+            t.add_column(c,data,description=a.meta['name'][c],unit=a.meta['unit'][c],dtype=a.meta['type'][c])
+        if os.path.exists(filename):
+            os.popen('rm {0}'.format(filename))
+        t.write(filename)
     logging.info("wrote {0}".format(filename))
     return
 
+def writeAnn(filename,catalog):
+    """Write an annotation file that can be read by Kvis.
+    Uses ra/dec from catalog.
+    Draws ellipses if bmaj/bmin/pa are in catalog 
+    Draws 30" circles otherwise
+    """
+    out=open(filename,'w')
+    ras = [a.ra for a in catalog]
+    decs= [a.dec for a in catalog]
+    if not hasattr(catalog[0],'a'): #a being the variable that I used for bmaj.
+        bmajs=[30/3600.0 for a in catalog]
+        bmins=bmaj
+        pas = [0 for a in catalog]
+    else:
+        bmajs = [a.a/3600.0 for a in catalog]
+        bmins = [a.b/3600.0 for a in catalog]
+        pas = [a.pa for a in catalog]
+    
+    print >>out,"COLOR YELLOW"
+    for ra,dec,bmaj,bmin,pa in zip(ras,decs,bmajs,bmins,pas):
+        print >>out,"ellipse {} {} {} {} {}".format(ra,dec,bmaj,bmin,pa)
+    out.close()
+    return
+    
 #image manipulation
 def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     """
