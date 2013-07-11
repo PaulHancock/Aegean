@@ -1324,8 +1324,16 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
             logging.info("Found {0} cores".format(cores))
         else:
             logging.info("Using {0} subprocesses".format(cores))
-        queue = pprocess.Queue(limit=cores,reuse=1)
-        fit_parallel = queue.manage(pprocess.MakeReusable(fit_islands))
+        try:
+            queue = pprocess.Queue(limit=cores,reuse=1)
+            fit_parallel = queue.manage(pprocess.MakeReusable(fit_islands))
+        except AttributeError, e:
+            if 'poll' in e.message:
+                logging.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
+                cores=1
+                queue=[]
+            else:
+                raise e
     
     sources = []
 
