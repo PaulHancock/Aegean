@@ -857,10 +857,10 @@ def writeAnn(filename,catalog,fmt):
     
     
     if fmt=='ann':
-        formatter="ellipse {} {} {} {} {}"
+        formatter="ellipse {0} {1} {2} {3} {4}"
     elif fmt=='reg':
         print >>out,"fk5"
-        formatter='ellipse {} {} {}d {}d {}d'
+        formatter='ellipse {0} {1} {2}d {3}d {4}d'
         
     for ra,dec,bmaj,bmin,pa in zip(ras,decs,bmajs,bmins,pas):
         print >>out,formatter.format(ra,dec,bmaj,bmin,pa)
