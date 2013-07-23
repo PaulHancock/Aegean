@@ -857,7 +857,12 @@ def writeAnn(filename,catalog,fmt):
     
     
     if fmt=='ann':
+<<<<<<< .mine
+        print >>out,'PA SKY'
         formatter="ellipse {0} {1} {2} {3} {4}"
+=======
+        formatter="ellipse {0} {1} {2} {3} {4}"
+>>>>>>> .r835
     elif fmt=='reg':
         print >>out,"fk5"
         formatter='ellipse {0} {1} {2}d {3}d {4}d'
@@ -1012,7 +1017,9 @@ def fix_shape(mp):
         mp.params[i*6+5]-= int(mp.params[i*6+5]/(2*np.pi)) * 2*np.pi
         #now limit it to -pi to pi 
         if mp.params[i*6+5]>np.pi:
-            mp.params[i*6+5]-=np.pi 
+            mp.params[i*6+5]-=np.pi
+        if mp.params[i*6+5]<=-np.pi:
+            mp.params[i*6+5]+=np.pi
     return mp
 
 ########################################## TESTING ################################
