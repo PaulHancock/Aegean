@@ -1578,7 +1578,7 @@ if __name__=="__main__":
     if options.beam is not None:
         beam=options.beam
         if len(beam)!=3:
-            print "Beam requires 3 args. You supplied {}".format(beam)
+            print "Beam requires 3 args. You supplied {0}".format(beam)
             sys.exit()
         options.beam=Beam(beam[0],beam[1],beam[2]*math.pi/180)
         
