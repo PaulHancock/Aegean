@@ -857,12 +857,8 @@ def writeAnn(filename,catalog,fmt):
     
     
     if fmt=='ann':
-<<<<<<< .mine
         print >>out,'PA SKY'
         formatter="ellipse {0} {1} {2} {3} {4}"
-=======
-        formatter="ellipse {0} {1} {2} {3} {4}"
->>>>>>> .r835
     elif fmt=='reg':
         print >>out,"fk5"
         formatter='ellipse {0} {1} {2}d {3}d {4}d'
