@@ -16,6 +16,7 @@ import sys, os
 import pyfits
 import numpy as np
 import math
+import pywcs
 
 #logging and nice options
 import logging
@@ -24,40 +25,22 @@ from optparse import OptionParser
 #external programs
 from AegeanTools.fits_image import FitsImage, Beam
 from AegeanTools.mpfit import mpfit
-from AegeanTools.convert import ra2dec, dec2dec, dec2hms, dec2dms
+from AegeanTools.convert import ra2dec, dec2dec, dec2hms, dec2dms, gcd, bear, translate
 import AegeanTools.flags as flags
 import AegeanTools.pprocess as pprocess
-import pywcs
-import multiprocessing
 
+import multiprocessing
 from scipy import ndimage as ndi
 from scipy import stats
 
 version='$Revision$'
 
-#default header for all .fits images that I create
-default_header="""BSCALE  =    1.00000000000E+00  /
-BZERO   =    0.00000000000E+00  /
-TELESCOP= 'SIM     '  /
-CDELT1  =   -5.55555589756E-05  /
-CRPIX1  =    2.56000000000E+02  /
-CRVAL1  =    1.80000000000E+02  /
-CTYPE1  = 'RA---SIN'  /
-CDELT2  =   -5.55555589756E-05  /
-CRPIX2  =    2.56000000000E+02  /
-CRVAL2  =    0.00000000000E+00  /
-CTYPE2  = 'DEC--SIN'  /
-CELLSCAL= 'CONSTANT'  /
-BUNIT   = 'JY/BEAM '  /
-EPOCH   =    2.00000000000E+03  /
-OBJECT  = 'none   '             /
-OBSERVER= 'Various   '  /
-VOBS    =    0.00000000000E+00  /
-BTYPE   = 'intensity'  /
-RMS     =    1        /"""
-
 header="""#Aegean version {0}
 # on dataset: {1}"""
+
+#global constants
+fwhm2cc = 1/(2*math.sqrt(2*math.log(2)))
+cc2fwhm = (2*math.sqrt(2*math.log(2)))
 
 #Note this is now done in Imports.flags but repeated here for reference
 ## Set some bitwise logic for flood routines
@@ -152,25 +135,8 @@ class Island():
 
 class SimpleSource():
     """
-    A measurement of flux at a desired location
+    A (forced) measurement of flux at a given location
     """
-    names = {'background':'BackgroundFlux',
-        'local_rms':'LocalRms',
-        'ra':'RAJ2000',
-        'dec':'DECJ2000',
-        'peak_flux':'Flux',
-        'err_peak_flux':'Flux error'}
-    
-    units={'background':'Jy/beam',
-        'local_rms':'Jy/beam',
-        'ra':'degrees',
-        'dec':'degrees',
-        'peak_flux':'Jy/beam',
-        'err_peak_flux':'Jy/beam'}
-    
-    dtypes =dict([(a,np.float64) for a in ['background','local_rms','ra','dec','peak_flux','err_peak_flux']])
-    meta={'name':names,'unit':units,'type':dtypes}
-        
     header ="""#RA           DEC          Flux      err
 #                        Jy/beam   Jy/beam
 #==========================================="""
@@ -219,53 +185,6 @@ class OutputSource(SimpleSource):
                 "{0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} {0.err_int_flux: 8.6f} "+\
                 "{0.a:5.2f} {0.err_a:5.2f} {0.b:5.2f} {0.err_b:5.2f} "+\
                 "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:05b}"
-    #format for kvis .ann files    
-    ann_fmt_ellipse= "COLOUR green\nCIRCLE W {0.ra} {0.dec} 0.0083333333\n"
-    ann_fmt_fixed= "COLOUR yellow\nCIRCLE W {0.ra} {0.dec} 0.0083333333\n"
-    ann_fmt_fail= "COLOUR red\nCIRCLE W {0.ra} {0.dec} 0.0083333333\n"
-    
-    names = SimpleSource.names
-    names.update({"island":"Island",
-        "source":"component",
-        "ra_str":"RAJ2000",
-        "dec_str":"DECJ2000",
-        "err_ra":"RA error",
-        "err_dec":"DEC error",
-        "int_flux":"Integrated Flux",
-        "err_int_flux":"Integrated Flux error",
-        "a":"Major Axis",
-        "err_a":"Major Axis error",
-        "b":"Minor Axis",
-        "err_b":"Minor Axis error",
-        "pa":"Position Angle",
-        "err_pa":"Position Angle error",
-        "flags":"Fitting Flags"})
-    units=SimpleSource.units
-    units.update({"island":"Number",
-        "source":"Number",
-        "ra_str":"HMS",
-        "dec_str":"DMS",
-        "err_ra":"degrees",
-        "err_dec":"degrees",
-        "int_flux":"Jy",
-        "err_int_flux":"Jy",
-        "a":"arcsec",
-        "err_a":"arcsec",
-        "b":"arcsec",
-        "err_b":"arcsec",
-        "pa":"degrees",
-        "err_pa":"degrees",
-        "flags":"string"})
-    
-    dtypes=SimpleSource.dtypes
-    dtypes.update({"island":int,
-        "source":int,
-        "ra_str":str,
-        "dec_str":str,
-        'flags':str})
-    dtypes.update(dict([(a,np.float64) for a in ["err_ra","err_dec","int_flux","err_int_flux","a","err_a","b","err_b",'pa','err_pa']]))
-    
-    meta={'name':names,'unit':units,'type':dtypes}
     
     def __init__(self):
         self.island = None # island number
@@ -322,13 +241,17 @@ class OutputSource(SimpleSource):
     
 class GlobalFittingData:
     '''
-    The global data used for fitting. Read-only once created. Used by island fitting subprocesses.
+    The global data used for fitting.
+    (should be) Read-only once created.
+    Used by island fitting subprocesses.
+    wcs parameter used by most functions.
     '''
     dcurve = None
     rmsimg = None
     bkgimg = None
     hdu_header = None
     beam = None
+    wcs = None
     
 class IslandFittingData:
     '''
@@ -337,7 +260,7 @@ class IslandFittingData:
     
     isle_num = island number (int)
     i = the pixel island (a 2D numpy array of pixel values)
-    scalars=(innerclip,outerclip,csigma,max_summits,cc2arcsec,pix2arcsec)
+    scalars=(innerclip,outerclip,csigma,max_summits)
     offsets=(xmin,xmax,ymin,ymax)
     '''
     isle_num = 0
@@ -370,46 +293,6 @@ class DummyMP():
         self.errmsg="There is no error, I just didn't bother fitting anything!"
 
 ######################################### FUNCTIONS ###############################
-
-##pyfits load/save
-def header_fill(header,info):
-    """Take the header tokens from <info> and add them to <header>."""
-    lines=info.split('\n')
-    for l in lines:
-        key,val = l[:-1].split('=')
-        try:
-            val=float(val)
-        except ValueError:
-            val=val.replace("'","").strip()
-        header.update(key.strip(),val,'<=Defaulted')
-    return
-
-def load_pixels(filename,region=None):
-    """
-    Get a region of pixels from a .fits file <filename>
-    region = [xmin,xmax,ymin,ymax]
-    default is all pixels
-    returns: pixels[y,x] as per pyfits format         
-    """
-    hdu=pyfits.open(filename)
-    pixels=hdu[0].data
-    if region is not None:
-        if len(region)==4:
-            c,d,a,b=region #pyfits loads arrays 'the other way'
-            pixels=pixels[a:b,c:d]
-    return pixels
-
-def save(data,filename,header=default_header):
-    """
-    Save an np.array as a fits file <filename>[.fits]
-    A default header is attached to the file so that it
-    is a valid fits file. (and can be read in kvis/ds9)
-    """
-    hdu=pyfits.PrimaryHDU(data)
-    hdulist=pyfits.HDUList()
-    hdulist.append(hdu)
-    header_fill(hdulist[0].header,header)
-    hdulist.writeto("{0}.fits".format(filename),clobber=True)
 
 ## floodfill functions
 def explore(data, rmsimg, status, queue, bounds, cutoffratio, pixel):
@@ -528,7 +411,7 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=True):
                 yield new_isle,xmin,xmax,ymin,ymax
     
 ##parameter estimates
-def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
+def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0]):
     """Estimates the number of sources in an island and returns initial parameters for the fit as well as
     limits on those parameters.
 
@@ -540,20 +423,25 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
     innerclip - the inner clipping level for flux data, in sigmas
     csigma - 1sigma value of the curvature map
              None => zero (default)
+    offsets - the (x,y) offset of data within it's parent image
+              this is required for proper WCS conversions
 
     returns:
     parinfo object for mpfit
-    
+    with all parameters in pixel coords    
     """
     #use a curvature of zero as a default significance cut
     if not csigma:
         csigma=0
     parinfo=[]
     
-    #limits on how far the position is allowed to move based on the primary beam shape
-    xo_lim=(beam.a*math.cos(beam.pa)+beam.b*math.sin(beam.pa))/2 
-    yo_lim=(beam.a*math.sin(beam.pa)+beam.b*math.cos(beam.pa))/2
-    fwhm2cc = 1/(2*math.sqrt(2*math.log(2)))
+    #calculate a local beam from the center of the data
+    xo,yo= data.shape
+    pixbeam = get_pixbeam(beam,offsets[0]+xo/2,offsets[1]+yo/2)
+    
+    #The position cannot be more than a pixel beam from the initial location
+    xo_lim=max(pixbeam.a*np.cos(np.radians(pixbeam.pa)),pixbeam.b*np.sin(np.radians(pixbeam.pa)))
+    yo_lim=max(pixbeam.a*np.sin(np.radians(pixbeam.pa)),pixbeam.b*np.cos(np.radians(pixbeam.pa)))
     logging.debug(" - shape {0}".format(data.shape))
     
     if not data.shape == curve.shape:
@@ -588,6 +476,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
         
         summit_flag = is_flag
         logging.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape,xmin,xmax,ymin,ymax,i))
+        #amp = summit[np.where(np.isfinite(summit))].max()
         amp=summit[np.where(summit==summit)].max()#HAXORZ!! stupid NaNs break all my things
         logging.debug(" - max is {0}".format(amp))
         (xpeak,ypeak)=np.where(summit==amp)
@@ -599,46 +488,44 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
         amp_min,amp_max= float(4*rmsimg[xo,yo]), float(amp*1.05+3*rmsimg[xo,yo])
         logging.debug("a_min {0}, a_max {1}".format(amp_min,amp_max))
         
-        xo_min,xo_max = min(xmin,xo-xo_lim),max(xmax,xo+xo_lim)
+        xo_min,xo_max = max(xmin,xo-xo_lim),min(xmax,xo+xo_lim)
         if xo_min==xo_max: #if we have a 1d summit then allow the position to vary by +/-0.5pix
             xo_min,xo_max=xo_min-0.5,xo_max+0.5
+            
         yo_min,yo_max = min(ymin,yo-yo_lim),max(ymax,yo+yo_lim)
-        if xo_min==xo_max: #if we have a 1d summit then allow the position to vary by +/-0.5pix
-            xo_min,xo_max=xo_min-0.5,xo_max+0.5
+        if yo_min==yo_max: #if we have a 1d summit then allow the position to vary by +/-0.5pix
+            yo_min,yo_max=yo_min-0.5,yo_max+0.5
 
         #TODO: The limits on major,minor work well for circular beams or unresolved sources
         #for elliptical beams *and* resolved sources this isn't good and should be redone
         
         xsize=xmax-xmin+1
         ysize=ymax-ymin+1
-        #initial shape is based on the size of the summit        
-        major=max(beam.a, ysize*math.sqrt(2) )*fwhm2cc
-        major_min,major_max = beam.a*fwhm2cc,max(major,(ysize+1)*math.sqrt(2)*fwhm2cc)
-        major_min=min(major_min,major_max)
         
-        minor=max(beam.b,xsize)*math.sqrt(2)*fwhm2cc
-        minor_min,minor_max = beam.b*fwhm2cc,max(minor, (xsize+1)*math.sqrt(2)*fwhm2cc) 
-        minor_min=min(minor_min,minor_max) 
+        #initial shape is the pix beam        
+        major=pixbeam.a*fwhm2cc
+        minor=pixbeam.b*fwhm2cc
+        
+        #constraints are based on the shape of the island
+        major_min,major_max = major*0.8, max((max(xsize,ysize)+1)*math.sqrt(2)*fwhm2cc,major*1.1)
+        minor_min,minor_max = minor*0.8, max((max(xsize,ysize)+1)*math.sqrt(2)*fwhm2cc,major*1.1)
 
         #TODO: update this to fit a psf for things that are "close" to a psf.
         #if the min/max of either major,minor are equal then use a PSF fit
         if minor_min==minor_max or major_min==major_max:
             summit_flag|=flags.FIXED2PSF
-            
-        if summit_flag & flags.FIXED2PSF:
-            minor=beam.b*fwhm2cc
-            major=beam.a*fwhm2cc
         
-        pa=beam.pa
+        pa=pixbeam.pa
         flag=summit_flag
-        logging.debug(" - var val min max | min max")
-        logging.debug(" - amp {0} {1} {2} ".format(amp,amp_min,amp_max))
-        logging.debug(" - xo {0} {1} {2} ".format(xo,xo_min,xo_max))
-        logging.debug(" - yo {0} {1} {2} ".format(yo,yo_min,yo_max))
-        logging.debug(" - major {0} {1} {2} | {3} {4}".format(major,major_min,major_max,major_min/fwhm2cc,major_max/fwhm2cc))
-        logging.debug(" - minor {0} {1} {2} | {3} {4}".format(minor,minor_min,minor_max,minor_min/fwhm2cc,minor_max/fwhm2cc))
-        logging.debug(" - pa {0} {1} {2}".format(pa,-np.pi,np.pi))
-        logging.debug(" - flags {0}".format(flag))
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.debug(" - var val min max | min max")
+            logging.debug(" - amp {0} {1} {2} ".format(amp,amp_min,amp_max))
+            logging.debug(" - xo {0} {1} {2} ".format(xo,xo_min,xo_max))
+            logging.debug(" - yo {0} {1} {2} ".format(yo,yo_min,yo_max))
+            logging.debug(" - major {0} {1} {2} | {3} {4}".format(major,major_min,major_max,major_min/fwhm2cc,major_max/fwhm2cc))
+            logging.debug(" - minor {0} {1} {2} | {3} {4}".format(minor,minor_min,minor_max,minor_min/fwhm2cc,minor_max/fwhm2cc))
+            logging.debug(" - pa {0} {1} {2}".format(pa,-180,180))
+            logging.debug(" - flags {0}".format(flag))
         parinfo.append( {'value':amp,
                          'fixed':False,
                          'parname':'{0}:amp'.format(i),
@@ -669,7 +556,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None):
         parinfo.append( {'value':pa,
                          'fixed': (flag & flags.FIXED2PSF)>0,
                          'parname':'{0}:pa'.format(i),
-                         'limits':[-np.pi,np.pi],
+                         'limits':[-180,180],
                          'limited':[False,False],
                          'flags':flag} )
         i+=1
@@ -680,25 +567,19 @@ def ntwodgaussian(inpars):
     """
     Return an array of values represented by multiple Gaussians as parameterized
     by params = [amp,x0,y0,major,minor,pa]{n}
-    
-    A rewrite of gausfitter.twodgaussian to be faster or at least scale better.
+    x0,y0,major,minor ar in pixels
+    pa is in degrees
     """
     if not len(inpars)%6 ==0:
-        logging.error("Aww dude, wheres my parameters? You didn't give me enough!")
+        logging.error("inpars requires a multiple of 6 parameters")
+        logging.error("only {0} parameters supplied".format(len(inpars)))
         sys.exit()
     pars=np.array(inpars).reshape(len(inpars)/6,6)
-    amp=[a[0] for a in pars]
-    xo=[ a[1] for a in pars]
-    yo=[ a[2] for a in pars]
-    major=[ a[3] for a in pars]
-    minor=[ a[4] for a in pars]
-    #add pi/2 so that we are now East of North instead of South of East
-    pa=[ a[5]+np.pi/2 for a in pars] 
-    st=[ math.sin(p)**2 for p in pa]
-    ct=[ math.cos(p)**2 for p in pa]
-    s2t=[math.sin(2*p) for p in pa]
+    amp,xo,yo,major,minor,pa = zip(*pars)
+    #transform pa->-pa so that our angles are CW instead of CCW
+    st,ct,s2t=zip(*[ (math.sin(np.radians(-p))**2,math.cos(np.radians(-p))**2,math.sin(2*np.radians(-p))) for p in pa])
     a = [ (ct[i]/major[i]**2 + st[i]/minor[i]**2)/2 for i in range(len(amp))]
-    bb= [ s2t[i]/4 *(1/minor[i]**2-1/major[i]**2) for i in range(len(amp))]
+    bb= [ s2t[i]/4 *(1/minor[i]**2-1/major[i]**2)   for i in range(len(amp))]
     c = [ (st[i]/major[i]**2 + ct[i]/minor[i]**2)/2 for i in range(len(amp))]
 
     def rfunc(x,y):
@@ -711,7 +592,7 @@ def ntwodgaussian(inpars):
 
 def twodgaussian(params, shape):
     '''
-    Build a 2D Gaussian ellipse as parameterised by "params" for a region with "shape"
+    Build a (single) 2D Gaussian ellipse as parameterised by "params" for a region with "shape"
         params - [amp, xo, yo, cx, cy, pa] where:
                 amp - amplitude
                 xo  - centre of Gaussian in X
@@ -720,19 +601,12 @@ def twodgaussian(params, shape):
                 cy  - width of Gaussian in Y (sigma or c, not FWHM)
                 pa  - position angle of Gaussian, aka theta (radians clockwise)
         shape - (y, x) dimensions of region
-    Returns a 2D numpy array with shape="shape" 
+    Returns a 2D numpy array with shape="shape"
+    
+    Actually just calls ntwodgaussian!!
     '''
     assert(len(shape) == 2)
-    amp, xo, yo, cx, cy, pa = params
-    y, x = np.indices(shape)
-    st = math.sin(pa)**2
-    ct = math.cos(pa)**2
-    s2t = math.sin(2*pa)
-    a = (ct/cx**2 + st/cy**2)/2
-    b = s2t/4 *(1/cy**2-1/cx**2)
-    c = (st/cx**2 + ct/cy**2)/2
-    v = amp*np.exp(-1*(a*(x-xo)**2 + 2*b*(x-xo)*(y-yo) + c*(y-yo)**2))
-    return v
+    return ntwodgaussian(params)(*np.indices(shape))
 
 def multi_gauss(data,rmsimg,parinfo):
     """
@@ -764,7 +638,7 @@ def load_aux_image(image,auxfile):
     """
     Load a fits file (bkg/rms/curve) and make sure that
     it is the same shape as the main image.
-    image = main image
+    image = main image object
     auxfile = filename of auxiliary file
     """
     auximg=FitsImage(auxfile).get_pixels()
@@ -806,8 +680,11 @@ def load_catalog(filename,fmt='csv'):
 
 def save_catalog(filename,catalog):
     '''
-    take a list of sources (OutputSources or SimpleSources)
-    and save the catalog as a table with format determined by the file extension
+    input:
+        filename - name of file to write, format determined by extension
+        catalog - a list of sources (OutputSources or SimpleSources)
+    returns:
+        nothing
     '''
     #.ann and .reg are handled by me
     extension=os.path.basename(filename).split('.')[-1]
@@ -838,10 +715,15 @@ def save_catalog(filename,catalog):
     return
 
 def writeAnn(filename,catalog,fmt):
-    """Write an annotation file that can be read by Kvis (.ann) or DS9 (.reg).
+    """
+    Write an annotation file that can be read by Kvis (.ann) or DS9 (.reg).
     Uses ra/dec from catalog.
     Draws ellipses if bmaj/bmin/pa are in catalog 
     Draws 30" circles otherwise
+    Input:
+        filename - file to write to
+        catalog - a list of OutputSource or SimpleSource
+        fmt - [.ann|.reg] format to use
     """
     out=open(filename,'w')
     ras = [a.ra for a in catalog]
@@ -867,15 +749,7 @@ def writeAnn(filename,catalog,fmt):
         print >>out,formatter.format(ra,dec,bmaj,bmin,pa)
     out.close()
     return
-    
-def writeReg(filename,catalog):
-    """Write a region file that canbe read by DS9.
-    Uses ra/dec from catalog.
-    Draws ellipses if bmaj/bmin/pa are in catalog
-    Draws 30" circles otherwise
-    """
-    out=open(filename,'w')
-    
+        
 #image manipulation
 def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     """
@@ -901,8 +775,15 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     xcen=int(img_x/2)
     ycen=int(img_y/2)
 
-    width_x = mesh_size*int(max(abs(math.cos(beam.pa)*beam.b), abs(math.sin(beam.pa)*beam.a)))
-    width_y = mesh_size*int(max(abs(math.sin(beam.pa)*beam.b), abs(math.cos(beam.pa)*beam.a)))
+    #calculate a local beam from the center of the data
+    pixbeam=get_pixbeam(beam,xcen,ycen)
+    
+    width_x = mesh_size*max(abs(math.cos(np.radians(pixbeam.pa))*pixbeam.b),
+                            abs(math.sin(np.radians(pixbeam.pa))*pixbeam.a) )
+    width_x = int(width_x)
+    width_y = mesh_size*max(abs(math.sin(np.radians(pixbeam.pa))*pixbeam.b),
+                            abs(math.cos(np.radians(pixbeam.pa))*pixbeam.a) )
+    width_y = int(width_y)
     
     rmsimg = np.zeros(data.shape)
     bkgimg = np.zeros(data.shape)
@@ -968,10 +849,17 @@ def estimate_background(data):
     return p50, iqr / 1.34896
     
 def curvature(data,aspect=None):
-    """Use a Lapacian kernal to figure the curvature map."""
+    """
+    Use a Lapacian kernal to calculate the curvature map.
+    input:
+        data - the image data
+        aspect - the ratio of pixel size (x/y)
+                NOT TESTED!
+    """
     if not aspect:
         kern=np.array( [[1,1,1],[1,-8,1],[1,1,1]])
     else:
+        logging.warn("Aspect != has not been tested.")
         #TODO: test that this actually works as intended
         a = 1.0/aspect
         b = 1.0/math.sqrt(1+aspect**2)
@@ -979,72 +867,118 @@ def curvature(data,aspect=None):
         kern = 0.25*np.array( [[b,a,b],[1,c,1],[b,a,b]])
     return ndi.convolve(data,kern)
 
-def gradient(data,aspect=1.0):
-    """Use a kernal to figure out the gradient map."""
-    gx = np.array( [[-1, 0, 1],[-2,0,2],[-1,0,1]])
-    gy = np.array( [[-1,-2,-1],[0,0,0],[1,2,1]])
-    return np.sqrt(ndi.convolve(data,gx)**2 + ndi.convolve(data,gy)**2)
-
 ##Nifty helpers
 def within(x,xm,xx):
     """Enforce xm<= x <=xx"""
     return min(max(x,xm),xx)
 
-def fix_shape(mp):
+def fix_shape(source):
     """
-    Ensure that a>=b and -pi<pa<=pi
+    Ensure that a>=b
+    adjust as required
     """
-    #params = [amp,xo,yo,major,minor,pa [, ... ]]
-    for i in range(len(mp.params) /6):
-        #fix the position angle so that it is East of North instead of South of East
-        #mp.params[i*6+5]+=np.pi/2
-        if mp.params[i*6+3]<mp.params[i*6+4]: # a<b
-            #swap the major an minor axes (and the errors)
-            bla=mp.params[i*6+4] 
-            mp.params[i*6+4]=mp.params[i*6+3]
-            mp.params[i*6+3]=bla
-            if not(mp.perror is None):
-                bla=mp.perror[i*6+4]
-                mp.perror[i*6+4]=mp.perror[i*6+3]
-                mp.perror[i*6+3]=bla
-            #change the position angle
-            mp.params[i*6+5]=mp.params[i*6+5]-np.pi/2
-        #limit the range of pa from 0 to 2pi
-        mp.params[i*6+5]-= int(mp.params[i*6+5]/(2*np.pi)) * 2*np.pi
-        #now limit it to -pi to pi 
-        if mp.params[i*6+5]>np.pi:
-            mp.params[i*6+5]-=np.pi
-        if mp.params[i*6+5]<=-np.pi:
-            mp.params[i*6+5]+=np.pi
-    return mp
+    if source.a<source.b:
+        source.a,source.b = source.b, source.a
+        source.err_a, source.err_b = source.err_b, source.err_a
+        source.pa +=90
+    return
 
-########################################## TESTING ################################
-# These were created at the same time as the parent functions but not updated
-# they may therefore not work
-######
-def test_bkg_rms(data_file,temp_dir):
-    print "TESTING RMS AND BGK IMGAES"
-    print data_file
-    img = FitsImage(data_file, hdu_index=0)
-    data = Island(img.get_pixels())
-    beam = img.beam
-    bkgimg,rmsimg=make_bkg_rms_image(data.pixels,beam,mesh_size=20)
-    save(bkgimg,'{0}/bkg_data'.format(temp_dir))
-    save(rmsimg,'{0}/rms_data'.format(temp_dir))
-    save(data.pixels,'{0}/data'.format(temp_dir))
+def pa_limit(pa):
+    """
+    Position angle is periodic with period 180\deg
+    Constrain pa such that -90<pa<=90
+    """
+    while pa<=-90:
+        pa+=180
+    while pa>90:
+        pa-=180
+    return pa
 
-def test_curvature(data_file,temp_dir):
-    print "TESTING CURVATURE"
-    data=load_pixels(data_file)
-    curve=curvature(data,aspect=1.0)
-    save(data,'{0}/tc_data'.format(temp_dir))
-    save(curve,'{0}/tc_aplace'.format(temp_dir))
-    save(d2x(data),'{0}/tc_d2x'.format(temp_dir))
-    save(d2y(data),'{0}//tc_d2y'.format(temp_dir))
-    lmask=(curve<0)*data
-    dmask=(d2x(data)<0) * (d2y(data)<0) *data
-    save(lmask,'{0}/tc_lmask'.format(temp_dir))
-    save(dmask,'{0}/tc_dmask'.format(temp_dir))
+#WCS helper functions
+
+def pix2sky(pixel):
+    """
+    Take pixel=(x,y) coords
+    convert to pos=(ra,dec) coords
+    """
+    x,y=pixel
+    #wcs and pyfits have oposite ideas of x/y
+    skybox = global_data.wcs.wcs_pix2sky([[y,x]],0)
+    return [float(skybox[0][0]), float(skybox[0][1])]
+
+def sky2pix(pos):
+    """
+    Take pos = (ra,dec) coords
+    convert to pixel = (x,y) coords
+    """
+    pixel = global_data.wcs.wcs_sky2pix([pos],0)
+    #wcs and pyfits have oposite ideas of x/y
+    return [pixel[0][1],pixel[0][0]]
+
+def sky2pix_vec(pos,r,pa):
+    """Convert a vector from sky to pixel corrds
+    vector is calculated at an origin pos=(ra,dec)
+    and has a magnitude (r) [in degrees]
+    and an angle (pa) [in degrees]
+    input:
+        pos - (ra,dec) of vector origin
+        r - magnitude in degrees
+        pa - angle in degrees
+    return:
+    x,y - corresponding to position ra,dec
+    r,theta - magnitude (piexls) and angle (degrees) of the origional vector
+    """
+    ra,dec= pos
+    x,y = sky2pix(pos)
+    a = translate(ra,dec,r,pa)
+    #[ra +r*np.sin(np.radians(pa))*np.cos(np.radians(dec)),
+    #     dec+r*np.cos(np.radians(pa))]
+    locations=sky2pix(a)
+    x_off,y_off = locations
+    a=np.sqrt((x-x_off)**2 + (y-y_off)**2)
+    theta=np.degrees(np.arctan2((y_off-y),(x_off-x)))
+    return (x,y,a,theta)
+
+def pix2sky_vec(pixel,r,theta):
+    """
+    Convert a vector from pixel to sky coords
+    vector is calculated at an origin pixel=(x,y)
+    and has a magnitude (r) [in pixels]
+    and an angle (theta) [in degrees]
+    input:
+        pixel - (x,y) of origin
+        r - magnitude in pixels
+        theta - in degrees
+    return:
+    ra,dec - corresponding to pixels x,y
+    r,pa - magnitude and angle (degrees) of the origional vector, as measured on the sky
+    """
+    ra1,dec1 = pix2sky(pixel)
+    x,y=pixel
+    a = [ x+r*np.cos(np.radians(theta)),
+          y+r*np.sin(np.radians(theta))]
+    locations = pix2sky(a)
+    ra2,dec2 = locations
+    a = gcd(ra1,dec1,ra2,dec2)
+    pa = bear(ra1,dec1,ra2,dec2)
+    return (ra1,dec1,a,pa)
+
+def get_pixbeam(beam,x,y):
+    """
+    Calculate a beam with parameters in pixel coordinates
+    at the given image location (x,y)
+    Input:
+        beam - a Beam object
+        x,y - the pixel coordinates at which to comput the beam   
+    Returns:
+        a beam where beam.a, beam.b are in pixels
+        and beam.pa is in degrees
+    """
+    #calculate a local beam from the center of the data
+    ra,dec = pix2sky([x,y])
+    major,pa =sky2pix_vec([ra,dec],beam.a,beam.pa)[2:4]
+    minor = sky2pix_vec([ra,dec],beam.b,beam.pa + 90)[2]
+    return Beam(major,minor,pa)
 
 ######################################### THE MAIN DRIVING FUNCTIONS ###############
 
@@ -1064,22 +998,14 @@ def fit_island(island_data):
     rmsimg = global_data.rmsimg
     bkgimg = global_data.bkgimg
     beam = global_data.beam
+    wcs = global_data.wcs
     
     # island data
     isle_num = island_data.isle_num
     i = island_data.i        
-    innerclip,outerclip,csigma,max_summits,cc2arcsec,pix2arcsec=island_data.scalars
+    innerclip,outerclip,csigma,max_summits=island_data.scalars
     xmin,xmax,ymin,ymax=island_data.offsets
     #avoids some problems with miriad generated fits files - HT John Morgan
-    try:
-        wcs=pywcs.WCS(hdu_header, naxis=2)
-    except:
-        wcs=pywcs.WCS(str(hdu_header),naxis=2)
-        
-    def pix2sky(pixel):
-        pixbox = np.array([pixel, pixel])
-        skybox = wcs.wcs_pix2sky(pixbox, 1)
-        return [float(skybox[0][0]), float(skybox[0][1])]
 
     isle=Island(i)
     icurve = dcurve[xmin:xmax+1,ymin:ymax+1]
@@ -1087,9 +1013,9 @@ def fit_island(island_data):
     bkg=bkgimg[xmin:xmax+1,ymin:ymax+1]
     
     logging.debug("=====")
-    logging.debug("Island ({0})".format(isle_num) )
+    logging.debug("Island ({0})".format(isle_num))
 
-    parinfo= estimate_parinfo(isle.pixels,rms,icurve,beam,innerclip,csigma=csigma)
+    parinfo= estimate_parinfo(isle.pixels,rms,icurve,beam,innerclip,csigma=csigma,offsets=[xmin,ymin])
 
     logging.debug("Rms is {0}".format(np.shape(rms)) )
     logging.debug("Isle is {0}".format(np.shape(isle.pixels)) )
@@ -1130,103 +1056,106 @@ def fit_island(island_data):
     else:
         mp,info=multi_gauss(isle.pixels,rms,parinfo)
 
-    logging.debug("Source 0 pa={0}".format(mp.params[5]))
-    #fix the major/minor axis
-    logging.debug("'fixing' the major/minor/pa of all sources")
-    mp=fix_shape(mp)
-    logging.debug("Source 0 pa={0}".format(mp.params[5]))
+    logging.debug("Source 0 pa={0} [pixel coords]".format(mp.params[5]))
     
     params=mp.params
     #report the source parameters
     err=False
     sources=[]
+    parlen=len(params)
     
-    for j in range(len(params)/6):
+    #fix_shape(mp)
+    par_matrix = np.asarray(params,dtype=np.float64) #float32's give string conversion errors.
+    par_matrix = par_matrix.reshape(parlen/6,6)
+        
+    #if there was a fitting error create an mp.perror matrix full of zeros
+    if mp.perror is None:
+        mp.perror = [0 for a in mp.params]
+        err=True
+        logging.debug("FitError: {0}".format(mp.errmsg))
+        logging.debug("info:")
+        for i in info:
+            logging.debug("{0}".format(i))
+            
+    #anything that has an error of zero should be converted to -1
+    for k,val in enumerate(mp.perror):
+        if val==0.0:
+            mp.perror[k]=-1
+
+    err_matrix = np.asarray(mp.perror).reshape(parlen/6,6)
+    
+    for j,((amp,xo,yo,major,minor,theta),(amp_err,xo_err,yo_err,major_err,minor_err,theta_err)) in enumerate(zip(par_matrix,err_matrix)):
+    #for j in range(len(params)/6):
+        #amp,xo,yo,major,minor,theta = map(lambda x: j*5+x,[0,1,2,3,4,5])
         source = OutputSource()
         source.island = isle_num
         source.source = j
-
+        
+        #record fitting and error flags
         src_flags=0
-        if mp.perror is None:
-            mp.perror = [0 for a in mp.params]
-            err=True
-            logging.debug("FitError: {0}".format(mp.errmsg))
-            logging.debug("info:")
-            for i in info:
-                logging.debug("{0}".format(i))
-        for k in range(len(mp.perror)):
-            if mp.perror[k]==0.0:
-                mp.perror[k]=-1
         if err:
             src_flags|=flags.FITERR
+            
         #read the flag information from the 'pa'
         src_flags|= info[j*6+5]['flags']
-
-        #np.float32 has some stupid problem with str.format so i have to cast everything to a float64
-        mp.params=[np.float64(a) for a in mp.params]
 
         #params = [amp,x0,y0,major,minor,pa]{n}
         #pixel pos within island + 
         # island offset within region +
         # region offset within image +
         # 1 for luck
-        # (pyfits->miriad conversion = luck)
-        dec_pix=mp.params[j*6+1] + xmin + 1
-        ra_pix =mp.params[j*6+2] + ymin + 1
-        coords = pix2sky([ra_pix, dec_pix])
-        source.ra = coords[0]
-        source.dec = coords[1]
+        # (pyfits->fits conversion = luck)
+        x_pix=xo + xmin + 1
+        y_pix=yo + ymin + 1
+
+        (source.ra,source.dec,source.a,source.pa) = pix2sky_vec((x_pix,y_pix),major*cc2fwhm,theta)
         source.ra_str= dec2hms(source.ra)
         source.dec_str= dec2dms(source.dec)
+        logging.debug("Source {0} Extracted pa={1}deg [pixel] -> {2}deg [sky]".format(j,theta,source.pa))
+        
+        #calculate minor axis and convert a/b to arcsec
+        source.a *= 3600 #arcseconds
+        source.b = pix2sky_vec((x_pix,y_pix),minor*cc2fwhm,theta+90)[2]*3600 #arcseconds
 
         #calculate ra,dec errors from the pixel error
-        if mp.perror[j*6+1]<0:
-            source.err_ra =-1
-            source.err_dec=-1
-        else:
-            #really big errors cause problems
-            #limit the errors to be the width of the island
-            dec_err_pix=dec_pix + within(mp.perror[j*6+1],-1,isle.pixels.shape[1])
-            ra_err_pix =ra_pix + within(mp.perror[j*6+2],-1,isle.pixels.shape[0])
-            err_coords = pix2sky([ra_err_pix, dec_err_pix])
-            source.err_ra = abs(source.ra - err_coords[0])
-            source.err_dec = abs(source.dec - err_coords[1])
-
+        #limit the errors to be the width of the island
+        x_err_pix=x_pix + within(xo_err,-1,isle.pixels.shape[0])
+        y_err_pix=y_pix + within(yo_err,-1,isle.pixels.shape[1])
+        err_coords = pix2sky([x_err_pix, y_err_pix])
+        source.err_ra = abs(source.ra - err_coords[0])   if xo_err>0 else -1
+        source.err_dec = abs(source.dec - err_coords[1]) if yo_err>0 else -1
+        source.err_a = abs(source.a - pix2sky_vec((x_pix,y_pix),(major+major_err)*cc2fwhm,theta)[2]*3600)    if major_err>0 else -1
+        source.err_b = abs(source.b - pix2sky_vec((x_pix,y_pix),(minor+minor_err)*cc2fwhm,theta+90)[2]*3600) if minor_err>0 else -1
+        source.err_pa= abs(source.pa - pix2sky_vec((x_pix,y_pix),major*cc2fwhm,theta+theta_err)[3])          if theta_err>0 else -1
+        #ensure a>=b
+        fix_shape(source)
+        #fix the pa to be between -90<pa<=90
+        source.pa = pa_limit(source.pa)
+        if source.err_pa>0:
+            # pa-err_pa = 180degrees is the same as 0degrees so change it
+            source.err_pa = abs(pa_limit(source.err_pa))
+        
+        
         # flux values
         #the background is taken from background map
         # Clamp the pixel location to the edge of the background map (see Trac #51)
-        ## This seems to be the reverse of the x/y ra/dec_pix definition from above.
-        x = max(min(int(round(ra_pix-ymin)), bkg.shape[1]-1),0)
-        y = max(min(int(round(dec_pix-xmin)), bkg.shape[0]-1),0)
-        source.background=bkg[y,x]
-        source.local_rms=rms[y,x]
-        source.peak_flux = mp.params[j*6]
-        source.err_peak_flux = mp.perror[j*6]
-
-
-        # major/minor axis and position angle
-        source.a = mp.params[j*6+3]*cc2arcsec
-        source.err_a = mp.perror[j*6+3]
-        if source.err_a>0:
-            source.err_a*=cc2arcsec
-        source.b = mp.params[j*6+4]*cc2arcsec
-        source.err_b = mp.perror[j*6+4]
-        if source.err_b>0:
-            source.err_b*=cc2arcsec
-        source.pa = mp.params[j*6+5]*180/np.pi
-        source.err_pa = mp.perror[j*6+5]
-        if source.err_pa>0:
-            source.err_pa*=180/np.pi
+        y = max(min(int(round(y_pix-ymin)), bkg.shape[1]-1),0)
+        x = max(min(int(round(x_pix-xmin)), bkg.shape[0]-1),0)
+        #FIXME check that these x,y are correct. maybe = y-1,x-1
+        source.background=bkg[x,y]
+        source.local_rms=rms[x,y]
+        source.peak_flux = amp
+        source.err_peak_flux = amp_err
+        
         source.flags = src_flags
         
+        pixbeam=get_pixbeam(beam,x_pix,y_pix)
         #integrated flux is calculated not fit or measured
-        source.int_flux=source.peak_flux*source.a*source.b/(beam.a*beam.b*pix2arcsec**2)
-        if -1 in [source.err_peak_flux,source.err_a,source.err_b,source.err_pa]:
-            source.err_int_flux=-1
-        else:
-            source.err_int_flux=source.int_flux*math.sqrt( (source.err_peak_flux/source.peak_flux)**2
-                                                          +(source.err_a/source.a)**2
-                                                          +(source.err_b/source.b)**2)
+        source.int_flux=source.peak_flux*source.a*source.b/(pixbeam.a*pixbeam.b)
+        #The error is never -1, but may be zero.
+        source.err_int_flux = source.int_flux*math.sqrt( (max(source.err_peak_flux,0)/source.peak_flux)**2
+                                                        +(max(source.err_a,0)/source.a)**2
+                                                        +(max(source.err_b,0)/source.b)**2)
         sources.append(source)
         logging.debug(source)
     return sources
@@ -1265,11 +1194,17 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     outerclip   - the flood clip in sigmas, used for flooding islands
                    Default = 4
     cores       - number of CPU cores to use. None means all cores.
+    rmsin       - filename of an rms image that will be used instead of
+                   the internally calculated one
+    bkgin       - filename of a background image that will be used instead of
+                    the internally calculated one
+    beam        - (major,minor,pa) (all degrees) of the synthesised beam to be use
+                   overides whatever is given in the fitsheader.
     Return:
     a list of OutputSource objects
     """
     if cores is not None:
-        assert(cores >= 1)
+        assert(cores >= 1), "cores must be one or more"
         
     global global_data
     
@@ -1277,8 +1212,18 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     hdu_header = img.get_hdu_header()
     beam=img.beam    
     data = Island(img.get_pixels())
-    dcurve=curvature(img.get_pixels(),aspect=beam.aspect)
-
+    dcurve=curvature(img.get_pixels())
+    
+    # Save global data for use by fitting subprocesses    
+    global_data = GlobalFittingData()
+    global_data.beam = beam
+    global_data.dcurve = dcurve
+    global_data.hdu_header = hdu_header
+    try:
+        global_data.wcs=pywcs.WCS(hdu_header, naxis=2)
+    except:
+        global_data.wcs=pywcs.WCS(str(hdu_header),naxis=2)
+        
     #if either of rms or bkg images are not supplied then caclucate them both
     if not (rmsin and bkgin):
         logging.info("Calculating background and rms data")
@@ -1297,25 +1242,15 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         logging.info("Calculating curvature data")
         cbkg, csigma = estimate_background(dcurve)
 
-    # Save global data for use by fitting subprocesses    
-    global_data = GlobalFittingData()
-    global_data.beam = beam
+    #add the background and rms to the global data
     global_data.bkgimg = bkgimg
     global_data.rmsimg = rmsimg
-    global_data.dcurve = dcurve
-    global_data.hdu_header = hdu_header
     
-    #TODO: don't assume square pixels. This will definately mean the source
-    # parameters are a bit wrong for images where degrees-per-pixel is not equal in X and Y
-    pix2arcsec = abs(img.deg_per_pixel_x) * 3600
-    logging.info("beam={1.a:5.2f}pix by {1.b:5.2f}pix, {1.pa:5.2e}rad".format(pix2arcsec, beam))
-    logging.info("pix2arcsec={0}".format(pix2arcsec))
-    logging.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a*pix2arcsec,beam.b*pix2arcsec,beam.pa*180/np.pi))
+ 
+    logging.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a*3600,beam.b*3600,beam.pa))
     logging.info("csigma={0}".format(csigma))
     logging.info("seedclip={0}".format(innerclip))
     logging.info("floodclip={0}".format(outerclip))
-    cc2fwhm = (2*math.sqrt(2*math.log(2)))
-    cc2arcsec=cc2fwhm*pix2arcsec
     
     isle_num=0
 
@@ -1350,7 +1285,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
             #empty islands have length 1
             continue 
         isle_num+=1
-        scalars=(innerclip,outerclip,csigma,max_summits,cc2arcsec,pix2arcsec)
+        scalars=(innerclip,outerclip,csigma,max_summits)
         offsets=(xmin,xmax,ymin,ymax)
         island_data = IslandFittingData(isle_num, i, scalars, offsets)
         # If cores==1 run fitting in main process. Otherwise build up groups of islands
@@ -1385,52 +1320,61 @@ def force_measure_flux(img,bkgimg,radec,rmsimg=None):
     '''
     Measure the flux of a point source at each of the specified locations
     Not fitting is done, just forced measurements
+    input:
+        img - the image data
+        bkgimg - the background image
+        radec - the locations at which to measure fluxes
+        rmsimg - if given, the rms at each location will also be taken
+                 from this image and reported
     returns:
     [(flux,err),...]
     '''
     catalog = []
-    # The beam in pixel terms
-    bmaj, bmin, bpa = (img.beam.a,img.beam.b,img.beam.pa)
-    ywidth = bmaj*bmin / ( (bmin*math.cos(bpa))**2 + (bmaj*math.sin(bpa))**2) #height
-    xwidth = bmaj*bmin / ( (bmin*math.sin(bpa))**2 + (bmaj*math.cos(bpa))**2) #width
-    
-    #round to an int and add 1
-    ywidth=int(round(ywidth))+1
-    xwidth=int(round(xwidth))+1
     
     for ra,dec in radec:
         #find the right pixels from the ra/dec
-        source_x, source_y = img.sky2pix([ra, dec])
-        source_x -= 1 # convert to 0-based
-        source_y -= 1 # convert to 0-based
+        source_x, source_y = sky2pix([ra,dec])
         x = int(round(source_x))
         y = int(round(source_y))
-        
+        if not 0<=x<img.x or not 0<=y<img.y:
+            logging.warn("Source at {0} {1} is outside of image bounds".format(ra,dec))
+            logging.warn("No measurements made")
+            continue
+
+
+        #make a pixbeam at this location
+        pixbeam = get_pixbeam(global_data.beam,source_x,source_y)
+        #determine the x and y extent of the beam
+        xwidth = 2*pixbeam.a*pixbeam.b
+        xwidth/= np.hypot(pixbeam.b*np.sin(np.radians(pixbeam.pa)),pixbeam.a*np.cos(np.radians(pixbeam.pa)))
+        ywidth = 2*pixbeam.a*pixbeam.b
+        ywidth/= np.hypot(pixbeam.b*np.cos(np.radians(pixbeam.pa)), pixbeam.a*np.sin(np.radians(pixbeam.pa)))
+        #round to an int and add 1
+        ywidth=int(round(ywidth))+1
+        xwidth=int(round(xwidth))+1
+
         #cut out an image of this size
         xmin = max(0, x - xwidth/2)
         ymin = max(0, y - ywidth/2)
-        xmax = min(img.x-1, x + xwidth/2 + 1)
-        ymax = min(img.y-1, y + ywidth/2 + 1)
-        data = img.get_pixels()[ymin:ymax, xmin:xmax]
+        xmax = min(img.x, x + xwidth/2 + 1)
+        ymax = min(img.y, y + ywidth/2 + 1)
+        #data = img.get_pixels()[ymin:ymax, xmin:xmax]
+        data = img.get_pixels()[xmin:xmax, ymin:ymax]
         
         # Make a Gaussian equal to the beam with amplitude 1.0 at the position of the source
         # in terms of the pixel region.
         amp = 1.0
         xo = source_x - xmin
         yo = source_y - ymin
-        cx = bmin / (2*math.sqrt(2*math.log(2))) # convert FWHM to "c"
-        cy = bmaj / (2*math.sqrt(2*math.log(2))) # convert FWHM to "c"
-        # Convert the position angle from anti-clockwise in the image plane (East-of-North)
-        # to clockwise in the data array domain because the Y axis (Dec) is inverted.
-        pa = -bpa
-        params = [amp, xo, yo, cx, cy, pa]
-        gaussian_data = twodgaussian(params, data.shape)
+        params = [amp, xo, yo, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa]
+        gaussian_data  = ntwodgaussian(params)(*np.indices(data.shape))
+        #gaussian_data = twodgaussian(params, data.shape)
         
         # Calculate the "best fit" amplitude as the average of the implied amplitude
         # for each pixel. Error is stddev.
         # Only use pixels within the FWHM, ie value>=0.5. Set the others to NaN
         ratios = np.where(gaussian_data>=0.5, data/gaussian_data, np.nan)
-        ratios_no_nans = np.extract(ratios==ratios, ratios) # get rid of NaNs
+        ratios_no_nans = np.extract(np.isfinite(ratios), ratios) # get rid of NaNs
         flux = np.average(ratios_no_nans)
         error = np.std(ratios_no_nans)
         source = SimpleSource()
@@ -1438,22 +1382,31 @@ def force_measure_flux(img,bkgimg,radec,rmsimg=None):
         source.dec=dec
         source.peak_flux=flux
         source.err_peak_flux=error
-        source.background=bkgimg[y,x]
+        source.background=bkgimg[x,y]
+        
         if rmsimg:
-            source.local_rms =rmsimg[y,x]
+            source.local_rms =rmsimg[x,y]
         catalog.append(source)
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.debug("Measured source {0}".format(source))
+            logging.debug("  used area = [{0}:{1},{2}:{3}]".format(xmin,xmax, ymin,ymax))
+            logging.debug("  xo,yo = {0},{1}".format(xo,yo))
+            logging.debug("  params = {0}".format(params))
+            logging.debug("  flux at [xmin+xo,ymin+yo]' = {0} Jy".format(data[int(xo),int(yo)]))
     return catalog
 
 def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=None, beam=None):
     '''
     Measure the flux at a given set of locations, assuming point sources.
     
-    Accept:
-    filename = a catalog of source positions (ra,dec) and an image
-    catfile
-    hdu_index
-    outfile
-    bkgin
+    Input:
+        filename - fits image file name to be read
+        catfile - a catalog of source positions (ra,dec)
+        hdu_index - if fits file has more than one hdu, it can be specified here
+        outfile - the output file to write to
+        bkgin - a background image filename
+        beam - beam parameters to overide those given in fits header
+        
     '''
     #load fitsfile
     img = FitsImage(filename, hdu_index=hdu_index,beam=beam)
@@ -1477,7 +1430,18 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
     else:
         logging.error("Unkonwn file format for {0}".format(catfile))
         sys.exit()
+        
     radec= load_catalog(catfile,fmt=fmt)
+    
+    global global_data
+    global_data = GlobalFittingData()
+    global_data.beam = img.beam
+    global_data.hdu_header = img.get_hdu_header()
+    try:
+        global_data.wcs=pywcs.WCS(global_data.hdu_header, naxis=2)
+    except:
+        global_data.wcs=pywcs.WCS(str(global_data.hdu_header),naxis=2)
+    
     #measure fluxes
     sources = force_measure_flux(img,bkgimg,radec)
 
@@ -1494,13 +1458,25 @@ def save_background_files(image_filename, hdu_index=0):
     Generate and save the background and RMS maps as FITS files.
     They are saved in the current directly as aegean-background.fits and aegean-rms.fits.
     '''
+    global global_data
+    
     logging.info("Saving background / RMS maps")
     img = FitsImage(image_filename, hdu_index=hdu_index)
     data = img.get_pixels()
     beam=img.beam
+    hdu_header = img.get_hdu_header()
+    dcurve= curvature(data) 
+    # Save global data for use by rms/bkg calcs     
+    global_data = GlobalFittingData()
+    global_data.beam = beam
+    global_data.dcurve = dcurve
+    global_data.hdu_header = hdu_header
+    try:
+        global_data.wcs=pywcs.WCS(hdu_header, naxis=2)
+    except:
+        global_data.wcs=pywcs.WCS(str(hdu_header),naxis=2)
+    
     bkgimg,rmsimg = make_bkg_rms_image(data,beam,mesh_size=20)
-    dcurve= curvature(data,aspect=beam.aspect) #scaled version of the curvature 
-    #grad = gradient(data)
     
     # Generate the new FITS files by copying the existing HDU and assigning new data.
     # This gives the new files the same WCS projection and other header fields. 
@@ -1513,10 +1489,9 @@ def save_background_files(image_filename, hdu_index=0):
     new_hdu.writeto("aegean-rms.fits", clobber=True)
     new_hdu.data = dcurve
     new_hdu.writeto("aegean-curvature.fits",clobber=True)
-    #new_hdu.data = grad
-    #new_hdu.writeto("aegean-grad.fits",clobber=True)
     logging.info("Saved aegean-background.fits, aegean-rms.fits and aegean-curvature.fits")
-    
+
+#command line version of this program runs from here.    
 if __name__=="__main__":
     usage="usage: %prog [options] FileName.fits"
     parser = OptionParser(usage=usage)
@@ -1545,7 +1520,7 @@ if __name__=="__main__":
     parser.add_option('--floodclip',dest='outerclip',type='float',
                       help='The clipping value (in sigmas) for growing islands. Default=4')
     parser.add_option('--beam',dest='beam',type='float', nargs=3,
-                      help='The beam parameters to be used is "--beam major minor pa" in (pixels,pixels,degrees). Default is to read from FITS header.')
+                      help='The beam parameters to be used is "--beam major minor pa" all in degrees. Default is to read from FITS header.')
     parser.add_option('--file_version',dest='file_version',action="store_true",
                       help='show the versions of each file')
     parser.add_option('--save_background', dest='save_background', action="store_true",
@@ -1561,6 +1536,10 @@ if __name__=="__main__":
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is Aegean {0}".format(version))
+    #debugging in multi core mode is very hard to understand
+    if options.debug:
+        logging.info("Setting cores=1 for debugging")
+        options.cores=1
     if options.file_version:
         logging.info("Using aegean.py {0}".format(version))
         logging.info("Using fits_image.py {0}".format(FitsImage.version))
@@ -1583,7 +1562,7 @@ if __name__=="__main__":
         if len(beam)!=3:
             print "Beam requires 3 args. You supplied {0}".format(beam)
             sys.exit()
-        options.beam=Beam(beam[0],beam[1],beam[2]*math.pi/180)
+        options.beam=Beam(beam[0],beam[1],beam[2])
         
     # Generate and save the background FITS files and exit if requested
     if options.save_background:
@@ -1597,9 +1576,7 @@ if __name__=="__main__":
     #Open the outfile
     if options.outfile is not sys.stdout:
         options.outfile=open(os.path.expanduser(options.outfile),'w')
-    
-
-        
+     
     if options.bkginfile and not os.path.exists(options.bkginfile):
         logging.error("{0} not found".format(options.bkginfile))
         sys.exit()

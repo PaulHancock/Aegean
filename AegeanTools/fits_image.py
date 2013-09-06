@@ -55,27 +55,21 @@ class FitsImage():
                 logging.info("BPA not present in fits header, using 0")
                 bpa=0
             else:
-                bpa=self.hdu.header["BPA"]*pi/180
-            if "BMAJ" not in self.hdu.header:
-                logging.info("BMAJ not present in fits header, using 3 pixels")
-                bmaj=3
-            else:
-                bmaj = sqrt((self.hdu.header["BMAJ"]*sin(bpa)/self.deg_per_pixel_x)**2 +
-                       (self.hdu.header["BMAJ"]*cos(bpa)/self.deg_per_pixel_y)**2)
-                #bmaj = abs(self.hdu.header["BMAJ"]/self.deg_per_pixel_y)
-            if "BMIN" not in self.hdu.header:
-                logging.info("BMIN not present in fits header, using 3 pixels")
-                bmin=3
-            else:
-                bmin = sqrt((self.hdu.header["BMIN"]*cos(bpa)/self.deg_per_pixel_x)**2 +
-                       (self.hdu.header["BMIN"]*sin(bpa)/self.deg_per_pixel_y)**2)
-                #bmin=abs(self.hdu.header["BMIN"]/self.deg_per_pixel_x)
+                bpa=self.hdu.header["BPA"]
                 
-            # TODO: handle non-square pixels and elliptical beam
+            if "BMAJ" not in self.hdu.header:
+                logging.error("BMAJ not present in fits header.")
+            else:
+                bmaj = self.hdu.header["BMAJ"]
+                
+            if "BMIN" not in self.hdu.header:
+                logging.error("BMIN not present in fits header.")
+            else:
+                bmin = self.hdu.header["BMIN"]
+                
             self.beam=Beam(bmaj, bmin, bpa)
         else: #use the supplied beam
             self.beam=beam
-        self.pixels_per_beam=min(self.beam.a, self.beam.b)
         self._pixels = None
         self._rms = None
         
@@ -140,8 +134,7 @@ class FitsImage():
 
     def get_hdu_header(self):
         return self.hdu.header
-            
-        
+
     def sky2pix(self, skypos):
         '''Get the pixel coordinates [x,y] (floats) given skypos [ra,dec] (degrees)'''
         skybox = [skypos, skypos]
@@ -151,15 +144,16 @@ class FitsImage():
 
 class Beam():
     """
-    Small class to hold the properties of the primary beam
-    major/minor axies should be in pixels
-    pa should be in radians
+    Small class to hold the properties of the beam
+    a/b in degrees
+    pa in radians
     """
     def __init__(self,a,b,pa):
-        self.a=abs(a)
-        self.b=abs(b)
+        assert a>0, "major axis must be >0"
+        assert b>0, "minor axis must be >0"
+        self.a=a
+        self.b=b
         self.pa=pa
-        self.aspect=abs(a)/abs(b)
     
     def __str__(self):
         return "a={0} b={1} pa={2}".format(self.a, self.b, self.pa)
