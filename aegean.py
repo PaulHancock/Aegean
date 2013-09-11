@@ -137,9 +137,9 @@ class SimpleSource():
     """
     A (forced) measurement of flux at a given location
     """
-    header ="""#RA           DEC          Flux      err
-#                        Jy/beam   Jy/beam
-#==========================================="""
+    header ="#RA           DEC          Flux      err"+\
+    "#                        Jy/beam   Jy/beam"+\
+    "#==========================================="
 
     formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f}"
     
@@ -175,9 +175,9 @@ class OutputSource(SimpleSource):
     formatter that makes printing easy. (as does OutputSource.__str__)
     """
      #header for the output   
-    header="""#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags
-#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   NCPES
-#=========================================================================================================================================================================================="""
+    header="#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags"+\
+    "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   NCPES"+\
+    "#=========================================================================================================================================================================================="
 
     #formatting strings for making nice output
     formatter = "({0.island:04d},{0.source:d}) {0.background: 8.6f} {0.local_rms: 8.6f} "+\
@@ -1151,7 +1151,7 @@ def fit_island(island_data):
         
         pixbeam=get_pixbeam(beam,x_pix,y_pix)
         #integrated flux is calculated not fit or measured
-        source.int_flux=source.peak_flux*source.a*source.b/(pixbeam.a*pixbeam.b)
+        source.int_flux=source.peak_flux*major*minor*cc2fwhm**2/(pixbeam.a*pixbeam.b)
         #The error is never -1, but may be zero.
         source.err_int_flux = source.int_flux*math.sqrt( (max(source.err_peak_flux,0)/source.peak_flux)**2
                                                         +(max(source.err_a,0)/source.a)**2
