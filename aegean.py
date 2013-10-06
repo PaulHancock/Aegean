@@ -15,6 +15,7 @@ Jay Banyer
 import sys, os
 import pyfits
 import numpy as np
+from scipy.special import erf
 import math
 import pywcs
 
@@ -175,12 +176,12 @@ class OutputSource(SimpleSource):
     formatter that makes printing easy. (as does OutputSource.__str__)
     """
      #header for the output   
-    header="#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags"+\
-    "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   NCPES"+\
+    header="#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags\n"+\
+    "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   NCPES\n"+\
     "#=========================================================================================================================================================================================="
 
     #formatting strings for making nice output
-    formatter = "({0.island:04d},{0.source:d}) {0.background: 8.6f} {0.local_rms: 8.6f} "+\
+    formatter = "({0.island:04d},{0.source:02d}) {0.background: 8.6f} {0.local_rms: 8.6f} "+\
                 "{0.ra_str:12s} {0.dec_str:12s} {0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} {0.err_dec: 9.7f} "+\
                 "{0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} {0.err_int_flux: 8.6f} "+\
                 "{0.a:5.2f} {0.err_a:5.2f} {0.b:5.2f} {0.err_b:5.2f} "+\
@@ -268,11 +269,12 @@ class IslandFittingData:
     scalars = []
     offsets = []
 
-    def __init__(self, isle_num, i, scalars, offsets):
+    def __init__(self, isle_num, i, scalars, offsets,doislandflux):
         self.isle_num = isle_num
         self.i = i
         self.scalars = scalars
         self.offsets = offsets
+        self.doislandflux = doislandflux
 
 class DummyMP():
     """
@@ -567,7 +569,8 @@ def ntwodgaussian(inpars):
     """
     Return an array of values represented by multiple Gaussians as parameterized
     by params = [amp,x0,y0,major,minor,pa]{n}
-    x0,y0,major,minor ar in pixels
+    x0,y0,major,minor are in pixels
+    major/minor are interpreted as being sigmas not FWHMs
     pa is in degrees
     """
     if not len(inpars)%6 ==0:
@@ -980,6 +983,19 @@ def get_pixbeam(beam,x,y):
     minor = sky2pix_vec([ra,dec],beam.b,beam.pa + 90)[2]
     return Beam(major,minor,pa)
 
+def sky_sep(pix1,pix2):
+    """
+    calculate the sky separation between two pixels
+    Input:
+        pix1 = [x1,y1]
+        pix2 = [x2,y2]
+    Returns:
+        sep = separation in degrees
+    """
+    pos1 = pix2sky(pix1)
+    pos2 = pix2sky(pix2)
+    sep = gcd(pos1[0],pos1[1],pos2[0],pos2[1])
+    return sep
 ######################################### THE MAIN DRIVING FUNCTIONS ###############
 
 #source finding and fitting
@@ -1002,16 +1018,18 @@ def fit_island(island_data):
     
     # island data
     isle_num = island_data.isle_num
-    i = island_data.i        
+    idata = island_data.i        
     innerclip,outerclip,csigma,max_summits=island_data.scalars
     xmin,xmax,ymin,ymax=island_data.offsets
-    #avoids some problems with miriad generated fits files - HT John Morgan
+    doislandflux = island_data.doislandflux
 
-    isle=Island(i)
+    isle=Island(idata)
     icurve = dcurve[xmin:xmax+1,ymin:ymax+1]
     rms=rmsimg[xmin:xmax+1,ymin:ymax+1]
     bkg=bkgimg[xmin:xmax+1,ymin:ymax+1]
-    
+
+    pixbeam = get_pixbeam(beam,(xmin+xmax)/2,(ymin+ymax)/2)
+
     logging.debug("=====")
     logging.debug("Island ({0})".format(isle_num))
 
@@ -1085,8 +1103,6 @@ def fit_island(island_data):
     err_matrix = np.asarray(mp.perror).reshape(parlen/6,6)
     
     for j,((amp,xo,yo,major,minor,theta),(amp_err,xo_err,yo_err,major_err,minor_err,theta_err)) in enumerate(zip(par_matrix,err_matrix)):
-    #for j in range(len(params)/6):
-        #amp,xo,yo,major,minor,theta = map(lambda x: j*5+x,[0,1,2,3,4,5])
         source = OutputSource()
         source.island = isle_num
         source.source = j
@@ -1158,6 +1174,57 @@ def fit_island(island_data):
                                                         +(max(source.err_b,0)/source.b)**2)
         sources.append(source)
         logging.debug(source)
+
+    #calculate the integrated island flux if required
+    if island_data.doislandflux:
+        logging.debug("Integrated flux for island {0}".format(isle_num))
+        kappa_sigma=np.where(idata-innerclip*rms>0, idata,0)
+        logging.debug("- island shape is {0}".format(kappa_sigma.shape))
+
+        source = OutputSource()
+        source.island=isle_num
+        source.source = -1
+        source.flags=0
+        source.peak_flux = kappa_sigma.max()
+        source.err_peak_flux = -1
+        #positions and background
+        positions = np.where(kappa_sigma == kappa_sigma.max())
+        xy=positions[0][0] +xmin, positions[1][0]+ymin
+        radec = pix2sky(xy)
+        source.ra = radec[0]
+        source.dec= radec[1]
+        source.err_ra=-1
+        source.err_dec=-1
+        source.ra_str = dec2hms(source.ra)
+        source.dec_str = dec2dms(source.dec)
+        source.background = bkg[positions[0][0],positions[1][0]]
+        source.local_rms = rms[positions[0][0],positions[1][0]]
+        #unused info
+        source.a=0
+        source.err_a=-1
+        source.b=0
+        source.err_b=-1
+        source.pa=0
+        source.err_pa=-1
+
+        logging.debug("- peak flux {0}".format(source.peak_flux))
+        logging.debug("- peak position {0}, {1}".format(source.ra_str,source.dec_str))
+
+        #integrated flux
+        beam_volume = 2*np.pi*pixbeam.a*pixbeam.b/cc2fwhm**2
+        isize = len(np.where(kappa_sigma>0)[0]) #number of non zero pixels
+        logging.debug("- pixels used {0}".format(isize))
+        source.int_flux = sum(sum(kappa_sigma)) #total flux Jy/beam
+        logging.debug("- sum of pixles {0}".format(source.int_flux))
+        source.int_flux /= beam_volume
+        logging.debug("- pixbeam {0},{1}".format(pixbeam.a,pixbeam.b))
+        logging.debug("- raw integrated flux {0}".format(source.int_flux))
+        eta = erf(np.sqrt(-1*np.log(source.local_rms*outerclip/source.peak_flux)))**2
+        source.int_flux = source.int_flux / eta**2
+        logging.debug("- eta {0}".format(eta))
+        logging.debug("- corrected integrated flux {0}".format(source.int_flux))
+        source.err_int_flux =-1
+        sources.append(source)
     return sources
 
 def fit_islands(islands):
@@ -1174,7 +1241,7 @@ def fit_islands(islands):
     return sources
     
 def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None,
-                          innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None):
+                          innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False):
     """
     Run the Aegean source finder.
     Inputs:
@@ -1200,6 +1267,8 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
                     the internally calculated one
     beam        - (major,minor,pa) (all degrees) of the synthesised beam to be use
                    overides whatever is given in the fitsheader.
+    doislandflux- if true, an integrated flux will be returned for each island in addition to 
+                    the individual component entries.
     Return:
     a list of OutputSource objects
     """
@@ -1287,7 +1356,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         isle_num+=1
         scalars=(innerclip,outerclip,csigma,max_summits)
         offsets=(xmin,xmax,ymin,ymax)
-        island_data = IslandFittingData(isle_num, i, scalars, offsets)
+        island_data = IslandFittingData(isle_num, i, scalars, offsets, doislandflux)
         # If cores==1 run fitting in main process. Otherwise build up groups of islands
         # and submit to queue for subprocesses. Passing a group of islands is more
         # efficient than passing single islands to the subprocesses.
@@ -1309,7 +1378,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         if src:# ignore src==None
             sources.extend(src)
     if outfile:
-        for source in sorted(sources):#, key=lambda x: "({0.island:04d},{0.source:02d})".format(x)):
+        for source in sorted(sources):
             outfile.write(str(source))
             outfile.write("\n")
 
@@ -1527,9 +1596,11 @@ if __name__=="__main__":
                       help='save the background/rms/curvature maps to aegean-background.fits, aegean-rms.fits, aegean-curvature.fits and exit')
     parser.add_option('--catalog',dest='catfile',
                       help='Catalog of locations at which fluxes will be measured. No source fitting is done. Many other options are ignored.')
+    parser.add_option('--island',dest='doislandflux',action="store_true",
+                      help='list the integrated island flux as well as the fitted component fluxes for each island')
     parser.set_defaults(debug=False,hdu_index=0,outfile=sys.stdout,out_table=None,rms=None,rmsinfile=None,bgkinfile=None,
                         max_summits=None,csigma=None,innerclip=5,outerclip=4,file_version=False,save_background=False,
-                        catfile=None,beam=None)
+                        catfile=None,beam=None,doislandflux=False)
     (options, args) = parser.parse_args()
 
     # configure logging
@@ -1590,7 +1661,8 @@ if __name__=="__main__":
     else:        
         sources = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,rms=options.rms,
                                     max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,
-                                    outerclip=options.outerclip, cores=options.cores, rmsin=options.rmsinfile, bkgin=options.bkginfile,beam=options.beam)
+                                    outerclip=options.outerclip, cores=options.cores, rmsin=options.rmsinfile, 
+                                    bkgin=options.bkginfile,beam=options.beam, doislandflux=options.doislandflux)
     if options.out_table:
         save_catalog(options.out_table,sources)
     if len(sources) == 0:
