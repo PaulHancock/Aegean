@@ -469,6 +469,8 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
         logging.debug("Tiny summit detected")
         logging.debug("{0}".format(data))
         summits=[ [data,0,data.shape[0],0,data.shape[1]] ]
+        #and are constrained to be point sources
+        is_flag |= flags.FIXED2PSF
     else:       
         kappa_sigma=Island( np.where( curve<-1*csigma, np.where(data-innerclip*rmsimg>0, data,-1) ,-1) )
         summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0,expand=False)
