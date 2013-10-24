@@ -1103,7 +1103,7 @@ def fit_island(island_data):
             mp.perror[k]=-1
 
     err_matrix = np.asarray(mp.perror).reshape(parlen/6,6)
-    
+    components= parlen/6
     for j,((amp,xo,yo,major,minor,theta),(amp_err,xo_err,yo_err,major_err,minor_err,theta_err)) in enumerate(zip(par_matrix,err_matrix)):
         source = OutputSource()
         source.island = isle_num
@@ -1176,7 +1176,7 @@ def fit_island(island_data):
                                                         +(max(source.err_b,0)/source.b)**2)
 
         #fiddle all the errors to be larger by sqrt(npix)
-        rt_npix=np.sqrt(sum(np.isfinite(isle.pixels).ravel()*1))
+        rt_npix=np.sqrt(sum(np.isfinite(isle.pixels).ravel()*1)/components)
         if source.err_ra>0:
             source.err_ra *=rt_npix
         if source.err_dec>0:
