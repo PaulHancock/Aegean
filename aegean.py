@@ -1174,6 +1174,24 @@ def fit_island(island_data):
         source.err_int_flux = source.int_flux*math.sqrt( (max(source.err_peak_flux,0)/source.peak_flux)**2
                                                         +(max(source.err_a,0)/source.a)**2
                                                         +(max(source.err_b,0)/source.b)**2)
+
+        #fiddle all the errors to be larger by sqrt(npix)
+        rt_npix=np.sqrt(sum(np.isfinite(isle.pixels).ravel()*1))
+        if source.err_ra>0:
+            source.err_ra *=rt_npix
+        if source.err_dec>0:
+            source.err_dec *=rt_npix
+        if source.err_peak_flux>0:
+            source.err_peak_flux *=rt_npix
+        if source.err_int_flux>0:
+            source.err_int_flux *=rt_npix
+        if source.err_a>0:
+            source.err_a *=rt_npix        
+        if source.err_b>0:
+            source.err_b *=rt_npix        
+        if source.err_pa>0:
+            source.err_pa *=rt_npix       
+
         sources.append(source)
         logging.debug(source)
 
