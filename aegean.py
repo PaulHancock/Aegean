@@ -908,7 +908,7 @@ def pix2sky(pixel):
     """
     x,y=pixel
     #wcs and pyfits have oposite ideas of x/y
-    skybox = global_data.wcs.wcs_pix2sky([[y,x]],0)
+    skybox = global_data.wcs.wcs_pix2sky([[y,x]],1)
     return [float(skybox[0][0]), float(skybox[0][1])]
 
 def sky2pix(pos):
@@ -916,7 +916,7 @@ def sky2pix(pos):
     Take pos = (ra,dec) coords
     convert to pixel = (x,y) coords
     """
-    pixel = global_data.wcs.wcs_sky2pix([pos],0)
+    pixel = global_data.wcs.wcs_sky2pix([pos],1)
     #wcs and pyfits have oposite ideas of x/y
     return [pixel[0][1],pixel[0][0]]
 
