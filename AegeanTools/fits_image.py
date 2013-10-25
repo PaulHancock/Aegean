@@ -4,9 +4,9 @@ Created on 18/07/2011
 @author: jay
 '''
 
-import pyfits
+import astropy.io.fits as pyfits
 import numpy
-import pywcs
+import astropy.wcs as pywcs
 import scipy.stats
 import logging
 from math import pi,cos,sin,sqrt
@@ -92,23 +92,8 @@ class FitsImage():
             else:
                 raise Exception("Can't handle {0} dimensions".format(len(self.hdu.data.shape)))
             logging.debug("Using axes {0} and {1}".format(self.hdu.header['CTYPE1'],self.hdu.header['CTYPE2']))
-            
-        #do we need to check for blank pixels?
-        if float(pyfits.__version__[0:3])<2.3:
-            #are there likely to be any blank pixels?
-            if "BLANK" in self.hdu.header:
-                self.wrangle_nans()
-        
         return self._pixels
 
-    def wrangle_nans(self):
-        '''
-        For versions of pyfits <2.3 blank pixels are imported with crazy fluxes
-        These need to be changed into NaN as per pyfits v2.3+
-        '''
-        blank = self.hdu.header["BLANK"]*self.bscale+self.bzero
-        self._pixels[numpy.where(abs(self._pixels-blank)<1e-9)]=numpy.NaN
-    
     def get_background_rms(self):
         '''
         Return the background RMS (Jy)
