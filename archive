@@ -1,0 +1,1 @@
+tar -cvf `grep '^version' aegean.py | awk '{print "Aegean."$2".tar"}'` *.py AegeanTools/*.py
