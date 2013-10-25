@@ -1127,6 +1127,9 @@ def fit_island(island_data):
         y_pix=yo + ymin + 1
 
         (source.ra,source.dec,source.a,source.pa) = pix2sky_vec((x_pix,y_pix),major*cc2fwhm,theta)
+        #negative degrees is valid for RA, but I don't want them.
+        if source.ra<0:
+            source.ra+=180
         source.ra_str= dec2hms(source.ra)
         source.dec_str= dec2dms(source.dec)
         logging.debug("Source {0} Extracted pa={1}deg [pixel] -> {2}deg [sky]".format(j,theta,source.pa))
