@@ -19,6 +19,10 @@ from scipy.special import erf
 import math
 import astropy.wcs as pywcs
 
+#tables and votables
+from astropy.table.table import Table 
+from astropy.io.votable import from_table, writeto
+
 #logging and nice options
 import logging
 from optparse import OptionParser
@@ -143,7 +147,8 @@ class SimpleSource():
     "#==========================================="
 
     formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f}"
-    
+    names = ['background','local_rms','ra','dec','peak_flux','err_peak_flux']
+
     def __init__(self):
         self.background = None
         self.local_rms = None
@@ -151,9 +156,7 @@ class SimpleSource():
         self.dec = None
         self.peak_flux = None
         self.err_peak_flux = None
-        
-
-    
+            
     def sanitise(self):
         '''
         Convert various numpy types to np.float64 so that they will print properly
@@ -168,7 +171,16 @@ class SimpleSource():
         '''
         self.sanitise()
         return self.formatter.format(self)
-   
+
+    def as_list(self):
+        """
+        return an ordered list of the source attributes
+        """
+        l=[]
+        for name in self.names:
+            l.append(getattr(self,name))
+        return l
+
 class OutputSource(SimpleSource):
     """
     Each source that is fit by Aegean is cast to this type.
@@ -186,7 +198,7 @@ class OutputSource(SimpleSource):
                 "{0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} {0.err_int_flux: 8.6f} "+\
                 "{0.a:5.2f} {0.err_a:5.2f} {0.b:5.2f} {0.err_b:5.2f} "+\
                 "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:05b}"
-    
+    names=['island','source','background','local_rms','ra_str','dec_str','ra','err_ra','dec','err_dec','peak_flux','err_peak_flux','int_flux','err_int_flux','a','err_a','b','err_b','pa','err_pa','flags']
     def __init__(self):
         self.island = None # island number
         self.source = None # source number
@@ -215,8 +227,11 @@ class OutputSource(SimpleSource):
         self.sanitise()
         return self.formatter.format(self)
     
-    def as_list(self):
+    def as_list_dep(self):
         """Return a list of all the parameters that are stored in this Source"""
+        l=[]
+        for name in self.names:
+            pass
         return [self.island,self.source,self.background,self.local_rms,
                 self.ra_str, self.dec_str, self.ra,self.err_ra,self.dec,self.err_dec,
                 self.peak_flux, self.err_peak_flux, self.int_flux, self.err_int_flux,
@@ -695,27 +710,19 @@ def save_catalog(filename,catalog):
     extension=os.path.basename(filename).split('.')[-1]
     if extension in ['ann','reg']:
         writeAnn(filename,catalog,extension)
-    else:    #the remaining extensions are handeled by atpy
-        try:
-            import atpy
-        except ImportError as e:
-            logging.error("In order to save in formats other than Aegean default you need to be able to import atpy")
-            logging.error(e.message)
-            logging.warning("File not saved")
-            return
-        
-        t=atpy.Table()
-        t.table_name="Aegean Source Catalog"
-        t.add_comment="Created by Aegean {0}".format(version)
-        
-        columns = catalog[0].__dict__.keys()
-        
-        for c in columns:
-            data = [getattr(a,c) for a in catalog]
-            t.add_column(c,data,description=a.meta['name'][c],unit=a.meta['unit'][c],dtype=a.meta['type'][c])
-        if os.path.exists(filename):
-            os.popen('rm {0}'.format(filename))
-        t.write(filename)
+    elif extension.lower() in ['vot','xml']:
+        names = catalog[0].names
+        dtypes = [type(a) for a in catalog[0].as_list()]
+        #meta = catalog[0].meta
+
+        t=Table(names=names,dtypes=dtypes)#,meta=meta)
+        for row in catalog:
+            t.add_row(row.as_list())
+        vot = from_table(t)
+        writeto(vot,filename)
+    else:
+        logging.warning("extension not recognised or supported {0}".format(extension))
+        filename='nothing'
     logging.info("wrote {0}".format(filename))
     return
 
