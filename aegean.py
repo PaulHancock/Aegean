@@ -13,11 +13,11 @@ Jay Banyer
 
 #standard imports
 import sys, os
-import pyfits
+import astropy.io.fits as pyfits
 import numpy as np
 from scipy.special import erf
 import math
-import pywcs
+import astropy.wcs as pywcs
 
 #logging and nice options
 import logging
