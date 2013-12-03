@@ -142,8 +142,8 @@ class SimpleSource():
     """
     A (forced) measurement of flux at a given location
     """
-    header ="#RA           DEC          Flux      err"+\
-    "#                        Jy/beam   Jy/beam"+\
+    header ="#RA           DEC          Flux      err\n"+\
+    "#                        Jy/beam   Jy/beam\n"+\
     "#==========================================="
 
     formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f}"
