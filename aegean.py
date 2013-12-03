@@ -181,6 +181,29 @@ class SimpleSource():
             l.append(getattr(self,name))
         return l
 
+class IslandSource(SimpleSource):
+    """
+    Each island of pixels can be characterised in a basic manner.
+    This class contains info relevant to such objects.
+    """
+    names=['island','background','local_rms','ra_str','dec_str','ra','dec','peak_flux','int_flux','err_int_flux','x_width','y_width','pixels','components']
+    def __init__(self):
+        self.island = None # island number
+        #background = None # local background zero point
+        #local_rms= None #local image rms
+        self.ra_str = None #str
+        self.dec_str = None #str
+        #ra = None # degrees
+        #dec = None # degrees
+        #peak_flux = None # Jy/beam
+        self.int_flux = None #Jy
+        self.err_int_flux= None #Jy
+        self.x_width = None
+        self.y_width = None
+        self.pixels = None
+        self.components =None
+    
+
 class OutputSource(SimpleSource):
     """
     Each source that is fit by Aegean is cast to this type.
@@ -711,19 +734,48 @@ def save_catalog(filename,catalog):
     if extension in ['ann','reg']:
         writeAnn(filename,catalog,extension)
     elif extension.lower() in ['vot','xml']:
+        writeVOTable(filename,catalog)
+    else:
+        logging.warning("extension not recognised or supported {0}".format(extension))
+        logging.info("wrote nothing")
+    return
+
+def writeVOTable(filename,catalog):
+    """
+    write VOTables for each of the souce types that are in the catalog
+    append an appropriate prefix to the file name for each type of source
+    """
+    def writer(filename,catalog):
         names = catalog[0].names
         dtypes = [type(a) for a in catalog[0].as_list()]
-        #meta = catalog[0].meta
+            #meta = catalog[0].meta
 
         t=Table(names=names,dtypes=dtypes)#,meta=meta)
         for row in catalog:
             t.add_row(row.as_list())
         vot = from_table(t)
         writeto(vot,filename)
-    else:
-        logging.warning("extension not recognised or supported {0}".format(extension))
-        filename='nothing'
-    logging.info("wrote {0}".format(filename))
+
+    def make_new_name(filename,suffix):
+        new_name = filename.split('.')
+        new_name[-2]+=suffix
+        new_name = '.'.join(new_name)
+        return new_name
+        
+    components,islands,simples=classify_catalog(catalog)
+    
+    if len(components)>0:
+        new_name = make_new_name(filename,'_comp')
+        writer(new_name,components)
+        logging.info("wrote {0}".format(new_name))
+    if len(islands)>0:
+        new_name = make_new_name(filename,'_isl')
+        writer(new_name,islands)
+        logging.info("wrote {0}".format(new_name))
+    if len(simples)>0:
+        new_name = make_new_name(filename,'_simp')
+        writer(new_name,simples)
+        logging.info("wrote {0}".format(new_name))
     return
 
 def writeAnn(filename,catalog,fmt):
@@ -740,6 +792,9 @@ def writeAnn(filename,catalog,fmt):
     out=open(filename,'w')
     ras = [a.ra for a in catalog]
     decs= [a.dec for a in catalog]
+    components,islands,simples = classify_catalog(catalog)
+    catalog=[]
+    catalog.extend(components,simples)
     if not hasattr(catalog[0],'a'): #a being the variable that I used for bmaj.
         bmajs=[30/3600.0 for a in catalog]
         bmins=bmaj
@@ -760,6 +815,7 @@ def writeAnn(filename,catalog,fmt):
     for ra,dec,bmaj,bmin,pa in zip(ras,decs,bmajs,bmins,pas):
         print >>out,formatter.format(ra,dec,bmaj,bmin,pa)
     out.close()
+    logging.info("wrote {0}".format(filename))
     return
         
 #image manipulation
@@ -1136,7 +1192,7 @@ def fit_island(island_data):
         (source.ra,source.dec,source.a,source.pa) = pix2sky_vec((x_pix,y_pix),major*cc2fwhm,theta)
         #negative degrees is valid for RA, but I don't want them.
         if source.ra<0:
-            source.ra+=180
+            source.ra+=360
         source.ra_str= dec2hms(source.ra)
         source.dec_str= dec2dms(source.dec)
         logging.debug("Source {0} Extracted pa={1}deg [pixel] -> {2}deg [sky]".format(j,theta,source.pa))
@@ -1211,31 +1267,22 @@ def fit_island(island_data):
         kappa_sigma=np.where(idata-innerclip*rms>0, idata,0)
         logging.debug("- island shape is {0}".format(kappa_sigma.shape))
 
-        source = OutputSource()
+        source = IslandSource()
         source.island=isle_num
-        source.source = -1
-        source.flags=0
+        source.components = j
         source.peak_flux = kappa_sigma.max()
-        source.err_peak_flux = -1
         #positions and background
         positions = np.where(kappa_sigma == kappa_sigma.max())
         xy=positions[0][0] +xmin, positions[1][0]+ymin
         radec = pix2sky(xy)
         source.ra = radec[0]
         source.dec= radec[1]
-        source.err_ra=-1
-        source.err_dec=-1
         source.ra_str = dec2hms(source.ra)
         source.dec_str = dec2dms(source.dec)
         source.background = bkg[positions[0][0],positions[1][0]]
         source.local_rms = rms[positions[0][0],positions[1][0]]
-        #unused info
-        source.a=0
-        source.err_a=-1
-        source.b=0
-        source.err_b=-1
-        source.pa=0
-        source.err_pa=-1
+        source.x_width,source.y_width = isle.pixels.shape
+        source.pixels=sum(np.isfinite(isle.pixels).ravel()*1)
 
         logging.debug("- peak flux {0}".format(source.peak_flux))
         logging.debug("- peak position {0}, {1}".format(source.ra_str,source.dec_str))
@@ -1253,7 +1300,7 @@ def fit_island(island_data):
         source.int_flux = source.int_flux / eta**2
         logging.debug("- eta {0}".format(eta))
         logging.debug("- corrected integrated flux {0}".format(source.int_flux))
-        source.err_int_flux =-1
+        source.err_int_flux =0
         sources.append(source)
     return sources
 
@@ -1399,7 +1446,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
             if len(island_group) >= group_size:
                 fit_parallel(island_group)
                 island_group = []
-    
+
     # The last partially-filled island group also needs to be queued for fitting
     if len(island_group) > 0:
         fit_parallel(island_group) 
@@ -1408,11 +1455,31 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         if src:# ignore src==None
             sources.extend(src)
     if outfile:
-        for source in sorted(sources):
+        components,islands,simples=classify_catalog(sources)
+        for source in sorted(components):
             outfile.write(str(source))
             outfile.write("\n")
 
     return sources
+
+def classify_catalog(catalog):
+    """
+    look at a catalog of sources and split them according to their class
+    returns:
+    components - sources of type OutputSource
+    islands - sources of type IslandSource
+    """
+    components=[]
+    islands=[]
+    simples=[]
+    for source in catalog:
+        if isinstance(source,OutputSource):
+            components.append(source)
+        elif isinstance(source,IslandSource):
+            islands.append(source)
+        elif isinstance(source,SimpleSource):
+            simples.append(source)
+    return components,islands,simples
 
 #just flux measuring
 def force_measure_flux(img,bkgimg,radec,rmsimg=None):
