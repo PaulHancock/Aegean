@@ -1191,6 +1191,7 @@ def fit_island(island_data):
 
         (source.ra,source.dec,source.a,source.pa) = pix2sky_vec((x_pix,y_pix),major*cc2fwhm,theta)
         #negative degrees is valid for RA, but I don't want them.
+        ra_orig=source.ra #need the origional RA for error calculations
         if source.ra<0:
             source.ra+=360
         source.ra_str= dec2hms(source.ra)
@@ -1206,7 +1207,7 @@ def fit_island(island_data):
         x_err_pix=x_pix + within(xo_err,-1,isle.pixels.shape[0])
         y_err_pix=y_pix + within(yo_err,-1,isle.pixels.shape[1])
         err_coords = pix2sky([x_err_pix, y_err_pix])
-        source.err_ra = abs(source.ra - err_coords[0])   if xo_err>0 else -1
+        source.err_ra = abs(ra_orig - err_coords[0])   if xo_err>0 else -1
         source.err_dec = abs(source.dec - err_coords[1]) if yo_err>0 else -1
         source.err_a = abs(source.a - pix2sky_vec((x_pix,y_pix),(major+major_err)*cc2fwhm,theta)[2]*3600)    if major_err>0 else -1
         source.err_b = abs(source.b - pix2sky_vec((x_pix,y_pix),(minor+minor_err)*cc2fwhm,theta+90)[2]*3600) if minor_err>0 else -1
