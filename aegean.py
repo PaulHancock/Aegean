@@ -13,6 +13,7 @@ Jay Banyer
 
 #standard imports
 import sys, os
+import re
 import astropy.io.fits as pyfits
 import numpy as np
 from scipy.special import erf
@@ -202,6 +203,8 @@ class IslandSource(SimpleSource):
         self.y_width = None
         self.pixels = None
         self.components =None
+        #not included in 'names' and thus not included by default in most output
+        self.extent =None
     
 
 class OutputSource(SimpleSource):
@@ -778,6 +781,30 @@ def writeVOTable(filename,catalog):
         logging.info("wrote {0}".format(new_name))
     return
 
+def writeIslandBoxes(filename,catalog):
+    """
+    Draw a box around each island in the given catalog.
+    The box simply outlines the pixels used in the fit.
+    Input:
+        falename = file to write
+        catalog = [IslandSource, ...]
+    """
+    out=open(filename,'w')
+    print >>out, "#Aegean Islands\nIMAGE"
+    box_fmt = 'box({0},{1},{2},{3}) #{4}'
+    for c in catalog:
+        #x/y swap for pyfits/numpy translation
+        ymin,ymax,xmin,xmax=c.extent
+        #+1 for array/image offset
+        #+0.5 to make lines run 'between' DS9 pixels
+        xcen = (xmin+xmax)/2.0 +1.5
+        xwidth= xmax-xmin 
+        ycen = (ymin+ymax)/2.0 +1.5
+        ywidth = ymax-ymin
+        print >>out,box_fmt.format(xcen,ycen,xwidth,ywidth,c.island)
+    out.close()
+    return
+
 def writeAnn(filename,catalog,fmt):
     """
     Write an annotation file that can be read by Kvis (.ann) or DS9 (.reg).
@@ -789,33 +816,39 @@ def writeAnn(filename,catalog,fmt):
         catalog - a list of OutputSource or SimpleSource
         fmt - [.ann|.reg] format to use
     """
-    out=open(filename,'w')
-    ras = [a.ra for a in catalog]
-    decs= [a.dec for a in catalog]
     components,islands,simples = classify_catalog(catalog)
     catalog=[]
-    catalog.extend(components,simples)
-    if not hasattr(catalog[0],'a'): #a being the variable that I used for bmaj.
-        bmajs=[30/3600.0 for a in catalog]
-        bmins=bmaj
-        pas = [0 for a in catalog]
-    else:
-        bmajs = [a.a/3600.0 for a in catalog]
-        bmins = [a.b/3600.0 for a in catalog]
-        pas = [a.pa for a in catalog]
-    
-    
-    if fmt=='ann':
-        print >>out,'PA SKY'
-        formatter="ellipse {0} {1} {2} {3} {4}"
-    elif fmt=='reg':
-        print >>out,"fk5"
-        formatter='ellipse {0} {1} {2}d {3}d {4}d'
-        
-    for ra,dec,bmaj,bmin,pa in zip(ras,decs,bmajs,bmins,pas):
-        print >>out,formatter.format(ra,dec,bmaj,bmin,pa)
-    out.close()
-    logging.info("wrote {0}".format(filename))
+    catalog.extend(components)
+    catalog.extend(simples)
+
+    if len(catalog)>0:
+        out=open(filename,'w')
+        ras = [a.ra for a in catalog]
+        decs= [a.dec for a in catalog]
+        if not hasattr(catalog[0],'a'): #a being the variable that I used for bmaj.
+            bmajs=[30/3600.0 for a in catalog]
+            bmins=bmaj
+            pas = [0 for a in catalog]
+        else:
+            bmajs = [a.a/3600.0 for a in catalog]
+            bmins = [a.b/3600.0 for a in catalog]
+            pas = [a.pa for a in catalog]
+
+        if fmt=='ann':
+            print >>out,'PA SKY'
+            formatter="ellipse {0} {1} {2} {3} {4}"
+        elif fmt=='reg':
+            print >>out,"fk5"
+            formatter='ellipse {0} {1} {2}d {3}d {4}d'
+
+        for ra,dec,bmaj,bmin,pa in zip(ras,decs,bmajs,bmins,pas):
+            print >>out,formatter.format(ra,dec,bmaj,bmin,pa)
+        out.close()
+        logging.info("wrote {0}".format(filename))
+    if len(islands)>0 and fmt=='reg':
+        new_file = re.sub('.reg$','_isl.reg',filename)
+        writeIslandBoxes(new_file,islands)
+        logging.info("worte {0}".format(new_file))
     return
         
 #image manipulation
@@ -1284,6 +1317,7 @@ def fit_island(island_data):
         source.local_rms = rms[positions[0][0],positions[1][0]]
         source.x_width,source.y_width = isle.pixels.shape
         source.pixels=sum(np.isfinite(isle.pixels).ravel()*1)
+        source.extent=[xmin,xmax,ymin,ymax]
 
         logging.debug("- peak flux {0}".format(source.peak_flux))
         logging.debug("- peak position {0}, {1}".format(source.ra_str,source.dec_str))
