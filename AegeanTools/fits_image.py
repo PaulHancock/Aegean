@@ -59,14 +59,17 @@ class FitsImage():
                 
             if "BMAJ" not in self.hdu.header:
                 logging.error("BMAJ not present in fits header.")
+                logging.error("BMAJ not supplied by user. Exiting.")
+                sys.exit(0)
             else:
                 bmaj = self.hdu.header["BMAJ"]
                 
             if "BMIN" not in self.hdu.header:
                 logging.error("BMIN not present in fits header.")
+                logging.error("BMIN not supplied by user. Exiting.")
+                sys.exit(0)
             else:
                 bmin = self.hdu.header["BMIN"]
-                
             self.beam=Beam(bmaj, bmin, bpa)
         else: #use the supplied beam
             self.beam=beam
