@@ -205,7 +205,21 @@ class IslandSource(SimpleSource):
         self.components =None
         #not included in 'names' and thus not included by default in most output
         self.extent =None
-    
+
+    def __repr__(self):
+        return "({0:d})".format(self.island)
+
+    def __cmp__(self,other):
+        """
+        sort order is firstly by island then by source
+        both in ascending order
+        """
+        if self.island>other.island:
+            return 1
+        elif self.island<other.island:
+            return -1
+        else:
+           return 0      
 
 class OutputSource(SimpleSource):
     """
@@ -263,7 +277,11 @@ class OutputSource(SimpleSource):
                 self.peak_flux, self.err_peak_flux, self.int_flux, self.err_int_flux,
                 self.a,self.err_a,self.b,self.err_b,
                 self.pa,self.err_pa,self.flags]
-    
+
+    def __repr__(self):
+        return "({0:d},{1:d})".format(self.island,self.source)
+
+
     def __cmp__(self,other):
         """
         sort order is firstly by island then by source
@@ -483,8 +501,9 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
     pixbeam = get_pixbeam(beam,offsets[0]+xo/2,offsets[1]+yo/2)
     
     #The position cannot be more than a pixel beam from the initial location
-    xo_lim=max(pixbeam.a*np.cos(np.radians(pixbeam.pa)),pixbeam.b*np.sin(np.radians(pixbeam.pa)))
-    yo_lim=max(pixbeam.a*np.sin(np.radians(pixbeam.pa)),pixbeam.b*np.cos(np.radians(pixbeam.pa)))
+    #Use abs so that these distances are always positive
+    xo_lim=max( abs(pixbeam.a*np.cos(np.radians(pixbeam.pa))), abs(pixbeam.b*np.sin(np.radians(pixbeam.pa))))
+    yo_lim=max( abs(pixbeam.a*np.sin(np.radians(pixbeam.pa))), abs(pixbeam.b*np.cos(np.radians(pixbeam.pa))))
     logging.debug(" - shape {0}".format(data.shape))
     
     if not data.shape == curve.shape:
@@ -796,11 +815,11 @@ def writeIslandBoxes(filename,catalog):
         #x/y swap for pyfits/numpy translation
         ymin,ymax,xmin,xmax=c.extent
         #+1 for array/image offset
-        #+0.5 to make lines run 'between' DS9 pixels
-        xcen = (xmin+xmax)/2.0 +1.5
-        xwidth= xmax-xmin 
-        ycen = (ymin+ymax)/2.0 +1.5
-        ywidth = ymax-ymin
+        xcen = (xmin+xmax)/2.0 +1
+        #+0.5 in each direction to make lines run 'between' DS9 pixels        
+        xwidth= xmax-xmin +1
+        ycen = (ymin+ymax)/2.0 +1
+        ywidth = ymax-ymin +1
         print >>out,box_fmt.format(xcen,ycen,xwidth,ywidth,c.island)
     out.close()
     return
@@ -818,7 +837,7 @@ def writeAnn(filename,catalog,fmt):
     """
     components,islands,simples = classify_catalog(catalog)
     catalog=[]
-    catalog.extend(components)
+    catalog.extend(sorted(components))
     catalog.extend(simples)
 
     if len(catalog)>0:
@@ -834,15 +853,18 @@ def writeAnn(filename,catalog,fmt):
             bmins = [a.b/3600.0 for a in catalog]
             pas = [a.pa for a in catalog]
 
+        names = [a.__repr__() for a in catalog]
         if fmt=='ann':
             print >>out,'PA SKY'
-            formatter="ellipse {0} {1} {2} {3} {4}"
+            formatter="ellipse {0} {1} {2} {3} {4} #{5}"
         elif fmt=='reg':
             print >>out,"fk5"
-            formatter='ellipse {0} {1} {2}d {3}d {4}d'
+            formatter='ellipse {0} {1} {2}d {3}d {4}d # text="{5}"'
+            #DS9 has some strange ideas about position angle
+            pas = [a-90 for a in pas]
 
-        for ra,dec,bmaj,bmin,pa in zip(ras,decs,bmajs,bmins,pas):
-            print >>out,formatter.format(ra,dec,bmaj,bmin,pa)
+        for ra,dec,bmaj,bmin,pa,name in zip(ras,decs,bmajs,bmins,pas,names):
+            print >>out,formatter.format(ra,dec,bmaj,bmin,pa,name)
         out.close()
         logging.info("wrote {0}".format(filename))
     if len(islands)>0 and fmt=='reg':
