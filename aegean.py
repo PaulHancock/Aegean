@@ -173,6 +173,13 @@ class SimpleSource():
         self.sanitise()
         return self.formatter.format(self)
 
+    def __repr__(self):
+        '''
+        A string representation of the name of this source
+        which is always just an empty string
+        '''
+        return ''
+
     def as_list(self):
         """
         return an ordered list of the source attributes
@@ -847,7 +854,7 @@ def writeAnn(filename,catalog,fmt):
         decs= [a.dec for a in catalog]
         if not hasattr(catalog[0],'a'): #a being the variable that I used for bmaj.
             bmajs=[30/3600.0 for a in catalog]
-            bmins=bmaj
+            bmins=bmajs
             pas = [0 for a in catalog]
         else:
             bmajs = [a.a/3600.0 for a in catalog]
@@ -875,8 +882,10 @@ def writeAnn(filename,catalog,fmt):
     return
         
 #image manipulation
-def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None,cores=None):
+def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     """
+    [legacy version used by the pipeline]
+
     Calculate an rms image and a bkg image
     
     inputs:
@@ -887,10 +896,9 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None,cores=None):
     forced_rms - the rms of the image
                 None => calculate the rms and bkg levels (default)
                 <float> => assume zero background and constant rms
-    cores - the maxmimum number of cores to use when multiprocessing
-            default/None = One core only.
     return:
     nothing
+
     """
     if forced_rms:
         return np.zeros(data.shape),np.ones(data.shape)*forced_rms
@@ -959,6 +967,97 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None,cores=None):
             estimate(ymin,ymax,xmin,xmax)
  
     return
+
+def make_bkg_rms_from_global(mesh_size=20,forced_rms=None,cores=None):
+    """
+    [Aegean specific version that uses multiple cores and global data]
+
+    Calculate an rms image and a bkg image
+    reads  data_pix, beam, rmsimg, bkgimg from global_data
+    writes rmsimg, bkgimg to global_data
+    is able to run on multiple cores
+    
+    inputs:
+    mesh_size - number of beams per box
+                default = 20
+    forced_rms - the rms of the image
+                None => calculate the rms and bkg levels (default)
+                <float> => assume zero background and constant rms
+    cores - the maxmimum number of cores to use when multiprocessing
+            default/None = One core only.
+    return:
+    nothing
+    """
+    if forced_rms:
+        global_data.bkgimg[:]=0
+        global_data.rmsimg[:]=forced_rms
+        return
+
+    data = global_data.data_pix
+    beam = global_data.beam
+    img_y,img_x = data.shape
+    xcen=int(img_x/2)
+    ycen=int(img_y/2)
+
+    #calculate a local beam from the center of the data
+    pixbeam=get_pixbeam(beam,xcen,ycen)
+    
+    width_x = mesh_size*max(abs(math.cos(np.radians(pixbeam.pa))*pixbeam.b),
+                            abs(math.sin(np.radians(pixbeam.pa))*pixbeam.a) )
+    width_x = int(width_x)
+    width_y = mesh_size*max(abs(math.sin(np.radians(pixbeam.pa))*pixbeam.b),
+                            abs(math.cos(np.radians(pixbeam.pa))*pixbeam.a) )
+    width_y = int(width_y)
+    
+    rmsimg = np.zeros(data.shape)
+    bkgimg = np.zeros(data.shape)
+    logging.debug("image size x,y:{0},{1}".format(img_x,img_y))
+    logging.debug("beam: {0}".format(beam))
+    logging.debug("mesh width (pix) x,y: {0},{1}".format(width_x,width_y))
+
+    #box centered at image center then tilling outwards
+    xstart=(xcen-width_x/2)%width_x #the starting point of the first "full" box
+    ystart=(ycen-width_y/2)%width_y
+    
+    xend=img_x - (img_x-xstart)%width_x #the end point of the last "full" box
+    yend=img_y - (img_y-ystart)%width_y
+      
+    xmins=[0]
+    xmins.extend(range(xstart,xend,width_x))
+    xmins.append(xend)
+    
+    xmaxs=[xstart]
+    xmaxs.extend(range(xstart+width_x,xend+1,width_x))
+    xmaxs.append(img_x)
+    
+    ymins=[0]
+    ymins.extend(range(ystart,yend,width_y))
+    ymins.append(yend)
+    
+    ymaxs=[ystart]
+    ymaxs.extend(range(ystart+width_y,yend+1,width_y))
+    ymaxs.append(img_y)
+
+    #if the image is smaller than our ideal mesh size, just use the whole image instead
+    if width_x >=img_x:
+        xmins=[0]
+        xmaxs=[img_x]
+    if width_y >=img_y:
+        ymins=[0]
+        ymaxs=[img_y]
+
+    if cores>1:
+        #set up the queue
+        queue = pprocess.Queue(limit=cores, reuse=1)
+        estimate = queue.manage(pprocess.MakeReusable(estimate_background_global))
+    else:
+        estimate = estimate_background_global
+
+    for xmin,xmax in zip(xmins,xmaxs):
+        for ymin,ymax in zip(ymins,ymaxs):
+            estimate(ymin,ymax,xmin,xmax)
+ 
+    return 
 
 def estimate_background_global(ymin,ymax,xmin,xmax):
     '''
@@ -1473,12 +1572,13 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     #if either of rms or bkg images are not supplied then caclucate them both
     if not (rmsin and bkgin):
         logging.info("Calculating background and rms data")
-        make_bkg_rms_image(data.pixels,beam,mesh_size=20,forced_rms=rms,cores=cores)
+        make_bkg_rms_from_global(mesh_size=20,forced_rms=rms,cores=cores)
+
 
     #replace the calculated images with input versions, if the user has supplied them.
     if bkgin:
         logging.info("loading background data from file {0}".format(bkgin))
-        glogbal_data.bkgimg = load_aux_image(img,bkgin)        
+        global_data.bkgimg = load_aux_image(img,bkgin)        
     if rmsin:
         logging.info("Loading rms data from file {0}".format(rmsin))
         global_data.rmsimg = load_aux_image(img,rmsin)
@@ -1677,12 +1777,28 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
     #hdu_header = img.get_hdu_header()
     beam=img.beam    
     data = Island(img.get_pixels())
+
+    global global_data
+    # Save global data for use by fitting subprocesses    
+    global_data = GlobalFittingData()
+    global_data.beam = beam
+    global_data.hdu_header = img.get_hdu_header()
+    global_data.data_pix = img.get_pixels()
+    global_data.bkgimg = np.zeros(global_data.data_pix.shape)
+    global_data.rmsimg = np.zeros(global_data.data_pix.shape)
+
+    try:
+        global_data.wcs=pywcs.WCS(global_data.hdu_header, naxis=2)
+    except:
+        global_data.wcs=pywcs.WCS(str(global_data.hdu_header),naxis=2)
+
     if bkgin:
         logging.info("Loading background data from file {0}".format(bkgin))
-        bkgimg = load_aux_image(img,bkgin)
+        global_data.bkgimg = load_aux_image(img,bkgin)
     else:
         logging.info("Calculating background data")
-        bkgimg = make_bkg_rms_image(data.pixels,beam,mesh_size=20,forced_rms=1)[0]
+        #fill the bkg/rms image with 0/1. 
+        make_bkg_rms_from_global(mesh_size=20,forced_rms=1)
     
     #load catalog
     if catfile.split('.')[-1]=='cat':
@@ -1697,17 +1813,8 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
         
     radec= load_catalog(catfile,fmt=fmt)
     
-    global global_data
-    global_data = GlobalFittingData()
-    global_data.beam = img.beam
-    global_data.hdu_header = img.get_hdu_header()
-    try:
-        global_data.wcs=pywcs.WCS(global_data.hdu_header, naxis=2)
-    except:
-        global_data.wcs=pywcs.WCS(str(global_data.hdu_header),naxis=2)
-    
     #measure fluxes
-    sources = force_measure_flux(img,bkgimg,radec)
+    sources = force_measure_flux(img,global_data.bkgimg,radec)
 
     #write output
     print >>outfile, header.format(version,filename)
@@ -1717,7 +1824,7 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
     return sources
 
 #secondary capabilities
-def save_background_files(image_filename, hdu_index=0):
+def save_background_files(image_filename, hdu_index=0,cores=None):
     '''
     Generate and save the background and RMS maps as FITS files.
     They are saved in the current directly as aegean-background.fits and aegean-rms.fits.
@@ -1735,12 +1842,17 @@ def save_background_files(image_filename, hdu_index=0):
     global_data.beam = beam
     global_data.dcurve = dcurve
     global_data.hdu_header = hdu_header
+    global_data.data_pix = img.get_pixels()
+    global_data.bkgimg = np.zeros(global_data.data_pix.shape)
+    global_data.rmsimg = np.zeros(global_data.data_pix.shape)
+
     try:
         global_data.wcs=pywcs.WCS(hdu_header, naxis=2)
     except:
         global_data.wcs=pywcs.WCS(str(hdu_header),naxis=2)
     
-    bkgimg,rmsimg = make_bkg_rms_image(data,beam,mesh_size=20)
+    make_bkg_rms_from_global(mesh_size=20,cores=cores)
+    bkgimg,rmsimg = global_data.bkgimg, global_data.rmsimg
     
     # Generate the new FITS files by copying the existing HDU and assigning new data.
     # This gives the new files the same WCS projection and other header fields. 
@@ -1802,22 +1914,48 @@ if __name__=="__main__":
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is Aegean {0}".format(version))
+
+    #check/set cores to use
+    if options.cores is None:
+        options.cores=multiprocessing.cpu_count()
+        logging.info("Found {0} cores".format(options.cores))
+    if options.cores >1:
+        try:
+            queue = pprocess.Queue(limit=options.cores,reuse=1)
+            temp = queue.manage(pprocess.MakeReusable(fit_islands))
+        except AttributeError, e:
+            if 'poll' in e.message:
+                logging.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
+                cores=1
+            else:
+                logging.error("Your system can't seem to make a queue, try using --cores=1")
+                raise e
+        finally:
+            del queue,temp
+
     #debugging in multi core mode is very hard to understand
     if options.debug:
         logging.info("Setting cores=1 for debugging")
         options.cores=1
+
+    logging.info("Using {0} cores".format(options.cores))
+
     if options.file_version:
         logging.info("Using aegean.py {0}".format(version))
         logging.info("Using fits_image.py {0}".format(FitsImage.version))
         sys.exit()
-        
+
+    #print help if the user enters no options or filename    
     if len(args)==0:
         parser.print_help()
         sys.exit()
+
+    #check that a valid filename was entered
     filename = args[0]
     if not os.path.exists(filename):
         logging.error( "{0} does not exist".format(filename))
         sys.exit()
+
     hdu_index = options.hdu_index
     if hdu_index > 0:
         logging.info( "Using hdu index {0}".format(hdu_index))
@@ -1826,23 +1964,23 @@ if __name__=="__main__":
     if options.beam is not None:
         beam=options.beam
         if len(beam)!=3:
-            print "Beam requires 3 args. You supplied {0}".format(beam)
+            beam = beam.split()
+            print "Beam requires 3 args. You supplied '{0}'".format(beam)
             sys.exit()
         options.beam=Beam(beam[0],beam[1],beam[2])
+        logging.info("Using user supplied beam parameters")
+        logging.info("Beam is {0} deg x {1} deg with pa {2}".format(options.beam.a,options.beam.b,options.beam.pa))
         
     # Generate and save the background FITS files and exit if requested
     if options.save_background:
-        save_background_files(filename, hdu_index=hdu_index)
+        save_background_files(filename, hdu_index=hdu_index,cores=options.cores)
         sys.exit()
 
-    if options.catfile and not os.path.exists(options.catfile):
-        logging.error( "{0} does not exist".format(options.catfile))
-        sys.exit()
-        
     #Open the outfile
     if options.outfile is not sys.stdout:
         options.outfile=open(os.path.expanduser(options.outfile),'w')
-     
+    
+    #check that the bkg and rms files exist
     if options.bkginfile and not os.path.exists(options.bkginfile):
         logging.error("{0} not found".format(options.bkginfile))
         sys.exit()
@@ -1850,7 +1988,11 @@ if __name__=="__main__":
         logging.error("{0} not found".format(options.rmsinfile))
         sys.exit()
             
+    #do forced measurements using catfile
     if options.catfile:
+        if not os.path.exists(options.catfile):
+            logging.error( "{0} does not exist".format(options.catfile))
+            sys.exit()
         sources = measure_catalog_fluxes(filename, catfile=options.catfile, hdu_index=options.hdu_index,
                                outfile=options.outfile, bkgin=options.bkginfile,beam=options.beam)
     else:        
@@ -1858,6 +2000,8 @@ if __name__=="__main__":
                                     max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,
                                     outerclip=options.outerclip, cores=options.cores, rmsin=options.rmsinfile, 
                                     bkgin=options.bkginfile,beam=options.beam, doislandflux=options.doislandflux)
+
+    #write the output tables
     if options.out_table:
         save_catalog(options.out_table,sources)
     if len(sources) == 0:
