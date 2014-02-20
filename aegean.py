@@ -312,6 +312,7 @@ class GlobalFittingData:
     hdu_header = None
     beam = None
     wcs = None
+    data_pix = None
     
 class IslandFittingData:
     '''
@@ -874,7 +875,7 @@ def writeAnn(filename,catalog,fmt):
     return
         
 #image manipulation
-def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
+def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None,cores=None):
     """
     Calculate an rms image and a bkg image
     
@@ -886,13 +887,14 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     forced_rms - the rms of the image
                 None => calculate the rms and bkg levels (default)
                 <float> => assume zero background and constant rms
-
+    cores - the maxmimum number of cores to use when multiprocessing
+            default/None = One core only.
     return:
-    bkgimg - np.ndarray of background offsets
-    rmsimg - np.ndarray of 1 sigma levels
+    nothing
     """
     if forced_rms:
         return np.zeros(data.shape),np.ones(data.shape)*forced_rms
+
     
     img_y,img_x = data.shape
     xcen=int(img_x/2)
@@ -945,15 +947,47 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
         ymins=[0]
         ymaxs=[img_y]
 
+    if cores>1:
+        #set up the queue
+        queue = pprocess.Queue(limit=cores, reuse=1)
+        estimate = queue.manage(pprocess.MakeReusable(estimate_background_global))
+    else:
+        estimate = estimate_background_global
+
     for xmin,xmax in zip(xmins,xmaxs):
         for ymin,ymax in zip(ymins,ymaxs):
-            bkg, rms = estimate_background(data[ymin:ymax,xmin:xmax])
-            rmsimg[ymin:ymax,xmin:xmax] = rms
-            bkgimg[ymin:ymax,xmin:xmax] = bkg
-  
-    return bkgimg,rmsimg
+            estimate(ymin,ymax,xmin,xmax)
+ 
+    return
 
-def estimate_background(data):
+def estimate_background_global(ymin,ymax,xmin,xmax):
+    '''
+    Estimate the background noise mean and RMS.
+    The mean is estimated as the median of data.
+    The RMS is estimated as the IQR of data / 1.34896.
+    Returns nothing
+    reads/writes data from global_data
+    works only on the sub-region specified by 
+    ymin,ymax,xmin,xmax
+    '''
+    data=global_data.data_pix[ymin:ymax,xmin:xmax]
+    pixels = np.extract(data==data, data).ravel()
+    if len(pixels) < 4:
+        bkg,rms= np.NaN, np.NaN
+    else:
+        pixels.sort()
+        p25 = pixels[pixels.size/4]
+        p50 = pixels[pixels.size/2]
+        p75 = pixels[pixels.size/4*3]
+        iqr = p75 - p25
+        bkg,rms = p50, iqr / 1.34896
+    #write the rms,bkg to the global data here
+    # so that it is done in parallel
+    global_data.bkgimg[ymin:ymax,xmin:xmax]=bkg
+    global_data.rmsimg[ymin:ymax,xmin:xmax]=rms
+    return
+
+def estimate_bkg_rms(data):
     '''
     Estimate the background noise mean and RMS.
     The mean is estimated as the median of data.
@@ -970,6 +1004,11 @@ def estimate_background(data):
     p75 = pixels[pixels.size/4*3]
     iqr = p75 - p25
     return p50, iqr / 1.34896
+
+def estimate_background(data):
+    logging.warn("This function has been deprecated and should no longer be used")
+    logging.warn("use estimate_background_global or estimate_bkg_rms instead")
+    return None, None
     
 def curvature(data,aspect=None):
     """
@@ -1374,7 +1413,7 @@ def fit_islands(islands):
         sources.extend(res)
     return sources
     
-def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None,
+def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None, 
                           innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False):
     """
     Run the Aegean source finder.
@@ -1422,6 +1461,10 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     global_data.beam = beam
     global_data.dcurve = dcurve
     global_data.hdu_header = hdu_header
+    global_data.data_pix = img.get_pixels()
+    global_data.bkgimg = np.zeros(global_data.data_pix.shape)
+    global_data.rmsimg = np.zeros(global_data.data_pix.shape)
+
     try:
         global_data.wcs=pywcs.WCS(hdu_header, naxis=2)
     except:
@@ -1430,26 +1473,24 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     #if either of rms or bkg images are not supplied then caclucate them both
     if not (rmsin and bkgin):
         logging.info("Calculating background and rms data")
-        bkgimg,rmsimg = make_bkg_rms_image(data.pixels,beam,mesh_size=20,forced_rms=rms)
+        make_bkg_rms_image(data.pixels,beam,mesh_size=20,forced_rms=rms,cores=cores)
 
     #replace the calculated images with input versions, if the user has supplied them.
     if bkgin:
         logging.info("loading background data from file {0}".format(bkgin))
-        bkgimg = load_aux_image(img,bkgin)        
+        glogbal_data.bkgimg = load_aux_image(img,bkgin)        
     if rmsin:
         logging.info("Loading rms data from file {0}".format(rmsin))
-        rmsimg = load_aux_image(img,rmsin)
+        global_data.rmsimg = load_aux_image(img,rmsin)
     
-    #the curvature images is always calculated
+    #the curvature rms is always calculated
     if csigma is None:
         logging.info("Calculating curvature data")
-        cbkg, csigma = estimate_background(dcurve)
+        cbkg, csigma = estimate_bkg_rms(dcurve)
 
-    #add the background and rms to the global data
-    global_data.bkgimg = bkgimg
-    global_data.rmsimg = rmsimg
-    
- 
+    bkgimg = global_data.bkgimg
+    rmsimg = global_data.rmsimg
+
     logging.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a*3600,beam.b*3600,beam.pa))
     logging.info("csigma={0}".format(csigma))
     logging.info("seedclip={0}".format(innerclip))
