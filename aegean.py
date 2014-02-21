@@ -957,7 +957,7 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
 
     for xmin,xmax in zip(xmins,xmaxs):
         for ymin,ymax in zip(ymins,ymaxs):
-            bkg, rms = estimate_background(data[ymin:ymax,xmin:xmax])
+            bkg, rms = estimate_bkg_rms(data[ymin:ymax,xmin:xmax])
             rmsimg[ymin:ymax,xmin:xmax] = rms
             bkgimg[ymin:ymax,xmin:xmax] = bkg
   
