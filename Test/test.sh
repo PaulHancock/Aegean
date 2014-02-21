@@ -22,7 +22,7 @@ return ${code}
 }
 
 rm out.log err.log
-#save background with single core
+#save background with single/multiple cores
 tst "python aegean.py Test/Images/1904-66_SIN.fits --save --cores=1"
 tst "python aegean.py Test/Images/1904-66_SIN.fits --save --cores=2"
 
@@ -39,7 +39,7 @@ tst "python aegean.py Test/Images/1904-66_SIN.fits --catalog=out.cat --table=kvi
 tst "python aegean.py Test/Images/1904-66_SIN.fits --island --table=ds9.reg"
 
 #use a user supplied beam parameter
-tst "python aegean.py Test/Images/1904-66_SIN.fits --beam=1e-3 1e-3 0"
+tst "python aegean.py Test/Images/1904-66_SIN.fits --beam=0.3 0.3 0"
 
 #do island fitting but don't ouput any tables
 tst "python aegean.py Test/Images/1904-66_SIN.fits --island --out=out.cat"
