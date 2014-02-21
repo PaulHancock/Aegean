@@ -955,18 +955,13 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
         ymins=[0]
         ymaxs=[img_y]
 
-    if cores>1:
-        #set up the queue
-        queue = pprocess.Queue(limit=cores, reuse=1)
-        estimate = queue.manage(pprocess.MakeReusable(estimate_background_global))
-    else:
-        estimate = estimate_background_global
-
     for xmin,xmax in zip(xmins,xmaxs):
         for ymin,ymax in zip(ymins,ymaxs):
-            estimate(ymin,ymax,xmin,xmax)
- 
-    return
+            bkg, rms = estimate_background(data[ymin:ymax,xmin:xmax])
+            rmsimg[ymin:ymax,xmin:xmax] = rms
+            bkgimg[ymin:ymax,xmin:xmax] = bkg
+  
+    return bkgimg,rmsimg
 
 def make_bkg_rms_from_global(mesh_size=20,forced_rms=None,cores=None):
     """
@@ -1009,8 +1004,6 @@ def make_bkg_rms_from_global(mesh_size=20,forced_rms=None,cores=None):
                             abs(math.cos(np.radians(pixbeam.pa))*pixbeam.a) )
     width_y = int(width_y)
     
-    rmsimg = np.zeros(data.shape)
-    bkgimg = np.zeros(data.shape)
     logging.debug("image size x,y:{0},{1}".format(img_x,img_y))
     logging.debug("beam: {0}".format(beam))
     logging.debug("mesh width (pix) x,y: {0},{1}".format(width_x,width_y))
@@ -1050,13 +1043,24 @@ def make_bkg_rms_from_global(mesh_size=20,forced_rms=None,cores=None):
         #set up the queue
         queue = pprocess.Queue(limit=cores, reuse=1)
         estimate = queue.manage(pprocess.MakeReusable(estimate_background_global))
+        #populate the queue
+        for xmin,xmax in zip(xmins,xmaxs):
+            for ymin,ymax in zip(ymins,ymaxs):
+                estimate(ymin,ymax,xmin,xmax)
     else:
-        estimate = estimate_background_global
+        queue=[]
+        for xmin,xmax in zip(xmins,xmaxs):
+            for ymin,ymax in zip(ymins,ymaxs):
+                queue.append(estimate_background_global(ymin,ymax,xmin,xmax))
 
-    for xmin,xmax in zip(xmins,xmaxs):
-        for ymin,ymax in zip(ymins,ymaxs):
-            estimate(ymin,ymax,xmin,xmax)
- 
+
+
+    #construct the bkg and rms images
+    global_data.rmsimg = np.zeros(data.shape)
+    global_data.bkgimg = np.zeros(data.shape)    
+    for ymin,ymax,xmin,xmax,bkg,rms in queue:
+        global_data.bkgimg[ymin:ymax,xmin:xmax]=bkg
+        global_data.rmsimg[ymin:ymax,xmin:xmax]=rms
     return 
 
 def estimate_background_global(ymin,ymax,xmin,xmax):
@@ -1080,11 +1084,9 @@ def estimate_background_global(ymin,ymax,xmin,xmax):
         p75 = pixels[pixels.size/4*3]
         iqr = p75 - p25
         bkg,rms = p50, iqr / 1.34896
-    #write the rms,bkg to the global data here
-    # so that it is done in parallel
-    global_data.bkgimg[ymin:ymax,xmin:xmax]=bkg
-    global_data.rmsimg[ymin:ymax,xmin:xmax]=rms
-    return
+    #return the input and output data so we know what we are doing
+    # when compiling the results of multiple processes
+    return ymin,ymax,xmin,xmax,bkg,rms
 
 def estimate_bkg_rms(data):
     '''
