@@ -1515,7 +1515,7 @@ def fit_islands(islands):
     return sources
     
 def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None, 
-                          innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False):
+                          innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,returnrms=False):
     """
     Run the Aegean source finder.
     Inputs:
@@ -1543,8 +1543,12 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
                    overides whatever is given in the fitsheader.
     doislandflux- if true, an integrated flux will be returned for each island in addition to 
                     the individual component entries.
+    returnrms - if true, also return the rms image. Default=False
     Return:
-    a list of OutputSource objects
+    if returnrms:
+        [ [OutputSource,...], rmsimg]
+    else:
+        [OuputSource,... ]
     """
     if cores is not None:
         assert(cores >= 1), "cores must be one or more"
@@ -1659,8 +1663,10 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         for source in sorted(components):
             outfile.write(str(source))
             outfile.write("\n")
-
-    return sources
+    if returnrms:
+        return [sources,global_data.rmsimg]
+    else:
+        return sources
 
 def classify_catalog(catalog):
     """
