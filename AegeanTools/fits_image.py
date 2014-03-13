@@ -8,7 +8,7 @@ import astropy.io.fits as pyfits
 import numpy
 import astropy.wcs as pywcs
 import scipy.stats
-import logging
+import logging,sys
 from math import pi,cos,sin,sqrt
 
 class FitsImage():
@@ -46,8 +46,9 @@ class FitsImage():
             
         self.x = self.hdu.header['NAXIS1']
         self.y = self.hdu.header['NAXIS2']
-        self.deg_per_pixel_x = self.hdu.header["CDELT1"] # is this always right?
-        self.deg_per_pixel_y = self.hdu.header["CDELT2"] # is this always right?
+        #the following no longer complies with the fits standard so i'm going to comment it out.
+        #self.deg_per_pixel_x = self.hdu.header["CDELT1"] # is this always right?
+        #self.deg_per_pixel_y = self.hdu.header["CDELT2"] # is this always right?
         
         if beam is None:
             #if the bpa isn't specified add it as zero
