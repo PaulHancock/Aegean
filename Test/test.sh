@@ -22,6 +22,10 @@ return ${code}
 }
 
 rm out.log err.log
+#test positive/negative source funcionality
+tst "python aegean.py Test/Images/1904-66_SIN.fits --nonegative"
+tst "python aegean.py Test/Images/1904-66_SIN_neg.fits --nopositive --island --table=out.vot"
+
 #save background with single/multiple cores
 tst "python aegean.py Test/Images/1904-66_SIN.fits --save --cores=1"
 tst "python aegean.py Test/Images/1904-66_SIN.fits --save --cores=2"

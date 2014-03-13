@@ -376,9 +376,7 @@ def explore(data, rmsimg, status, queue, bounds, cutoffratio, pixel):
     """
     (x, y) = pixel
     if x < 0 or y < 0:
-        print '\n WTF?! Just found a pixel at coordinate' , pixel
-        print 'Something screwy going on, edge masking should have caught this.'
-        print '*** Code terminating ***'
+        logging.error("Floodfill tried to look at a pixel at {0}, which is off the map.")
         sys.exit()
 
     if x > 0:
@@ -432,7 +430,7 @@ def flood(data, rmsimg, status, bounds, peak, cutoffratio):
 
     return blob
 
-def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=True):
+def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=False):
     """
     <a generator function>
     Find all the sub islands in data.
@@ -454,25 +452,25 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=True):
     #logging.debug("status: {0}".format(status[1:5,1:5]))
     logging.debug("Peaked pixels: {0}/{1}".format(np.sum(status),len(data.pixels.ravel())))
     # making pixel list
-    ax,ay=np.where(data.pixels/rmsimg>innerclip)
+    ax,ay=np.where(abs(data.pixels)/rmsimg>innerclip)
     peaks=[(data.pixels[ax[i],ay[i]],ax[i],ay[i]) for i in range(len(ax))]
     if len(peaks)==0:
         logging.debug("There are no pixels above the clipping limit")
         return
-    # sorting pixel list
+    # sorting pixel list -unsure why we do this it's probably a waste of time.
     peaks.sort(reverse=True)
-    peaks=map(lambda x:x[1:],peaks)
-    logging.debug("Brightest Peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[0]],rmsimg[peaks[0]]))
-    logging.debug("Faintest Peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[-1]],rmsimg[peaks[-1]]))
+    peaks=map(lambda x:x[1:],peaks) #strip the flux data so we are left with just the positions
+    logging.debug("Most positive peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[0]],rmsimg[peaks[0]]))
+    logging.debug("Most negative peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[-1]],rmsimg[peaks[-1]]))
     bounds=(data.pixels.shape[0]-1,data.pixels.shape[1]-1)
     
     # starting image segmentation
     for peak in peaks:
-        blob=flood(data.pixels,rmsimg,status,bounds,peak,cutoffratio=outerclip)
+        blob=flood(abs(data.pixels),rmsimg,status,bounds,peak,cutoffratio=outerclip)
         npix=len(blob)
         if npix>=1:#islands with no pixels have length 1
             if expand:
-                logging.debug("I don't want to expand")
+                #I forgot what I was going to do here I should just remove it
                 logging.error("You said ''expand'' but this is not yet working!")
                 sys.exit(1)
             new_isle,xmin,xmax,ymin,ymax=data.list2map(blob)
@@ -499,6 +497,11 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
     parinfo object for mpfit
     with all parameters in pixel coords    
     """
+    #is this a negative island?
+    isnegative = max(data[np.isfinite(data)])<0
+    if isnegative:
+        logging.debug("[is a negative island]")
+
     #use a curvature of zero as a default significance cut
     if not csigma:
         csigma=0
@@ -536,28 +539,33 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
         #1d islands or small islands only get one source
         logging.debug("Tiny summit detected")
         logging.debug("{0}".format(data))
-        summits=[ [data,0,data.shape[0],0,data.shape[1]] ]
+        summits=[ [abs(data),0,data.shape[0],0,data.shape[1]] ]
         #and are constrained to be point sources
         is_flag |= flags.FIXED2PSF
     else:       
-        kappa_sigma=Island( np.where( curve<-1*csigma, np.where(data-innerclip*rmsimg>0, data,-1) ,-1) )
-        summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0,expand=False)
+        kappa_sigma=Island( np.where( abs(curve)>csigma, np.where(abs(data)-innerclip*rmsimg>0, abs(data),-1) ,-1) )
+        summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0)
         
     i=0
     for summit,xmin,xmax,ymin,ymax in summits:
-        
         summit_flag = is_flag
         logging.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape,xmin,xmax,ymin,ymax,i))
-        #amp = summit[np.where(np.isfinite(summit))].max()
-        amp=summit[np.where(summit==summit)].max()#HAXORZ!! stupid NaNs break all my things
-        logging.debug(" - max is {0}".format(amp))
+        if isnegative:
+            summit=-1*summit
+            amp=summit[np.isfinite(summit)].min()
+        else:
+            amp=summit[np.isfinite(summit)].max() #stupid NaNs break all my things
+        logging.debug(" - max is {0: 5.2f}".format(amp))
         (xpeak,ypeak)=np.where(summit==amp)
         logging.debug(" - peak at {0},{1}".format(xpeak,ypeak))
         xo = xpeak[0]+xmin
         yo = ypeak[0]+ymin
-        #allow amp to be 5% or 3sigma higher
+        #allow amp to be 5% or (innerclip - 1)sigma higher
         #TODO: the 5% should depend on the beam sampling
-        amp_min,amp_max= float(4*rmsimg[xo,yo]), float(amp*1.05+3*rmsimg[xo,yo])
+        if amp>0:
+            amp_min,amp_max= float(innerclip*rmsimg[xo,yo]), float(amp*1.05+(innerclip-1)*rmsimg[xo,yo])
+        else:
+            amp_max,amp_min= float(-1*innerclip*rmsimg[xo,yo]), float(amp*1.05-(innerclip-1)*rmsimg[xo,yo])
         logging.debug("a_min {0}, a_max {1}".format(amp_min,amp_max))
         
         xo_min,xo_max = max(xmin,xo-xo_lim),min(xmax,xo+xo_lim)
@@ -1332,6 +1340,7 @@ def fit_island(island_data):
         mp=DummyMP(parinfo=parinfo,perror=None)
         info=parinfo
     else:
+        #do the fitting
         mp,info=multi_gauss(isle.pixels,rms,parinfo)
 
     logging.debug("Source 0 pa={0} [pixel coords]".format(mp.params[5]))
@@ -1460,15 +1469,19 @@ def fit_island(island_data):
     #calculate the integrated island flux if required
     if island_data.doislandflux:
         logging.debug("Integrated flux for island {0}".format(isle_num))
-        kappa_sigma=np.where(idata-innerclip*rms>0, idata,0)
+        kappa_sigma=np.where(abs(idata)-innerclip*rms>0, idata,np.NaN)
         logging.debug("- island shape is {0}".format(kappa_sigma.shape))
 
         source = IslandSource()
         source.island=isle_num
         source.components = j
-        source.peak_flux = kappa_sigma.max()
+        source.peak_flux = kappa_sigma[np.isfinite(kappa_sigma)].max()
+        #check for negative islands
+        if source.peak_flux<0:
+            source.peak_flux = kappa_sigma[np.isfinite(kappa_sigma)].min()
+        logging.debug("- peak flux {0}".format(source.peak_flux))        
         #positions and background
-        positions = np.where(kappa_sigma == kappa_sigma.max())
+        positions = np.where(kappa_sigma == source.peak_flux)
         xy=positions[0][0] +xmin, positions[1][0]+ymin
         radec = pix2sky(xy)
         source.ra = radec[0]
@@ -1481,7 +1494,7 @@ def fit_island(island_data):
         source.pixels=sum(np.isfinite(isle.pixels).ravel()*1)
         source.extent=[xmin,xmax,ymin,ymax]
 
-        logging.debug("- peak flux {0}".format(source.peak_flux))
+
         logging.debug("- peak position {0}, {1}".format(source.ra_str,source.dec_str))
 
         #integrated flux
@@ -1515,7 +1528,8 @@ def fit_islands(islands):
     return sources
     
 def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None, 
-                          innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,returnrms=False):
+                          innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, 
+                          doislandflux=False,returnrms=False,nopositive=False,nonegative=False):
     """
     Run the Aegean source finder.
     Inputs:
@@ -1543,7 +1557,10 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
                    overides whatever is given in the fitsheader.
     doislandflux- if true, an integrated flux will be returned for each island in addition to 
                     the individual component entries.
-    returnrms - if true, also return the rms image. Default=False
+    returnrms   - if true, also return the rms image. Default=False
+    nopositive  - if true, sources with positive fluxes will not be reported
+    nonegative  - if true, sources with negative fluxes will not be reported
+
     Return:
     if returnrms:
         [ [OutputSource,...], rmsimg]
@@ -1559,6 +1576,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     hdu_header = img.get_hdu_header()
     beam=img.beam    
     data = Island(img.get_pixels())
+    #curvature image is always calculated
     dcurve=curvature(img.get_pixels())
     
     # Save global data for use by fitting subprocesses    
@@ -1589,7 +1607,6 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         logging.info("Loading rms data from file {0}".format(rmsin))
         global_data.rmsimg = load_aux_image(img,rmsin)
     
-    #the curvature rms is always calculated
     if csigma is None:
         logging.info("Calculating curvature data")
         cbkg, csigma = estimate_bkg_rms(dcurve)
@@ -1607,6 +1624,9 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     if cores == 1: #single-threaded, no parallel processing
         queue = []
     else:
+        #This check is also made during start up when running aegean from the command line
+        #However I reproduce it here so that we don't fall over when aegean is being imported
+        #into other codes (eg the VAST pipeline)
         if cores is None:
             cores=multiprocessing.cpu_count()
             logging.info("Found {0} cores".format(cores))
@@ -1657,7 +1677,12 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         
     for src in queue:
         if src:# ignore src==None
-            sources.extend(src)
+            #src is actually a list of sources
+            for s in src:
+                #ignore sources that we have been told to ignore
+                if (s.peak_flux>0 and nopositive) or (s.peak_flux<0 and nonegative):
+                    continue
+                sources.append(s)
     if outfile:
         components,islands,simples=classify_catalog(sources)
         for source in sorted(components):
@@ -1913,15 +1938,29 @@ if __name__=="__main__":
                       help='Catalog of locations at which fluxes will be measured. No source fitting is done. Many other options are ignored.')
     parser.add_option('--island',dest='doislandflux',action="store_true",
                       help='list the integrated island flux as well as the fitted component fluxes for each island')
+    parser.add_option('--nopositive',dest='nopositive',action="store_true",
+                      help="don't return sources with positive fluxes")
+    parser.add_option('--nonegative',dest='nonegative',action="store_true",
+                      help="don't return sources with negative fluxes")
     parser.set_defaults(debug=False,hdu_index=0,outfile=sys.stdout,out_table=None,rms=None,rmsinfile=None,bgkinfile=None,
                         max_summits=None,csigma=None,innerclip=5,outerclip=4,file_version=False,save_background=False,
-                        catfile=None,beam=None,doislandflux=False)
+                        catfile=None,beam=None,doislandflux=False,nopositive=False,nonegative=False)
     (options, args) = parser.parse_args()
+
+    # tell numpy to shut up about "invalid values encountered"
+    # Its just NaN's and I don't need to hear about it once per core
+    np.seterr(invalid='ignore')
 
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is Aegean {0}".format(version))
+
+    #check for nopositive/nonegative conflict
+    if options.nopositive and options.nonegative:
+        logging.info("You don't want positive sources OR negative sources")
+        logging.info("So you don't get ANY sources")
+        sys.exit()
 
     #check/set cores to use
     if options.cores is None:
@@ -2007,7 +2046,8 @@ if __name__=="__main__":
         sources = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,rms=options.rms,
                                     max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,
                                     outerclip=options.outerclip, cores=options.cores, rmsin=options.rmsinfile, 
-                                    bkgin=options.bkginfile,beam=options.beam, doislandflux=options.doislandflux)
+                                    bkgin=options.bkginfile,beam=options.beam, doislandflux=options.doislandflux,
+                                    nonegative=options.nonegative,nopositive=options.nopositive)
 
     #write the output tables
     if options.out_table:
