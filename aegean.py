@@ -1575,7 +1575,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     img = FitsImage(filename, hdu_index=hdu_index,beam=beam)
     hdu_header = img.get_hdu_header()
     beam=img.beam    
-    data = Island(img.get_pixels())
+    #data = Island(img.get_pixels())
     #curvature image is always calculated
     dcurve=curvature(img.get_pixels())
     
@@ -1584,6 +1584,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     global_data.beam = beam
     global_data.dcurve = dcurve
     global_data.hdu_header = hdu_header
+    #inigial values of the three images
     global_data.data_pix = img.get_pixels()
     global_data.bkgimg = np.zeros(global_data.data_pix.shape)
     global_data.rmsimg = np.zeros(global_data.data_pix.shape)
@@ -1598,7 +1599,6 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         logging.info("Calculating background and rms data")
         make_bkg_rms_from_global(mesh_size=20,forced_rms=rms,cores=cores)
 
-
     #replace the calculated images with input versions, if the user has supplied them.
     if bkgin:
         logging.info("loading background data from file {0}".format(bkgin))
@@ -1606,13 +1606,24 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     if rmsin:
         logging.info("Loading rms data from file {0}".format(rmsin))
         global_data.rmsimg = load_aux_image(img,rmsin)
+
+    #subtract the background image from the data image and save
+    logging.debug("Data max is {0}".format( img.get_pixels()[np.isfinite(img.get_pixels())].max()))
+    logging.debug("Doing background subtraction")
+    img.set_pixels( img.get_pixels() - global_data.bkgimg)
+    global_data.data_pix = img.get_pixels()
+    logging.debug("Data max is {0}".format( img.get_pixels()[np.isfinite(img.get_pixels())].max()))
     
+    #calculate the curvature if required
     if csigma is None:
         logging.info("Calculating curvature data")
         cbkg, csigma = estimate_bkg_rms(dcurve)
-
+        
+    #we now work with the updated versions of the three images
     bkgimg = global_data.bkgimg
     rmsimg = global_data.rmsimg
+    data = Island(img.get_pixels()) #not an image
+    #data = global_data.data_pix
 
     logging.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a*3600,beam.b*3600,beam.pa))
     logging.info("csigma={0}".format(csigma))

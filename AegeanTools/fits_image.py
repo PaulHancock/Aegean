@@ -98,6 +98,16 @@ class FitsImage():
             logging.debug("Using axes {0} and {1}".format(self.hdu.header['CTYPE1'],self.hdu.header['CTYPE2']))
         return self._pixels
 
+    def set_pixels(self,pixels):
+        """
+        Allow the pixels to be replaced
+        Will only work if pixels.shape is the same as self._pixels.shape
+        """
+        assert pixels.shape == self._pixels.shape, "Shape mismatch between pixels supplied {0} and existing image pixels {1}".format(pixels.shape,self._pixels.shape)
+        self._pixels = pixels
+            
+
+
     def get_background_rms(self):
         '''
         Return the background RMS (Jy)
