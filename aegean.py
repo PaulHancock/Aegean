@@ -1985,6 +1985,7 @@ if __name__=="__main__":
             if 'poll' in e.message:
                 logging.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
                 cores=1
+                queue=[]
             else:
                 logging.error("Your system can't seem to make a queue, try using --cores=1")
                 raise e
