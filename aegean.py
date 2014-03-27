@@ -1897,6 +1897,9 @@ def save_background_files(image_filename, hdu_index=0,cores=None):
     
     make_bkg_rms_from_global(mesh_size=20,cores=cores)
     bkgimg,rmsimg = global_data.bkgimg, global_data.rmsimg
+    #mask these arrays the same as the data
+    bkgimg[np.where(np.isnan(data))]=np.NaN
+    rmsimg[np.where(np.isnan(data))]=np.NaN
     
     # Generate the new FITS files by copying the existing HDU and assigning new data.
     # This gives the new files the same WCS projection and other header fields. 
