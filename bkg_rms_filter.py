@@ -200,7 +200,11 @@ if __name__=="__main__":
     parser.set_defaults(out_base='out',step_size=None,box_size=None)
     (options, args) = parser.parse_args()
 
-    filename = args[0]
+    if len(args)<1:
+    	parser.print_help()
+    	sys.exit()
+    else:
+    	filename = args[0]
     if not os.path.exists(filename):
         print "{0} does not exist".format(filename)
         sys.exit()
