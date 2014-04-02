@@ -1475,10 +1475,10 @@ def fit_island(island_data):
         source = IslandSource()
         source.island=isle_num
         source.components = j
-        source.peak_flux = kappa_sigma[np.isfinite(kappa_sigma)].max()
+        source.peak_flux = np.nanmax(kappa_sigma)
         #check for negative islands
         if source.peak_flux<0:
-            source.peak_flux = kappa_sigma[np.isfinite(kappa_sigma)].min()
+            source.peak_flux = np.nanmin(kappa_sigma)
         logging.debug("- peak flux {0}".format(source.peak_flux))        
         #positions and background
         positions = np.where(kappa_sigma == source.peak_flux)
@@ -1494,22 +1494,22 @@ def fit_island(island_data):
         source.pixels=sum(np.isfinite(isle.pixels).ravel()*1)
         source.extent=[xmin,xmax,ymin,ymax]
 
-
-        logging.debug("- peak position {0}, {1}".format(source.ra_str,source.dec_str))
+        logging.debug("- peak position {0}, {1} [{2},{3}]".format(source.ra_str,source.dec_str,positions[0][0],positions[1][0]))
 
         #integrated flux
         beam_volume = 2*np.pi*pixbeam.a*pixbeam.b/cc2fwhm**2
-        isize = len(np.where(kappa_sigma>0)[0]) #number of non zero pixels
+        isize = len(np.isfinite(kappa_sigma)[0]) #number of non zero pixels
         logging.debug("- pixels used {0}".format(isize))
-        source.int_flux = sum(sum(kappa_sigma)) #total flux Jy/beam
+        source.int_flux = np.nansum(kappa_sigma) #total flux Jy/beam
         logging.debug("- sum of pixles {0}".format(source.int_flux))
         source.int_flux /= beam_volume
         logging.debug("- pixbeam {0},{1}".format(pixbeam.a,pixbeam.b))
         logging.debug("- raw integrated flux {0}".format(source.int_flux))
-        eta = erf(np.sqrt(-1*np.log(source.local_rms*outerclip/source.peak_flux)))**2
+        eta = erf(np.sqrt(-1*np.log( abs(source.local_rms*outerclip/source.peak_flux) )))**2
         source.int_flux = source.int_flux / eta**2
         logging.debug("- eta {0}".format(eta))
         logging.debug("- corrected integrated flux {0}".format(source.int_flux))
+        #somehow I don't trust this but w/e
         source.err_int_flux =0
         sources.append(source)
     return sources
