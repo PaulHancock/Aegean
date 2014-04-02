@@ -816,7 +816,7 @@ def writeVOTable(filename,catalog):
         logging.info("wrote {0}".format(new_name))
     return
 
-def writeIslandBoxes(filename,catalog):
+def writeIslandBoxes(filename,catalog,fmt):
     """
     Draw a box around each island in the given catalog.
     The box simply outlines the pixels used in the fit.
@@ -825,8 +825,16 @@ def writeIslandBoxes(filename,catalog):
         catalog = [IslandSource, ...]
     """
     out=open(filename,'w')
-    print >>out, "#Aegean Islands\nIMAGE"
-    box_fmt = 'box({0},{1},{2},{3}) #{4}'
+
+    print >>out, "#Aegean Islands"
+    if fmt=='reg':
+        print >>out, "IMAGE"
+        box_fmt = 'box({0},{1},{2},{3}) #{4}'
+    elif fmt=='ann':
+        print >>out, "COORD P"
+        box_fmt = 'box P {0} {1} {2} {3} #{4}'
+    else:
+        return #fmt not supported
     for c in catalog:
         #x/y swap for pyfits/numpy translation
         ymin,ymax,xmin,xmax=c.extent
@@ -883,10 +891,19 @@ def writeAnn(filename,catalog,fmt):
             print >>out,formatter.format(ra,dec,bmaj,bmin,pa,name)
         out.close()
         logging.info("wrote {0}".format(filename))
-    if len(islands)>0 and fmt=='reg':
-        new_file = re.sub('.reg$','_isl.reg',filename)
-        writeIslandBoxes(new_file,islands)
+    if len(islands)>0:
+        if fmt=='reg':
+            new_file = re.sub('.reg$','_isl.reg',filename)
+        elif fmt=='ann':
+            new_file = re.sub('.ann$','_isl.ann',filename)
+            logging.warn('kvis islands are currently not working')
+            return
+        else:
+            logging.warn('format {0} not supported for island annotations'.format(fmt))
+            return
+        writeIslandBoxes(new_file,islands,fmt)
         logging.info("worte {0}".format(new_file))
+
     return
         
 #image manipulation
