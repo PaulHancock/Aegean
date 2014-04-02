@@ -1523,7 +1523,7 @@ def fit_island(island_data):
         logging.debug("- pixbeam {0},{1}".format(pixbeam.a,pixbeam.b))
         logging.debug("- raw integrated flux {0}".format(source.int_flux))
         eta = erf(np.sqrt(-1*np.log( abs(source.local_rms*outerclip/source.peak_flux) )))**2
-        source.int_flux = source.int_flux / eta**2
+        source.int_flux = source.int_flux / eta
         logging.debug("- eta {0}".format(eta))
         logging.debug("- corrected integrated flux {0}".format(source.int_flux))
         #somehow I don't trust this but w/e
@@ -1616,6 +1616,9 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         logging.info("Calculating background and rms data")
         make_bkg_rms_from_global(mesh_size=20,forced_rms=rms,cores=cores)
 
+    #if a forced rms was supplied use that instead
+    global_data.rmsimg = np.ones(global_data.data_pix.shape)*rms
+    
     #replace the calculated images with input versions, if the user has supplied them.
     if bkgin:
         logging.info("loading background data from file {0}".format(bkgin))
