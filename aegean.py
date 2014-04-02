@@ -1617,7 +1617,8 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         make_bkg_rms_from_global(mesh_size=20,forced_rms=rms,cores=cores)
 
     #if a forced rms was supplied use that instead
-    global_data.rmsimg = np.ones(global_data.data_pix.shape)*rms
+    if rms is not None:
+        global_data.rmsimg = np.ones(global_data.data_pix.shape)*rms
     
     #replace the calculated images with input versions, if the user has supplied them.
     if bkgin:
