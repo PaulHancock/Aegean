@@ -194,7 +194,7 @@ class IslandSource(SimpleSource):
     Each island of pixels can be characterised in a basic manner.
     This class contains info relevant to such objects.
     """
-    names=['island','background','local_rms','ra_str','dec_str','ra','dec','peak_flux','int_flux','err_int_flux','x_width','y_width','pixels','components']
+    names=['island','components','background','local_rms','ra_str','dec_str','ra','dec','peak_flux','int_flux','err_int_flux','eta','x_width','y_width','pixels']
     def __init__(self):
         self.island = None # island number
         #background = None # local background zero point
@@ -210,6 +210,7 @@ class IslandSource(SimpleSource):
         self.y_width = None
         self.pixels = None
         self.components =None
+        self.eta = None
         #not included in 'names' and thus not included by default in most output
         self.extent =None
 
@@ -784,13 +785,14 @@ def writeVOTable(filename,catalog):
     append an appropriate prefix to the file name for each type of source
     """
     def writer(filename,catalog):
-        names = catalog[0].names
-        dtypes = [type(a) for a in catalog[0].as_list()]
-            #meta = catalog[0].meta
-
-        t=Table(names=names,dtypes=dtypes)#,meta=meta)
-        for row in catalog:
-            t.add_row(row.as_list())
+        #construct a dict of the data
+        #this method preserves the data types in the VOTable
+        tab_dict = {}
+        for name in catalog[0].names:
+            tab_dict[name]=[getattr(c,name,None) for c in catalog]
+        t=Table(tab_dict)
+        #re-order the columns
+        t=t[[n for n in catalog[0].names]]
         vot = from_table(t)
         writeto(vot,filename)
 
@@ -807,7 +809,7 @@ def writeVOTable(filename,catalog):
         writer(new_name,components)
         logging.info("wrote {0}".format(new_name))
     if len(islands)>0:
-        new_name = make_new_name(filename,'_isl')
+        new_name = make_new_name(filename,'_isle')
         writer(new_name,islands)
         logging.info("wrote {0}".format(new_name))
     if len(simples)>0:
@@ -1491,7 +1493,7 @@ def fit_island(island_data):
 
         source = IslandSource()
         source.island=isle_num
-        source.components = j
+        source.components = j+1
         source.peak_flux = np.nanmax(kappa_sigma)
         #check for negative islands
         if source.peak_flux<0:
@@ -1523,11 +1525,11 @@ def fit_island(island_data):
         logging.debug("- pixbeam {0},{1}".format(pixbeam.a,pixbeam.b))
         logging.debug("- raw integrated flux {0}".format(source.int_flux))
         eta = erf(np.sqrt(-1*np.log( abs(source.local_rms*outerclip/source.peak_flux) )))**2
-        source.int_flux = source.int_flux / eta
         logging.debug("- eta {0}".format(eta))
+        source.eta = eta
         logging.debug("- corrected integrated flux {0}".format(source.int_flux))
         #somehow I don't trust this but w/e
-        source.err_int_flux =0
+        source.err_int_flux =-1
         sources.append(source)
     return sources
 
