@@ -1948,7 +1948,7 @@ if __name__=="__main__":
     parser.add_option("--outfile",dest='outfile',
                       help="Destination of catalog output, default=stdout")
     parser.add_option("--table",dest='out_table',
-                      help="Destination of catalog table output. Format infered from extension. default=None")
+                      help="Destination of catalog table output [possibly as a comma separated list]. Format(s) infered from extension(s). default=None")
     parser.add_option("--rms",dest='rms',type='float',
                       help="Assume a single image noise of rms, default is to calculate a rms over regions of 20x20 beams")
     parser.add_option("--rmsin",dest='rmsinfile',
@@ -2087,7 +2087,9 @@ if __name__=="__main__":
 
     #write the output tables
     if options.out_table:
-        save_catalog(options.out_table,sources)
+        tables = options.out_table.split(',')
+        for t in tables:
+            save_catalog(t,sources)
     if len(sources) == 0:
         logging.info("No sources found in image")
 
