@@ -1435,6 +1435,7 @@ def fit_island(island_data):
         source.err_a = abs(source.a - pix2sky_vec((x_pix,y_pix),(major+major_err)*cc2fwhm,theta)[2]*3600)    if major_err>0 else -1
         source.err_b = abs(source.b - pix2sky_vec((x_pix,y_pix),(minor+minor_err)*cc2fwhm,theta+90)[2]*3600) if minor_err>0 else -1
         source.err_pa= abs(source.pa - pix2sky_vec((x_pix,y_pix),major*cc2fwhm,theta+theta_err)[3])          if theta_err>0 else -1
+
         #ensure a>=b
         fix_shape(source)
         #fix the pa to be between -90<pa<=90
@@ -1442,7 +1443,6 @@ def fit_island(island_data):
         if source.err_pa>0:
             # pa-err_pa = 180degrees is the same as 0degrees so change it
             source.err_pa = abs(pa_limit(source.err_pa))
-        
         
         # flux values
         #the background is taken from background map
@@ -1454,7 +1454,21 @@ def fit_island(island_data):
         source.local_rms=rms[x,y]
         source.peak_flux = amp
         source.err_peak_flux = amp_err
-        
+
+        #ensure that the ra/dec errors are not smaller than condon_error_1997 suggests
+        logging.debug("errors in ra/dec {0},{1}".format(source.err_ra,source.err_dec))
+        pix_spacing = np.sqrt(global_data.pixarea)
+        if source.err_ra>0:
+            min_err_ra= abs( (pix_spacing*source.local_rms/source.peak_flux)*np.sqrt(2*major/minor*np.sin(np.radians(theta))**2 + 2*minor/major*np.cos(np.radians(theta))**2  ))
+            logging.debug('min_err_ra {0}'.format(min_err_ra))
+            source.err_ra =max(source.err_ra,  min_err_ra)
+        if source.err_dec>0:
+            min_err_dec = abs((pix_spacing*source.local_rms/source.peak_flux)*np.sqrt(2*major/minor*np.cos(np.radians(theta))**2 + 2*minor/major*np.sin(np.radians(theta))**2  ))
+            source.err_dec=max(source.err_dec, min_err_dec)
+            logging.debug('min_err_dec {0}'.format(min_err_dec))
+        logging.debug("errors after fixing {0},{1}".format(source.err_ra,source.err_dec))
+
+        #set some flags
         source.flags = src_flags
         
         pixbeam=get_pixbeam(beam,x_pix,y_pix)
@@ -1607,6 +1621,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     global_data.data_pix = img.get_pixels()
     global_data.bkgimg = np.zeros(global_data.data_pix.shape)
     global_data.rmsimg = np.zeros(global_data.data_pix.shape)
+    global_data.pixarea = img.pixarea
 
     try:
         global_data.wcs=pywcs.WCS(hdu_header, naxis=2)
