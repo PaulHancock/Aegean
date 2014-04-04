@@ -46,6 +46,9 @@ class FitsImage():
             
         self.x = self.hdu.header['NAXIS1']
         self.y = self.hdu.header['NAXIS2']
+        #this is correct at the center of the image for all images, and everywhere for conformal projections
+        self.pixarea = abs(self.hdu.header["CDELT1"]*self.hdu.header["CDELT2"])
+
         #the following no longer complies with the fits standard so i'm going to comment it out.
         #self.deg_per_pixel_x = self.hdu.header["CDELT1"] # is this always right?
         #self.deg_per_pixel_y = self.hdu.header["CDELT2"] # is this always right?
