@@ -444,16 +444,18 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=False):
     """
     if outerclip is None:
         outerclip=innerclip
+    #somehow this avoids problems with multiple cores not working properly!?!?
+    abspix=abs(data.pixels)
         
     status=np.zeros(data.pixels.shape,dtype=np.uint8)
     # Selecting PEAKED pixels
     logging.debug("InnerClip: {0}".format(innerclip))
 
-    status += np.where(data.pixels/rmsimg>innerclip,flags.PEAKED,0)
+    status += np.where(abspix/rmsimg>innerclip,flags.PEAKED,0)
     #logging.debug("status: {0}".format(status[1:5,1:5]))
     logging.debug("Peaked pixels: {0}/{1}".format(np.sum(status),len(data.pixels.ravel())))
     # making pixel list
-    ax,ay=np.where(abs(data.pixels)/rmsimg>innerclip)
+    ax,ay=np.where(abspix/rmsimg>innerclip)
     peaks=[(data.pixels[ax[i],ay[i]],ax[i],ay[i]) for i in range(len(ax))]
     if len(peaks)==0:
         logging.debug("There are no pixels above the clipping limit")
@@ -467,7 +469,7 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=False):
     
     # starting image segmentation
     for peak in peaks:
-        blob=flood(abs(data.pixels),rmsimg,status,bounds,peak,cutoffratio=outerclip)
+        blob=flood(abspix,rmsimg,status,bounds,peak,cutoffratio=outerclip)
         npix=len(blob)
         if npix>=1:#islands with no pixels have length 1
             if expand:
