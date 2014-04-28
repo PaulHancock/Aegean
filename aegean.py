@@ -1504,7 +1504,7 @@ def fit_island(island_data):
     #calculate the integrated island flux if required
     if island_data.doislandflux:
         logging.debug("Integrated flux for island {0}".format(isle_num))
-        kappa_sigma=np.where(abs(idata)-innerclip*rms>0, idata,np.NaN)
+        kappa_sigma=np.where(abs(idata)-outerclip*rms>0, idata,np.NaN)
         logging.debug("- island shape is {0}".format(kappa_sigma.shape))
 
         source = IslandSource()
