@@ -39,8 +39,8 @@ tst "python aegean.py Test/Images/1904-66_SIN.fits --out=out.cat --table=table.x
 #do forced measurements with this catalog
 tst "python aegean.py Test/Images/1904-66_SIN.fits --catalog=out.cat --table=kvis.ann"
 
-#do island fitting and ouput a ds9 reg file
-tst "python aegean.py Test/Images/1904-66_SIN.fits --island --table=ds9.reg"
+#do island fitting and ouput a ds9 reg file and an sqlite3 database
+tst "python aegean.py Test/Images/1904-66_SIN.fits --island --table=ds9.reg,my.db"
 
 #use a user supplied beam parameter
 tst "python aegean.py Test/Images/1904-66_SIN.fits --beam=0.3 0.3 0"
@@ -51,3 +51,5 @@ tst "python aegean.py Test/Images/1904-66_SIN.fits --island --out=out.cat"
 #test some hdu options
 tst "python aegean.py Test/Images/MultiHDU.fits --hdu=1 --out=out.cat"
 
+echo "to clean up:"
+echo "rm aegean-rms.fits aegean-background.fits aegean-curvature.fits out{_comp,_isle}.vot out.cat table_comp.xml kvis_simp.ann ds9{_comp,_isle}.reg my.db"

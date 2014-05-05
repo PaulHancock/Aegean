@@ -23,6 +23,7 @@ import astropy.wcs as pywcs
 #tables and votables
 from astropy.table.table import Table 
 from astropy.io.votable import from_table, writeto
+import sqlite3
 
 #logging and nice options
 import logging
@@ -151,12 +152,12 @@ class SimpleSource():
     names = ['background','local_rms','ra','dec','peak_flux','err_peak_flux']
 
     def __init__(self):
-        self.background = None
-        self.local_rms = None
-        self.ra = None
-        self.dec = None
-        self.peak_flux = None
-        self.err_peak_flux = None
+        self.background = 0.0
+        self.local_rms = 0.0
+        self.ra = 0.0
+        self.dec = 0.0
+        self.peak_flux = 0.0
+        self.err_peak_flux = 0.0
             
     def sanitise(self):
         '''
@@ -196,23 +197,23 @@ class IslandSource(SimpleSource):
     """
     names=['island','components','background','local_rms','ra_str','dec_str','ra','dec','peak_flux','int_flux','err_int_flux','eta','x_width','y_width','pixels']
     def __init__(self):
-        self.island = None # island number
+        self.island = 0 # island number
         #background = None # local background zero point
         #local_rms= None #local image rms
-        self.ra_str = None #str
-        self.dec_str = None #str
+        self.ra_str = '' #str
+        self.dec_str = '' #str
         #ra = None # degrees
         #dec = None # degrees
         #peak_flux = None # Jy/beam
-        self.int_flux = None #Jy
-        self.err_int_flux= None #Jy
-        self.x_width = None
-        self.y_width = None
-        self.pixels = None
-        self.components =None
-        self.eta = None
+        self.int_flux = 0.0 #Jy
+        self.err_int_flux= 0.0 #Jy
+        self.x_width = 0
+        self.y_width = 0
+        self.pixels = 0
+        self.components =0
+        self.eta = 0.0
         #not included in 'names' and thus not included by default in most output
-        self.extent =None
+        self.extent =0
 
     def __repr__(self):
         return "({0:d})".format(self.island)
@@ -248,27 +249,27 @@ class OutputSource(SimpleSource):
                 "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:05b}"
     names=['island','source','background','local_rms','ra_str','dec_str','ra','err_ra','dec','err_dec','peak_flux','err_peak_flux','int_flux','err_int_flux','a','err_a','b','err_b','pa','err_pa','flags']
     def __init__(self):
-        self.island = None # island number
-        self.source = None # source number
+        self.island = 0 # island number
+        self.source = 0 # source number
         #background = None # local background zero point
         #local_rms= None #local image rms
-        self.ra_str = None #str
-        self.dec_str = None #str
+        self.ra_str = '' #str
+        self.dec_str = '' #str
         #ra = None # degrees
-        self.err_ra = None # degrees
+        self.err_ra = 0.0 # degrees
         #dec = None # degrees
-        self.err_dec = None
+        self.err_dec = 0.0
         #peak_flux = None # Jy/beam
         #err_peak_flux = None # Jy/beam
-        self.int_flux = None #Jy
-        self.err_int_flux= None #Jy
-        self.a = None # major axis (arcsecs)
-        self.err_a = None # arcsecs
-        self.b = None # minor axis (arcsecs)
-        self.err_b = None # arcsecs
-        self.pa = None # position angle (degrees - WHAT??)
-        self.err_pa = None # degrees
-        self.flags = None
+        self.int_flux = 0.0 #Jy
+        self.err_int_flux= 0.0 #Jy
+        self.a = 0.0 # major axis (arcsecs)
+        self.err_a = 0.0 # arcsecs
+        self.b = 0.0 # minor axis (arcsecs)
+        self.err_b = 0.0 # arcsecs
+        self.pa = 0.0 # position angle (degrees - WHAT??)
+        self.err_pa = 0.0 # degrees
+        self.flags = 0
     
 
     def __str__(self):
@@ -766,7 +767,7 @@ def save_catalog(filename,catalog):
     '''
     input:
         filename - name of file to write, format determined by extension
-        catalog - a list of sources (OutputSources or SimpleSources)
+        catalog - a list of sources (OutputSources, SimpleSources, or IslandSource)
     returns:
         nothing
     '''
@@ -776,6 +777,8 @@ def save_catalog(filename,catalog):
         writeAnn(filename,catalog,extension)
     elif extension.lower() in ['vot','xml']:
         writeVOTable(filename,catalog)
+    elif extension.lower() in ['db','sqlite']:
+        writeDB(filename,catalog)
     else:
         logging.warning("extension not recognised or supported {0}".format(extension))
         logging.info("wrote nothing")
@@ -864,12 +867,16 @@ def writeAnn(filename,catalog,fmt):
         fmt - [.ann|.reg] format to use
     """
     components,islands,simples = classify_catalog(catalog)
-    catalog=[]
-    catalog.extend(sorted(components))
-    catalog.extend(simples)
+    if len(components)>0:
+        catalog=sorted(components)
+        suffix="comp"
+    elif len(simples)>0:
+        catalog=simples
+        suffix="simp"
+    else:
+        catalog=[]
 
     if len(catalog)>0:
-        out=open(filename,'w')
         ras = [a.ra for a in catalog]
         decs= [a.dec for a in catalog]
         if not hasattr(catalog[0],'a'): #a being the variable that I used for bmaj.
@@ -883,9 +890,13 @@ def writeAnn(filename,catalog,fmt):
 
         names = [a.__repr__() for a in catalog]
         if fmt=='ann':
+            new_file = re.sub('.ann$','_{0}.ann'.format(suffix),filename)
+            out=open(new_file,'w')
             print >>out,'PA SKY'
             formatter="ellipse {0} {1} {2} {3} {4} #{5}"
         elif fmt=='reg':
+            new_file = re.sub('.reg$','_{0}.reg'.format(suffix),filename)
+            out=open(new_file,'w')
             print >>out,"fk5"
             formatter='ellipse {0} {1} {2}d {3}d {4}d # text="{5}"'
             #DS9 has some strange ideas about position angle
@@ -897,9 +908,9 @@ def writeAnn(filename,catalog,fmt):
         logging.info("wrote {0}".format(filename))
     if len(islands)>0:
         if fmt=='reg':
-            new_file = re.sub('.reg$','_isl.reg',filename)
+            new_file = re.sub('.reg$','_isle.reg',filename)
         elif fmt=='ann':
-            new_file = re.sub('.ann$','_isl.ann',filename)
+            new_file = re.sub('.ann$','_isle.ann',filename)
             logging.warn('kvis islands are currently not working')
             return
         else:
@@ -909,7 +920,62 @@ def writeAnn(filename,catalog,fmt):
         logging.info("worte {0}".format(new_file))
 
     return
-        
+
+def writeDB(filename,catalog):
+    """
+    Output an sqlite3 database containing one table for each source type
+    inputs:
+    filename - output filename
+    catalog - a catalog of sources to populated the database with
+    """
+    def sqlTypes(obj, names):
+        """
+        Return the sql type corresponding to each named parameter in obj
+        """
+        types=[]
+        for n in names:
+            val=getattr(obj,n)
+            if isinstance(val,bool):
+                types.append("BOOL")
+            elif isinstance(val,int):
+                types.append("INT")
+            elif isinstance(val,float):
+                types.append("FLOAT")
+            elif isinstance(val,(str,unicode)):
+                types.append("VARCHAR")
+            else:
+                logging.warn("Column {0} is of unknown type {1}".format(n,type(n)))
+                logging.warn("Using VARCHAR")
+                types.append("VARCHAR)")
+        return types
+
+    components,islands,simples=classify_catalog(sources)
+
+    if os.path.exists(filename):
+        logging.warn("overwriting {0}".format(filename))
+        os.remove(filename)
+    conn=sqlite3.connect(filename)
+    db=conn.cursor()
+    #determine the column names by inspecting the catalog class
+    for t,tn in zip(classify_catalog(sources),["components","islands","simples"]):
+        if len(t)<1:
+            continue #don't write empty tables
+        col_names = t[0].names
+        col_types = sqlTypes(t[0],col_names)
+        stmnt=','.join([ "{0} {1}".format(a,b) for a,b in zip(col_names,col_types)])
+        db.execute('CREATE TABLE {0} ({1})'.format(tn,stmnt))
+        stmnt='INSERT INTO {0} ({1}) VALUES ({2})'.format(tn,','.join(col_names), ','.join(['?' for i in col_names]))
+        #convert values of -1 into None
+        nulls = lambda x: [x,None][x==-1]
+        db.executemany(stmnt,[map(nulls,r.as_list()) for r in t])
+        logging.info("Created table {0}".format(tn))
+    conn.commit()
+    logging.info(db.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall())
+    conn.close()
+    logging.info("Wrote file {0}".format(filename))
+    return
+
+
 #image manipulation
 def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     """
@@ -1515,6 +1581,7 @@ def fit_island(island_data):
         if source.peak_flux<0:
             source.peak_flux = np.nanmin(kappa_sigma)
         logging.debug("- peak flux {0}".format(source.peak_flux))        
+        source.extent = [xmin,xmax,ymin,ymax]
         #positions and background
         positions = np.where(kappa_sigma == source.peak_flux)
         xy=positions[0][0] +xmin, positions[1][0]+ymin
