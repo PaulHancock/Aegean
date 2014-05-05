@@ -520,6 +520,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
     xo_lim=max( abs(pixbeam.a*np.cos(np.radians(pixbeam.pa))), abs(pixbeam.b*np.sin(np.radians(pixbeam.pa))))
     yo_lim=max( abs(pixbeam.a*np.sin(np.radians(pixbeam.pa))), abs(pixbeam.b*np.cos(np.radians(pixbeam.pa))))
     logging.debug(" - shape {0}".format(data.shape))
+    logging.debug(" - xo_lim,yo_lim {0}, {1}".format(xo_lim,yo_lim))
     
     if not data.shape == curve.shape:
         logging.error("data and curvature are mismatched")
@@ -549,7 +550,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
     else:       
         kappa_sigma=Island( np.where( abs(curve)>csigma, np.where(abs(data)-innerclip*rmsimg>0, abs(data),-1) ,-1) )
         summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0)
-        
+
     i=0
     for summit,xmin,xmax,ymin,ymax in summits:
         summit_flag = is_flag
@@ -576,7 +577,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
         if xo_min==xo_max: #if we have a 1d summit then allow the position to vary by +/-0.5pix
             xo_min,xo_max=xo_min-0.5,xo_max+0.5
             
-        yo_min,yo_max = min(ymin,yo-yo_lim),max(ymax,yo+yo_lim)
+        yo_min,yo_max = max(ymin,yo-yo_lim),min(ymax,yo+yo_lim)
         if yo_min==yo_max: #if we have a 1d summit then allow the position to vary by +/-0.5pix
             yo_min,yo_max=yo_min-0.5,yo_max+0.5
 
