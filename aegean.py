@@ -31,6 +31,7 @@ from optparse import OptionParser
 
 #external programs
 from AegeanTools.fits_image import FitsImage, Beam
+from AegeanTools.msq2 import MarchingSquares
 from AegeanTools.mpfit import mpfit
 from AegeanTools.convert import ra2dec, dec2dec, dec2hms, dec2dms, gcd, bear, translate
 import AegeanTools.flags as flags
@@ -214,6 +215,7 @@ class IslandSource(SimpleSource):
         self.eta = 0.0
         #not included in 'names' and thus not included by default in most output
         self.extent =0
+        self.contours=[]
 
     def __repr__(self):
         return "({0:d})".format(self.island)
@@ -824,12 +826,36 @@ def writeVOTable(filename,catalog):
         logging.info("wrote {0}".format(new_name))
     return
 
+def writeIslandContours(filename,catalog,fmt):
+    """
+    Draw a contour around the pixels of each island
+    Input:
+    filename = file to write
+    catalog = [IslandSource, ...]
+    """
+    out=open(filename,'w')
+    print >>out, "#Aegean island contours"
+    if fmt=='reg':
+        line_fmt = 'image;line({0},{1},{2},{3})'
+        text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
+    if fmt=='ann':
+        print >>out, "COORD P"
+        logging.warn("Kvis not yet supported")
+    for c in catalog:
+        contour = c.contour
+        for p1,p2 in zip(contour[:-1],contour[1:]):
+            print >>out, line_fmt.format(p1[1]+0.5,p1[0]+0.5,p2[1]+0.5,p2[0]+0.5)
+        print >>out, line_fmt.format(contour[-1][1]+0.5,contour[-1][0]+0.5,contour[0][1]+0.5,contour[0][0]+0.5)
+        print >>out, text_fmt.format(c.ra,c.dec,c.island)
+    out.close()
+    return
+
 def writeIslandBoxes(filename,catalog,fmt):
     """
     Draw a box around each island in the given catalog.
     The box simply outlines the pixels used in the fit.
     Input:
-        falename = file to write
+        filename = file to write
         catalog = [IslandSource, ...]
     """
     out=open(filename,'w')
@@ -917,7 +943,8 @@ def writeAnn(filename,catalog,fmt):
         else:
             logging.warn('format {0} not supported for island annotations'.format(fmt))
             return
-        writeIslandBoxes(new_file,islands,fmt)
+        #writeIslandBoxes(new_file,islands,fmt)
+        writeIslandContours(new_file,islands,fmt)
         logging.info("worte {0}".format(new_file))
 
     return
@@ -1596,6 +1623,8 @@ def fit_island(island_data):
         source.x_width,source.y_width = isle.pixels.shape
         source.pixels=sum(np.isfinite(isle.pixels).ravel()*1)
         source.extent=[xmin,xmax,ymin,ymax]
+        msq=MarchingSquares(idata)
+        source.contour = [(a[0]+xmin,a[1]+ymin) for a in msq.perimeter]
 
         logging.debug("- peak position {0}, {1} [{2},{3}]".format(source.ra_str,source.dec_str,positions[0][0],positions[1][0]))
 
