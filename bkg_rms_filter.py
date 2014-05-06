@@ -133,7 +133,7 @@ def running_filter(data,step_size,box_size):
 	#filtered_rms[mask]=np.NaN
 	return interpolated_bkg,interpolated_rms
 
-def filter_image(im_name,out_base,step_size=None,box_size=None):
+def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False):
 	"""
 
 	"""
@@ -153,6 +153,9 @@ def filter_image(im_name,out_base,step_size=None,box_size=None):
 	print "using step_size {0}, box_size {1}".format(step_size,box_size)
 	print "on data shape {0}".format(data.shape)
 	bkg,rms = running_filter(data,step_size=step_size,box_size=box_size)
+	if twopass:
+		print "running second pass to get a better rms"
+		_,rms=running_filter(data-bkg,step_size=step_size,box_size=box_size)
 	bkg_out = '_'.join([os.path.expanduser(out_base),'bkg.fits'])
 	rms_out = '_'.join([os.path.expanduser(out_base),'rms.fits'])
 
@@ -197,7 +200,9 @@ if __name__=="__main__":
     	              help='The [x,y] size of the grid to use. Default = ~4* beam size square.')
     parser.add_option('--box',dest='box_size',type='int',nargs=2,
     	              help='The [x,y] size of the box over which the rms/bkg is calculated. Default = 5*grid.')
-    parser.set_defaults(out_base='out',step_size=None,box_size=None)
+    parser.add_option('--twopass',dest='twopass',action='store_true',
+    	              help='Calculate the bkg and rms in a two passes instead of one. (when the bkg changes rapidly)')
+    parser.set_defaults(out_base='out',step_size=None,box_size=None,twopass=False)
     (options, args) = parser.parse_args()
 
     if len(args)<1:
@@ -209,5 +214,5 @@ if __name__=="__main__":
         print "{0} does not exist".format(filename)
         sys.exit()
 
-    filter_image(im_name=filename,out_base=options.out_base,step_size=options.step_size,box_size=options.box_size)
+    filter_image(im_name=filename,out_base=options.out_base,step_size=options.step_size,box_size=options.box_size,twopass=options.twopass)
     print "Done"
