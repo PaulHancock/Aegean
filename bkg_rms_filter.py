@@ -270,15 +270,24 @@ def scipy_filter(im_name,out_base,step_size,box_size,cores=None):
     logging.info("using step_size {0}, box_size {1}".format(step_size,box_size))
     logging.info("on data shape {0}".format(data.shape))
     logging.info("with scipy generic filter median/std")
-
+    #scipy can't handle nan values when using score at percentile
     def iqrms(x):
-        a=scoreatpercentile(x,[75,25])
+        a=scoreatpercentile(x[np.isfinite(x)],[75,25])
         return  (a[0]-a[1])/1.34896
-    bkg = generic_filter(data,lambda x: scoreatpercentile(x,50),size=box_size)
+    def median(x):
+        a=scoreatpercentile(x[np.isfinite(x)],50)
+        return a
+
+    bkg = generic_filter(data,median,size=box_size)
     rms = generic_filter(data-bkg,iqrms,size=box_size)
 
     bkg_out = '_'.join([os.path.expanduser(out_base),'bkg.fits'])
     rms_out = '_'.join([os.path.expanduser(out_base),'rms.fits'])
+    #masking
+    mask = np.isnan(data)
+    bkg[mask]=np.NaN
+    rms[mask]=np.NaN
+
     save_image(fits,bkg,bkg_out)
     save_image(fits,rms,rms_out)
 
