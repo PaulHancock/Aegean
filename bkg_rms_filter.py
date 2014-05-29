@@ -31,7 +31,9 @@ gdata.data = None
 gdata.step_size=None
 gdata.box_size=None
 
-def running_filter(xmin,xmax,ymin,ymax):
+            
+
+def running_filter(xmn,xmx,ymn,ymx):
     """
     A version of running_filter that works on a subset of the data
     and returns the data without interpolation
@@ -39,6 +41,8 @@ def running_filter(xmin,xmax,ymin,ymax):
     Input:
     bounds - 
     """
+    #TODO propagate this change to the remainder of the func
+    xmin,xmax,ymin,ymax=ymn,ymx,xmn,xmx
     data=gdata.data
     box_size=gdata.box_size
     step_size=gdata.step_size
@@ -53,24 +57,21 @@ def running_filter(xmin,xmax,ymin,ymax):
         Returns:
         x,y,previous_x,previous_y
         """
+
+        xvals = range(xmin,xmax,step_size[0])
+        if xvals[-1]!=xmax:
+            xvals.append(xmax)
+        yvals = range(ymin,ymax,step_size[1])
+        if yvals[-1]!=ymax:
+            yvals.append(ymax)
         #initial data
-        x,y=xmin,ymin #locations
-        px,py=xmin,ymin #previous locations
-        yield x,y,px,py #first box
-        sizex,sizey=step_size
-        while True:
-            #this needs to move in a zig/zag pattern to 
-            #maximise overlaps between adjacent steps
-            x+=sizex
-            if x>=xmax or x<xmin:
-                x-=sizex #go 'back' a step
-                y+=sizey
-                sizex*=-1 #change our step direction
-                if y>=ymax:
-                    break # we are at then end of our iterations
-            yield x,y,px,py
-            px=x
-            py=y
+        px,py=xvals[0],yvals[0]
+        i=1
+        for y in yvals:
+            for x in xvals[::i]:
+                yield x,y,px,py
+                px,py=x,y
+            i*=-1 #change x direction
 
     def box(x,y):
         """
@@ -98,9 +99,6 @@ def running_filter(xmin,xmax,ymin,ymax):
         px_min,px_max,py_min,py_max = box(px,py)
         old=[]
         new=[]
-        #print "box is",x_min,x_max,y_min,y_max
-        #print data[x_min:x_max,y_min:y_max]
-
         #we only move in one direction at a time, but don't know which
         if (x_min>px_min) or (x_max>px_max):
             #down
@@ -161,7 +159,7 @@ def filter_mc(data,step_size,box_size,cores):
         logging.info("using {0} cores".format(cores))
         #for now we hard code these
         #assuming that the image is larger in x than y
-        nx,ny = {1:(1,1),2:(2,1),4:(2,2),6:(3,2),8:(4,2),16:(4,4),1:(4,4)}[cores]
+        nx,ny = {1:(1,1),2:(2,1),4:(2,2),6:(3,2),8:(3,3),16:(4,4),1:(4,4)}[cores]
 
         if img_x<img_y:
             nx,ny=ny,nx #if the image is smaller in x than in y
@@ -178,18 +176,18 @@ def filter_mc(data,step_size,box_size,cores):
         #locations of the box edges
         xmins=[0]
         xmins.extend(range(xstart,xend,width_x))
-        
+
         xmaxs=[xstart]
         xmaxs.extend(range(xstart+width_x,xend+1,width_x))
         xmaxs[-1]=img_x
         
         ymins=[0]
         ymins.extend(range(ystart,yend,width_y))
-        
+
         ymaxs=[ystart]
         ymaxs.extend(range(ystart+width_y,yend+1,width_y))
         ymaxs[-1]=img_y
-
+    
         for xmin,xmax in zip(xmins,xmaxs):
             for ymin,ymax in zip(ymins,ymaxs):
                 parfilt(xmin,xmax,ymin,ymax)
@@ -215,6 +213,7 @@ def filter_mc(data,step_size,box_size,cores):
     mask = np.where(np.isnan(data))
     interpolated_bkg[mask]=np.NaN
     interpolated_rms[mask]=np.NaN
+    del queue, parfilt
     return interpolated_bkg,interpolated_rms
 
 def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False,cores=None):
@@ -237,14 +236,16 @@ def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False,cor
     logging.info("using step_size {0}, box_size {1}".format(step_size,box_size))
     logging.info("on data shape {0}".format(data.shape))
     bkg,rms = filter_mc(data,step_size=step_size,box_size=box_size,cores=cores)
+    logging.info("done")
     if twopass:
         logging.info("running second pass to get a better rms")
         _,rms=filter_mc(data-bkg,step_size=step_size,box_size=box_size,cores=cores)
+        logging.info("done")
 
     bkg_out = '_'.join([os.path.expanduser(out_base),'bkg.fits'])
     rms_out = '_'.join([os.path.expanduser(out_base),'rms.fits'])
-    save_image(fits,bkg,bkg_out)
-    save_image(fits,rms,rms_out)
+    save_image(fits,np.array(bkg,dtype=np.float32),bkg_out)
+    save_image(fits,np.array(rms,dtype=np.float32),rms_out)
 
 ###
 # Alternate Filters
@@ -272,10 +273,16 @@ def scipy_filter(im_name,out_base,step_size,box_size,cores=None):
     logging.info("with scipy generic filter median/std")
     #scipy can't handle nan values when using score at percentile
     def iqrms(x):
-        a=scoreatpercentile(x[np.isfinite(x)],[75,25])
+        d=x[np.isfinite(x)]
+        if len(d)<2:
+            return np.nan
+        a=scoreatpercentile(d,[75,25])
         return  (a[0]-a[1])/1.34896
     def median(x):
-        a=scoreatpercentile(x[np.isfinite(x)],50)
+        d=x[np.isfinite(x)]
+        if len(d)<2:
+            return np.nan
+        a=scoreatpercentile(d,50)
         return a
 
     bkg = generic_filter(data,median,size=box_size)
@@ -327,12 +334,13 @@ if __name__=="__main__":
                       help='The [x,y] size of the box over which the rms/bkg is calculated. Default = 5*grid.')
     parser.add_option('--cores',dest='cores',type='int',
                       help='Number of corse to use. Default = all avaliable.')
+    parser.add_option('--onepass',dest='twopass',action='store_false', help='the opposite of twopass. default=False')
     parser.add_option('--twopass',dest='twopass',action='store_true',
                       help='Calculate the bkg and rms in a two passes instead of one. (when the bkg changes rapidly)')
     parser.add_option('--scipy',dest='usescipy',action='store_true',
                       help='Use scipy generic filter instead of the running percentile filter. (for testing/timing)')
     parser.add_option('--debug',dest='debug',action='store_true',help='debug mode, default=False')
-    parser.set_defaults(out_base='out',step_size=None,box_size=None,twopass=False,cores=None,usescipy=False,debug=False)
+    parser.set_defaults(out_base='out',step_size=None,box_size=None,twopass=True,cores=None,usescipy=False,debug=False)
     (options, args) = parser.parse_args()
 
     logging_level = logging.DEBUG if options.debug else logging.INFO
