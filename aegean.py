@@ -149,8 +149,8 @@ class SimpleSource():
     "#                        Jy/beam   Jy/beam\n"+\
     "#==========================================="
 
-    formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f}"
-    names = ['background','local_rms','ra','dec','peak_flux','err_peak_flux']
+    formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.flags:06b}"
+    names = ['background','local_rms','ra','dec','peak_flux','err_peak_flux','flags']
 
     def __init__(self):
         self.background = 0.0
@@ -159,6 +159,8 @@ class SimpleSource():
         self.dec = 0.0
         self.peak_flux = 0.0
         self.err_peak_flux = 0.0
+        self.flags = 0
+
             
     def sanitise(self):
         '''
@@ -196,8 +198,9 @@ class IslandSource(SimpleSource):
     Each island of pixels can be characterised in a basic manner.
     This class contains info relevant to such objects.
     """
-    names=['island','components','background','local_rms','ra_str','dec_str','ra','dec','peak_flux','int_flux','err_int_flux','eta','x_width','y_width','pixels']
+    names=['island','components','background','local_rms','ra_str','dec_str','ra','dec','peak_flux','int_flux','err_int_flux','eta','x_width','y_width','pixels','flags']
     def __init__(self):
+        SimpleSource.__init__(self)
         self.island = 0 # island number
         #background = None # local background zero point
         #local_rms= None #local image rms
@@ -240,17 +243,18 @@ class OutputSource(SimpleSource):
     """
      #header for the output   
     header="#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags\n"+\
-    "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   NCPES\n"+\
-    "#=========================================================================================================================================================================================="
+    "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   WNCPES\n"+\
+    "#==========================================================================================================================================================================================="
 
     #formatting strings for making nice output
     formatter = "({0.island:04d},{0.source:02d}) {0.background: 8.6f} {0.local_rms: 8.6f} "+\
                 "{0.ra_str:12s} {0.dec_str:12s} {0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} {0.err_dec: 9.7f} "+\
                 "{0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} {0.err_int_flux: 8.6f} "+\
                 "{0.a:5.2f} {0.err_a:5.2f} {0.b:5.2f} {0.err_b:5.2f} "+\
-                "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:05b}"
+                "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:06b}"
     names=['island','source','background','local_rms','ra_str','dec_str','ra','err_ra','dec','err_dec','peak_flux','err_peak_flux','int_flux','err_int_flux','a','err_a','b','err_b','pa','err_pa','flags']
     def __init__(self):
+        SimpleSource.__init__(self)
         self.island = 0 # island number
         self.source = 0 # source number
         #background = None # local background zero point
@@ -270,9 +274,7 @@ class OutputSource(SimpleSource):
         self.b = 0.0 # minor axis (arcsecs)
         self.err_b = 0.0 # arcsecs
         self.pa = 0.0 # position angle (degrees - WHAT??)
-        self.err_pa = 0.0 # degrees
-        self.flags = 0
-    
+        self.err_pa = 0.0 # degrees    
 
     def __str__(self):
         self.sanitise()
@@ -503,6 +505,8 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
     parinfo object for mpfit
     with all parameters in pixel coords    
     """
+    is_flag=0
+
     #is this a negative island?
     isnegative = max(data[np.isfinite(data)])<0
     if isnegative:
@@ -515,8 +519,12 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
     
     #calculate a local beam from the center of the data
     xo,yo= data.shape
+
     pixbeam = get_pixbeam(beam,offsets[0]+xo/2,offsets[1]+yo/2)
-    
+    if pixbeam is None:
+        logging.debug("WCSERR")
+        is_flag=flags.WCSERR
+        pixbeam=Beam(1,1,0)
     #The position cannot be more than a pixel beam from the initial location
     #Use abs so that these distances are always positive
     xo_lim=max( abs(pixbeam.a*np.cos(np.radians(pixbeam.pa))), abs(pixbeam.b*np.sin(np.radians(pixbeam.pa))))
@@ -534,10 +542,10 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
     non_nan_pix=len(data[np.where(data==data)].ravel())
     if 4<= non_nan_pix and non_nan_pix <= 6:
         logging.debug("FIXED2PSF")
-        is_flag=flags.FIXED2PSF
+        is_flag|=flags.FIXED2PSF
     elif non_nan_pix < 4: 
         logging.debug("FITERRSMALL!")
-        is_flag=flags.FITERRSMALL
+        is_flag|=flags.FITERRSMALL
     else:
         is_flag=0
     logging.debug(" - size {0}".format(len(data.ravel())))
@@ -1033,6 +1041,9 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
 
     #calculate a local beam from the center of the data
     pixbeam=get_pixbeam(beam,xcen,ycen)
+    if pixbeam is None:
+        logging.error("Cannot calculate the beam shape at the image center")
+        sys.exit()
     
     width_x = mesh_size*max(abs(math.cos(np.radians(pixbeam.pa))*pixbeam.b),
                             abs(math.sin(np.radians(pixbeam.pa))*pixbeam.a) )
@@ -1119,7 +1130,10 @@ def make_bkg_rms_from_global(mesh_size=20,forced_rms=None,cores=None):
 
     #calculate a local beam from the center of the data
     pixbeam=get_pixbeam(beam,xcen,ycen)
-    
+    if pixbeam is None:
+        logging.error("Cannot calculate the beam shape at the image center")
+        sys.exit()
+
     width_x = mesh_size*max(abs(math.cos(np.radians(pixbeam.pa))*pixbeam.b),
                             abs(math.sin(np.radians(pixbeam.pa))*pixbeam.a) )
     width_x = int(width_x)
@@ -1363,7 +1377,14 @@ def get_pixbeam(beam,x,y):
     #calculate a local beam from the center of the data
     ra,dec = pix2sky([x,y])
     major,pa =sky2pix_vec([ra,dec],beam.a,beam.pa)[2:4]
-    minor = sky2pix_vec([ra,dec],beam.b,beam.pa + 90)[2]
+    minor = abs(sky2pix_vec([ra,dec],beam.b,beam.pa + 90)[2])
+    if major<0:
+        major*=-1
+        pa-=180
+    if pa<0:
+        pa+=360
+    if not major>0:
+        return None
     return Beam(major,minor,pa)
 
 def sky_sep(pix1,pix2):
@@ -1411,7 +1432,11 @@ def fit_island(island_data):
     rms=rmsimg[xmin:xmax+1,ymin:ymax+1]
     bkg=bkgimg[xmin:xmax+1,ymin:ymax+1]
 
+    is_flag=0
     pixbeam = get_pixbeam(beam,(xmin+xmax)/2,(ymin+ymax)/2)
+    if pixbeam is None:
+        is_flag|=flags.WCSERR
+        pixbeam=Beam(1,1,0)
 
     logging.debug("=====")
     logging.debug("Island ({0})".format(isle_num))
@@ -1431,27 +1456,21 @@ def fit_island(island_data):
         logging.debug("Island {0} has no summits!".format(isle_num))
         return []
 
-    #extract a flag for the island
-    is_flag=0
+    #determine if the island is big enough to fit
     for src in parinfo:
         if src['parname'].split(":")[-1] in ['minor','major','pa']:
             if src['flags'] & flags.FITERRSMALL:
-                is_flag=src['flags']
+                is_flag|=flags.FITERRSMALL
+                logging.debug("Island is too small for a fit, not fitting anything")
+                is_flag|=flags.NOTFIT
                 break
+    #limit the number of components to fit
     if (max_summits is not None) and (num_summits > max_summits):
         logging.info("Island has too many summits ({0}), not fitting anything".format(num_summits))
-        #set all the flags to be NOTFIT
-        for src in parinfo:
-            if src['parname'].split(":")[-1] in ['minor','major','pa']:
-                src['flags']|=flags.NOTFIT
-        mp=DummyMP(parinfo=parinfo,perror=None)
-        info=parinfo
-    elif is_flag & flags.FITERRSMALL:
-        logging.debug("Island is too small for a fit, not fitting anything")
-        #set all the flags to be NOTFIT
-        for src in parinfo:
-            if src['parname'].split(":")[-1] in ['minor','major','pa']:
-                src['flags']|=flags.NOTFIT
+        is_flag=flags.NOTFIT
+
+    #supply dummy info if there is no fitting
+    if is_flag & flags.NOTFIT:
         mp=DummyMP(parinfo=parinfo,perror=None)
         info=parinfo
     else:
@@ -1473,7 +1492,7 @@ def fit_island(island_data):
     #if there was a fitting error create an mp.perror matrix full of zeros
     if mp.perror is None:
         mp.perror = [0 for a in mp.params]
-        err=True
+        is_flag|=flags.FIXED2PSF
         logging.debug("FitError: {0}".format(mp.errmsg))
         logging.debug("info:")
         for i in info:
@@ -1491,12 +1510,9 @@ def fit_island(island_data):
         source.island = isle_num
         source.source = j
         
-        #record fitting and error flags
-        src_flags=0
-        if err:
-            src_flags|=flags.FITERR
-            
-        #read the flag information from the 'pa'
+        #take general flags from the island
+        src_flags=is_flag
+        #and specific flags from the source
         src_flags|= info[j*6+5]['flags']
 
         #params = [amp,x0,y0,major,minor,pa]{n}
@@ -1509,6 +1525,9 @@ def fit_island(island_data):
         y_pix=yo + ymin + 1
 
         (source.ra,source.dec,source.a,source.pa) = pix2sky_vec((x_pix,y_pix),major*cc2fwhm,theta)
+        #if one of these values are nan then there has been some problem with the WCS handling
+        if not all(np.isfinite([source.ra,source.dec,source.a,source.pa])):
+            src_flags|=flags.WCSERR
         #negative degrees is valid for RA, but I don't want them.
         ra_orig=source.ra #need the origional RA for error calculations
         if source.ra<0:
@@ -1563,17 +1582,19 @@ def fit_island(island_data):
             source.err_dec=max(source.err_dec, min_err_dec)
             logging.debug('min_err_dec {0}'.format(min_err_dec))
         logging.debug("errors after fixing {0},{1}".format(source.err_ra,source.err_dec))
-
-        #set some flags
-        source.flags = src_flags
         
         pixbeam=get_pixbeam(beam,x_pix,y_pix)
         #integrated flux is calculated not fit or measured
-        source.int_flux=source.peak_flux*major*minor*cc2fwhm**2/(pixbeam.a*pixbeam.b)
-        #The error is never -1, but may be zero.
-        source.err_int_flux = source.int_flux*math.sqrt( (max(source.err_peak_flux,0)/source.peak_flux)**2
-                                                        +(max(source.err_a,0)/source.a)**2
-                                                        +(max(source.err_b,0)/source.b)**2)
+        if pixbeam is not None:
+            source.int_flux=source.peak_flux*major*minor*cc2fwhm**2/(pixbeam.a*pixbeam.b)
+            #The error is never -1, but may be zero.
+            source.err_int_flux = source.int_flux*math.sqrt( (max(source.err_peak_flux,0)/source.peak_flux)**2
+                                                            +(max(source.err_a,0)/source.a)**2
+                                                            +(max(source.err_b,0)/source.b)**2)
+        else:
+            source.flags|= flags.WCSERR
+            source.int_flux=np.nan
+            source.err_int_flux=np.nan
 
         #fiddle all the errors to be larger by sqrt(npix)
         rt_npix=np.sqrt(sum(np.isfinite(isle.pixels).ravel()*1)/components)
@@ -1592,6 +1613,9 @@ def fit_island(island_data):
         if source.err_pa>0:
             source.err_pa *=rt_npix       
 
+        #set the flags
+        source.flags = src_flags
+
         sources.append(source)
         logging.debug(source)
 
@@ -1602,6 +1626,7 @@ def fit_island(island_data):
         logging.debug("- island shape is {0}".format(kappa_sigma.shape))
 
         source = IslandSource()
+        source.flags=0
         source.island=isle_num
         source.components = j+1
         source.peak_flux = np.nanmax(kappa_sigma)
@@ -1629,20 +1654,25 @@ def fit_island(island_data):
         logging.debug("- peak position {0}, {1} [{2},{3}]".format(source.ra_str,source.dec_str,positions[0][0],positions[1][0]))
 
         #integrated flux
-        beam_volume = 2*np.pi*pixbeam.a*pixbeam.b/cc2fwhm**2
-        isize = len(np.isfinite(kappa_sigma)[0]) #number of non zero pixels
-        logging.debug("- pixels used {0}".format(isize))
-        source.int_flux = np.nansum(kappa_sigma) #total flux Jy/beam
-        logging.debug("- sum of pixles {0}".format(source.int_flux))
-        source.int_flux /= beam_volume
-        logging.debug("- pixbeam {0},{1}".format(pixbeam.a,pixbeam.b))
-        logging.debug("- raw integrated flux {0}".format(source.int_flux))
-        eta = erf(np.sqrt(-1*np.log( abs(source.local_rms*outerclip/source.peak_flux) )))**2
-        logging.debug("- eta {0}".format(eta))
-        source.eta = eta
-        logging.debug("- corrected integrated flux {0}".format(source.int_flux))
+        if pixbeam is not None:
+            beam_volume = 2*np.pi*pixbeam.a*pixbeam.b/cc2fwhm**2
+            isize = len(np.isfinite(kappa_sigma)[0]) #number of non zero pixels
+            logging.debug("- pixels used {0}".format(isize))
+            source.int_flux = np.nansum(kappa_sigma) #total flux Jy/beam
+            logging.debug("- sum of pixles {0}".format(source.int_flux))
+            source.int_flux /= beam_volume
+            logging.debug("- pixbeam {0},{1}".format(pixbeam.a,pixbeam.b))
+            logging.debug("- raw integrated flux {0}".format(source.int_flux))
+            eta = erf(np.sqrt(-1*np.log( abs(source.local_rms*outerclip/source.peak_flux) )))**2
+            logging.debug("- eta {0}".format(eta))
+            source.eta = eta
+            logging.debug("- corrected integrated flux {0}".format(source.int_flux))
+        else:
+            source.flags|=flags.WCSERR
+            source.int_flux=np.nan
+            source.eta=np.nan
         #somehow I don't trust this but w/e
-        source.err_int_flux =-1
+        source.err_int_flux =np.nan
         sources.append(source)
     return sources
 
@@ -1886,9 +1916,12 @@ def force_measure_flux(img,bkgimg,radec,rmsimg=None):
             logging.warn("No measurements made")
             continue
 
-
+        flag=0
         #make a pixbeam at this location
         pixbeam = get_pixbeam(global_data.beam,source_x,source_y)
+        if pixbeam is None:
+            flag|=flags.WCSERR
+            pixbeam=Beam(1,1,0)
         #determine the x and y extent of the beam
         xwidth = 2*pixbeam.a*pixbeam.b
         xwidth/= np.hypot(pixbeam.b*np.sin(np.radians(pixbeam.pa)),pixbeam.a*np.cos(np.radians(pixbeam.pa)))
@@ -1928,6 +1961,7 @@ def force_measure_flux(img,bkgimg,radec,rmsimg=None):
         source.peak_flux=flux
         source.err_peak_flux=error
         source.background=bkgimg[x,y]
+        source.flags = flag
         
         if rmsimg:
             source.local_rms =rmsimg[x,y]
