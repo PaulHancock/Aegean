@@ -51,5 +51,9 @@ tst "python aegean.py Test/Images/1904-66_SIN.fits --island --out=out.cat"
 #test some hdu options
 tst "python aegean.py Test/Images/MultiHDU.fits --hdu=1 --out=out.cat"
 
+#test WCS problem handling
+
+tst "python aegean.py Test/Images/WCS_edge.fits"
+
 echo "to clean up:"
 echo "rm aegean-rms.fits aegean-background.fits aegean-curvature.fits out{_comp,_isle}.vot out.cat table_comp.xml kvis_simp.ann ds9{_comp,_isle}.reg my.db"
