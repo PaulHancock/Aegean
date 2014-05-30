@@ -71,6 +71,8 @@ def dec2dec(dec):
 	return float(d[0]) + float(d[1])/60.0 + float(d[2])/3600.0
 
 def dec2dms(x):
+	if not np.isfinite(x):
+		return 'XX:XX:XX.XX'
 	if x<0:
 		sign='-'
 	else:
@@ -82,6 +84,8 @@ def dec2dms(x):
 	return '{0}{1:02d}:{2:02d}:{3:05.2f}'.format(sign,d,m,s)
 
 def dec2hms(x):
+	if not np.isfinite(x):
+		return 'XX:XX:XX.XX'
 	x=x/15.0
 	h=int(x)
 	x=(x-h)*60
