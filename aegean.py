@@ -465,8 +465,10 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=False):
     if len(peaks)==0:
         logging.debug("There are no pixels above the clipping limit")
         return
-    # sorting pixel list -unsure why we do this it's probably a waste of time.
+    # sorting pixel list - strongest peak should be found first
     peaks.sort(reverse=True)
+    if peaks[0][0]<0: 
+        peaks.reverse()
     peaks=map(lambda x:x[1:],peaks) #strip the flux data so we are left with just the positions
     logging.debug("Most positive peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[0]],rmsimg[peaks[0]]))
     logging.debug("Most negative peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[-1]],rmsimg[peaks[-1]]))
@@ -557,8 +559,11 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
         summits=[ [data,0,data.shape[0],0,data.shape[1]] ]
         #and are constrained to be point sources
         is_flag |= flags.FIXED2PSF
-    else:       
-        kappa_sigma=Island( np.where( abs(curve)>csigma, np.where(abs(data)-innerclip*rmsimg>0, data,np.nan) ,np.nan) )
+    else:
+        if isnegative:
+            kappa_sigma=Island( np.where( curve>csigma, np.where(data+innerclip*rmsimg<0, data, np.nan) ,np.nan) )
+        else:
+            kappa_sigma=Island( np.where( -1*curve>csigma, np.where(data-innerclip*rmsimg>0, data, np.nan) ,np.nan) )     
         summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0)
 
     i=0
@@ -566,7 +571,6 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
         summit_flag = is_flag
         logging.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape,xmin,xmax,ymin,ymax,i))
         if isnegative:
-            summit=-1*summit
             amp=summit[np.isfinite(summit)].min()
         else:
             amp=summit[np.isfinite(summit)].max() #stupid NaNs break all my things
@@ -928,12 +932,12 @@ def writeAnn(filename,catalog,fmt):
             new_file = re.sub('.ann$','_{0}.ann'.format(suffix),filename)
             out=open(new_file,'w')
             print >>out,'PA SKY'
-            formatter="ellipse {0} {1} {2} {3} {4} #{5}"
+            formatter="ellipse {0} {1} {2} {3} {4+07.3f} #{5}"
         elif fmt=='reg':
             new_file = re.sub('.reg$','_{0}.reg'.format(suffix),filename)
             out=open(new_file,'w')
             print >>out,"fk5"
-            formatter='ellipse {0} {1} {2}d {3}d {4}d # text="{5}"'
+            formatter='ellipse {0} {1} {2}d {3}d {4:+07.3f}d # text="{5}"'
             #DS9 has some strange ideas about position angle
             pas = [a-90 for a in pas]
 
@@ -2039,7 +2043,7 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
     return sources
 
 #secondary capabilities
-def save_background_files(image_filename, hdu_index=0,cores=None):
+def save_background_files(image_filename, hdu_index=0,cores=None,beam=None):
     '''
     Generate and save the background and RMS maps as FITS files.
     They are saved in the current directly as aegean-background.fits and aegean-rms.fits.
@@ -2047,7 +2051,7 @@ def save_background_files(image_filename, hdu_index=0,cores=None):
     global global_data
     
     logging.info("Saving background / RMS maps")
-    img = FitsImage(image_filename, hdu_index=hdu_index)
+    img = FitsImage(image_filename, hdu_index=hdu_index,beam=beam)
     data = img.get_pixels()
     beam=img.beam
     hdu_header = img.get_hdu_header()
@@ -2206,7 +2210,7 @@ if __name__=="__main__":
         
     # Generate and save the background FITS files and exit if requested
     if options.save_background:
-        save_background_files(filename, hdu_index=hdu_index,cores=options.cores)
+        save_background_files(filename, hdu_index=hdu_index,cores=options.cores,beam=options.beam)
         sys.exit()
 
     #Open the outfile
