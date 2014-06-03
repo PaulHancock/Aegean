@@ -554,11 +554,11 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
         #1d islands or small islands only get one source
         logging.debug("Tiny summit detected")
         logging.debug("{0}".format(data))
-        summits=[ [abs(data),0,data.shape[0],0,data.shape[1]] ]
+        summits=[ [data,0,data.shape[0],0,data.shape[1]] ]
         #and are constrained to be point sources
         is_flag |= flags.FIXED2PSF
     else:       
-        kappa_sigma=Island( np.where( abs(curve)>csigma, np.where(abs(data)-innerclip*rmsimg>0, abs(data),-1) ,-1) )
+        kappa_sigma=Island( np.where( abs(curve)>csigma, np.where(abs(data)-innerclip*rmsimg>0, data,np.nan) ,np.nan) )
         summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0)
 
     i=0
