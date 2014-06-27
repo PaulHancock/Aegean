@@ -14,11 +14,11 @@ Jay Banyer
 #standard imports
 import sys, os
 import re
-import astropy.io.fits as pyfits
 import numpy as np
 from scipy.special import erf
 import math
 import astropy.wcs as pywcs
+import astropy.io.fits as pyfits
 
 #tables and votables
 from astropy.table.table import Table 
@@ -50,20 +50,20 @@ header="""#Aegean version {0}
 fwhm2cc = 1/(2*math.sqrt(2*math.log(2)))
 cc2fwhm = (2*math.sqrt(2*math.log(2)))
 
-#Note this is now done in Imports.flags but repeated here for reference
+#Note this is now done in AegeanTools.flags but repeated here for reference
 ## Set some bitwise logic for flood routines
 #PEAKED = 1    # 001
 #QUEUED = 2    # 010
 #VISITED = 4   # 100
 #
 ## Err Flags for fitting routines
-#FITERRSMALL   = 1 #00001
-#FITERR        = 2 #00010
-#FIXED2PSF     = 4 #00100
-#FIXEDCIRCULAR = 8 #01000
-#NOTFIT        =16 #10000
-####################################### CLASSES ################################
-##########
+#FITERRSMALL   = 1 #000001
+#FITERR        = 2 #000010
+#FIXED2PSF     = 4 #000100
+#FIXEDCIRCULAR = 8 #001000
+#NOTFIT        =16 #010000
+#WCSERR        =32 #100000
+####################################### CLASSES ####################################
 
 class Island():
     """
@@ -758,6 +758,65 @@ def load_bkg_rms_image(image,bkgfile,rmsfile):
     rmsimg = load_aux_image(image,rmsfile)
     return bkgimg,rmsimg
 
+def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False,rms=None,cores=1):
+    """
+    populate the global_data object by loading or calculating the various components
+    """
+    global global_data
+    
+    img = FitsImage(filename, hdu_index=hdu_index,beam=beam)
+    hdu_header = img.get_hdu_header()
+    beam=img.beam    
+    #data = Island(img.get_pixels())
+    #curvature image is always calculated
+    dcurve=curvature(img.get_pixels())
+    
+    # Save global data for use by fitting subprocesses    
+    global_data = GlobalFittingData()
+    global_data.beam = beam
+    global_data.dcurve = dcurve
+    global_data.hdu_header = hdu_header
+    #inigial values of the three images
+    global_data.data_pix = img.get_pixels()
+    global_data.bkgimg = np.zeros(global_data.data_pix.shape)
+    global_data.rmsimg = np.zeros(global_data.data_pix.shape)
+    global_data.pixarea = img.pixarea
+
+    try:
+        global_data.wcs=pywcs.WCS(hdu_header, naxis=2)
+    except:
+        global_data.wcs=pywcs.WCS(str(hdu_header),naxis=2)
+        
+    #if either of rms or bkg images are not supplied then caclucate them both
+    if not (rmsin and bkgin):
+        if verb:
+            logging.info("Calculating background and rms data")
+        make_bkg_rms_from_global(mesh_size=20,forced_rms=rms,cores=cores)
+
+    #if a forced rms was supplied use that instead
+    if rms is not None:
+        global_data.rmsimg = np.ones(global_data.data_pix.shape)*rms
+    
+    #replace the calculated images with input versions, if the user has supplied them.
+    if bkgin:
+        if verb:
+            logging.info("loading background data from file {0}".format(bkgin))
+        global_data.bkgimg = load_aux_image(img,bkgin)        
+    if rmsin:
+        if verb:
+            logging.info("Loading rms data from file {0}".format(rmsin))
+        global_data.rmsimg = load_aux_image(img,rmsin)
+
+    #subtract the background image from the data image and save
+    if verb:
+        logging.debug("Data max is {0}".format( img.get_pixels()[np.isfinite(img.get_pixels())].max()))
+        logging.debug("Doing background subtraction")
+    img.set_pixels( img.get_pixels() - global_data.bkgimg)
+    global_data.data_pix = img.get_pixels()
+    if verb:
+        logging.debug("Data max is {0}".format( img.get_pixels()[np.isfinite(img.get_pixels())].max()))
+    return
+
 def load_catalog(filename,fmt='csv'):
     '''
     load a catalog and extract the source positions
@@ -932,7 +991,7 @@ def writeAnn(filename,catalog,fmt):
             new_file = re.sub('.ann$','_{0}.ann'.format(suffix),filename)
             out=open(new_file,'w')
             print >>out,'PA SKY'
-            formatter="ellipse {0} {1} {2} {3} {4+07.3f} #{5}"
+            formatter="ellipse {0} {1} {2} {3} {4:+07.3f} #{5}"
         elif fmt=='reg':
             new_file = re.sub('.reg$','_{0}.reg'.format(suffix),filename)
             out=open(new_file,'w')
@@ -1014,7 +1073,6 @@ def writeDB(filename,catalog):
     conn.close()
     logging.info("Wrote file {0}".format(filename))
     return
-
 
 #image manipulation
 def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
@@ -1404,6 +1462,7 @@ def sky_sep(pix1,pix2):
     pos2 = pix2sky(pix2)
     sep = gcd(pos1[0],pos1[1],pos2[0],pos2[1])
     return sep
+
 ######################################### THE MAIN DRIVING FUNCTIONS ###############
 
 #source finding and fitting
@@ -1693,9 +1752,7 @@ def fit_islands(islands):
         sources.extend(res)
     return sources
     
-def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None, 
-                          innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, 
-                          doislandflux=False,returnrms=False,nopositive=False,nonegative=False):
+def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None, innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,returnrms=False,nopositive=False,nonegative=False):
     """
     Run the Aegean source finder.
     Inputs:
@@ -1733,68 +1790,23 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     else:
         [OuputSource,... ]
     """
+    np.seterr(invalid='ignore')
     if cores is not None:
         assert(cores >= 1), "cores must be one or more"
         
-    global global_data
-    
-    img = FitsImage(filename, hdu_index=hdu_index,beam=beam)
-    hdu_header = img.get_hdu_header()
-    beam=img.beam    
-    #data = Island(img.get_pixels())
-    #curvature image is always calculated
-    dcurve=curvature(img.get_pixels())
-    
-    # Save global data for use by fitting subprocesses    
-    global_data = GlobalFittingData()
-    global_data.beam = beam
-    global_data.dcurve = dcurve
-    global_data.hdu_header = hdu_header
-    #inigial values of the three images
-    global_data.data_pix = img.get_pixels()
-    global_data.bkgimg = np.zeros(global_data.data_pix.shape)
-    global_data.rmsimg = np.zeros(global_data.data_pix.shape)
-    global_data.pixarea = img.pixarea
-
-    try:
-        global_data.wcs=pywcs.WCS(hdu_header, naxis=2)
-    except:
-        global_data.wcs=pywcs.WCS(str(hdu_header),naxis=2)
-        
-    #if either of rms or bkg images are not supplied then caclucate them both
-    if not (rmsin and bkgin):
-        logging.info("Calculating background and rms data")
-        make_bkg_rms_from_global(mesh_size=20,forced_rms=rms,cores=cores)
-
-    #if a forced rms was supplied use that instead
-    if rms is not None:
-        global_data.rmsimg = np.ones(global_data.data_pix.shape)*rms
-    
-    #replace the calculated images with input versions, if the user has supplied them.
-    if bkgin:
-        logging.info("loading background data from file {0}".format(bkgin))
-        global_data.bkgimg = load_aux_image(img,bkgin)        
-    if rmsin:
-        logging.info("Loading rms data from file {0}".format(rmsin))
-        global_data.rmsimg = load_aux_image(img,rmsin)
-
-    #subtract the background image from the data image and save
-    logging.debug("Data max is {0}".format( img.get_pixels()[np.isfinite(img.get_pixels())].max()))
-    logging.debug("Doing background subtraction")
-    img.set_pixels( img.get_pixels() - global_data.bkgimg)
-    global_data.data_pix = img.get_pixels()
-    logging.debug("Data max is {0}".format( img.get_pixels()[np.isfinite(img.get_pixels())].max()))
+    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,beam=beam,rms=rms,cores=cores,verb=True)
     
     #calculate the curvature if required
     if csigma is None:
         logging.info("Calculating curvature data")
-        cbkg, csigma = estimate_bkg_rms(dcurve)
+        cbkg, csigma = estimate_bkg_rms(global_data.dcurve)
         
     #we now work with the updated versions of the three images
     bkgimg = global_data.bkgimg
     rmsimg = global_data.rmsimg
-    data = Island(img.get_pixels()) #not an image
+    data = Island(global_data.data_pix) #not an image
     #data = global_data.data_pix
+    beam=global_data.beam
 
     logging.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a*3600,beam.b*3600,beam.pa))
     logging.info("csigma={0}".format(csigma))
@@ -1875,6 +1887,13 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     else:
         return sources
 
+def VASTP_find_sources_in_image():
+    """
+    A version of find_sources_in_image that will accept already open files from the VAST pipeline.
+    Should have identical behaviour to the non-pipeline version.
+    """
+    pass
+
 def classify_catalog(catalog):
     """
     look at a catalog of sources and split them according to their class
@@ -1895,27 +1914,26 @@ def classify_catalog(catalog):
     return components,islands,simples
 
 #just flux measuring
-def force_measure_flux(img,bkgimg,radec,rmsimg=None):
+def force_measure_flux(radec):
     '''
     Measure the flux of a point source at each of the specified locations
     Not fitting is done, just forced measurements
+    Assumes that global_data hase been populated
     input:
-        img - the image data
-        bkgimg - the background image
+        img - the image data [array]
         radec - the locations at which to measure fluxes
-        rmsimg - if given, the rms at each location will also be taken
-                 from this image and reported
     returns:
     [(flux,err),...]
     '''
     catalog = []
-    
+
+    shape = global_data.data_pix.shape
     for ra,dec in radec:
         #find the right pixels from the ra/dec
         source_x, source_y = sky2pix([ra,dec])
         x = int(round(source_x))
         y = int(round(source_y))
-        if not 0<=x<img.x or not 0<=y<img.y:
+        if not 0<=x<shape[0] or not 0<=y<shape[1]:
             logging.warn("Source at {0} {1} is outside of image bounds".format(ra,dec))
             logging.warn("No measurements made")
             continue
@@ -1938,10 +1956,9 @@ def force_measure_flux(img,bkgimg,radec,rmsimg=None):
         #cut out an image of this size
         xmin = max(0, x - xwidth/2)
         ymin = max(0, y - ywidth/2)
-        xmax = min(img.x, x + xwidth/2 + 1)
-        ymax = min(img.y, y + ywidth/2 + 1)
-        #data = img.get_pixels()[ymin:ymax, xmin:xmax]
-        data = img.get_pixels()[xmin:xmax, ymin:ymax]
+        xmax = min(shape[0], x + xwidth/2 + 1)
+        ymax = min(shape[1], y + ywidth/2 + 1)
+        data = global_data.data_pix[xmin:xmax, ymin:ymax]
         
         # Make a Gaussian equal to the beam with amplitude 1.0 at the position of the source
         # in terms of the pixel region.
@@ -1964,11 +1981,11 @@ def force_measure_flux(img,bkgimg,radec,rmsimg=None):
         source.dec=dec
         source.peak_flux=flux
         source.err_peak_flux=error
-        source.background=bkgimg[x,y]
+        source.background=global_data.bkgimg[x,y]
         source.flags = flag
         
-        if rmsimg:
-            source.local_rms =rmsimg[x,y]
+        source.local_rms =global_data.rmsimg[x,y]
+
         catalog.append(source)
         if logging.getLogger().isEnabledFor(logging.DEBUG):
             logging.debug("Measured source {0}".format(source))
@@ -1978,7 +1995,7 @@ def force_measure_flux(img,bkgimg,radec,rmsimg=None):
             logging.debug("  flux at [xmin+xo,ymin+yo]' = {0} Jy".format(data[int(xo),int(yo)]))
     return catalog
 
-def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=None, beam=None):
+def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=None, rmsin=None, cores=1, rms=None, beam=None):
     '''
     Measure the flux at a given set of locations, assuming point sources.
     
@@ -1988,36 +2005,13 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
         hdu_index - if fits file has more than one hdu, it can be specified here
         outfile - the output file to write to
         bkgin - a background image filename
+        rmsin - an rms image filename
+        cores - cores to use
+        rms - forced rms value
         beam - beam parameters to overide those given in fits header
         
     '''
-    #load fitsfile
-    img = FitsImage(filename, hdu_index=hdu_index,beam=beam)
-    #hdu_header = img.get_hdu_header()
-    beam=img.beam    
-    data = Island(img.get_pixels())
-
-    global global_data
-    # Save global data for use by fitting subprocesses    
-    global_data = GlobalFittingData()
-    global_data.beam = beam
-    global_data.hdu_header = img.get_hdu_header()
-    global_data.data_pix = img.get_pixels()
-    global_data.bkgimg = np.zeros(global_data.data_pix.shape)
-    global_data.rmsimg = np.zeros(global_data.data_pix.shape)
-
-    try:
-        global_data.wcs=pywcs.WCS(global_data.hdu_header, naxis=2)
-    except:
-        global_data.wcs=pywcs.WCS(str(global_data.hdu_header),naxis=2)
-
-    if bkgin:
-        logging.info("Loading background data from file {0}".format(bkgin))
-        global_data.bkgimg = load_aux_image(img,bkgin)
-    else:
-        logging.info("Calculating background data")
-        #fill the bkg/rms image with 0/1. 
-        make_bkg_rms_from_global(mesh_size=20,forced_rms=1)
+    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,rms=rms,cores=cores,verb=True)
     
     #load catalog
     if catfile.split('.')[-1]=='cat':
@@ -2033,7 +2027,7 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
     radec= load_catalog(catfile,fmt=fmt)
     
     #measure fluxes
-    sources = force_measure_flux(img,global_data.bkgimg,radec)
+    sources = force_measure_flux(radec)
 
     #write output
     print >>outfile, header.format(version,filename)
@@ -2041,6 +2035,26 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
     for source in sources:
         print >>outfile, str(source)
     return sources
+
+def VASTP_measure_catalog_fluxes(filename, positions, hdu_index=0,bkgin=None,rmsin=None,rms=None,cores=1,beam=None):
+    """
+    A version of measure_catalog_fluxes that will accept a list of pisitions instead of reading from a file.
+    Input:
+        filename - fits image file name to be read
+        positions - a list of source positions (ra,dec)
+        hdu_index - if fits file has more than one hdu, it can be specified here
+        outfile - the output file to write to
+        bkgin - a background image filename
+        rmsin - an rms image filename
+        cores - cores to use
+        rms - forced rms value
+        beam - beam parameters to overide those given in fits header
+    """
+    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,rms=rms,cores=cores,beam=beam,verb=True)
+    #measure fluxes
+    sources = force_measure_flux(positions)
+    return sources
+    
 
 #secondary capabilities
 def save_background_files(image_filename, hdu_index=0,cores=None,beam=None):
@@ -2081,6 +2095,9 @@ def save_background_files(image_filename, hdu_index=0,cores=None,beam=None):
     new_hdu = img.hdu
     # Set the ORIGIN to indicate Aegean made this file
     new_hdu.header.update("ORIGIN", "Aegean {0}".format(version))
+    for c in ['CRPIX3','CRPIX4','CDELT3','CDELT4','CRVAL3','CRVAL4','CTYPE3','CTYPE4']:
+        if c in new_hdu.header:
+            del new_hdu.header[c]
     new_hdu.data = bkgimg
     new_hdu.writeto("aegean-background.fits", clobber=True)
     new_hdu.data = rmsimg
