@@ -150,7 +150,7 @@ class SimpleSource():
     "#==========================================="
 
     formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.flags:06b}"
-    names = ['background','local_rms','ra','dec','peak_flux','err_peak_flux','flags']
+    names = ['background','local_rms','ra','dec','peak_flux','err_peak_flux','flags','peak_pixel']
 
     def __init__(self):
         self.background = 0.0
@@ -160,6 +160,11 @@ class SimpleSource():
         self.peak_flux = 0.0
         self.err_peak_flux = 0.0
         self.flags = 0
+        self.peak_pixel =0.0
+        #for the vast pipeline - Measured but not output by Aegean (yet)        
+        self.a=0.0
+        self.b=0.0
+        self.pa=0.0
 
             
     def sanitise(self):
@@ -269,11 +274,11 @@ class OutputSource(SimpleSource):
         #err_peak_flux = None # Jy/beam
         self.int_flux = 0.0 #Jy
         self.err_int_flux= 0.0 #Jy
-        self.a = 0.0 # major axis (arcsecs)
+        #self.a = 0.0 # major axis (arcsecs)
         self.err_a = 0.0 # arcsecs
-        self.b = 0.0 # minor axis (arcsecs)
+        #self.b = 0.0 # minor axis (arcsecs)
         self.err_b = 0.0 # arcsecs
-        self.pa = 0.0 # position angle (degrees - WHAT??)
+        #self.pa = 0.0 # position angle (degrees - WHAT??)
         self.err_pa = 0.0 # degrees    
 
     def __str__(self):
@@ -1934,8 +1939,11 @@ def force_measure_flux(radec):
         x = int(round(source_x))
         y = int(round(source_y))
         if not 0<=x<shape[0] or not 0<=y<shape[1]:
-            logging.warn("Source at {0} {1} is outside of image bounds".format(ra,dec))
-            logging.warn("No measurements made")
+            #logging.warn("Source at {0} {1} is outside of image bounds".format(ra,dec))
+            #logging.warn("No measurements made - dummy source created")
+            dummy = SimpleSource()
+            dummy.ra=-1
+            catalog.append(dummy)
             continue
 
         flag=0
@@ -1967,7 +1975,6 @@ def force_measure_flux(radec):
         yo = source_y - ymin
         params = [amp, xo, yo, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa]
         gaussian_data  = ntwodgaussian(params)(*np.indices(data.shape))
-        #gaussian_data = twodgaussian(params, data.shape)
         
         # Calculate the "best fit" amplitude as the average of the implied amplitude
         # for each pixel. Error is stddev.
@@ -1983,8 +1990,11 @@ def force_measure_flux(radec):
         source.err_peak_flux=error
         source.background=global_data.bkgimg[x,y]
         source.flags = flag
-        
+        source.peak_pixel = np.nanmax(data)
         source.local_rms =global_data.rmsimg[x,y]
+        source.a = global_data.beam.a
+        source.b = global_data.beam.b
+        source.pa = global_data.beam.pa
 
         catalog.append(source)
         if logging.getLogger().isEnabledFor(logging.DEBUG):
