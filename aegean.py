@@ -1708,6 +1708,9 @@ def fit_island(island_data):
         xy=positions[0][0] +xmin, positions[1][0]+ymin
         radec = pix2sky(xy)
         source.ra = radec[0]
+        #convert negative ra's to positive ones
+        if source.ra<0:
+            source.ra+=360
         source.dec= radec[1]
         source.ra_str = dec2hms(source.ra)
         source.dec_str = dec2dms(source.dec)
