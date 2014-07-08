@@ -129,6 +129,7 @@ def running_filter(xmn,xmx,ymn,ymx):
             rms_values.append((p75-p25)/1.34896)
     #return our lists, the interpolation will be done on the master node
     #also tell the master node where the data came from
+    logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     return xmin,xmax,ymin,ymax,bkg_points,bkg_values,rms_points,rms_values
 
 def filter_mc(data,step_size,box_size,cores):
@@ -159,7 +160,7 @@ def filter_mc(data,step_size,box_size,cores):
         logging.info("using {0} cores".format(cores))
         #for now we hard code these
         #assuming that the image is larger in x than y
-        nx,ny = {1:(1,1),2:(2,1),4:(2,2),6:(3,2),8:(3,3),16:(4,4),1:(4,4)}[cores]
+        nx,ny = {1:(1,1),2:(2,1),4:(2,2),6:(3,2),8:(2,4),16:(4,4),1:(4,4)}[cores]
 
         if img_x<img_y:
             nx,ny=ny,nx #if the image is smaller in x than in y
