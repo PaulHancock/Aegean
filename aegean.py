@@ -2111,11 +2111,26 @@ def save_background_files(image_filename, hdu_index=0,cores=None,beam=None):
     for c in ['CRPIX3','CRPIX4','CDELT3','CDELT4','CRVAL3','CRVAL4','CTYPE3','CTYPE4']:
         if c in new_hdu.header:
             del new_hdu.header[c]
-    new_hdu.data = bkgimg
+    #make the output file the same size as the input by matching the bitpix
+    bitpix = new_hdu.header['BITPIX']
+    if bitpix==8:
+        dtype=np.unit8
+    elif bitpix==16:
+        dtype=np.int16
+    elif bitpix==32:
+        dtype=np.int32
+    elif bitpix==-32:
+        dtype=np.float32
+    elif bitpix==-64:
+        dtype=np.float64
+    else:
+        logging.warn("Cannot determine BITPIX")
+        dtype=None
+    new_hdu.data = np.array(bkgimg,dtype=dtype)
     new_hdu.writeto("aegean-background.fits", clobber=True)
-    new_hdu.data = rmsimg
+    new_hdu.data = np.array(rmsimg,dtype=dtype)
     new_hdu.writeto("aegean-rms.fits", clobber=True)
-    new_hdu.data = dcurve
+    new_hdu.data = np.array(dcurve,dtype=dtype)
     new_hdu.writeto("aegean-curvature.fits",clobber=True)
     logging.info("Saved aegean-background.fits, aegean-rms.fits and aegean-curvature.fits")
 
