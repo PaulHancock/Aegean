@@ -822,7 +822,7 @@ def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False
         logging.debug("Data max is {0}".format( img.get_pixels()[np.isfinite(img.get_pixels())].max()))
     return
 
-def load_catalog(filename,fmt='csv'):
+def load_catalog(filename):
     '''
     load a catalog and extract the source positions
     acceptable formats are:
@@ -830,16 +830,25 @@ def load_catalog(filename,fmt='csv'):
     cat - format created by Aegean
     returns [(ra,dec),...]
     '''
-    if fmt=='csv':
+    fmt = os.path.splitext(filename)[-1]
+    print fmt
+    if fmt=='.csv':
+        logging.info("Reading first two columns of csv file")
         lines=[a.strip().split(',') for a in open(filename,'r').readlines() if not a.startswith('#') ]
         catalog=[ (float(a[0]),float(a[1])) for a in lines]      
-    elif fmt=='cat':
+    elif fmt=='.cat':
+        logging.info("Reading ra/dec columns of Aegean catalog")
         lines = [a.strip().split() for a in open(filename,'r').readlines() if not a.startswith('#') ]
         catalog = [ (float(a[5]),float(a[7])) for a in lines]
     else:
-        logging.error("Catalog file {0} not loaded".format(filename))
-        catalog=None
-        
+        logging.info("Assuming ascii format, reading first two columns")
+        lines = [a.strip().split() for a in open(filename,'r').readlines() if not a.startswith('#')]
+        try:
+            catalog = [ (float(a[0]),float(a[1])) for a in lines]
+        except :
+            logging.error("Expecting two columns of floats but failed to parse")
+            logging.error("Catalog file {0} not loaded".format(filename))
+            sys.exit()
     return catalog
 
 def save_catalog(filename,catalog):
@@ -2027,21 +2036,9 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
     load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,rms=rms,cores=cores,verb=True)
     
     #load catalog
-    if catfile.split('.')[-1]=='cat':
-        logging.debug("Using Aegean catalog file format")
-        fmt='cat'
-    elif catfile.split('.')[-1]=='csv':
-        logging.debug("Using csv file format")
-        fmt='csv'
-    else:
-        logging.error("Unkonwn file format for {0}".format(catfile))
-        sys.exit()
-        
-    radec= load_catalog(catfile,fmt=fmt)
-    
+    radec= load_catalog(catfile)
     #measure fluxes
     sources = force_measure_flux(radec)
-
     #write output
     print >>outfile, header.format(version,filename)
     print >>outfile, SimpleSource.header
@@ -2147,7 +2144,7 @@ if __name__=="__main__":
     parser.add_option("--outfile",dest='outfile',
                       help="Destination of catalog output, default=stdout")
     parser.add_option("--table",dest='out_table',
-                      help="Destination of catalog table output [possibly as a comma separated list]. Format(s) infered from extension(s). default=None")
+                      help="Destination of catalog table output. Format(s) infered from extension(s):. xml/vot = VOTable, db/sqlite = Sqlite database, reg = ds9 regions file, ann = kvis annotation file. Default=None. multiple files can be written eg: --table=out.reg,out.vot,src.db")
     parser.add_option("--rms",dest='rms',type='float',
                       help="Assume a single image noise of rms, default is to calculate a rms over regions of 20x20 beams")
     parser.add_option("--rmsin",dest='rmsinfile',
@@ -2169,7 +2166,7 @@ if __name__=="__main__":
     parser.add_option('--save_background', dest='save_background', action="store_true",
                       help='save the background/rms/curvature maps to aegean-background.fits, aegean-rms.fits, aegean-curvature.fits and exit')
     parser.add_option('--catalog',dest='catfile',
-                      help='Catalog of locations at which fluxes will be measured. No source fitting is done. Many other options are ignored.')
+                      help='Catalog of locations at which fluxes will be measured. No source fitting is done. Many other options are ignored. Expect ra/dec to be in decimal degrees. Extensions determine format: .csv = assume comma separated values and read first two columns, .cat = read ra/dec from Aegean catalog file, other = assume space separated file and read first two columns')
     parser.add_option('--island',dest='doislandflux',action="store_true",
                       help='list the integrated island flux as well as the fitted component fluxes for each island')
     parser.add_option('--nopositive',dest='nopositive',action="store_true",
