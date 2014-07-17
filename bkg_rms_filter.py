@@ -165,9 +165,9 @@ def filter_mc(data,step_size,box_size,cores):
         if img_x<img_y:
             nx,ny=ny,nx #if the image is smaller in x than in y
 
-        #box widths should be multiples of the ste_size
-        width_x = (img_x/nx/step_size[0])*step_size[0]
-        width_y = (img_y/ny/step_size[1])*step_size[1]
+        #box widths should be multiples of the ste_size, and not zero
+        width_x = max(img_x/nx/step_size[0],1)*step_size[0]
+        width_y = max(img_y/ny/step_size[1],1)*step_size[1]
         
         xstart=width_x
         ystart=width_y
@@ -208,8 +208,16 @@ def filter_mc(data,step_size,box_size,cores):
         _,_,_,_,bkg_points,bkg_values,rms_points,rms_values=running_filter(0,img_x,0,img_y)
     #and do the interpolation etc...
     (gx,gy) = np.mgrid[0:data.shape[0],0:data.shape[1]]
-    interpolated_bkg = griddata(bkg_points,bkg_values,(gx,gy),method='linear')
-    interpolated_rms = griddata(rms_points,rms_values,(gx,gy),method='linear')
+    #if the bkg/rms points have len zero this is because they are all nans so we return
+    # arrays of nans
+    if len(bkg_points)>0:
+        interpolated_bkg = griddata(bkg_points,bkg_values,(gx,gy),method='linear')
+    else:
+        interpolated_bkg=gx*np.nan
+    if len(rms_points)>0:
+        interpolated_rms = griddata(rms_points,rms_values,(gx,gy),method='linear')
+    else:
+        interpolated_rms=gx*np.nan
     #mask the output image as per the input image
     mask = np.where(np.isnan(data))
     interpolated_bkg[mask]=np.NaN
