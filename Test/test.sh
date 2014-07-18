@@ -33,8 +33,8 @@ tst "python aegean.py Test/Images/1904-66_SIN.fits --save --cores=2"
 #load background and process image
 tst "python aegean.py Test/Images/1904-66_SIN.fits --rmsin=aegean-rms.fits --bkgin=aegean-background.fits --out=out.cat"
 
-#create an output catalog in Aegean format
-tst "python aegean.py Test/Images/1904-66_SIN.fits --out=out.cat --table=table.xml"
+#create an output table in various formats
+tst "python aegean.py Test/Images/1904-66_SIN.fits --out=out.cat --table=table.xml,table.vo,table.csv,table.tex,table.tab"
 
 #do forced measurements with this catalog
 tst "python aegean.py Test/Images/1904-66_SIN.fits --catalog=out.cat --table=kvis.ann"
@@ -56,4 +56,4 @@ tst "python aegean.py Test/Images/MultiHDU.fits --hdu=1 --out=out.cat"
 tst "python aegean.py Test/Images/WCS_edge.fits"
 
 echo "to clean up:"
-echo "rm aegean-rms.fits aegean-background.fits aegean-curvature.fits out{_comp,_isle}.vot out.cat table_comp.xml kvis_simp.ann ds9{_comp,_isle}.reg my.db"
+echo "rm aegean-rms.fits aegean-background.fits aegean-curvature.fits out{_comp,_isle}.vot out.cat table_comp.{xml,vo,csv,tex,tab} kvis_simp.ann ds9{_comp,_isle}.reg my.db"
