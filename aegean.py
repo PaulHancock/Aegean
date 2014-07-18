@@ -22,7 +22,9 @@ import astropy.io.fits as pyfits
 
 #tables and votables
 from astropy.table.table import Table 
-from astropy.io.votable import from_table, writeto
+from astropy.io import ascii
+from astropy.io.votable import from_table
+from astropy.io.votable import writeto as writetoVO
 import sqlite3
 
 #logging and nice options
@@ -860,24 +862,29 @@ def save_catalog(filename,catalog):
         nothing
     '''
     #.ann and .reg are handled by me
-    extension=os.path.basename(filename).split('.')[-1]
+    extension=os.path.splitext(filename)[1][1:]
     if extension in ['ann','reg']:
         writeAnn(filename,catalog,extension)
-    elif extension.lower() in ['vot','xml']:
+    elif extension.lower() in ['vo','vot','xml']:
         writeVOTable(filename,catalog)
     elif extension.lower() in ['db','sqlite']:
         writeDB(filename,catalog)
+    elif extension.lower() in ['csv']:
+        write_table(filename,catalog,format='csv')
+    elif extension.lower() in ['tex']:
+        write_table(filename,catalog,format='latex')
+    elif extension.lower() in ['tab']:
+        write_table(filename,catalog,format='tab')
     else:
-        logging.warning("extension not recognised or supported {0}".format(extension))
-        logging.info("wrote nothing")
+        logging.warning("extension not recognised {0}".format(extension))
+        logging.warning("You get tab format")
+        write_table(filename,catalog,format='tab')
     return
 
-def writeVOTable(filename,catalog):
+def write_table(filename,catalog,format=None):
     """
-    write VOTables for each of the souce types that are in the catalog
-    append an appropriate prefix to the file name for each type of source
     """
-    def writer(filename,catalog):
+    def writer(filename,catalog,format=None):
         #construct a dict of the data
         #this method preserves the data types in the VOTable
         tab_dict = {}
@@ -886,30 +893,39 @@ def writeVOTable(filename,catalog):
         t=Table(tab_dict)
         #re-order the columns
         t=t[[n for n in catalog[0].names]]
-        vot = from_table(t)
-        writeto(vot,filename)
 
-    def make_new_name(filename,suffix):
-        new_name = filename.split('.')
-        new_name[-2]+=suffix
-        new_name = '.'.join(new_name)
-        return new_name
-        
+        if format is not None:
+            if format.lower() in ["vot","vo","xml"]:
+                vot = from_table(t)
+                writetoVO(vot,filename)
+            else:
+                ascii.write(t,filename,format)
+        else:
+            ascii.write(t,filename)
+        return
+
     components,islands,simples=classify_catalog(catalog)
     
     if len(components)>0:
-        new_name = make_new_name(filename,'_comp')
-        writer(new_name,components)
+        new_name = "{1}{0}{2}".format('_comp',*os.path.splitext(filename))
+        writer(new_name,components,format)
         logging.info("wrote {0}".format(new_name))
     if len(islands)>0:
-        new_name = make_new_name(filename,'_isle')
-        writer(new_name,islands)
+        new_name = "{1}{0}{2}".format('_isle',*os.path.splitext(filename))
+        writer(new_name,islands,format)
         logging.info("wrote {0}".format(new_name))
     if len(simples)>0:
-        new_name = make_new_name(filename,'_simp')
-        writer(new_name,simples)
+        new_name = "{1}{0}{2}".format('_simp',*os.path.splitext(filename))
+        writer(new_name,simples,format)
         logging.info("wrote {0}".format(new_name))
     return
+
+def writeVOTable(filename,catalog):
+    """
+    write VOTables for each of the souce types that are in the catalog
+    append an appropriate prefix to the file name for each type of source
+    """
+    write_table(filename,catalog,format="vo")
 
 def writeIslandContours(filename,catalog,fmt):
     """
