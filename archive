@@ -1,2 +1,0 @@
-cp guide/guide.pdf guide.pdf
-tar -cvf `grep '^version' aegean.py | awk '{print "Aegean."$2".tar"}'` *.py AegeanTools/*.py guide*.pdf
