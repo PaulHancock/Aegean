@@ -147,8 +147,6 @@ class FitsImage():
 class Beam():
     """
     Small class to hold the properties of the beam
-    a/b in degrees
-    pa in radians
     """
     def __init__(self,a,b,pa):
         assert a>0, "major axis must be >0"

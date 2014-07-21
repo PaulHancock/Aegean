@@ -147,12 +147,12 @@ class SimpleSource():
     """
     A (forced) measurement of flux at a given location
     """
-    header ="#RA           DEC          Flux      err\n"+\
-    "#                        Jy/beam   Jy/beam\n"+\
-    "#==========================================="
+    header ="#RA           DEC          Flux      err     a     b         pa  flags\n"+\
+            "#                        Jy/beam   Jy/beam   ''    ''        deg WNCPES\n"+\
+            "#======================================================================="
 
-    formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.flags:06b}"
-    names = ['background','local_rms','ra','dec','peak_flux','err_peak_flux','flags','peak_pixel']
+    formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.a:5.2f} {0.b:5.2f} {0.pa:6.1f} {0.flags:06b}"
+    names = ['background','local_rms','ra','dec','peak_flux','err_peak_flux','flags','peak_pixel','a','b','pa']
 
     def __init__(self):
         self.background = 0.0
@@ -163,7 +163,6 @@ class SimpleSource():
         self.err_peak_flux = 0.0
         self.flags = 0
         self.peak_pixel =0.0
-        #for the vast pipeline - Measured but not output by Aegean (yet)        
         self.a=0.0
         self.b=0.0
         self.pa=0.0
@@ -250,8 +249,8 @@ class OutputSource(SimpleSource):
     """
      #header for the output   
     header="#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags\n"+\
-    "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   WNCPES\n"+\
-    "#==========================================================================================================================================================================================="
+           "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   WNCPES\n"+\
+           "#==========================================================================================================================================================================================="
 
     #formatting strings for making nice output
     formatter = "({0.island:04d},{0.source:02d}) {0.background: 8.6f} {0.local_rms: 8.6f} "+\
@@ -2020,8 +2019,8 @@ def force_measure_flux(radec):
         source.flags = flag
         source.peak_pixel = np.nanmax(data)
         source.local_rms =global_data.rmsimg[x,y]
-        source.a = global_data.beam.a
-        source.b = global_data.beam.b
+        source.a = global_data.beam.a *3600 #arcsec
+        source.b = global_data.beam.b *3600
         source.pa = global_data.beam.pa
 
         catalog.append(source)
