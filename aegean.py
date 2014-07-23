@@ -2088,7 +2088,7 @@ def VASTP_measure_catalog_fluxes(filename, positions, hdu_index=0,bkgin=None,rms
     
 
 #secondary capabilities
-def save_background_files(image_filename, hdu_index=0,cores=None,beam=None):
+def save_background_files(image_filename, hdu_index=0,cores=None,beam=None,outbase=None):
     '''
     Generate and save the background and RMS maps as FITS files.
     They are saved in the current directly as aegean-background.fits and aegean-rms.fits.
@@ -2100,11 +2100,9 @@ def save_background_files(image_filename, hdu_index=0,cores=None,beam=None):
     data = img.get_pixels()
     beam=img.beam
     hdu_header = img.get_hdu_header()
-    dcurve= curvature(data) 
     # Save global data for use by rms/bkg calcs     
     global_data = GlobalFittingData()
     global_data.beam = beam
-    global_data.dcurve = dcurve
     global_data.hdu_header = hdu_header
     global_data.data_pix = img.get_pixels()
     global_data.bkgimg = np.zeros(global_data.data_pix.shape)
@@ -2144,13 +2142,20 @@ def save_background_files(image_filename, hdu_index=0,cores=None,beam=None):
     else:
         logging.warn("Cannot determine BITPIX")
         dtype=None
+
+    if outbase is None:
+        outbase,_ = os.path.splitext(os.path.basename(image_filename))
+    noise_out = outbase+'_rms.fits'
+    background_out = outbase+'_bkg.fits'
+
     new_hdu.data = np.array(bkgimg,dtype=dtype)
-    new_hdu.writeto("aegean-background.fits", clobber=True)
+    new_hdu.writeto(background_out, clobber=True)
+    logging.info("Wrote {0}".format(background_out))
+
     new_hdu.data = np.array(rmsimg,dtype=dtype)
-    new_hdu.writeto("aegean-rms.fits", clobber=True)
-    new_hdu.data = np.array(dcurve,dtype=dtype)
-    new_hdu.writeto("aegean-curvature.fits",clobber=True)
-    logging.info("Saved aegean-background.fits, aegean-rms.fits and aegean-curvature.fits")
+    new_hdu.writeto(noise_out, clobber=True)
+    logging.info("Wrote {0}".format(noise_out))
+    return
 
 #command line version of this program runs from here.    
 if __name__=="__main__":
@@ -2285,10 +2290,10 @@ if __name__=="__main__":
         save_background_files(filename, hdu_index=hdu_index,cores=options.cores,beam=options.beam,outbase=options.outbase)
 
     #check that the background and noise files exist
-    if options.background and not os.path.exists(options.background):
-        logging.error("{0} not found".format(options.background))
+    if options.backgroundimg and not os.path.exists(options.backgroundimg):
+        logging.error("{0} not found".format(options.backgroundimg))
         sys.exit()
-    if options.noise and not os.path.exists(options.noise):
+    if options.noiseimg and not os.path.exists(options.noiseimg):
         logging.error("{0} not found".format(options.noise))
         sys.exit()
             
