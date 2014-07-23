@@ -2161,7 +2161,7 @@ def save_background_files(image_filename, hdu_index=0,cores=None,beam=None,outba
 if __name__=="__main__":
     usage="usage: %prog [options] FileName.fits"
     parser = OptionParser(usage=usage)
-    parser.add_option("--find",dest='find',action='store_true',default=True,
+    parser.add_option("--find",dest='find',action='store_true',default=False,
      help='Source finding mode. [default: true, unless --save or --measure are selected]')
     parser.add_option("--cores", dest="cores", type="int",default=None,
      help="Number of CPU cores to use for processing [default: all cores]")
