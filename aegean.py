@@ -15,8 +15,15 @@ Jay Banyer
 import sys, os
 import re
 import numpy as np
-from scipy.special import erf
 import math
+
+import scipy
+from scipy import ndimage as ndi
+from scipy import stats
+from scipy.special import erf
+
+#fits and wcs handling
+import astropy
 import astropy.wcs as pywcs
 import astropy.io.fits as pyfits
 
@@ -31,19 +38,18 @@ import sqlite3
 import logging
 from optparse import OptionParser
 
-#external programs
+#external and support programs
 from AegeanTools.fits_image import FitsImage, Beam
 from AegeanTools.msq2 import MarchingSquares
 from AegeanTools.mpfit import mpfit
 from AegeanTools.convert import ra2dec, dec2dec, dec2hms, dec2dms, gcd, bear, translate
 import AegeanTools.flags as flags
+
+#multiple cores support
 import AegeanTools.pprocess as pprocess
-
 import multiprocessing
-from scipy import ndimage as ndi
-from scipy import stats
 
-version='$Revision$'
+version='1.8'
 
 header="""#Aegean version {0}
 # on dataset: {1}"""
@@ -2150,63 +2156,93 @@ def save_background_files(image_filename, hdu_index=0,cores=None,beam=None):
 if __name__=="__main__":
     usage="usage: %prog [options] FileName.fits"
     parser = OptionParser(usage=usage)
-    parser.add_option("--cores", dest="cores", type="int",
-                      help="Number of CPU cores to use for processing [default: all cores]")
-    parser.add_option("--debug", dest="debug", action="store_true",
-                      help="Enable debug log output")
-    parser.add_option("--hdu", dest="hdu_index", type="int",
-                      help="HDU index (0-based) for cubes with multiple images in extensions")
-    parser.add_option("--outfile",dest='outfile',
-                      help="Destination of catalog output, default=stdout")
-    parser.add_option("--table",dest='out_table',
-                      help="Destination of catalog table output. Format(s) infered from extension(s):. xml/vot = VOTable, db/sqlite = Sqlite database, reg = ds9 regions file, ann = kvis annotation file. Default=None. multiple files can be written eg: --table=out.reg,out.vot,src.db")
-    parser.add_option("--rms",dest='rms',type='float',
-                      help="Assume a single image noise of rms, default is to calculate a rms over regions of 20x20 beams")
-    parser.add_option("--rmsin",dest='rmsinfile',
-                      help="A .fits file that represents the image rms, usually created from --save_background.")
-    parser.add_option('--bkgin',dest='bkginfile',
-                      help="A .fits file that represents the background level, usually created from --save_background.")
-    parser.add_option("--maxsummits",dest='max_summits',type='float',
-                      help="If more than *maxsummits* summits are detected in an island, no fitting is done, only estimation. Default is None = always fit")
-    parser.add_option("--csigma",dest='csigma',type='float',
-                      help="The clipping value applied to the curvature map, when deciding which peaks/summits are significant. Default is None = calculate from image")
-    parser.add_option('--seedclip',dest='innerclip',type='float',
-                     help='The clipping value (in sigmas) for seeding islands. Default=5')
-    parser.add_option('--floodclip',dest='outerclip',type='float',
-                      help='The clipping value (in sigmas) for growing islands. Default=4')
-    parser.add_option('--beam',dest='beam',type='float', nargs=3,
-                      help='The beam parameters to be used is "--beam major minor pa" all in degrees. Default is to read from FITS header.')
-    parser.add_option('--file_version',dest='file_version',action="store_true",
-                      help='show the versions of each file')
-    parser.add_option('--save_background', dest='save_background', action="store_true",
-                      help='save the background/rms/curvature maps to aegean-background.fits, aegean-rms.fits, aegean-curvature.fits and exit')
-    parser.add_option('--catalog',dest='catfile',
-                      help='Catalog of locations at which fluxes will be measured. No source fitting is done. Many other options are ignored. Expect ra/dec to be in decimal degrees. Extensions determine format: .csv = assume comma separated values and read first two columns, .cat = read ra/dec from Aegean catalog file, other = assume space separated file and read first two columns')
-    parser.add_option('--island',dest='doislandflux',action="store_true",
-                      help='list the integrated island flux as well as the fitted component fluxes for each island')
-    parser.add_option('--nopositive',dest='nopositive',action="store_true",
-                      help="don't return sources with positive fluxes")
-    parser.add_option('--nonegative',dest='nonegative',action="store_true",
-                      help="don't return sources with negative fluxes")
-    parser.set_defaults(debug=False,hdu_index=0,outfile=sys.stdout,out_table=None,rms=None,rmsinfile=None,bgkinfile=None,
-                        max_summits=None,csigma=None,innerclip=5,outerclip=4,file_version=False,save_background=False,
-                        catfile=None,beam=None,doislandflux=False,nopositive=False,nonegative=False)
-    (options, args) = parser.parse_args()
+    parser.add_option("--find",dest='find',action='store_true',default=True,
+     help='Source finding mode. [default: true, unless --save or --measure are selected]')
+    parser.add_option("--cores", dest="cores", type="int",default=None,
+     help="Number of CPU cores to use for processing [default: all cores]")
+    parser.add_option("--debug", dest="debug", action="store_true",default=False,
+     help="Enable debug mode. [default: false]")
+    parser.add_option("--hdu", dest="hdu_index", type="int",default=0,
+     help="HDU index (0-based) for cubes with multiple images in extensions. [default: 0]")
+    parser.add_option("--out",dest='outfile',default=None,
+      help="Destination of catalog/table output. [default: stdout]")
+    parser.add_option("--forcerms",dest='rms',type='float',default=False,
+      help="Assume a single image noise of rms, and a background of zero. [defalt: false]")
+    parser.add_option("--noise",dest='noiseimg', default=None,
+      help="A .fits file that represents the image noise (rms), created from Aegean with --save or BANE. [default: none]")
+    parser.add_option('--background',dest='backgroundimg', default=None,
+      help="A .fits file that represents the background level,, created from Aegean with --save or BANE. [default: none]")    
+    parser.add_option("--maxsummits",dest='max_summits',type='float', default=None,
+      help="If more than *maxsummits* summits are detected in an island, no fitting is done, only estimation. [default: no limit]")
+    parser.add_option("--csigma",dest='csigma',type='float',default=None,
+        help="[DEPRECATION IMINENT] The clipping value applied to the curvature map, when deciding which peaks/summits are significant. [default: 1sigma]")
+    parser.add_option('--seedclip',dest='innerclip',type='float',default=5,
+        help='The clipping value (in sigmas) for seeding islands. [default: 5]')
+    parser.add_option('--floodclip',dest='outerclip',type='float',default=4,
+      help='The clipping value (in sigmas) for growing islands. [default: 4]')
+    parser.add_option('--beam',dest='beam',type='float', nargs=3, default=None,
+      help='The beam parameters to be used is "--beam major minor pa" all in degrees. [default: read from fits header].')
+    parser.add_option('--versions',dest='file_versions',action="store_true",default=False,
+      help='Show the file versions of relevant modules. [default: false]')
+    parser.add_option('--island',dest='doislandflux',action="store_true",default=False,
+      help='Also calculate the island flux in addition to the individual components. [default: false]')
+    parser.add_option('--nopositive',dest='nopositive',action="store_true",default=False,
+      help="Don't report sources with positive fluxes. [default: false]")
+    parser.add_option('--negative',dest='negative',action="store_true",default=False,
+      help="Report sources with negative fluxes. [default: false]")
 
-    # tell numpy to shut up about "invalid values encountered"
-    # Its just NaN's and I don't need to hear about it once per core
-    np.seterr(invalid='ignore')
+
+    parser.add_option('--save', dest='save', action="store_true",default=False,
+      help='Enable the saving of the background and noise images. Sets --find to false. [default: false]')
+    parser.add_option('--outbase',dest='outbase',default=None,
+        help='If --save is True, then this specifies the base name of the background and noise images. [default: inferred from input image]')
+
+    parser.add_option('--measure',dest='measure',action='store_true',default=False,
+        help='Enable forced measurement mode. Requires an input source list via --input. Sets --find to false. [default: false]')
+    parser.add_option('--input',dest='input',default=None,
+        help='If --measure is true, this gives the filename for a catalog of locations at which fluxes will be measured. [default: none]')
+
+    (options, args) = parser.parse_args()
 
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is Aegean {0}".format(version))
 
-    #check for nopositive/nonegative conflict
-    if options.nopositive and options.nonegative:
-        logging.info("You don't want positive sources OR negative sources")
-        logging.info("So you don't get ANY sources")
+    if options.file_versions:
+        logging.info("Numpy {0} from {1} ".format(np.__version__,np.__file__))
+        logging.info("Scipy {0} from {1}".format(scipy.__version__,scipy.__file__))
+        logging.info("AstroPy {0} from {1}".format(astropy.__version__,astropy.__file__))
         sys.exit()
+
+    #print help if the user enters no options or filename    
+    if len(args)==0:
+        parser.print_help()
+        sys.exit()
+
+    #check that a valid filename was entered
+    filename = args[0]
+    if not os.path.exists(filename):
+        logging.error( "{0} not found".format(filename))
+        sys.exit(-1)
+
+    # tell numpy to shut up about "invalid values encountered"
+    # Its just NaN's and I don't need to hear about it once per core
+    np.seterr(invalid='ignore')
+
+    #check for nopositive/negative conflict
+    if options.nopositive and not options.negative:
+        logging.warning('Requested no positive sources, but no negative sources. Nothing to find.')
+        sys.exit()
+
+    #if measure/save are enabled we turn off "find" unless it was specifically 
+    if (options.measure or options.save) and not options.find:
+        options.find=False
+
+    #debugging in multi core mode is very hard to understand
+    if options.debug:
+        logging.info("Setting cores=1 for debugging")
+        options.cores=1
 
     #check/set cores to use
     if options.cores is None:
@@ -2227,28 +2263,7 @@ if __name__=="__main__":
         finally:
             del queue,temp
 
-    #debugging in multi core mode is very hard to understand
-    if options.debug:
-        logging.info("Setting cores=1 for debugging")
-        options.cores=1
-
     logging.info("Using {0} cores".format(options.cores))
-
-    if options.file_version:
-        logging.info("Using aegean.py {0}".format(version))
-        logging.info("Using fits_image.py {0}".format(FitsImage.version))
-        sys.exit()
-
-    #print help if the user enters no options or filename    
-    if len(args)==0:
-        parser.print_help()
-        sys.exit()
-
-    #check that a valid filename was entered
-    filename = args[0]
-    if not os.path.exists(filename):
-        logging.error( "{0} does not exist".format(filename))
-        sys.exit()
 
     hdu_index = options.hdu_index
     if hdu_index > 0:
@@ -2265,42 +2280,47 @@ if __name__=="__main__":
         logging.info("Using user supplied beam parameters")
         logging.info("Beam is {0} deg x {1} deg with pa {2}".format(options.beam.a,options.beam.b,options.beam.pa))
         
-    # Generate and save the background FITS files and exit if requested
-    if options.save_background:
-        save_background_files(filename, hdu_index=hdu_index,cores=options.cores,beam=options.beam)
-        sys.exit()
+    # Generate and save the background FITS files
+    if options.save:
+        save_background_files(filename, hdu_index=hdu_index,cores=options.cores,beam=options.beam,outbase=options.outbase)
 
-    #Open the outfile
-    if options.outfile is not sys.stdout:
-        options.outfile=open(os.path.expanduser(options.outfile),'w')
-    
-    #check that the bkg and rms files exist
-    if options.bkginfile and not os.path.exists(options.bkginfile):
-        logging.error("{0} not found".format(options.bkginfile))
+    #check that the background and noise files exist
+    if options.background and not os.path.exists(options.background):
+        logging.error("{0} not found".format(options.background))
         sys.exit()
-    if options.rmsinfile and not os.path.exists(options.rmsinfile):
-        logging.error("{0} not found".format(options.rmsinfile))
+    if options.noise and not os.path.exists(options.noise):
+        logging.error("{0} not found".format(options.noise))
         sys.exit()
             
     #do forced measurements using catfile
-    if options.catfile:
-        if not os.path.exists(options.catfile):
-            logging.error( "{0} does not exist".format(options.catfile))
+    sources = []
+    if options.measure:
+        if options.input is None:
+            logging.error("Must specify input catalog when --measure is selected")
             sys.exit()
-        sources = measure_catalog_fluxes(filename, catfile=options.catfile, hdu_index=options.hdu_index,
+        if not os.path.exists(options.input):
+            logging.error("{0} not found".format(options.input))
+            sys.exit()
+        logging.info("Measuring fluxes of input catalog.")
+        measurements = measure_catalog_fluxes(filename, catfile=options.catfile, hdu_index=options.hdu_index,
                                outfile=options.outfile, bkgin=options.bkginfile,beam=options.beam)
-    else:        
-        sources = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,rms=options.rms,
+        if len(measurements)==0:
+            logging.info("No measurements made")
+        sources.extend(measurements)
+
+    if options.find:
+        logging.info("Finding sources.")
+        detections = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,rms=options.rms,
                                     max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,
                                     outerclip=options.outerclip, cores=options.cores, rmsin=options.rmsinfile, 
                                     bkgin=options.bkginfile,beam=options.beam, doislandflux=options.doislandflux,
                                     nonegative=options.nonegative,nopositive=options.nopositive)
+        if len(detections)==0:
+            logging.info("No sources found in image")
+        sources.extend(detections)
 
-    #write the output tables
-    if options.out_table:
+    #write the output tables is there is data
+    if len(sources)>0 and options.out:
         tables = options.out_table.split(',')
         for t in tables:
             save_catalog(t,sources)
-    if len(sources) == 0:
-        logging.info("No sources found in image")
-
