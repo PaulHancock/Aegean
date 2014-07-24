@@ -2218,9 +2218,6 @@ if __name__=="__main__":
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is Aegean {0}".format(version))
 
-    logging.info("Input parameters")
-    logging.info(options)
-
     if options.file_versions:
         logging.info("Numpy {0} from {1} ".format(np.__version__,np.__file__))
         logging.info("Scipy {0} from {1}".format(scipy.__version__,scipy.__file__))
