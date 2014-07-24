@@ -23,21 +23,21 @@ return ${code}
 
 rm out.log err.log
 #test positive/negative source funcionality
-tst "python aegean.py Test/Images/1904-66_SIN.fits --nonegative"
-tst "python aegean.py Test/Images/1904-66_SIN_neg.fits --nopositive --island --table=out.vot"
+tst "python aegean.py Test/Images/1904-66_SIN.fits --negative --nopositive"
+tst "python aegean.py Test/Images/1904-66_SIN_neg.fits --negative --island --table=out.vot"
 
 #save background with single/multiple cores
-tst "python aegean.py Test/Images/1904-66_SIN.fits --save --cores=1"
-tst "python aegean.py Test/Images/1904-66_SIN.fits --save --cores=2"
+tst "python aegean.py Test/Images/1904-66_SIN.fits --save --cores=1 --beam 0.3 0.3 0"
+tst "python aegean.py Test/Images/1904-66_SIN.fits --save --cores=2 --outbase=aux"
 
 #load background and process image
-tst "python aegean.py Test/Images/1904-66_SIN.fits --rmsin=aegean-rms.fits --bkgin=aegean-background.fits --out=out.cat"
+tst "python aegean.py Test/Images/1904-66_SIN.fits --noise=aux_rms.fits --background=aux_bkg.fits --out=out.cat"
 
 #create an output table in various formats
 tst "python aegean.py Test/Images/1904-66_SIN.fits --out=out.cat --table=table.xml,table.vo,table.csv,table.tex,table.tab"
 
 #do forced measurements with this catalog
-tst "python aegean.py Test/Images/1904-66_SIN.fits --catalog=out.cat --table=kvis.ann"
+tst "python aegean.py Test/Images/1904-66_SIN.fits --measure --input=out.cat --table=kvis.ann"
 
 #do island fitting and ouput a ds9 reg file and an sqlite3 database
 tst "python aegean.py Test/Images/1904-66_SIN.fits --island --table=ds9.reg,my.db"
@@ -52,8 +52,12 @@ tst "python aegean.py Test/Images/1904-66_SIN.fits --island --out=out.cat"
 tst "python aegean.py Test/Images/MultiHDU.fits --hdu=1 --out=out.cat"
 
 #test WCS problem handling
-
-tst "python aegean.py Test/Images/WCS_edge.fits"
+#tst "python aegean.py Test/Images/WCS_edge.fits"
 
 echo "to clean up:"
-echo "rm aegean-rms.fits aegean-background.fits aegean-curvature.fits out{_comp,_isle}.vot out.cat table_comp.{xml,vo,csv,tex,tab} kvis_simp.ann ds9{_comp,_isle}.reg my.db"
+echo "rm 1904-66_SIN_{bkg,rms}.fits aux_{bkg,rms}.fits out{_comp,_isle}.vot out.cat table_comp.{xml,vo,csv,tex,tab} kvis_simp.ann ds9{_comp,_isle}.reg my.db"
+
+
+
+
+
