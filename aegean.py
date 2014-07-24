@@ -200,6 +200,7 @@ class SimpleSource():
         """
         return an ordered list of the source attributes
         """
+        self.sanitise()
         l=[]
         for name in self.names:
             l.append(getattr(self,name))
@@ -1073,7 +1074,7 @@ def writeDB(filename,catalog):
                 types.append("BOOL")
             elif isinstance(val,int):
                 types.append("INT")
-            elif isinstance(val,float):
+            elif isinstance(val,(float,np.float32)): #float32 is bugged and claims not to be a float
                 types.append("FLOAT")
             elif isinstance(val,(str,unicode)):
                 types.append("VARCHAR")
