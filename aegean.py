@@ -2161,58 +2161,62 @@ def save_background_files(image_filename, hdu_index=0,cores=None,beam=None,outba
 if __name__=="__main__":
     usage="usage: %prog [options] FileName.fits"
     parser = OptionParser(usage=usage)
-    parser.add_option("--find",dest='find',action='store_true',default=False,
-     help='Source finding mode. [default: true, unless --save or --measure are selected]')
+    parser.add_option("--find", dest='find',action='store_true',default=False,
+                                help='Source finding mode. [default: true, unless --save or --measure are selected]')
     parser.add_option("--cores", dest="cores", type="int",default=None,
-     help="Number of CPU cores to use for processing [default: all cores]")
+                                 help="Number of CPU cores to use for processing [default: all cores]")
     parser.add_option("--debug", dest="debug", action="store_true",default=False,
-     help="Enable debug mode. [default: false]")
+                                 help="Enable debug mode. [default: false]")
     parser.add_option("--hdu", dest="hdu_index", type="int",default=0,
-     help="HDU index (0-based) for cubes with multiple images in extensions. [default: 0]")
-    parser.add_option("--out",dest='outfile',default=None,
-      help="Destination of catalog/table output. [default: stdout]")
-    parser.add_option("--forcerms",dest='rms',type='float',default=False,
-      help="Assume a single image noise of rms, and a background of zero. [defalt: false]")
-    parser.add_option("--noise",dest='noiseimg', default=None,
-      help="A .fits file that represents the image noise (rms), created from Aegean with --save or BANE. [default: none]")
-    parser.add_option('--background',dest='backgroundimg', default=None,
-      help="A .fits file that represents the background level,, created from Aegean with --save or BANE. [default: none]")    
-    parser.add_option("--maxsummits",dest='max_summits',type='float', default=None,
-      help="If more than *maxsummits* summits are detected in an island, no fitting is done, only estimation. [default: no limit]")
-    parser.add_option("--csigma",dest='csigma',type='float',default=None,
-        help="[DEPRECATION IMINENT] The clipping value applied to the curvature map, when deciding which peaks/summits are significant. [default: 1sigma]")
-    parser.add_option('--seedclip',dest='innerclip',type='float',default=5,
-        help='The clipping value (in sigmas) for seeding islands. [default: 5]')
-    parser.add_option('--floodclip',dest='outerclip',type='float',default=4,
-      help='The clipping value (in sigmas) for growing islands. [default: 4]')
-    parser.add_option('--beam',dest='beam',type='float', nargs=3, default=None,
-      help='The beam parameters to be used is "--beam major minor pa" all in degrees. [default: read from fits header].')
-    parser.add_option('--versions',dest='file_versions',action="store_true",default=False,
-      help='Show the file versions of relevant modules. [default: false]')
-    parser.add_option('--island',dest='doislandflux',action="store_true",default=False,
-      help='Also calculate the island flux in addition to the individual components. [default: false]')
-    parser.add_option('--nopositive',dest='nopositive',action="store_true",default=False,
-      help="Don't report sources with positive fluxes. [default: false]")
-    parser.add_option('--negative',dest='negative',action="store_true",default=False,
-      help="Report sources with negative fluxes. [default: false]")
+                               help="HDU index (0-based) for cubes with multiple images in extensions. [default: 0]")
+    parser.add_option("--out", dest='outfile',default=None,
+                               help="Destination of catalog/table output. [default: stdout]")
+    parser.add_option("--forcerms", dest='rms',type='float',default=None,
+                                    help="Assume a single image noise of rms, and a background of zero. [defalt: false]")
+    parser.add_option("--noise", dest='noiseimg', default=None,
+                                 help="A .fits file that represents the image noise (rms), created from Aegean with --save or BANE. [default: none]")
+    parser.add_option('--background', dest='backgroundimg', default=None,
+                                      help="A .fits file that represents the background level,, created from Aegean with --save or BANE. [default: none]")    
+    parser.add_option("--maxsummits", dest='max_summits',type='float', default=None,
+                                      help="If more than *maxsummits* summits are detected in an island, no fitting is done, only estimation. [default: no limit]")
+    parser.add_option("--csigma", dest='csigma',type='float',default=None,
+                                  help="[DEPRECATION IMINENT] The clipping value applied to the curvature map, when deciding which peaks/summits are significant. [default: 1sigma]")
+    parser.add_option('--seedclip', dest='innerclip',type='float',default=5,
+                                    help='The clipping value (in sigmas) for seeding islands. [default: 5]')
+    parser.add_option('--floodclip', dest='outerclip',type='float',default=4,
+                                     help='The clipping value (in sigmas) for growing islands. [default: 4]')
+    parser.add_option('--beam', dest='beam',type='float', nargs=3, default=None,
+                                help='The beam parameters to be used is "--beam major minor pa" all in degrees. [default: read from fits header].')
+    parser.add_option('--versions', dest='file_versions',action="store_true",default=False,
+                                    help='Show the file versions of relevant modules. [default: false]')
+    parser.add_option('--island', dest='doislandflux',action="store_true",default=False,
+                                  help='Also calculate the island flux in addition to the individual components. [default: false]')
+    parser.add_option('--nopositive', dest='nopositive',action="store_true",default=False,
+                                      help="Don't report sources with positive fluxes. [default: false]")
+    parser.add_option('--negative', dest='negative',action="store_true",default=False,
+                                    help="Report sources with negative fluxes. [default: false]")
 
 
     parser.add_option('--save', dest='save', action="store_true",default=False,
-      help='Enable the saving of the background and noise images. Sets --find to false. [default: false]')
-    parser.add_option('--outbase',dest='outbase',default=None,
-        help='If --save is True, then this specifies the base name of the background and noise images. [default: inferred from input image]')
+                                help='Enable the saving of the background and noise images. Sets --find to false. [default: false]')
+    parser.add_option('--outbase', dest='outbase',default=None,
+                                   help='If --save is True, then this specifies the base name of the background and noise images. [default: inferred from input image]')
 
-    parser.add_option('--measure',dest='measure',action='store_true',default=False,
-        help='Enable forced measurement mode. Requires an input source list via --input. Sets --find to false. [default: false]')
-    parser.add_option('--input',dest='input',default=None,
-        help='If --measure is true, this gives the filename for a catalog of locations at which fluxes will be measured. [default: none]')
+    parser.add_option('--measure', dest='measure',action='store_true',default=False,
+                                   help='Enable forced measurement mode. Requires an input source list via --input. Sets --find to false. [default: false]')
+    parser.add_option('--input', dest='input',default=None,
+                                 help='If --measure is true, this gives the filename for a catalog of locations at which fluxes will be measured. [default: none]')
 
     (options, args) = parser.parse_args()
+
 
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is Aegean {0}".format(version))
+
+    logging.info("Input parameters")
+    logging.info(options)
 
     if options.file_versions:
         logging.info("Numpy {0} from {1} ".format(np.__version__,np.__file__))
@@ -2233,7 +2237,7 @@ if __name__=="__main__":
 
     # tell numpy to shut up about "invalid values encountered"
     # Its just NaN's and I don't need to hear about it once per core
-    np.seterr(invalid='ignore')
+    np.seterr(invalid='ignore',divide='ignore')
 
     #check for nopositive/negative conflict
     if options.nopositive and not options.negative:
@@ -2243,6 +2247,8 @@ if __name__=="__main__":
     #if measure/save are enabled we turn off "find" unless it was specifically 
     if (options.measure or options.save) and not options.find:
         options.find=False
+    else:
+        options.find=True
 
     #debugging in multi core mode is very hard to understand
     if options.debug:
@@ -2315,17 +2321,17 @@ if __name__=="__main__":
 
     if options.find:
         logging.info("Finding sources.")
-        detections = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,rms=options.rms,
+        detections = find_sources_in_image(filename, outfile=sys.stdout, hdu_index=options.hdu_index,rms=options.rms,
                                     max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,
-                                    outerclip=options.outerclip, cores=options.cores, rmsin=options.rmsinfile, 
-                                    bkgin=options.bkginfile,beam=options.beam, doislandflux=options.doislandflux,
-                                    nonegative=options.nonegative,nopositive=options.nopositive)
+                                    outerclip=options.outerclip, cores=options.cores, rmsin=options.noiseimg, 
+                                    bkgin=options.backgroundimg,beam=options.beam, doislandflux=options.doislandflux,
+                                    nonegative= not options.negative,nopositive=options.nopositive)
         if len(detections)==0:
             logging.info("No sources found in image")
         sources.extend(detections)
 
     #write the output tables is there is data
-    if len(sources)>0 and options.out:
-        tables = options.out_table.split(',')
+    if len(sources)>0 and options.outfile:
+        tables = options.outfile.split(',')
         for t in tables:
             save_catalog(t,sources)
