@@ -2321,8 +2321,8 @@ if __name__=="__main__":
             logging.error("{0} not found".format(options.input))
             sys.exit()
         logging.info("Measuring fluxes of input catalog.")
-        measurements = measure_catalog_fluxes(filename, catfile=options.catfile, hdu_index=options.hdu_index,
-                               outfile=options.outfile, bkgin=options.bkginfile,beam=options.beam)
+        measurements = measure_catalog_fluxes(filename, catfile=options.input, hdu_index=options.hdu_index,
+                               outfile=options.outfile, bkgin=options.backgroundimg,rmsin=options.noiseimg,beam=options.beam)
         if len(measurements)==0:
             logging.info("No measurements made")
         sources.extend(measurements)
