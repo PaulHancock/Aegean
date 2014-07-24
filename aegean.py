@@ -2170,7 +2170,9 @@ if __name__=="__main__":
     parser.add_option("--hdu", dest="hdu_index", type="int",default=0,
                                help="HDU index (0-based) for cubes with multiple images in extensions. [default: 0]")
     parser.add_option("--out", dest='outfile',default=None,
-                               help="Destination of catalog/table output. [default: stdout]")
+                               help="Destination of Aegean catalog output. [default: stdout]")
+    parser.add_option("--table", dest='tables',default=None,
+                                 help="Additional table outputs, format inferred from extension. [default: none]")
     parser.add_option("--forcerms", dest='rms',type='float',default=None,
                                     help="Assume a single image noise of rms, and a background of zero. [defalt: false]")
     parser.add_option("--noise", dest='noiseimg', default=None,
@@ -2303,6 +2305,12 @@ if __name__=="__main__":
         logging.error("{0} not found".format(options.noise))
         sys.exit()
             
+    #if an outputfile was specified open it for writing, otherwise use stdout
+    if not options.outfile:
+        options.outfile=sys.stdout
+    else:
+        options.outfile=open(options.outfile,'w')
+
     #do forced measurements using catfile
     sources = []
     if options.measure:
@@ -2321,7 +2329,7 @@ if __name__=="__main__":
 
     if options.find:
         logging.info("Finding sources.")
-        detections = find_sources_in_image(filename, outfile=sys.stdout, hdu_index=options.hdu_index,rms=options.rms,
+        detections = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,rms=options.rms,
                                     max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,
                                     outerclip=options.outerclip, cores=options.cores, rmsin=options.noiseimg, 
                                     bkgin=options.backgroundimg,beam=options.beam, doislandflux=options.doislandflux,
@@ -2330,8 +2338,7 @@ if __name__=="__main__":
             logging.info("No sources found in image")
         sources.extend(detections)
 
-    #write the output tables is there is data
-    if len(sources)>0 and options.outfile:
-        tables = options.outfile.split(',')
-        for t in tables:
+
+    if len(sources)>0 and options.tables:
+        for t in options.tables.split(','):
             save_catalog(t,sources)
