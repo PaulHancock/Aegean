@@ -22,6 +22,9 @@ return ${code}
 }
 
 rm out.log err.log
+#show module versions
+tst "python aegean.py --versions"
+
 #test positive/negative source funcionality
 tst "python aegean.py Test/Images/1904-66_SIN.fits --negative --nopositive"
 tst "python aegean.py Test/Images/1904-66_SIN_neg.fits --negative --island --table=out.vot"
@@ -51,11 +54,14 @@ tst "python aegean.py Test/Images/1904-66_SIN.fits --island --out=out.cat"
 #test some hdu options
 tst "python aegean.py Test/Images/MultiHDU.fits --hdu=1 --out=out.cat"
 
+#measure and find at the same time with islands
+tst "python aegean.py Test/Images/1904-66_SIN.fits --measure --input=out.cat --find --island --table=out.db"
+
 #test WCS problem handling
 #tst "python aegean.py Test/Images/WCS_edge.fits"
 
 echo "to clean up:"
-echo "rm 1904-66_SIN_{bkg,rms}.fits aux_{bkg,rms}.fits out{_comp,_isle}.vot out.cat table_comp.{xml,vo,csv,tex,tab} kvis_simp.ann ds9{_comp,_isle}.reg my.db"
+echo "rm 1904-66_SIN_{bkg,rms}.fits aux_{bkg,rms}.fits out{_comp,_isle}.vot out.{cat,db} table_comp.{xml,vo,csv,tex,tab} kvis_simp.ann ds9{_comp,_isle}.reg my.db"
 
 
 
