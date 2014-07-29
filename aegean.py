@@ -859,6 +859,21 @@ def load_catalog(filename):
             sys.exit()
     return catalog
 
+#writing table formats   
+
+def table_format_supported(filename):
+    """
+    Return true if the filename will map to a supported file format
+    """
+    name,ext = os.path.splitext(filename)
+    return ext[1:].lower() in get_table_formats()
+
+def get_table_formats():
+    """
+    Return a list of file extentions that are supported (mapped to an output)
+    """
+    return ['ann','reg','vo','vot','xml','db','sqlite','csv','tex','tab']
+
 def save_catalog(filename,catalog):
     '''
     input:
@@ -2302,6 +2317,20 @@ if __name__=="__main__":
     if options.noiseimg and not os.path.exists(options.noiseimg):
         logging.error("{0} not found".format(options.noise))
         sys.exit()
+
+    #check that the output table formats are supported (if given)
+    # BEFORE any cpu intensive work is done
+    if options.tables:
+        cont=True
+        for t in options.tables.split(','):
+            if not table_format_supported(t):
+                cont=False
+                logging.warn("Format not supported for {0}".format(t))
+        if not cont:
+            logging.error("Invalid table format specified.")
+            sys.exit()
+
+
             
     #if an outputfile was specified open it for writing, otherwise use stdout
     if not options.outfile:
