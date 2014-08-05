@@ -339,6 +339,7 @@ class GlobalFittingData:
     beam = None
     wcs = None
     data_pix = None
+    dtype = None
     
 class IslandFittingData:
     '''
@@ -789,10 +790,11 @@ def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False
     global_data.beam = beam
     global_data.dcurve = dcurve
     global_data.hdu_header = hdu_header
-    #inigial values of the three images
+    #initial values of the three images
     global_data.data_pix = img.get_pixels()
-    global_data.bkgimg = np.zeros(global_data.data_pix.shape)
-    global_data.rmsimg = np.zeros(global_data.data_pix.shape)
+    global_data.dtype = type(global_data.data_pix)
+    global_data.bkgimg = np.zeros(global_data.data_pix.shape,dtype=global_data.dtype)
+    global_data.rmsimg = np.zeros(global_data.data_pix.shape,dtype=global_data.dtype)
     global_data.pixarea = img.pixarea
 
     try:
@@ -2104,71 +2106,42 @@ def VASTP_measure_catalog_fluxes(filename, positions, hdu_index=0,bkgin=None,rms
     
 
 #secondary capabilities
-def save_background_files(image_filename, hdu_index=0,cores=None,beam=None,outbase=None):
+def save_background_files(image_filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,rms=None,cores=1,outbase=None):
     '''
     Generate and save the background and RMS maps as FITS files.
     They are saved in the current directly as aegean-background.fits and aegean-rms.fits.
     '''
     global global_data
-    
-    logging.info("Saving background / RMS maps")
-    img = FitsImage(image_filename, hdu_index=hdu_index,beam=beam)
-    data = img.get_pixels()
-    beam=img.beam
-    hdu_header = img.get_hdu_header()
-    # Save global data for use by rms/bkg calcs     
-    global_data = GlobalFittingData()
-    global_data.beam = beam
-    global_data.hdu_header = hdu_header
-    global_data.data_pix = img.get_pixels()
-    global_data.bkgimg = np.zeros(global_data.data_pix.shape)
-    global_data.rmsimg = np.zeros(global_data.data_pix.shape)
 
-    try:
-        global_data.wcs=pywcs.WCS(hdu_header, naxis=2)
-    except:
-        global_data.wcs=pywcs.WCS(str(hdu_header),naxis=2)
-    
-    make_bkg_rms_from_global(mesh_size=20,cores=cores)
-    bkgimg,rmsimg = global_data.bkgimg, global_data.rmsimg
+    logging.info("Saving background / RMS maps")
+    #load image, and load/create background/rms images
+    load_globals(image_filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,beam=beam,verb=True,rms=rms,cores=cores)
+    img = FitsImage(image_filename, hdu_index=hdu_index,beam=beam)
+    bkgimg,rmsimg = global_data.bkgimg,global_data.rmsimg
+
     #mask these arrays the same as the data
-    bkgimg[np.where(np.isnan(data))]=np.NaN
-    rmsimg[np.where(np.isnan(data))]=np.NaN
+    bkgimg[np.where(np.isnan(global_data.data_pix))]=np.NaN
+    rmsimg[np.where(np.isnan(global_data.data_pix))]=np.NaN
     
     # Generate the new FITS files by copying the existing HDU and assigning new data.
     # This gives the new files the same WCS projection and other header fields. 
     new_hdu = img.hdu
     # Set the ORIGIN to indicate Aegean made this file
-    new_hdu.header.update("ORIGIN", "Aegean {0}".format(version))
+    new_hdu.header["ORIGIN"] = "Aegean {0}".format(version)
     for c in ['CRPIX3','CRPIX4','CDELT3','CDELT4','CRVAL3','CRVAL4','CTYPE3','CTYPE4']:
         if c in new_hdu.header:
             del new_hdu.header[c]
-    #make the output file the same size as the input by matching the bitpix
-    bitpix = new_hdu.header['BITPIX']
-    if bitpix==8:
-        dtype=np.unit8
-    elif bitpix==16:
-        dtype=np.int16
-    elif bitpix==32:
-        dtype=np.int32
-    elif bitpix==-32:
-        dtype=np.float32
-    elif bitpix==-64:
-        dtype=np.float64
-    else:
-        logging.warn("Cannot determine BITPIX")
-        dtype=None
 
     if outbase is None:
         outbase,_ = os.path.splitext(os.path.basename(image_filename))
     noise_out = outbase+'_rms.fits'
     background_out = outbase+'_bkg.fits'
 
-    new_hdu.data = np.array(bkgimg,dtype=dtype)
+    new_hdu.data = bkgimg
     new_hdu.writeto(background_out, clobber=True)
     logging.info("Wrote {0}".format(background_out))
 
-    new_hdu.data = np.array(rmsimg,dtype=dtype)
+    new_hdu.data = rmsimg
     new_hdu.writeto(noise_out, clobber=True)
     logging.info("Wrote {0}".format(noise_out))
     return
