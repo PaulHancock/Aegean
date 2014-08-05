@@ -12,7 +12,7 @@ import logging,sys
 from math import pi,cos,sin,sqrt
 
 class FitsImage():
-    def __init__(self, filename, hdu_index=0, hdu=None, beam=None):
+    def __init__(self, filename=None, hdu_index=0, hdu=None, beam=None):
         """
         filename: the name of the fits image file
         hdu_index = index of FITS HDU when extensions are used (0 is primary HDU)
@@ -108,8 +108,6 @@ class FitsImage():
         assert pixels.shape == self._pixels.shape, "Shape mismatch between pixels supplied {0} and existing image pixels {1}".format(pixels.shape,self._pixels.shape)
         self._pixels = pixels
             
-
-
     def get_background_rms(self):
         '''
         Return the background RMS (Jy)
