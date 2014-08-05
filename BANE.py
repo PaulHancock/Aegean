@@ -17,7 +17,7 @@ import AegeanTools.pprocess as pprocess
 
 import multiprocessing
 
-version='$Revision$'
+version='0.1'
 
 ###
 #

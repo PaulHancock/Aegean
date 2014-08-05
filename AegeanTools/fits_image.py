@@ -12,7 +12,6 @@ import logging,sys
 from math import pi,cos,sin,sqrt
 
 class FitsImage():
-    version='$Revision$'
     def __init__(self, filename, hdu_index=0, hdu=None, beam=None):
         """
         filename: the name of the fits image file
