@@ -332,6 +332,7 @@ class GlobalFittingData:
     Used by island fitting subprocesses.
     wcs parameter used by most functions.
     '''
+    img = None
     dcurve = None
     rmsimg = None
     bkgimg = None
@@ -779,29 +780,22 @@ def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False
     global global_data
     
     img = FitsImage(filename, hdu_index=hdu_index,beam=beam)
-    hdu_header = img.get_hdu_header()
     beam=img.beam    
-    #data = Island(img.get_pixels())
-    #curvature image is always calculated
-    dcurve=curvature(img.get_pixels())
     
     # Save global data for use by fitting subprocesses    
     global_data = GlobalFittingData()
     global_data.beam = beam
-    global_data.dcurve = dcurve
-    global_data.hdu_header = hdu_header
+    global_data.hdu_header = img.get_hdu_header()
+    global_data.wcs = img.wcs
     #initial values of the three images
+    global_data.img = img
     global_data.data_pix = img.get_pixels()
-    global_data.dtype = type(global_data.data_pix)
+    global_data.dtype = type(global_data.data_pix[0][0])
     global_data.bkgimg = np.zeros(global_data.data_pix.shape,dtype=global_data.dtype)
     global_data.rmsimg = np.zeros(global_data.data_pix.shape,dtype=global_data.dtype)
     global_data.pixarea = img.pixarea
+    global_data.dcurve = curvature(global_data.data_pix,dtype=global_data.dtype)
 
-    try:
-        global_data.wcs=pywcs.WCS(hdu_header, naxis=2)
-    except:
-        global_data.wcs=pywcs.WCS(str(hdu_header),naxis=2)
-        
     #if either of rms or bkg images are not supplied then caclucate them both
     if not (rmsin and bkgin):
         if verb:
@@ -811,7 +805,7 @@ def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False
     #if a forced rms was supplied use that instead
     if rms is not None:
         global_data.rmsimg = np.ones(global_data.data_pix.shape)*rms
-    
+
     #replace the calculated images with input versions, if the user has supplied them.
     if bkgin:
         if verb:
@@ -1308,8 +1302,11 @@ def make_bkg_rms_from_global(mesh_size=20,forced_rms=None,cores=None):
 
 
     #construct the bkg and rms images
-    global_data.rmsimg = np.zeros(data.shape)
-    global_data.bkgimg = np.zeros(data.shape)    
+    if global_data.rmsimg is None:
+        global_data.rmsimg = np.zeros(data.shape,dtype=global_data.dtype)
+    if global_data.bkgimg is None:
+        global_data.bkgimg = np.zeros(data.shape,dtype=global_data.dtype)
+
     for ymin,ymax,xmin,xmax,bkg,rms in queue:
         global_data.bkgimg[ymin:ymax,xmin:xmax]=bkg
         global_data.rmsimg[ymin:ymax,xmin:xmax]=rms
@@ -1326,7 +1323,7 @@ def estimate_background_global(ymin,ymax,xmin,xmax):
     ymin,ymax,xmin,xmax
     '''
     data=global_data.data_pix[ymin:ymax,xmin:xmax]
-    pixels = np.extract(data==data, data).ravel()
+    pixels = np.extract(np.isfinite(data), data).ravel()
     if len(pixels) < 4:
         bkg,rms= np.NaN, np.NaN
     else:
@@ -1363,7 +1360,7 @@ def estimate_background(data):
     logging.warn("use estimate_background_global or estimate_bkg_rms instead")
     return None, None
     
-def curvature(data,aspect=None):
+def curvature(data,aspect=None,dtype=None):
     """
     Use a Lapacian kernal to calculate the curvature map.
     input:
@@ -2116,9 +2113,8 @@ def save_background_files(image_filename,hdu_index=0,bkgin=None,rmsin=None,beam=
     logging.info("Saving background / RMS maps")
     #load image, and load/create background/rms images
     load_globals(image_filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,beam=beam,verb=True,rms=rms,cores=cores)
-    img = FitsImage(image_filename, hdu_index=hdu_index,beam=beam)
+    img = global_data.img
     bkgimg,rmsimg = global_data.bkgimg,global_data.rmsimg
-
     #mask these arrays the same as the data
     bkgimg[np.where(np.isnan(global_data.data_pix))]=np.NaN
     rmsimg[np.where(np.isnan(global_data.data_pix))]=np.NaN
