@@ -99,6 +99,8 @@ class FitsImage():
             else:
                 raise Exception("Can't handle {0} dimensions".format(len(self.hdu.data.shape)))
             logging.debug("Using axes {0} and {1}".format(self.hdu.header['CTYPE1'],self.hdu.header['CTYPE2']))
+            #convert +/- inf to nan
+            self._pixels[numpy.where(numpy.isinf(self._pixels))] = numpy.nan
         return self._pixels
 
     def set_pixels(self,pixels):

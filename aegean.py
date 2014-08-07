@@ -523,7 +523,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
     is_flag=0
 
     #is this a negative island?
-    isnegative = max(data[np.isfinite(data)])<0
+    isnegative = max(data[np.where(np.isfinite(data))])<0
     if isnegative:
         logging.debug("[is a negative island]")
 
@@ -554,7 +554,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
 
     #For small islands we can't do a 6 param fit
     #Don't count the NaN values as part of the island
-    non_nan_pix=len(data[np.where(data==data)].ravel())
+    non_nan_pix=len(data[np.where(np.isfinite(data))].ravel())
     if 4<= non_nan_pix and non_nan_pix <= 6:
         logging.debug("FIXED2PSF")
         is_flag|=flags.FIXED2PSF
@@ -732,7 +732,7 @@ def multi_gauss(data,rmsimg,parinfo):
     """
     
     data=np.array(data)
-    mask=np.where(data==data) #the indices of the *non* NaN values in data
+    mask=np.where(np.isfinite(data)) #the indices of the *non* NaN values in data
     
     def model(p):
         """Return a map with a number of gaussians determined by the input parameters."""
@@ -1324,7 +1324,7 @@ def estimate_background_global(ymin,ymax,xmin,xmax):
     ymin,ymax,xmin,xmax
     '''
     data=global_data.data_pix[ymin:ymax,xmin:xmax]
-    pixels = np.extract(data==data, data).ravel()
+    pixels = np.extract(np.isfinite(data), data).ravel()
     if len(pixels) < 4:
         bkg,rms= np.NaN, np.NaN
     else:
@@ -1346,7 +1346,7 @@ def estimate_bkg_rms(data):
     Returns (bkg, rms).
     Returns (NaN, NaN) if data contains fewer than 4 values.
     '''
-    pixels = np.extract(data==data, data).ravel()
+    pixels = np.extract(np.isfinite(data), data).ravel()
     if len(pixels) < 4:
         return np.NaN, np.NaN
     pixels.sort()
