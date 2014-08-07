@@ -773,7 +773,7 @@ def load_bkg_rms_image(image,bkgfile,rmsfile):
     rmsimg = load_aux_image(image,rmsfile)
     return bkgimg,rmsimg
 
-def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False,rms=None,cores=1):
+def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False,rms=None,cores=1,csigma=None):
     """
     populate the global_data object by loading or calculating the various components
     """
@@ -794,7 +794,14 @@ def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False
     global_data.bkgimg = np.zeros(global_data.data_pix.shape,dtype=global_data.dtype)
     global_data.rmsimg = np.zeros(global_data.data_pix.shape,dtype=global_data.dtype)
     global_data.pixarea = img.pixarea
-    global_data.dcurve = curvature(global_data.data_pix,dtype=global_data.dtype)
+
+    dcurve = curvature(global_data.data_pix,dtype=global_data.dtype)
+    global_data.dcurve=dcurve
+    #calculate the curvature if required
+    if csigma is None:
+        logging.info("Calculating curvature csigma")
+        junk, csigma = estimate_bkg_rms(dcurve)
+        del junk
 
     #if either of rms or bkg images are not supplied then caclucate them both
     if not (rmsin and bkgin):
@@ -1804,7 +1811,7 @@ def fit_islands(islands):
         res = fit_island(island)
         sources.extend(res)
     return sources
-    
+
 def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None, innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,returnrms=False,nopositive=False,nonegative=False):
     """
     Run the Aegean source finder.
@@ -1857,8 +1864,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     #we now work with the updated versions of the three images
     bkgimg = global_data.bkgimg
     rmsimg = global_data.rmsimg
-    data = Island(global_data.data_pix) #not an image
-    #data = global_data.data_pix
+    data = Island(global_data.data_pix) #not a FitsImage
     beam=global_data.beam
 
     logging.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a*3600,beam.b*3600,beam.pa))
@@ -2101,7 +2107,6 @@ def VASTP_measure_catalog_fluxes(filename, positions, hdu_index=0,bkgin=None,rms
     sources = force_measure_flux(positions)
     return sources
     
-
 #secondary capabilities
 def save_background_files(image_filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,rms=None,cores=1,outbase=None):
     '''
