@@ -25,81 +25,64 @@ class FitsImage():
             logging.debug("Loading HDU {0} from {1}".format(hdu_index, filename))
             hdus = pyfits.open(filename)
             self.hdu = hdus[hdu_index]
-            
+            del hdus
+        
+        self._header=self.hdu.header
         #need to read these headers before we 'touch' the data or they dissappear
-        if "BZERO" in self.hdu.header:
-            self.bzero= self.hdu.header["BZERO"]
+        if "BZERO" in self._header:
+            self.bzero= self._header["BZERO"]
         else:
             self.bzero=0
-        if "BSCALE" in self.hdu.header:
-            self.bscale=self.hdu.header["BSCALE"]
+        if "BSCALE" in self._header:
+            self.bscale=self._header["BSCALE"]
         else:
             self.bscale=1
             
         self.filename = filename
         #fix possible problems with miriad generated fits files % HT John Morgan.
         try:
-            self.wcs = pywcs.WCS(self.hdu.header, naxis=2)
+            self.wcs = pywcs.WCS(self._header, naxis=2)
         except:
-            self.wcs = pywcs.WCS(str(self.hdu.header),naxis=2)
+            self.wcs = pywcs.WCS(str(self._header),naxis=2)
             
-        self.x = self.hdu.header['NAXIS1']
-        self.y = self.hdu.header['NAXIS2']
+        self.x = self._header['NAXIS1']
+        self.y = self._header['NAXIS2']
         #this is correct at the center of the image for all images, and everywhere for conformal projections
-        self.pixarea = abs(self.hdu.header["CDELT1"]*self.hdu.header["CDELT2"])
-
-        #the following no longer complies with the fits standard so i'm going to comment it out.
-        #self.deg_per_pixel_x = self.hdu.header["CDELT1"] # is this always right?
-        #self.deg_per_pixel_y = self.hdu.header["CDELT2"] # is this always right?
+        self.pixarea = abs(self._header["CDELT1"]*self._header["CDELT2"])
         
         if beam is None:
             #if the bpa isn't specified add it as zero
-            if "BPA" not in self.hdu.header:
+            if "BPA" not in self._header:
                 logging.info("BPA not present in fits header, using 0")
                 bpa=0
             else:
-                bpa=self.hdu.header["BPA"]
+                bpa=self._header["BPA"]
                 
-            if "BMAJ" not in self.hdu.header:
+            if "BMAJ" not in self._header:
                 logging.error("BMAJ not present in fits header.")
                 logging.error("BMAJ not supplied by user. Exiting.")
                 sys.exit(0)
             else:
-                bmaj = self.hdu.header["BMAJ"]
+                bmaj = self._header["BMAJ"]
                 
-            if "BMIN" not in self.hdu.header:
+            if "BMIN" not in self._header:
                 logging.error("BMIN not present in fits header.")
                 logging.error("BMIN not supplied by user. Exiting.")
                 sys.exit(0)
             else:
-                bmin = self.hdu.header["BMIN"]
+                bmin = self._header["BMIN"]
             self.beam=Beam(bmaj, bmin, bpa)
         else: #use the supplied beam
             self.beam=beam
-        self._pixels = None
         self._rms = None
+        self._pixels = numpy.squeeze(self.hdu.data)
+        #convert +/- inf to nan
+        self._pixels[numpy.where(numpy.isinf(self._pixels))] = numpy.nan
+        del self.hdu
+        logging.debug("Using axes {0} and {1}".format(self._header['CTYPE1'],self._header['CTYPE2']))
+
         
     def get_pixels(self):
-        '''
-        Returns all pixel values.
-        Returns a numpy array with [y,x] as per pyfits.
-        NB - value is calculated on first request then cached for speed
-        '''
-        # FIXME: this is specific to MWA files which have frequency and stokes
-        # dimensions of length 1
-        if self._pixels is None:
-            if len(self.hdu.data.shape) == 2:
-                self._pixels = self.hdu.data
-            elif len(self.hdu.data.shape) == 3:
-                
-                self._pixels = self.hdu.data[0]
-            elif len(self.hdu.data.shape) == 4:
-                self._pixels = self.hdu.data[0][0]
-            else:
-                raise Exception("Can't handle {0} dimensions".format(len(self.hdu.data.shape)))
-            logging.debug("Using axes {0} and {1}".format(self.hdu.header['CTYPE1'],self.hdu.header['CTYPE2']))
-            #convert +/- inf to nan
-            self._pixels[numpy.where(numpy.isinf(self._pixels))] = numpy.nan
         return self._pixels
 
     def set_pixels(self,pixels):
@@ -134,7 +117,7 @@ class FitsImage():
         return [float(skybox[0][0]), float(skybox[0][1])]
 
     def get_hdu_header(self):
-        return self.hdu.header
+        return self._header
 
     def sky2pix(self, skypos):
         '''Get the pixel coordinates [x,y] (floats) given skypos [ra,dec] (degrees)'''
