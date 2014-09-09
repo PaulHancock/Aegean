@@ -36,7 +36,6 @@ try:
     votables_supported=True
 except:
     votables_supported=False
-    pass
 import sqlite3
 
 #logging and nice options
@@ -338,6 +337,7 @@ class GlobalFittingData:
     Used by island fitting subprocesses.
     wcs parameter used by most functions.
     '''
+    img = None
     dcurve = None
     rmsimg = None
     bkgimg = None
@@ -345,6 +345,7 @@ class GlobalFittingData:
     beam = None
     wcs = None
     data_pix = None
+    dtype = None
     
 class IslandFittingData:
     '''
@@ -353,7 +354,7 @@ class IslandFittingData:
     
     isle_num = island number (int)
     i = the pixel island (a 2D numpy array of pixel values)
-    scalars=(innerclip,outerclip,csigma,max_summits)
+    scalars=(innerclip,outerclip,max_summits)
     offsets=(xmin,xmax,ymin,ymax)
     '''
     isle_num = 0
@@ -507,7 +508,7 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=False):
                 yield new_isle,xmin,xmax,ymin,ymax
     
 ##parameter estimates
-def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0]):
+def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
     """Estimates the number of sources in an island and returns initial parameters for the fit as well as
     limits on those parameters.
 
@@ -517,8 +518,6 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
     curve  - np.ndarray of curvature values
     beam   - beam object
     innerclip - the inner clipping level for flux data, in sigmas
-    csigma - 1sigma value of the curvature map
-             None => zero (default)
     offsets - the (x,y) offset of data within it's parent image
               this is required for proper WCS conversions
 
@@ -533,9 +532,6 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
     if isnegative:
         logging.debug("[is a negative island]")
 
-    #use a curvature of zero as a default significance cut
-    if not csigma:
-        csigma=0
     parinfo=[]
     
     #calculate a local beam from the center of the data
@@ -580,9 +576,9 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,csigma=None,offsets=[0,0])
         is_flag |= flags.FIXED2PSF
     else:
         if isnegative:
-            kappa_sigma=Island( np.where( curve>csigma, np.where(data+innerclip*rmsimg<0, data, np.nan) ,np.nan) )
+            kappa_sigma=Island( np.where( curve>0.5, np.where(data+innerclip*rmsimg<0, data, np.nan) ,np.nan) )
         else:
-            kappa_sigma=Island( np.where( -1*curve>csigma, np.where(data-innerclip*rmsimg>0, data, np.nan) ,np.nan) )     
+            kappa_sigma=Island( np.where( -1*curve>0.5, np.where(data-innerclip*rmsimg>0, data, np.nan) ,np.nan) )     
         summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0)
 
     i=0
@@ -777,35 +773,39 @@ def load_bkg_rms_image(image,bkgfile,rmsfile):
     rmsimg = load_aux_image(image,rmsfile)
     return bkgimg,rmsimg
 
-def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False,rms=None,cores=1):
+def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False,rms=None,cores=1,csigma=None):
     """
     populate the global_data object by loading or calculating the various components
     """
     global global_data
     
     img = FitsImage(filename, hdu_index=hdu_index,beam=beam)
-    hdu_header = img.get_hdu_header()
     beam=img.beam    
-    #data = Island(img.get_pixels())
-    #curvature image is always calculated
-    dcurve=curvature(img.get_pixels())
     
     # Save global data for use by fitting subprocesses    
     global_data = GlobalFittingData()
     global_data.beam = beam
-    global_data.dcurve = dcurve
-    global_data.hdu_header = hdu_header
-    #inigial values of the three images
+    global_data.hdu_header = img.get_hdu_header()
+    global_data.wcs = img.wcs
+    #initial values of the three images
+    global_data.img = img
     global_data.data_pix = img.get_pixels()
-    global_data.bkgimg = np.zeros(global_data.data_pix.shape)
-    global_data.rmsimg = np.zeros(global_data.data_pix.shape)
+    global_data.dtype = type(global_data.data_pix[0][0])
+    global_data.bkgimg = np.zeros(global_data.data_pix.shape,dtype=global_data.dtype)
+    global_data.rmsimg = np.zeros(global_data.data_pix.shape,dtype=global_data.dtype)
     global_data.pixarea = img.pixarea
+    #calculate curvature but store it as -1,0,+1
+    cimg = curvature(global_data.data_pix,dtype=global_data.dtype)
+    if csigma is None:
+        logging.info("Calculating curvature csigma")
+        _,csigma = estimate_bkg_rms(cimg)
+    dcurve = np.zeros(global_data.data_pix.shape,dtype=np.int8)
+    dcurve[np.where(cimg<=-abs(csigma))]=-1
+    dcurve[np.where(cimg>=abs(csigma))]=1
+    del cimg
 
-    try:
-        global_data.wcs=pywcs.WCS(hdu_header, naxis=2)
-    except:
-        global_data.wcs=pywcs.WCS(str(hdu_header),naxis=2)
-        
+    global_data.dcurve=dcurve
+
     #if either of rms or bkg images are not supplied then caclucate them both
     if not (rmsin and bkgin):
         if verb:
@@ -815,7 +815,7 @@ def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False
     #if a forced rms was supplied use that instead
     if rms is not None:
         global_data.rmsimg = np.ones(global_data.data_pix.shape)*rms
-    
+
     #replace the calculated images with input versions, if the user has supplied them.
     if bkgin:
         if verb:
@@ -827,12 +827,12 @@ def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False
         global_data.rmsimg = load_aux_image(img,rmsin)
 
     #subtract the background image from the data image and save
-    if verb:
+    if verb and logging.getLogger().isEnabledFor(logging.DEBUG):
         logging.debug("Data max is {0}".format( img.get_pixels()[np.isfinite(img.get_pixels())].max()))
         logging.debug("Doing background subtraction")
     img.set_pixels( img.get_pixels() - global_data.bkgimg)
     global_data.data_pix = img.get_pixels()
-    if verb:
+    if verb and logging.getLogger().isEnabledFor(logging.DEBUG):
         logging.debug("Data max is {0}".format( img.get_pixels()[np.isfinite(img.get_pixels())].max()))
     return
 
@@ -982,6 +982,7 @@ def writeIslandContours(filename,catalog,fmt):
         text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
     if fmt=='ann':
         print >>out, "COORD P"
+        text_fmt=None
         logging.warn("Kvis not yet supported")
     for c in catalog:
         contour = c.contour
@@ -1326,8 +1327,11 @@ def make_bkg_rms_from_global(mesh_size=20,forced_rms=None,cores=None):
 
 
     #construct the bkg and rms images
-    global_data.rmsimg = np.zeros(data.shape)
-    global_data.bkgimg = np.zeros(data.shape)    
+    if global_data.rmsimg is None:
+        global_data.rmsimg = np.zeros(data.shape,dtype=global_data.dtype)
+    if global_data.bkgimg is None:
+        global_data.bkgimg = np.zeros(data.shape,dtype=global_data.dtype)
+
     for ymin,ymax,xmin,xmax,bkg,rms in queue:
         global_data.bkgimg[ymin:ymax,xmin:xmax]=bkg
         global_data.rmsimg[ymin:ymax,xmin:xmax]=rms
@@ -1381,7 +1385,7 @@ def estimate_background(data):
     logging.warn("use estimate_background_global or estimate_bkg_rms instead")
     return None, None
     
-def curvature(data,aspect=None):
+def curvature(data,aspect=None,dtype=None):
     """
     Use a Lapacian kernal to calculate the curvature map.
     input:
@@ -1557,7 +1561,7 @@ def fit_island(island_data):
     # island data
     isle_num = island_data.isle_num
     idata = island_data.i        
-    innerclip,outerclip,csigma,max_summits=island_data.scalars
+    innerclip,outerclip,max_summits=island_data.scalars
     xmin,xmax,ymin,ymax=island_data.offsets
     doislandflux = island_data.doislandflux
 
@@ -1575,7 +1579,7 @@ def fit_island(island_data):
     logging.debug("=====")
     logging.debug("Island ({0})".format(isle_num))
 
-    parinfo= estimate_parinfo(isle.pixels,rms,icurve,beam,innerclip,csigma=csigma,offsets=[xmin,ymin])
+    parinfo= estimate_parinfo(isle.pixels,rms,icurve,beam,innerclip,offsets=[xmin,ymin])
 
     logging.debug("Rms is {0}".format(np.shape(rms)) )
     logging.debug("Isle is {0}".format(np.shape(isle.pixels)) )
@@ -1825,7 +1829,7 @@ def fit_islands(islands):
         res = fit_island(island)
         sources.extend(res)
     return sources
-    
+
 def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None, innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,returnrms=False,nopositive=False,nonegative=False):
     """
     Run the Aegean source finder.
@@ -1868,22 +1872,15 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     if cores is not None:
         assert(cores >= 1), "cores must be one or more"
         
-    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,beam=beam,rms=rms,cores=cores,verb=True)
+    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,beam=beam,rms=rms,cores=cores,csigma=csigma,verb=True)
     
-    #calculate the curvature if required
-    if csigma is None:
-        logging.info("Calculating curvature data")
-        cbkg, csigma = estimate_bkg_rms(global_data.dcurve)
-        
     #we now work with the updated versions of the three images
     bkgimg = global_data.bkgimg
     rmsimg = global_data.rmsimg
-    data = Island(global_data.data_pix) #not an image
-    #data = global_data.data_pix
+    data = Island(global_data.data_pix) #not a FitsImage
     beam=global_data.beam
 
     logging.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a*3600,beam.b*3600,beam.pa))
-    logging.info("csigma={0}".format(csigma))
     logging.info("seedclip={0}".format(innerclip))
     logging.info("floodclip={0}".format(outerclip))
     
@@ -1923,7 +1920,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
             #empty islands have length 1
             continue 
         isle_num+=1
-        scalars=(innerclip,outerclip,csigma,max_summits)
+        scalars=(innerclip,outerclip,max_summits)
         offsets=(xmin,xmax,ymin,ymax)
         island_data = IslandFittingData(isle_num, i, scalars, offsets, doislandflux)
         # If cores==1 run fitting in main process. Otherwise build up groups of islands
@@ -2122,73 +2119,42 @@ def VASTP_measure_catalog_fluxes(filename, positions, hdu_index=0,bkgin=None,rms
     sources = force_measure_flux(positions)
     return sources
     
-
 #secondary capabilities
-def save_background_files(image_filename, hdu_index=0,cores=None,beam=None,outbase=None):
+def save_background_files(image_filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,rms=None,cores=1,outbase=None):
     '''
     Generate and save the background and RMS maps as FITS files.
     They are saved in the current directly as aegean-background.fits and aegean-rms.fits.
     '''
     global global_data
-    
-    logging.info("Saving background / RMS maps")
-    img = FitsImage(image_filename, hdu_index=hdu_index,beam=beam)
-    data = img.get_pixels()
-    beam=img.beam
-    hdu_header = img.get_hdu_header()
-    # Save global data for use by rms/bkg calcs     
-    global_data = GlobalFittingData()
-    global_data.beam = beam
-    global_data.hdu_header = hdu_header
-    global_data.data_pix = img.get_pixels()
-    global_data.bkgimg = np.zeros(global_data.data_pix.shape)
-    global_data.rmsimg = np.zeros(global_data.data_pix.shape)
 
-    try:
-        global_data.wcs=pywcs.WCS(hdu_header, naxis=2)
-    except:
-        global_data.wcs=pywcs.WCS(str(hdu_header),naxis=2)
-    
-    make_bkg_rms_from_global(mesh_size=20,cores=cores)
-    bkgimg,rmsimg = global_data.bkgimg, global_data.rmsimg
+    logging.info("Saving background / RMS maps")
+    #load image, and load/create background/rms images
+    load_globals(image_filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,beam=beam,verb=True,rms=rms,cores=cores)
+    img = global_data.img
+    bkgimg,rmsimg = global_data.bkgimg,global_data.rmsimg
     #mask these arrays the same as the data
-    bkgimg[np.where(np.isnan(data))]=np.NaN
-    rmsimg[np.where(np.isnan(data))]=np.NaN
+    bkgimg[np.where(np.isnan(global_data.data_pix))]=np.NaN
+    rmsimg[np.where(np.isnan(global_data.data_pix))]=np.NaN
     
     # Generate the new FITS files by copying the existing HDU and assigning new data.
     # This gives the new files the same WCS projection and other header fields. 
     new_hdu = img.hdu
     # Set the ORIGIN to indicate Aegean made this file
-    new_hdu.header.update("ORIGIN", "Aegean {0}".format(version))
+    new_hdu.header["ORIGIN"] = "Aegean {0}".format(version)
     for c in ['CRPIX3','CRPIX4','CDELT3','CDELT4','CRVAL3','CRVAL4','CTYPE3','CTYPE4']:
         if c in new_hdu.header:
             del new_hdu.header[c]
-    #make the output file the same size as the input by matching the bitpix
-    bitpix = new_hdu.header['BITPIX']
-    if bitpix==8:
-        dtype=np.unit8
-    elif bitpix==16:
-        dtype=np.int16
-    elif bitpix==32:
-        dtype=np.int32
-    elif bitpix==-32:
-        dtype=np.float32
-    elif bitpix==-64:
-        dtype=np.float64
-    else:
-        logging.warn("Cannot determine BITPIX")
-        dtype=None
 
     if outbase is None:
         outbase,_ = os.path.splitext(os.path.basename(image_filename))
     noise_out = outbase+'_rms.fits'
     background_out = outbase+'_bkg.fits'
 
-    new_hdu.data = np.array(bkgimg,dtype=dtype)
+    new_hdu.data = bkgimg
     new_hdu.writeto(background_out, clobber=True)
     logging.info("Wrote {0}".format(background_out))
 
-    new_hdu.data = np.array(rmsimg,dtype=dtype)
+    new_hdu.data = rmsimg
     new_hdu.writeto(noise_out, clobber=True)
     logging.info("Wrote {0}".format(noise_out))
     return
