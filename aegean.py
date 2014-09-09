@@ -503,7 +503,7 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=False):
                 yield new_isle,xmin,xmax,ymin,ymax
     
 ##parameter estimates
-def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=[0,0]):
+def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
     """Estimates the number of sources in an island and returns initial parameters for the fit as well as
     limits on those parameters.
 
@@ -963,6 +963,7 @@ def writeIslandContours(filename,catalog,fmt):
         text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
     if fmt=='ann':
         print >>out, "COORD P"
+        text_fmt=None
         logging.warn("Kvis not yet supported")
     for c in catalog:
         contour = c.contour
