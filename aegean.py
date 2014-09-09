@@ -30,8 +30,12 @@ import astropy.io.fits as pyfits
 #tables and votables
 from astropy.table.table import Table 
 from astropy.io import ascii
-from astropy.io.votable import from_table
-from astropy.io.votable import writeto as writetoVO
+try:
+    from astropy.io.votable import from_table
+    from astropy.io.votable import writeto as writetoVO
+    votables_supported=True
+except:
+    votables_supported=False
 import sqlite3
 
 #logging and nice options
@@ -862,18 +866,36 @@ def load_catalog(filename):
 
 #writing table formats   
 
-def table_format_supported(filename):
-    """
-    Return true if the filename will map to a supported file format
-    """
-    name,ext = os.path.splitext(filename)
-    return ext[1:].lower() in get_table_formats()
+def check_table_formats(files):
+    cont=True
+    formats=get_table_formats()
+    for t in files.split(','):
+        name,ext = os.path.splitext(t)
+        ext=ext[1:].lower()
+        if not ext in formats:
+            cont=False
+            logging.warn("Format not supported for {0} ({1})".format(t,ext))
+    if not cont:
+        logging.error("Invalid table format specified.")
+        sys.exit()
+    return
 
 def get_table_formats():
     """
     Return a list of file extentions that are supported (mapped to an output)
     """
-    return ['ann','reg','vo','vot','xml','db','sqlite','csv','tex','tab']
+    fmts=['ann','reg']
+    if votables_supported:
+        fmts.extend(['vo','vot','xml'])
+    else:
+        logging.info("VOTables are not supported from this version of Astropy ({0})".format(astropy.__version__))
+    if astropy.__version__.startswith('0.2') or astropy.__version__.startswith('0.3'):
+        logging.info("Ascii tables are not supported with this version of Astropy ({0})".format(astropy.__version__))
+    else:
+        fmts.extend(['csv','tab','tex'])
+    #assume this is always possible -> though it may not be on some systems
+    fmts.extend(['db','sqlite'])
+    return fmts
 
 def save_catalog(filename,catalog):
     '''
@@ -884,19 +906,15 @@ def save_catalog(filename,catalog):
         nothing
     '''
     #.ann and .reg are handled by me
-    extension=os.path.splitext(filename)[1][1:]
+    extension=os.path.splitext(filename)[1][1:].lower()
     if extension in ['ann','reg']:
         writeAnn(filename,catalog,extension)
-    elif extension.lower() in ['vo','vot','xml']:
+    elif extension in ['vo','vot','xml']:
         writeVOTable(filename,catalog)
-    elif extension.lower() in ['db','sqlite']:
+    elif extension in ['db','sqlite']:
         writeDB(filename,catalog)
-    elif extension.lower() in ['csv']:
-        write_table(filename,catalog,format='csv')
-    elif extension.lower() in ['tex']:
-        write_table(filename,catalog,format='latex')
-    elif extension.lower() in ['tab']:
-        write_table(filename,catalog,format='tab')
+    elif extension in ascii_table_formats.keys():
+        write_table(filename,catalog,format=ascii_table_formats[extension])
     else:
         logging.warning("extension not recognised {0}".format(extension))
         logging.warning("You get tab format")
