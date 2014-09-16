@@ -988,6 +988,9 @@ def writeIslandContours(filename,catalog,fmt):
         for p1,p2 in zip(contour[:-1],contour[1:]):
             print >>out, line_fmt.format(p1[1]+0.5,p1[0]+0.5,p2[1]+0.5,p2[0]+0.5)
         print >>out, line_fmt.format(contour[-1][1]+0.5,contour[-1][0]+0.5,contour[0][1]+0.5,contour[0][0]+0.5)
+        #comment out lines that have invalid ra/dec (WCS problems)
+        if np.nan in [c.ra,c.dec]:
+            print >>out,'#',
         print >>out, text_fmt.format(c.ra,c.dec,c.island)
     out.close()
     return
@@ -1072,6 +1075,9 @@ def writeAnn(filename,catalog,fmt):
             pas = [a-90 for a in pas]
 
         for ra,dec,bmaj,bmin,pa,name in zip(ras,decs,bmajs,bmins,pas,names):
+            #comment out lines that have invalid or stupid entries
+            if np.nan in [ra,dec,bmaj,bmin,pa] or bmaj>=180:
+                print >>out,'#',
             print >>out,formatter.format(ra,dec,bmaj,bmin,pa,name)
         out.close()
         logging.info("wrote {0}".format(filename))
@@ -2305,18 +2311,8 @@ if __name__=="__main__":
 
     #check that the output table formats are supported (if given)
     # BEFORE any cpu intensive work is done
-    if options.tables:
-        cont=True
-        for t in options.tables.split(','):
-            if not table_format_supported(t):
-                cont=False
-                logging.warn("Format not supported for {0}".format(t))
-        if not cont:
-            logging.error("Invalid table format specified.")
-            sys.exit()
+    check_table_formats(options.tables)
 
-
-            
     #if an outputfile was specified open it for writing, otherwise use stdout
     if not options.outfile:
         options.outfile=sys.stdout
