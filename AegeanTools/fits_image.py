@@ -78,7 +78,7 @@ class FitsImage():
         self._pixels = numpy.squeeze(self.hdu.data)
         #convert +/- inf to nan
         self._pixels[numpy.where(numpy.isinf(self._pixels))] = numpy.nan
-        del self.hdu
+        #del self.hdu
         logging.debug("Using axes {0} and {1}".format(self._header['CTYPE1'],self._header['CTYPE2']))
 
         
