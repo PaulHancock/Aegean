@@ -2314,11 +2314,7 @@ if __name__=="__main__":
     # BEFORE any cpu intensive work is done
     if options.tables is not None:
         check_table_formats(options.tables)
-<<<<<<< HEAD
-            
-=======
 
->>>>>>> dev
     #if an outputfile was specified open it for writing, otherwise use stdout
     if not options.outfile:
         options.outfile=sys.stdout
