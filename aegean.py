@@ -2311,7 +2311,8 @@ if __name__=="__main__":
 
     #check that the output table formats are supported (if given)
     # BEFORE any cpu intensive work is done
-    check_table_formats(options.tables)
+    if options.tables is not None:
+        check_table_formats(options.tables)
 
     #if an outputfile was specified open it for writing, otherwise use stdout
     if not options.outfile:
