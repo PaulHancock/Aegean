@@ -772,7 +772,7 @@ def load_bkg_rms_image(image,bkgfile,rmsfile):
     rmsimg = load_aux_image(image,rmsfile)
     return bkgimg,rmsimg
 
-def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False,rms=None,cores=1,csigma=None):
+def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False,rms=None,cores=1,csigma=None,do_curve=True):
     """
     populate the global_data object by loading or calculating the various components
     """
@@ -793,17 +793,19 @@ def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False
     global_data.bkgimg = np.zeros(global_data.data_pix.shape,dtype=global_data.dtype)
     global_data.rmsimg = np.zeros(global_data.data_pix.shape,dtype=global_data.dtype)
     global_data.pixarea = img.pixarea
-    #calculate curvature but store it as -1,0,+1
-    cimg = curvature(global_data.data_pix,dtype=global_data.dtype)
-    if csigma is None:
-        logging.info("Calculating curvature csigma")
-        _,csigma = estimate_bkg_rms(cimg)
-    dcurve = np.zeros(global_data.data_pix.shape,dtype=np.int8)
-    dcurve[np.where(cimg<=-abs(csigma))]=-1
-    dcurve[np.where(cimg>=abs(csigma))]=1
-    del cimg
+    global_data.dcurve = None
+    if do_curve:
+        #calculate curvature but store it as -1,0,+1
+        cimg = curvature(global_data.data_pix,dtype=global_data.dtype)
+        if csigma is None:
+            logging.info("Calculating curvature csigma")
+            _,csigma = estimate_bkg_rms(cimg)
+        dcurve = np.zeros(global_data.data_pix.shape,dtype=np.int8)
+        dcurve[np.where(cimg<=-abs(csigma))]=-1
+        dcurve[np.where(cimg>=abs(csigma))]=1
+        del cimg
 
-    global_data.dcurve=dcurve
+        global_data.dcurve=dcurve
 
     #if either of rms or bkg images are not supplied then caclucate them both
     if not (rmsin and bkgin):
@@ -2013,7 +2015,9 @@ def force_measure_flux(radec):
             #logging.warn("Source at {0} {1} is outside of image bounds".format(ra,dec))
             #logging.warn("No measurements made - dummy source created")
             dummy = SimpleSource()
-            dummy.ra=-1
+            dummy.peak_flux = np.nan
+            dummy.peak_pixel = np.nan
+            dummy.flags=flags.FITERR
             catalog.append(dummy)
             continue
 
@@ -2051,9 +2055,20 @@ def force_measure_flux(radec):
         # for each pixel. Error is stddev.
         # Only use pixels within the FWHM, ie value>=0.5. Set the others to NaN
         ratios = np.where(gaussian_data>=0.5, data/gaussian_data, np.nan)
-        ratios_no_nans = np.extract(np.isfinite(ratios), ratios) # get rid of NaNs
-        flux = np.average(ratios_no_nans)
-        error = np.std(ratios_no_nans)
+        #ratios_no_nans = np.extract(np.isfinite(ratios), ratios) # get rid of NaNs
+        #flux = np.average(ratios_no_nans)
+        #error = np.std(ratios_no_nans)
+        lratios=np.log(ratios)
+        flux = np.exp(np.nanmean(lratios))
+        error = np.nanstd(lratios)*flux
+
+        if not np.isfinite(flux) or not np.isfinite(error):
+            dummy = SimpleSource()
+            dummy.peak_flux = np.nan
+            dummy.peak_pixel = np.nan
+            dummy.flags=flags.FITERR
+            catalog.append(dummy)
+            continue
         source = SimpleSource()
         source.ra=ra
         source.dec=dec
@@ -2092,7 +2107,7 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
         beam - beam parameters to overide those given in fits header
         
     '''
-    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,rms=rms,cores=cores,verb=True)
+    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,rms=rms,cores=cores,verb=True,do_curve=False)
     
     #load catalog
     radec= load_catalog(catfile)
@@ -2119,7 +2134,7 @@ def VASTP_measure_catalog_fluxes(filename, positions, hdu_index=0,bkgin=None,rms
         rms - forced rms value
         beam - beam parameters to overide those given in fits header
     """
-    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,rms=rms,cores=cores,beam=beam,verb=True)
+    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,rms=rms,cores=cores,beam=beam,verb=True,do_curve=False)
     #measure fluxes
     sources = force_measure_flux(positions)
     return sources
