@@ -32,7 +32,7 @@ gdata.step_size=None
 gdata.box_size=None
 
             
-
+@profile
 def running_filter(xmn,xmx,ymn,ymx):
     """
     A version of running_filter that works on a subset of the data
@@ -255,7 +255,8 @@ def filter_mc(data,step_size,box_size,cores):
     mask = np.where(np.isnan(data))
     interpolated_bkg[mask]=np.NaN
     interpolated_rms[mask]=np.NaN
-    del queue, parfilt
+    if cores>1:
+        del queue, parfilt
     return interpolated_bkg,interpolated_rms
 
 def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False,cores=None):
