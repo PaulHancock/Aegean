@@ -1709,7 +1709,6 @@ def fit_island(island_data):
         # Clamp the pixel location to the edge of the background map (see Trac #51)
         y = max(min(int(round(y_pix-ymin)), bkg.shape[1]-1),0)
         x = max(min(int(round(x_pix-xmin)), bkg.shape[0]-1),0)
-        #FIXME check that these x,y are correct. maybe = y-1,x-1
         source.background=bkg[x,y]
         source.local_rms=rms[x,y]
         source.peak_flux = amp
