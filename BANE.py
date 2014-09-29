@@ -32,7 +32,7 @@ gdata.step_size=None
 gdata.box_size=None
 
             
-@profile
+#@profile
 def running_filter(xmn,xmx,ymn,ymx):
     """
     A version of running_filter that works on a subset of the data
