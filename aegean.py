@@ -894,7 +894,7 @@ def get_table_formats():
     if astropy.__version__.startswith('0.2') or astropy.__version__.startswith('0.3'):
         logging.info("Ascii tables are not supported with this version of Astropy ({0})".format(astropy.__version__))
     else:
-        fmts.extend(['csv','tab','tex'])
+        fmts.extend(['csv','tab','tex','html'])
     #assume this is always possible -> though it may not be on some systems
     fmts.extend(['db','sqlite'])
     return fmts
@@ -907,7 +907,7 @@ def save_catalog(filename,catalog):
     returns:
         nothing
     '''
-    ascii_table_formats={'csv':'csv','tab':'tsv','tex':'latex'}
+    ascii_table_formats={'csv':'csv','tab':'tab','tex':'latex','html':'html'}
     #.ann and .reg are handled by me
     extension=os.path.splitext(filename)[1][1:].lower()
     if extension in ['ann','reg']:
