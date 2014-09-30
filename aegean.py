@@ -907,6 +907,7 @@ def save_catalog(filename,catalog):
     returns:
         nothing
     '''
+    ascii_table_formats={'csv':'csv','tab':'tsv','tex':'latex'}
     #.ann and .reg are handled by me
     extension=os.path.splitext(filename)[1][1:].lower()
     if extension in ['ann','reg']:
