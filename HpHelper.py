@@ -48,6 +48,17 @@ class Region():
             area+=len(self.pixeldict[d])*hp.nside2pixarea(2**d,degrees=degrees)
         return area
 
+    def get_demoted(self):
+        """
+        :return: Return a set of pixels that represent this region at maxdepth
+        """
+        pd = self.pixeldict.copy()
+        for d in xrange(1,self.maxdepth):
+            for p in pd[d]:
+                pd[d+1].update(set([4*p,4*p+1,4*p+2,4*p+3]))
+            pd[d]=set()
+        return pd[self.maxdepth]
+
     def _demote_all(self):
         """
         Represent this region as pixels at maxdepth only
@@ -79,15 +90,18 @@ class Region():
                         self.pixeldict[d-1].add(p/4)
         return
 
-    def sky_within(self,ra,dec):
+    def sky_within(self,ra,dec,degin=False):
         """
         Test whether a sky position is within this region
         :param ra: RA in radians
         :param dec: Dec in decimal radians
+        :param degin: True if the input parameters are in degrees instead of radians
         :return: True if RA/Dec is within this region
         """
-
-        theta,phi = self.sky2ang(ra,dec)
+        if degin:
+            theta,phi = self.sky2ang(np.radians(ra),np.radians(dec))
+        else:
+            theta,phi = self.sky2ang(ra,dec)
         #pixel number at the maxdepth
         pix = hp.ang2pix(2**self.maxdepth,theta,phi,nest=True)
         # print pix
@@ -120,8 +134,20 @@ class Region():
             self._renorm()
         return
 
-    def difference(self,other):
-        pass #as above, propagating set operations
+    def without(self,other):
+        """
+        Remove the overlap between this region and the other region
+        :param other: Another region
+        :return: None
+        """
+        #work only on the lowest level
+        #TODO: Allow this to be done for regions with different depths.
+        assert self.maxdepth==other.maxdepth, "Regions must have the same maxdepth"
+        self._demote_all()
+        opd = other.get_demoted()
+        self.pixeldict[self.maxdepth].difference_update(opd)
+        self._renorm()
+        return
 
     def write_reg(self,filename):
         """
@@ -220,14 +246,36 @@ def test_conversions():
     ra,dec=Region.vec2sky(vec)
     print "output",np.degrees(ra),np.degrees(dec)
 
-def test_reg():
+def test_pickle():
     ra=66.38908
     dec= -26.72466
     radius=22
-    #print "RA:{0},DEC:{1}, radius:{2}".format(ra,dec,radius)
     region=Region(maxdepth=8)
     region.add_circles(np.radians(ra),np.radians(dec),np.radians(radius))
-    region.write_reg('/home/hancock/temp/test.reg')
+    try:
+        import cPickle as pickle
+    except:
+        import pickle
+    pickle.dump(region,open('out.arf','w'))
+    region2=pickle.load(open('out.arf'))
+    print "Pickle dump/load works =",region.pixeldict == region2.pixeldict
+    return
+
+def test_reg():
+    # ra=66.38908
+    # dec= -26.72466
+    # radius=22
+    ra=[55]
+    dec=[-20]
+    radius=[9]
+    # #print "RA:{0},DEC:{1}, radius:{2}".format(ra,dec,radius)
+    region=Region(maxdepth=9)
+    region.add_circles(np.radians(ra),np.radians(dec),np.radians(radius))
+    r2=Region(maxdepth=9)
+    r2.add_circles(np.radians(66.389),np.radians(-26.72466),np.radians(22))
+    r2.without(region)
+    r2.add_circles(np.radians(ra),np.radians(dec),np.radians([1]))
+    r2.write_reg('/home/hancock/temp/test.reg')
 
 
 if __name__=="__main__":
@@ -235,3 +283,4 @@ if __name__=="__main__":
     # test_sky_within()
     # test_conversions()
     test_reg()
+    # test_pickle()
