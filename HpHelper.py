@@ -1,9 +1,7 @@
 #! /usr/bin/env python
 
-import healpy as hp
-import numpy as np
-
-nside=2**11 #gives pixels of approx 1.7x1.7 arcmin
+import healpy as hp #dev on 1.8.1
+import numpy as np #dev on 1.8.1
 
 class Region():
     def __init__(self,maxdepth=11):
@@ -38,17 +36,17 @@ class Region():
     def add_poly(self,positions):
         pass #as above for a polygon
 
-    def get_area(self):
-        pass
-
-    def get_pixeldict(self):
-        return self.pixeldict
-
     def add_pixels(self,pix,depth):
         if depth not in self.pixeldict:
             self.pixeldict[depth]=set()
         self.pixeldict[depth].update(set(pix))
         pass
+
+    def get_area(self,degrees=True):
+        area=0
+        for d in xrange(1,self.maxdepth+1):
+            area+=len(self.pixeldict[d])*hp.nside2pixarea(2**d,degrees=degrees)
+        return area
 
     def _demote_all(self):
         """
@@ -73,7 +71,8 @@ class Region():
             for p in plist:
                 if p%4==0:
                     nset=set((p,p+1,p+2,p+3))
-                    if nset.intersection(plist) != set():
+                    if p+1 in plist and p+2 in plist and p+3 in plist:
+                    # if nset.intersection(plist) != set():
                         #remove the four pixels from this level
                         self.pixeldict[d].difference_update(nset)
                         #add a new pixel to the next level up
@@ -91,12 +90,12 @@ class Region():
         theta,phi = self.sky2ang(ra,dec)
         #pixel number at the maxdepth
         pix = hp.ang2pix(2**self.maxdepth,theta,phi,nest=True)
-        print pix
+        # print pix
         #search from shallow -> deep since shallow levels have less pixels
         for d in xrange(1,self.maxdepth+1):
             #determine the pixel number when promoted to level d
             dpix = pix//4**(self.maxdepth-d)
-            print dpix,d,self.pixeldict[d]
+            # print dpix,d,self.pixeldict[d]
             if dpix in self.pixeldict[d]:
                 return True
         return False
@@ -106,8 +105,17 @@ class Region():
         Add another Region by performing union on their pixlists
         :param other: A Region
         """
-        for d in xrange(1,max(self.maxdepth,other.maxdepth)+1):
+        #merge the pixels that are common to both
+        for d in xrange(1,min(self.maxdepth,other.maxdepth)+1):
             self.add_pixels(other.pixdict[d],d)
+
+        #if the other region is at higher resolution, then include a degraded version of the remaining pixels.
+        if self.maxdepth<other.maxdepth:
+            for d in xrange(self.maxdepth+1,other.maxdepth+1):
+                for p in other.pixeldict[d]:
+                    #promote this pixel to self.maxdepth
+                    pp = p/4**(d-self.maxdepth)
+                    self.pixeldict[self.maxdepth].add(pp)
         if renorm:
             self._renorm()
         return
@@ -115,14 +123,30 @@ class Region():
     def difference(self,other):
         pass #as above, propagating set operations
 
-    def area(self,degrees=True):
-        return len(self.pixel)*hp.nside2pixarea(self.nside,degrees=degrees)
+    def write_reg(self,filename):
+        """
+        Write a ds9 region file that represents this region as a set of diamonds.
+        :param filename: file to write
+        :return: None
+        """
+        with open(filename,'w') as out:
+            for d in xrange(1,self.maxdepth+1):
+                for p in self.pixeldict[d]:
+                    line="fk5; polygon "
+                    x,y,z = hp.boundaries(2**d,p,step=1,nest=True)
+                    for vec in zip(x,y,z):
+                        #print "vec",vec
+                        for ra,dec in zip(*self.vec2sky(np.array(vec),degrees=True)):
+                            #print "pos",ra,dec
+                            line += "{0} {1} ".format(ra,dec)
+                    print>>out, line
+        return
 
     def __repr__(self):
-        return "Region of with maximum depth {0}".format(self.maxdepth)
+        return "Region of with maximum depth {0}, and total area {1:5.2g}deg^2".format(self.maxdepth,self.get_area())
 
     @classmethod
-    def sky2ang(self,ra,dec):
+    def sky2ang(cls,ra,dec):
         """
         Convert ra,dec coordinates to theta,phi coordinates
         :param ra: RA in radians
@@ -134,15 +158,33 @@ class Region():
         return theta,phi
 
     @classmethod
-    def sky2vec(self,ra,dec):
+    def sky2vec(cls,ra,dec):
         """
 
-        :param ra:
-        :param dec:
-        :return:
+        :param ra: RA
+        :param dec: DEC
+        :return: A vector list
         """
-        x,y,z=hp.ang2vec(*self.sky2ang(ra,dec))
-        return x,y,z
+        theta_phi = cls.sky2ang(ra,dec)
+        vec=hp.ang2vec(*theta_phi)
+        return vec
+
+    @classmethod
+    def vec2sky(cls,vec,degrees=False):
+        """
+        Convert [x,y,z] vectors into sky coordinates ra,dec
+        :param vec: A vector list
+        :param degrees: Return ra/dec in degrees? Default = false
+        :return: ra, dec in radians or degrees
+        """
+        theta,phi =hp.vec2ang(vec)
+        ra=phi
+        dec=np.pi/2-theta
+
+        if degrees:
+            ra=np.degrees(ra)
+            dec=np.degrees(dec)
+        return ra,dec
 
 def test_renorm_demote():
     ra=13.5
@@ -151,6 +193,7 @@ def test_renorm_demote():
     print "RA:{0},DEC:{1}, radius:{2}".format(ra,dec,radius)
     region=Region(maxdepth=11)
     region.add_circles(np.radians(ra),np.radians(dec),np.radians(radius))
+    region._demote_all()
     start_dict= region.pixeldict.copy()
     print start_dict
     region._renorm()
@@ -168,35 +211,27 @@ def test_sky_within():
     print region.sky_within(np.radians(ra[0]),np.radians(dec[0]))
     print region.sky_within(np.radians(ra[0]+5*radius[0]),np.radians(dec[0]))
 
+def test_conversions():
+    ra=13.5
+    dec=-45
+    print "input",ra,dec
+    vec=Region.sky2vec(np.radians(ra),np.radians(dec))
+    print "vector",vec
+    ra,dec=Region.vec2sky(vec)
+    print "output",np.degrees(ra),np.degrees(dec)
+
+def test_reg():
+    ra=66.38908
+    dec= -26.72466
+    radius=22
+    #print "RA:{0},DEC:{1}, radius:{2}".format(ra,dec,radius)
+    region=Region(maxdepth=8)
+    region.add_circles(np.radians(ra),np.radians(dec),np.radians(radius))
+    region.write_reg('/home/hancock/temp/test.reg')
+
 
 if __name__=="__main__":
-    #test_renorm_demote()
-    test_sky_within()
-
-#return the 8 nearest neighbouring pixels
-#get_all_neighbours(nside,theta,phi)
-#get_all_neighbours(nside,pix)
-
-#as above but not including diagonals
-#get_neighbours(nside,theta,phi)
-
-#convert an angle on the sky to a healpix pixel
-#ang2pix( 4, [theta,phi])
-
-#return all ipix that are within the given region
-#region specified as verticies (not ra/dec)
-#hp.query_polygon(4, [ [0,1,1],[1,1,1],[0,0,1]])
-
-#return all pix that are within a disk
-# if inclusive then return all pix that overlap the disc
-# else include only those whose centers are within the disc
-#hp.query_disc(4,vec,radius,inclusive=True)
-
-#convert theta,phi to a vector
-# dec = pi/2-theta
-# ra = phi
-# both in radians
-#hp.ang2vec(theta,phi)
-
-#to check if a position is within a given pixel we just check
-#if ang2pix(nside, [theta,phi]) == pix
+    # test_renorm_demote()
+    # test_sky_within()
+    # test_conversions()
+    test_reg()
