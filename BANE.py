@@ -132,6 +132,44 @@ def running_filter(xmn,xmx,ymn,ymx):
     logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     return xmin,xmax,ymin,ymax,bkg_points,bkg_values,rms_points,rms_values
 
+def gen_factors(m,permute=True):
+    """
+    Generate a list of integer factors for m
+    :param m: A positive integer
+    :return:
+    """
+    #convert to int if people have been naughty
+    n=int(abs(m))
+    #brute force the factors, one of which is always less than sqrt(n)
+    for i in xrange(1,int(n**0.5+1)):
+        if n%i==0:
+            yield i,n/i
+            #yield the reverse pair if it is unique
+            if i != n/i and permute:
+                yield n/i,i
+
+def optimum_sections(cores,data_shape):
+    """
+    Choose the best sectioning scheme based on the number of cores available and the shape of the data
+    :param cores: Number of available cores
+    :param data_shape: Shape of the data as [x,y]
+    :return: (nx,ny) the number of divisions in each direction
+    """
+    if cores==1:
+        return (1,1)
+    if cores%1==1:
+        cores-=1
+    x,y=data_shape
+    min_overlap=np.inf
+    best=(1,1)
+    for (mx,my) in gen_factors(cores):
+        overlap=x*(my-1) + y*(mx-1)
+        if overlap<min_overlap:
+            best=(mx,my)
+            min_overlap=overlap
+    logging.debug("Sectioning chosen to be {0[0]}x{0[1]} for a score of {1}".format(best,min_overlap))
+    return best
+
 def filter_mc(data,step_size,box_size,cores):
     """
     Perform a running filter over multiple cores
@@ -158,12 +196,7 @@ def filter_mc(data,step_size,box_size,cores):
     img_y,img_x = data.shape
     if cores>1:
         logging.info("using {0} cores".format(cores))
-        #for now we hard code these
-        #assuming that the image is larger in x than y
-        nx,ny = {1:(1,1),2:(2,1),4:(2,2),6:(3,2),8:(2,4),16:(4,4),1:(4,4)}[cores]
-
-        if img_x<img_y:
-            nx,ny=ny,nx #if the image is smaller in x than in y
+        nx,ny=optimum_sections(cores,data.shape)
 
         #box widths should be multiples of the ste_size, and not zero
         width_x = max(img_x/nx/step_size[0],1)*step_size[0]
@@ -259,6 +292,7 @@ def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False,cor
 
 ###
 # Alternate Filters
+# Used only for testing algorithm speeds, not really useful
 ###
 
 def scipy_filter(im_name,out_base,step_size,box_size,cores=None):
