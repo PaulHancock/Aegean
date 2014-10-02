@@ -48,6 +48,7 @@ def maskfile(regionfile,infile,outfile):
     data = im[0].data
 
     #easy/slow version
+    #TODO: revise this to be faster if at all possible.
     for i,row in enumerate(data):
         for j,val in enumerate(row):
             skybox = wcs.wcs_pix2world([[i,j]],1)
@@ -57,7 +58,7 @@ def maskfile(regionfile,infile,outfile):
 
     im[0].data=data
     im.writeto(outfile,clobber=True)
-    logging.info("Wrotw {0}".format(outfile))
+    logging.info("Wrote {0}".format(outfile))
     return
 
 

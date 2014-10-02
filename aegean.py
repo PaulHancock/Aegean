@@ -38,6 +38,11 @@ except:
     votables_supported=False
 import sqlite3
 
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+
 #logging and nice options
 import logging
 from optparse import OptionParser
@@ -48,12 +53,13 @@ from AegeanTools.msq2 import MarchingSquares
 from AegeanTools.mpfit import mpfit
 from AegeanTools.convert import ra2dec, dec2dec, dec2hms, dec2dms, gcd, bear, translate
 import AegeanTools.flags as flags
+from AegeanTools.regions import Region
 
 #multiple cores support
 import AegeanTools.pprocess as pprocess
 import multiprocessing
 
-version='1.8'
+version='1.8.1'
 
 header="""#Aegean version {0}
 # on dataset: {1}"""
@@ -345,6 +351,7 @@ class GlobalFittingData:
     wcs = None
     data_pix = None
     dtype = None
+    region = None
     
 class IslandFittingData:
     '''
@@ -455,7 +462,7 @@ def flood(data, rmsimg, status, bounds, peak, cutoffratio):
 
     return blob
 
-def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=False):
+def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,domask=False):
     """
     <a generator function>
     Find all the sub islands in data.
@@ -481,6 +488,13 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=False):
     # making pixel list
     ax,ay=np.where(abspix/rmsimg>innerclip)
     peaks=[(data.pixels[ax[i],ay[i]],ax[i],ay[i]) for i in range(len(ax))]
+
+    #ignore pixels outside the masking region
+    if global_data.region is not None and domask:
+        logging.debug("masking pixels")
+        logging.debug("peaks {0}".format(len(peaks)))
+        peaks=[p for p in peaks if global_data.region.sky_within(*pix2sky((p[1],p[2])),degin=True)]
+        logging.debug("non masked peaks {0}".format(len(peaks)))
     if len(peaks)==0:
         logging.debug("There are no pixels above the clipping limit")
         return
@@ -492,16 +506,13 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=False):
     logging.debug("Most positive peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[0]],rmsimg[peaks[0]]))
     logging.debug("Most negative peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[-1]],rmsimg[peaks[-1]]))
     bounds=(data.pixels.shape[0]-1,data.pixels.shape[1]-1)
-    
+
+
     # starting image segmentation
     for peak in peaks:
         blob=flood(abspix,rmsimg,status,bounds,peak,cutoffratio=outerclip)
         npix=len(blob)
         if npix>=1:#islands with no pixels have length 1
-            if expand:
-                #I forgot what I was going to do here I should just remove it
-                logging.error("You said ''expand'' but this is not yet working!")
-                sys.exit(1)
             new_isle,xmin,xmax,ymin,ymax=data.list2map(blob)
             if new_isle is not None:
                 yield new_isle,xmin,xmax,ymin,ymax
@@ -578,7 +589,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
             kappa_sigma=Island( np.where( curve>0.5, np.where(data+innerclip*rmsimg<0, data, np.nan) ,np.nan) )
         else:
             kappa_sigma=Island( np.where( -1*curve>0.5, np.where(data-innerclip*rmsimg>0, data, np.nan) ,np.nan) )     
-        summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0)
+        summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0,domask=False)
 
     i=0
     for summit,xmin,xmax,ymin,ymax in summits:
@@ -772,7 +783,7 @@ def load_bkg_rms_image(image,bkgfile,rmsfile):
     rmsimg = load_aux_image(image,rmsfile)
     return bkgimg,rmsimg
 
-def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False,rms=None,cores=1,csigma=None,do_curve=True):
+def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False,rms=None,cores=1,csigma=None,do_curve=True,mask=None):
     """
     populate the global_data object by loading or calculating the various components
     """
@@ -780,9 +791,18 @@ def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False
     
     img = FitsImage(filename, hdu_index=hdu_index,beam=beam)
     beam=img.beam    
-    
+
     # Save global data for use by fitting subprocesses    
     global_data = GlobalFittingData()
+
+    if mask is not None:
+        if os.path.exists(mask):
+            global_data.region=pickle.load(open(mask))
+        else:
+            logging.error("File {0} not found for loading".format(mask))
+    else:
+        global_data.region=None
+
     global_data.beam = beam
     global_data.hdu_header = img.get_hdu_header()
     global_data.wcs = img.wcs
@@ -1837,7 +1857,7 @@ def fit_islands(islands):
         sources.extend(res)
     return sources
 
-def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None, innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,returnrms=False,nopositive=False,nonegative=False):
+def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None, innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,returnrms=False,nopositive=False,nonegative=False,mask=None):
     """
     Run the Aegean source finder.
     Inputs:
@@ -1879,7 +1899,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     if cores is not None:
         assert(cores >= 1), "cores must be one or more"
         
-    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,beam=beam,rms=rms,cores=cores,csigma=csigma,verb=True)
+    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,beam=beam,rms=rms,cores=cores,csigma=csigma,verb=True,mask=mask)
     
     #we now work with the updated versions of the three images
     bkgimg = global_data.bkgimg
@@ -1922,7 +1942,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         print >>outfile,OutputSource.header
     island_group = []
     group_size = 20
-    for i,xmin,xmax,ymin,ymax in gen_flood_wrap(data,rmsimg,innerclip,outerclip,expand=False):
+    for i,xmin,xmax,ymin,ymax in gen_flood_wrap(data,rmsimg,innerclip,outerclip,domask=True):
         if len(i)<=1:
             #empty islands have length 1
             continue 
@@ -2220,6 +2240,8 @@ if __name__=="__main__":
     parser.add_option('--negative', dest='negative',action="store_true",default=False,
                                     help="Report sources with negative fluxes. [default: false]")
 
+    parser.add_option('--mask',dest='mask',default=None,
+                                    help="Use this regions file to mask the image before source finding")
 
     parser.add_option('--save', dest='save', action="store_true",default=False,
                                 help='Enable the saving of the background and noise images. Sets --find to false. [default: false]')
@@ -2357,7 +2379,7 @@ if __name__=="__main__":
                                     max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,
                                     outerclip=options.outerclip, cores=options.cores, rmsin=options.noiseimg, 
                                     bkgin=options.backgroundimg,beam=options.beam, doislandflux=options.doislandflux,
-                                    nonegative= not options.negative,nopositive=options.nopositive)
+                                    nonegative= not options.negative,nopositive=options.nopositive,mask=options.mask)
         if len(detections)==0:
             logging.info("No sources found in image")
         sources.extend(detections)
