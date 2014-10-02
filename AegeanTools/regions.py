@@ -9,16 +9,19 @@ class Region():
         self.pixeldict=dict( (i,set()) for i in xrange(1,maxdepth+1))
         return
 
+    def __repr__(self):
+        return "Region of with maximum depth {0}, and total area {1:5.2g}deg^2".format(self.maxdepth,self.get_area())
+
     def add_circles(self,ra_cen,dec_cen,radius,depth=None):
         """
-        Add a set of circles to this region
-        :param ra_cen:
-        :param dec_cen:
-        :param radius:
-        :param depth:
-        :return:
+        Add one or more circles to this region
+        :param ra_cen: ra or list of ras for circle centers
+        :param dec_cen: dec or list of decs for circle centers
+        :param radius: radius or list of radii for circles
+        :param depth: The depth at which we wisht to represent the circle (forced to be <=maxdepth
+        :return: None
         """
-        if depth==None:
+        if depth==None or depth>self.maxdepth:
             depth=self.maxdepth
         try:
             ras,decs,radii = iter(ra_cen),iter(dec_cen),iter(radius)
@@ -34,6 +37,11 @@ class Region():
         return
 
     def add_poly(self,positions):
+        """
+        Add a single polygon to this region
+        :param positions: list of [ (ra,dec), ... ] positions that form the polygon
+        :return: None
+        """
         pass #as above for a polygon
 
     def add_pixels(self,pix,depth):
@@ -56,7 +64,6 @@ class Region():
         for d in xrange(1,self.maxdepth):
             for p in pd[d]:
                 pd[d+1].update(set([4*p,4*p+1,4*p+2,4*p+3]))
-            pd[d]=set()
         return pd[self.maxdepth]
 
     def _demote_all(self):
@@ -168,9 +175,6 @@ class Region():
                     print>>out, line
         return
 
-    def __repr__(self):
-        return "Region of with maximum depth {0}, and total area {1:5.2g}deg^2".format(self.maxdepth,self.get_area())
-
     @classmethod
     def sky2ang(cls,ra,dec):
         """
@@ -256,8 +260,8 @@ def test_pickle():
         import cPickle as pickle
     except:
         import pickle
-    pickle.dump(region,open('out.arf','w'))
-    region2=pickle.load(open('out.arf'))
+    pickle.dump(region,open('out.mim','w'))
+    region2=pickle.load(open('out.mim'))
     print "Pickle dump/load works =",region.pixeldict == region2.pixeldict
     return
 
@@ -282,5 +286,5 @@ if __name__=="__main__":
     # test_renorm_demote()
     # test_sky_within()
     # test_conversions()
-    test_reg()
+    # test_reg()
     # test_pickle()
