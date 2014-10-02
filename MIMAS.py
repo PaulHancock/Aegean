@@ -9,8 +9,11 @@ Created: Paul Hancock, Oct 2014
 import argparse
 import logging
 import numpy as np
-import sys
+import sys, os
+from astropy.io import fits as pyfits
+from astropy.wcs import wcs as pywcs
 from AegeanTools.regions import Region
+from AegeanTools.fits_image import FitsImage
 
 version='0.1'
 
@@ -19,6 +22,44 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
+
+#globals
+filewcs=None
+
+def maskfile(regionfile,infile,outfile):
+    """
+    Created a masked version of file, using region.
+    This does not change the shape or size of the image, it just sets some pixels to be null/nan
+    :param region: A Region that describes the area of interest
+    :param file: The name of the fits file to mask.
+    :param maskfile: The masked file to be written
+    :return: None
+    """
+    #Check that the input file is accessible and then open it
+    assert os.path.exists(infile), "Cannot locate fits file {0}".format(infile)
+    im = pyfits.open(infile)
+    assert os.path.exists(regionfile), "Cannot locate region file {0}".format(regionfile)
+    region=pickle.load(open(regionfile))
+    #fix possible problems with miriad generated fits files % HT John Morgan.
+    try:
+        wcs = pywcs.WCS(im[0].header, naxis=2)
+    except:
+        wcs = pywcs.WCS(str(im[0].header),naxis=2)
+    data = im[0].data
+
+    #easy/slow version
+    for i,row in enumerate(data):
+        for j,val in enumerate(row):
+            skybox = wcs.wcs_pix2world([[i,j]],1)
+            ra,dec = float(skybox[0][0]), float(skybox[0][1])
+            if not region.sky_within(ra,dec,degin=True):
+                data[j,i]=np.nan
+
+    im[0].data=data
+    im.writeto(outfile,clobber=True)
+    logging.info("Wrotw {0}".format(outfile))
+    return
+
 
 def mim2reg(mimfile,regfile):
     region=pickle.load(open(mimfile,'r'))
@@ -32,7 +73,9 @@ if __name__=="__main__":
     parser = argparse.ArgumentParser(epilog=epilog,prefix_chars='+-')
     #tools for creating .mim files
     parser.add_argument('-o', dest='outfile', action='store', help='output filename [default=region.mim]', default='region.mim')
-    parser.add_argument('-depth', dest='maxdepth',action='store', metavar='N', default=8, help='maximum nside=2**N to be used to represent this region. [Default=8]')
+    parser.add_argument('-depth', dest='maxdepth',action='store',
+                        metavar='N', default=8, type=int,
+                        help='maximum nside=2**N to be used to represent this region. [Default=8]')
     parser.add_argument('+r', dest='add_region', action='append',
                         default=[], type=str, metavar='filename',nargs='*',
                         help='add a region specified by the given file (.mim format)')
@@ -57,7 +100,9 @@ if __name__=="__main__":
 
     #tools that use .mim files
     parser.add_argument('--mim2reg',dest='mim2reg', action='append', type=str, metavar=('region.mim','region.reg'), nargs=2, help='convert region.mim into region.reg', default=[])
-
+    parser.add_argument('--mask',dest='mask', action='store',
+                        type=str, metavar=('region.mim','file.fits','masked.fits'), nargs=3, default=[],
+                        help='use region.mim to mask file.fits and write masekd.fits')
     #extras
     parser.add_argument('--debug', dest='debug', action='store_true', help='debug mode [default=False]', default=False)
     parser.add_argument('--version', action='version', version='%(prog)s '+version)
@@ -70,6 +115,11 @@ if __name__=="__main__":
     if len(results.mim2reg)>0:
         for i,o in results.mim2reg:
             mim2reg(i,o)
+        sys.exit()
+
+    if len(results.mask)>0:
+        m,i,o = results.mask
+        maskfile(m,i,o)
         sys.exit()
 
     #create empty region
