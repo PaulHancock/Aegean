@@ -9,13 +9,13 @@ Created: Paul Hancock, Oct 2014
 import argparse
 import logging
 import numpy as np
-import sys, os
+import sys
+import os
 from astropy.io import fits as pyfits
 from astropy.wcs import wcs as pywcs
 from AegeanTools.regions import Region
-from AegeanTools.fits_image import FitsImage
 
-version='0.1'
+version='0.2'
 
 #seems like this fails sometimes
 try:
@@ -30,9 +30,9 @@ def maskfile(regionfile,infile,outfile):
     """
     Created a masked version of file, using region.
     This does not change the shape or size of the image, it just sets some pixels to be null/nan
-    :param region: A Region that describes the area of interest
-    :param file: The name of the fits file to mask.
-    :param maskfile: The masked file to be written
+    :param regionfile: A Region that describes the area of interest
+    :param infile: The name of the fits file to mask.
+    :param outfile: The masked file to be written
     :return: None
     """
     #Check that the input file is accessible and then open it
@@ -119,8 +119,8 @@ if __name__=="__main__":
         sys.exit()
 
     if len(results.mask)>0:
-        m,i,o = results.mask
-        maskfile(m,i,o)
+        m, i, o = results.mask
+        maskfile(m, i, o)
         sys.exit()
 
     #create empty region
@@ -139,18 +139,18 @@ if __name__=="__main__":
 
 
     #add circles
-    if len(results.include_circles)>0:
+    if len(results.include_circles) > 0:
         ras,decs,radii=zip(*results.include_circles)
-        ras=map(np.radians,ras)
-        decs=map(np.radians,decs)
-        radii=map(np.radians,radii)
-        region.add_circles(ras,decs,radii)
+        ras=map(np.radians, ras)
+        decs=map(np.radians, decs)
+        radii=map(np.radians, radii)
+        region.add_circles(ras, decs, radii)
 
     #remove circles
-    if len(results.exclude_circles)>0:
+    if len(results.exclude_circles) > 0:
         r2=Region(results.maxdepth)
         ras,decs,radii=zip(*results.exclude_circles)
-        r2.add_circles(ras,decs,radii)
+        r2.add_circles(ras, decs, radii)
         region.without(r2)
 
     #write output

@@ -19,13 +19,13 @@ import math
 
 import scipy
 from scipy import ndimage as ndi
-from scipy import stats
+#from scipy import stats
 from scipy.special import erf
 
 #fits and wcs handling
 import astropy
-import astropy.wcs as pywcs
-import astropy.io.fits as pyfits
+#import astropy.wcs as pywcs
+#import astropy.io.fits as pyfits
 
 #tables and votables
 from astropy.table.table import Table 
@@ -38,6 +38,9 @@ except:
     votables_supported=False
 import sqlite3
 
+#need Region in the name space in order to be able to unpickle it
+from AegeanTools.regions import Region
+#for loading regions
 try:
     import cPickle as pickle
 except ImportError:
@@ -53,15 +56,14 @@ from AegeanTools.msq2 import MarchingSquares
 from AegeanTools.mpfit import mpfit
 from AegeanTools.convert import ra2dec, dec2dec, dec2hms, dec2dms, gcd, bear, translate
 import AegeanTools.flags as flags
-from AegeanTools.regions import Region
 
 #multiple cores support
 import AegeanTools.pprocess as pprocess
 import multiprocessing
 
-version='1.8.1'
+version = '1.8.1'
 
-header="""#Aegean version {0}
+header = """#Aegean version {0}
 # on dataset: {1}"""
 
 #global constants
@@ -476,6 +478,7 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,domask=False):
     if outerclip is None:
         outerclip=innerclip
     #somehow this avoids problems with multiple cores not working properly!?!?
+    #TODO figure out why this is so.
     abspix=abs(data.pixels)
         
     status=np.zeros(data.pixels.shape,dtype=np.uint8)
@@ -487,26 +490,26 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,domask=False):
     logging.debug("Peaked pixels: {0}/{1}".format(np.sum(status),len(data.pixels.ravel())))
     # making pixel list
     ax,ay=np.where(abspix/rmsimg>innerclip)
+
+    #TODO: change this so that I can sort without having to decorate/undecorate
     peaks=[(data.pixels[ax[i],ay[i]],ax[i],ay[i]) for i in range(len(ax))]
 
     #ignore pixels outside the masking region
     if global_data.region is not None and domask:
         logging.debug("masking pixels")
-        logging.debug("peaks {0}".format(len(peaks)))
-        peaks=[p for p in peaks if global_data.region.sky_within(*pix2sky((p[1],p[2])),degin=True)]
-        logging.debug("non masked peaks {0}".format(len(peaks)))
-    if len(peaks)==0:
+        peaks = [p for p in peaks if global_data.region.sky_within(*pix2sky((p[1],p[2])),degin=True)]
+
+    if len(peaks) == 0:
         logging.debug("There are no pixels above the clipping limit")
         return
     # sorting pixel list - strongest peak should be found first
-    peaks.sort(reverse=True)
-    if peaks[0][0]<0: 
+    peaks.sort(reverse = True)
+    if peaks[0][0] < 0:
         peaks.reverse()
     peaks=map(lambda x:x[1:],peaks) #strip the flux data so we are left with just the positions
-    logging.debug("Most positive peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[0]],rmsimg[peaks[0]]))
-    logging.debug("Most negative peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[-1]],rmsimg[peaks[-1]]))
-    bounds=(data.pixels.shape[0]-1,data.pixels.shape[1]-1)
-
+    logging.debug("Most positive peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[0]], rmsimg[peaks[0]]))
+    logging.debug("Most negative peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[-1]], rmsimg[peaks[-1]]))
+    bounds=(data.pixels.shape[0] - 1, data.pixels.shape[1] - 1)
 
     # starting image segmentation
     for peak in peaks:
