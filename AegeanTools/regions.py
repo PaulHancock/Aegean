@@ -283,6 +283,7 @@ def test_reg():
 
 
 if __name__=="__main__":
+    pass
     # test_renorm_demote()
     # test_sky_within()
     # test_conversions()
