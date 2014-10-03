@@ -39,12 +39,15 @@ except:
 import sqlite3
 
 #need Region in the name space in order to be able to unpickle it
-from AegeanTools.regions import Region
-#for loading regions
 try:
-    import cPickle as pickle
+    from AegeanTools.regions import Region
+    region_available=True
+    try:
+        import cPickle as pickle
+    except ImportError:
+        import pickle
 except ImportError:
-    import pickle
+    region_available=False
 
 #logging and nice options
 import logging
@@ -2359,6 +2362,15 @@ if __name__=="__main__":
         options.outfile=sys.stdout
     else:
         options.outfile=open(options.outfile,'w')
+
+    if options.mask is not None:
+        if not os.path.exists(options.mask):
+            logging.error("Mask file {0} not found")
+            sys.exit()
+        if not region_available:
+            logging.error("Could not import AegeanTools/Region.py")
+            logging.error("(you probably need to install HealPy)")
+            sys.exit()
 
     #do forced measurements using catfile
     sources = []
