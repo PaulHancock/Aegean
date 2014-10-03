@@ -18,7 +18,7 @@ class Region():
         :param ra_cen: ra or list of ras for circle centers
         :param dec_cen: dec or list of decs for circle centers
         :param radius: radius or list of radii for circles
-        :param depth: The depth at which we wisht to represent the circle (forced to be <=maxdepth
+        :param depth: The depth at which we wish to represent the circle (forced to be <=maxdepth
         :return: None
         """
         if depth==None or depth>self.maxdepth:
@@ -31,18 +31,28 @@ class Region():
             radii=[radius]
 
         for ra,dec,rad in zip(ras,decs,radii):
-            pix=hp.query_disc(2**depth,self.sky2vec(ra,dec),rad,inclusive=True,nest=True)
+            pix=hp.query_disc(2**depth,self.sky2vec(ra,dec)[0],rad,inclusive=True,nest=True)
             self.add_pixels(pix,depth)
         self._renorm()
         return
 
-    def add_poly(self,positions):
+    def add_poly(self,positions,depth=None):
         """
         Add a single polygon to this region
         :param positions: list of [ (ra,dec), ... ] positions that form the polygon
+        :param depth: The depth at which we wish to represent the circle (forced to be <=maxdepth
         :return: None
         """
-        pass #as above for a polygon
+        assert len(positions)>=3, "A minimum of three coordinate pairs are required"
+
+        if depth==None or depth>self.maxdepth:
+            depth=self.maxdepth
+
+        ras,decs =zip(*positions)
+        pix=hp.query_polygon(2**depth,self.sky2vec(ras,decs),inclusive=True,nest=True)
+        self.add_pixels(pix,depth)
+        self._renorm()
+        return
 
     def add_pixels(self,pix,depth):
         if depth not in self.pixeldict:
@@ -106,9 +116,9 @@ class Region():
         :return: True if RA/Dec is within this region
         """
         if degin:
-            theta,phi = self.sky2ang(np.radians(ra),np.radians(dec))
+            theta,phi = self.sky2ang(np.radians(ra),np.radians(dec))[0]
         else:
-            theta,phi = self.sky2ang(ra,dec)
+            theta,phi = self.sky2ang(ra,dec)[0]
         #pixel number at the maxdepth
         pix = hp.ang2pix(2**self.maxdepth,theta,phi,nest=True)
         # print pix
@@ -179,24 +189,36 @@ class Region():
     def sky2ang(cls,ra,dec):
         """
         Convert ra,dec coordinates to theta,phi coordinates
-        :param ra: RA in radians
-        :param dec: Dec in radians
-        :return: (theta,phi)
+        ra,dec may be floats or lists of floats
+        :param ra: RAs in radians
+        :param dec: Decs in radians
+        :return: (thetas,phis)
         """
-        theta=np.pi/2-dec
-        phi=ra
-        return theta,phi
+        try:
+            ra,dec = iter(ra),iter(dec)
+        except TypeError:
+            ra=[ra]
+            dec=[dec]
+        theta=[np.pi/2-d for d in dec]
+        phi=[r for r in ra]
+        return zip(theta,phi)
 
     @classmethod
     def sky2vec(cls,ra,dec):
         """
-
+        Convert ra and dec lists into a list of vectors
+        ra,dec can either be floats, or lists of floats
         :param ra: RA
         :param dec: DEC
-        :return: A vector list
+        :return: A list of vectors
         """
+        try:
+            ra,dec = iter(ra),iter(dec)
+        except TypeError:
+            ra=[ra]
+            dec=[dec]
         theta_phi = cls.sky2ang(ra,dec)
-        vec=hp.ang2vec(*theta_phi)
+        vec=[hp.ang2vec(*tp) for tp in theta_phi]
         return vec
 
     @classmethod
@@ -279,13 +301,22 @@ def test_reg():
     r2.add_circles(np.radians(66.389),np.radians(-26.72466),np.radians(22))
     r2.without(region)
     r2.add_circles(np.radians(ra),np.radians(dec),np.radians([1]))
-    r2.write_reg('/home/hancock/temp/test.reg')
+    r2.write_reg('test.reg')
 
+def test_poly():
+    ra=[50,50,70,70]
+    dec=[-20,-25,-25,-20]
+    # #print "RA:{0},DEC:{1}, radius:{2}".format(ra,dec,radius)
+    region=Region(maxdepth=9)
+    positions=zip(np.radians(ra),np.radians(dec))
+    print positions
+    region.add_poly(positions)
+    region.write_reg('test.reg')
 
 if __name__=="__main__":
-    pass
+    # test_poly()
     # test_renorm_demote()
     # test_sky_within()
     # test_conversions()
-    # test_reg()
+    test_reg()
     # test_pickle()
