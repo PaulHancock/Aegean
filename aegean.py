@@ -2246,8 +2246,8 @@ if __name__=="__main__":
     parser.add_option('--negative', dest='negative',action="store_true",default=False,
                                     help="Report sources with negative fluxes. [default: false]")
 
-    parser.add_option('--mask',dest='mask',default=None,
-                                    help="Use this regions file to mask the image before source finding")
+    parser.add_option('--region',dest='region',default=None,
+                                    help="Use this regions file to restrict source finding in this image.")
 
     parser.add_option('--save', dest='save', action="store_true",default=False,
                                 help='Enable the saving of the background and noise images. Sets --find to false. [default: false]')
@@ -2316,7 +2316,8 @@ if __name__=="__main__":
             if 'poll' in e.message:
                 logging.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
                 cores=1
-                queue=[]
+                queue=None
+                temp=None
             else:
                 logging.error("Your system can't seem to make a queue, try using --cores=1")
                 raise e
@@ -2363,9 +2364,9 @@ if __name__=="__main__":
     else:
         options.outfile=open(options.outfile,'w')
 
-    if options.mask is not None:
-        if not os.path.exists(options.mask):
-            logging.error("Mask file {0} not found")
+    if options.region is not None:
+        if not os.path.exists(options.region):
+            logging.error("Region file {0} not found")
             sys.exit()
         if not region_available:
             logging.error("Could not import AegeanTools/Region.py")
@@ -2394,7 +2395,7 @@ if __name__=="__main__":
                                     max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,
                                     outerclip=options.outerclip, cores=options.cores, rmsin=options.noiseimg, 
                                     bkgin=options.backgroundimg,beam=options.beam, doislandflux=options.doislandflux,
-                                    nonegative= not options.negative,nopositive=options.nopositive,mask=options.mask)
+                                    nonegative= not options.negative,nopositive=options.nopositive,mask=options.region)
         if len(detections)==0:
             logging.info("No sources found in image")
         sources.extend(detections)
