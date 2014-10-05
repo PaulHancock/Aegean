@@ -24,14 +24,14 @@ class Region():
         if depth==None or depth>self.maxdepth:
             depth=self.maxdepth
         try:
-            ras,decs,radii = iter(ra_cen),iter(dec_cen),iter(radius)
+            sky=zip(ra_cen,dec_cen)
+            rad=radius
         except TypeError:
-            ras=[ra_cen]
-            decs=[dec_cen]
-            radii=[radius]
-
-        for ra,dec,rad in zip(ras,decs,radii):
-            pix=hp.query_disc(2**depth,self.sky2vec(ra,dec)[0],rad,inclusive=True,nest=True)
+            sky= [[ra_cen,dec_cen]]
+            rad=[radius]
+        vectors = self.sky2vec(sky)
+        for vec,r in zip(vectors,rad):
+            pix=hp.query_disc(2**depth,vec,r,inclusive=True,nest=True)
             self.add_pixels(pix,depth)
         self._renorm()
         return
@@ -49,7 +49,8 @@ class Region():
             depth=self.maxdepth
 
         ras,decs =zip(*positions)
-        pix=hp.query_polygon(2**depth,self.sky2vec(ras,decs),inclusive=True,nest=True)
+        sky=self.radec2sky(ras,decs)
+        pix=hp.query_polygon(2**depth,self.sky2vec(sky),inclusive=True,nest=True)
         self.add_pixels(pix,depth)
         self._renorm()
         return
@@ -115,12 +116,16 @@ class Region():
         :param degin: True if the input parameters are in degrees instead of radians
         :return: True if RA/Dec is within this region
         """
+        #TODO allos this function to take a list of positions and return a list of True/False
+        sky=self.radec2sky(ra,dec)
+
         if degin:
-            theta,phi = self.sky2ang(np.radians(ra),np.radians(dec))[0]
-        else:
-            theta,phi = self.sky2ang(ra,dec)[0]
+            sky=np.radians(sky)
+
+        theta_phi = self.sky2ang(sky)[0]
+
         #pixel number at the maxdepth
-        pix = hp.ang2pix(2**self.maxdepth,theta,phi,nest=True)
+        pix = hp.ang2pix(2**self.maxdepth,*theta_phi,nest=True)
         # print pix
         #search from shallow -> deep since shallow levels have less pixels
         for d in xrange(1,self.maxdepth+1):
@@ -176,101 +181,160 @@ class Region():
             for d in xrange(1,self.maxdepth+1):
                 for p in self.pixeldict[d]:
                     line="fk5; polygon "
-                    x,y,z = hp.boundaries(2**d,p,step=1,nest=True)
-                    for vec in zip(x,y,z):
-                        #print "vec",vec
-                        for ra,dec in zip(*self.vec2sky(np.array(vec),degrees=True)):
-                            #print "pos",ra,dec
-                            line += "{0} {1} ".format(ra,dec)
+                    vectors = zip(*hp.boundaries(2**d,p,step=1,nest=True))
+                    #print p, vectors,
+                    #print self.vec2sky(np.array(vectors),degrees=True)
+                    for sky in self.vec2sky(np.array(vectors),degrees=True):
+                        ra, dec = sky
+                        line += "{0} {1} ".format(ra,dec)
                     print>>out, line
         return
 
     @classmethod
-    def sky2ang(cls,ra,dec):
+    def radec2sky(cls,ra,dec):
         """
-        Convert ra,dec coordinates to theta,phi coordinates
-        ra,dec may be floats or lists of floats
-        :param ra: RAs in radians
-        :param dec: Decs in radians
-        :return: (thetas,phis)
+
+        :param ra:
+        :param dec:
+        :return:
         """
         try:
-            ra,dec = iter(ra),iter(dec)
+            sky=zip(ra,dec)
         except TypeError:
-            ra=[ra]
-            dec=[dec]
-        theta=[np.pi/2-d for d in dec]
-        phi=[r for r in ra]
-        return zip(theta,phi)
+            sky= [[ra,dec]]
+        return sky
 
     @classmethod
-    def sky2vec(cls,ra,dec):
+    def sky2ang(cls,sky):
         """
-        Convert ra and dec lists into a list of vectors
-        ra,dec can either be floats, or lists of floats
-        :param ra: RA
-        :param dec: DEC
-        :return: A list of vectors
+        Convert ra,dec coordinates to theta,phi coordinates
+        ra -> phi
+        dec -> theta
+        :param sky: float [(ra,dec),...]
+        :return: A list of [(theta,phi), ...]
         """
-        try:
-            ra,dec = iter(ra),iter(dec)
-        except TypeError:
-            ra=[ra]
-            dec=[dec]
-        theta_phi = cls.sky2ang(ra,dec)
-        vec=[hp.ang2vec(*tp) for tp in theta_phi]
+        theta_phi = [ (np.pi/2 - s[1], s[0]) for s in sky]
+        return theta_phi
+
+    @classmethod
+    def sky2vec(cls,sky):
+        """
+        Convert sky positions in to 3d-vectors
+        :param sky: [(ra,dec), ...]
+        :return: [(x,y,z), ...]
+        """
+        theta_phi = cls.sky2ang(sky)
+        theta,phi = map(np.array,zip(*theta_phi))
+        vec=hp.ang2vec(theta,phi)
         return vec
 
     @classmethod
     def vec2sky(cls,vec,degrees=False):
         """
         Convert [x,y,z] vectors into sky coordinates ra,dec
-        :param vec: A vector list
+        :param vec: An array-like list of ([x,y,z],...)
         :param degrees: Return ra/dec in degrees? Default = false
-        :return: ra, dec in radians or degrees
+        :return: [(ra,...),(dec,...)]
         """
-        theta,phi =hp.vec2ang(vec)
+        theta,phi = hp.vec2ang(vec)
         ra=phi
         dec=np.pi/2-theta
 
         if degrees:
             ra=np.degrees(ra)
             dec=np.degrees(dec)
-        return ra,dec
+        return cls.radec2sky(ra,dec)
 
-def test_renorm_demote():
+def test_radec2sky():
+    ra,dec = (15,-45)
+    sky = Region.radec2sky(ra,dec)
+    assert sky == [[ra,dec]], "radec2sky broken on non-list input"
+    ra = [0,10]
+    dec = [-45,45]
+    sky = Region.radec2sky(ra,dec)
+    assert sky == [(ra[0],dec[0]),(ra[1],dec[1])], 'radec2sky broken on list input'
+
+def test_sky2ang_symmetric():
+    sky = np.radians(np.array([[15,-45]]))
+    tp = Region.sky2ang(sky)
+    tp = np.array([ [tp[0][1],tp[0][0]]])
+    sky2 = Region.sky2ang(tp)
+    sky2 = np.array([ [sky2[0][1],sky2[0][0]]])
+    assert np.all(sky-sky2<1e-9), "sky2ang failed to be symmetric"
+    return
+
+def test_sky2ang_corners():
+    corners=np.radians([[0,0],[360,-90]])
+    theta_phi = Region.sky2ang(corners)
+    answers = np.array([ [np.pi/2,0],[np.pi,2*np.pi]])
+    assert np.all(theta_phi - answers< 1e-9), 'sky2ang corner cases failed'
+
+def test_sky2vec_corners():
+    sky = np.radians(   [ [0,0],   [90,90], [45,-90]])
+    answers = np.array( [ [1,0,0], [0,0,1], [0,0,-1]])
+    vec = Region.sky2vec(sky)
+    assert np.all(vec - answers<1e-9), 'sky2vec corner cases failed'
+
+def test_vec2sky_corners():
+    vectors = np.array( [ [1,0,0], [0,0,1], [0,0,-1]])
+    skycoords = Region.vec2sky(vectors,degrees=True)
+    answers = np.array( [ [0,0],   [0,90], [0,-90]] )
+    assert np.all( skycoords == answers), 'vec2sky fails on corners'
+
+def test_sky2vec2sky():
+    ra,dec=np.radians(np.array((0,-45)))
+    sky= Region.radec2sky(ra,dec)
+    vec = Region.sky2vec(sky)
+    sky2 = Region.vec2sky(vec)
+    assert np.all(np.array(sky2) - np.array(sky) ==0 ), "sky2vec2sky failed"
+    vec2 = Region.sky2vec(sky2)
+    assert np.all(np.array(vec) - np.array(vec2) ==0), 'vec2sky2vec failed'
+
+def test_add_circles_list_scalar():
+    ra_list = np.radians([13.5,13.5])
+    dec_list = np.radians([-90,-90])
+    radius_list = np.radians([0.1,0.01])
+    ra = ra_list[0]
+    dec = dec_list[0]
+    radius = radius_list[0]
+    region1=Region(maxdepth=11)
+    region2=Region(maxdepth=11)
+    region1.add_circles(ra_list,dec_list,radius_list)
+    region1._demote_all()
+    region2.add_circles(ra,dec,radius)
+    region2._demote_all()
+    test=True
+    for i in xrange(1,region1.maxdepth+1):
+        if len(region1.pixeldict[i].difference(region2.pixeldict[i])) >0:
+            test=False
+    assert test, 'add_circles gives different results for lists and scalars'
+
+def test_renorm_demote_symmetric():
     ra=13.5
     dec=-90
     radius=0.1
-    print "RA:{0},DEC:{1}, radius:{2}".format(ra,dec,radius)
+    #print "RA:{0},DEC:{1}, radius:{2}".format(ra,dec,radius)
     region=Region(maxdepth=11)
     region.add_circles(np.radians(ra),np.radians(dec),np.radians(radius))
     region._demote_all()
-    start_dict= region.pixeldict.copy()
-    print start_dict
+    start_dict=region.pixeldict.copy()
     region._renorm()
     region._demote_all()
     end_dict=region.pixeldict.copy()
-    print end_dict
+    test=True
+    for i in xrange(1,region.maxdepth+1):
+        if len(end_dict[i].difference(start_dict[i])) >0:
+            test=False
+    assert test, 'renorm and demote are not symmetric'
 
 def test_sky_within():
-    ra=[13.5, 15]
-    dec=[-45, -40]
-    radius=[0.1,0.1]
-    print "RA:{0},DEC:{1}, radius:{2}".format(ra,dec,radius)
+    ra=np.radians([13.5, 15])
+    dec=np.radians([-45, -40])
+    radius=np.radians([0.1,0.1])
     region=Region(maxdepth=11)
-    region.add_circles(np.radians(ra),np.radians(dec),np.radians(radius))
-    print region.sky_within(np.radians(ra[0]),np.radians(dec[0]))
-    print region.sky_within(np.radians(ra[0]+5*radius[0]),np.radians(dec[0]))
-
-def test_conversions():
-    ra=13.5
-    dec=-45
-    print "input",ra,dec
-    vec=Region.sky2vec(np.radians(ra),np.radians(dec))
-    print "vector",vec
-    ra,dec=Region.vec2sky(vec)
-    print "output",np.degrees(ra),np.degrees(dec)
+    region.add_circles(ra,dec,radius)
+    assert region.sky_within(ra[0],dec[0]), "Failed on position at center of region"
+    assert not region.sky_within(ra[0]+5*radius[0],dec[0]), "Failed on position outside of region"
 
 def test_pickle():
     ra=66.38908
@@ -284,39 +348,36 @@ def test_pickle():
         import pickle
     pickle.dump(region,open('out.mim','w'))
     region2=pickle.load(open('out.mim'))
-    print "Pickle dump/load works =",region.pixeldict == region2.pixeldict
+    assert region.pixeldict == region2.pixeldict, 'pickle/unpickle does not give same region'
     return
 
 def test_reg():
-    # ra=66.38908
-    # dec= -26.72466
-    # radius=22
-    ra=[55]
-    dec=[-20]
-    radius=[9]
-    # #print "RA:{0},DEC:{1}, radius:{2}".format(ra,dec,radius)
+    ra=np.radians([285])
+    dec=np.radians([-66])
+    radius=np.radians([0.1])
     region=Region(maxdepth=9)
-    region.add_circles(np.radians(ra),np.radians(dec),np.radians(radius))
-    r2=Region(maxdepth=9)
-    r2.add_circles(np.radians(66.389),np.radians(-26.72466),np.radians(22))
-    r2.without(region)
-    r2.add_circles(np.radians(ra),np.radians(dec),np.radians([1]))
-    r2.write_reg('test.reg')
+    region.add_circles(ra,dec,radius)
+    region.write_reg('test.reg')
 
 def test_poly():
     ra=[50,50,70,70]
     dec=[-20,-25,-25,-20]
-    # #print "RA:{0},DEC:{1}, radius:{2}".format(ra,dec,radius)
     region=Region(maxdepth=9)
     positions=zip(np.radians(ra),np.radians(dec))
-    print positions
     region.add_poly(positions)
     region.write_reg('test.reg')
 
 if __name__=="__main__":
-    # test_poly()
-    # test_renorm_demote()
-    # test_sky_within()
-    # test_conversions()
+    test_vec2sky_corners()
     test_reg()
-    # test_pickle()
+    test_radec2sky()
+    test_sky2ang_symmetric()
+    test_sky2ang_corners()
+    test_sky2vec2sky()
+    test_poly()
+    test_renorm_demote_symmetric()
+    test_add_circles_list_scalar()
+    test_sky_within()
+    test_reg()
+    test_pickle()
+    test_sky2vec_corners()
