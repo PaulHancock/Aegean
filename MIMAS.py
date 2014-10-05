@@ -93,21 +93,31 @@ def combine_regions(container):
 
     #add circles
     if len(container.include_circles) > 0:
-        ras,decs,radii=zip(*container.include_circles)
-        ras=map(np.radians, ras)
-        decs=map(np.radians, decs)
-        radii=map(np.radians, radii)
+        circles = np.radians(container.include_circles)
+        ras,decs,radii=zip(*circles)
         region.add_circles(ras, decs, radii)
 
     #remove circles
     if len(container.exclude_circles) > 0:
         r2=Region(container.maxdepth)
-        ras,decs,radii=zip(*container.exclude_circles)
-        ras=map(np.radians, ras)
-        decs=map(np.radians, decs)
-        radii=map(np.radians, radii)
+        circles = np.radians(container.include_circles)
+        ras,decs,radii=zip(*circles)
         r2.add_circles(ras, decs, radii)
         region.without(r2)
+
+    #add polygons
+    if len(container.include_polygons) > 0:
+        poly = np.array(np.radians(container.include_polygons))
+        poly = poly.reshape((poly.shape[0]/2,2))
+        region.add_poly(poly)
+
+    #remove polygons
+    if len(container.exclude_polygons) > 0:
+        poly = np.radians(container.include_polygons)
+        r2 = Regions(container.maxdepth)
+        r2.add_poly(poly)
+        region.without(r2)
+
     return region
 
 def save_region(region,filename):
@@ -146,10 +156,10 @@ if __name__=="__main__":
                         help='exclude the given circles from a region')
 
     #add/remove polygons
-    group1.add_argument('+p', dest='included_polygons', action='append',
+    group1.add_argument('+p', dest='include_polygons', action='store',
                         default=[], type=float, metavar=('ra','dec'), nargs='*',
                         help='add a polygon to this region ( decimal degrees)')
-    group1.add_argument('-p', dest='excluded_polygons', action='append',
+    group1.add_argument('-p', dest='exclude_polygons', action='store',
                         default=[], type=float, metavar=('ra','dec'), nargs='*',
                         help='remove a polygon from this region ( decimal degrees)')
 
