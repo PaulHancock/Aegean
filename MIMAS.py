@@ -62,13 +62,11 @@ def maskfile(regionfile,infile,outfile):
     logging.info("Wrote {0}".format(outfile))
     return
 
-
 def mim2reg(mimfile,regfile):
     region=pickle.load(open(mimfile,'r'))
     region.write_reg(regfile)
     logging.info("Converted {0} -> {1}".format(mimfile,regfile))
     return
-
 
 def combine_regions(container):
     """
@@ -105,6 +103,9 @@ def combine_regions(container):
     if len(container.exclude_circles) > 0:
         r2=Region(container.maxdepth)
         ras,decs,radii=zip(*container.exclude_circles)
+        ras=map(np.radians, ras)
+        decs=map(np.radians, decs)
+        radii=map(np.radians, radii)
         r2.add_circles(ras, decs, radii)
         region.without(r2)
     return region
