@@ -26,7 +26,7 @@ except ImportError:
 #globals
 filewcs=None
 
-@profile
+#@profile
 def maskfile(regionfile,infile,outfile):
     """
     Created a masked version of file, using region.
@@ -41,7 +41,6 @@ def maskfile(regionfile,infile,outfile):
     im = pyfits.open(infile)
     assert os.path.exists(regionfile), "Cannot locate region file {0}".format(regionfile)
     region=pickle.load(open(regionfile))
-    #fix possible problems with miriad generated fits files % HT John Morgan.
     try:
         wcs = pywcs.WCS(im[0].header, naxis=2)
     except:
@@ -52,14 +51,11 @@ def maskfile(regionfile,infile,outfile):
     else:
         data = im[0].data
 
-    #easy/slow version
-    #TODO: revise this to be faster if at all possible.
     #create an array but don't set the values (they are random)
     bigmask = np.empty( data.shape, dtype=bool)
     for i,row in enumerate(data):
         ra,dec = wcs.wcs_pix2world([(j,i) for j in xrange(len(row))],1).transpose()
         mask = region.sky_within(ra, dec, degin=True)
-        #mask = [ not a for a in mask]
         mask = np.bitwise_not(mask)
         bigmask[i]=mask
     data[bigmask]=np.nan
