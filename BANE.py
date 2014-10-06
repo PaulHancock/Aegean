@@ -377,7 +377,7 @@ if __name__=="__main__":
     parser.add_option('--box',dest='box_size',type='int',nargs=2,
                       help='The [x,y] size of the box over which the rms/bkg is calculated. Default = 5*grid.')
     parser.add_option('--cores',dest='cores',type='int',
-                      help='Number of corse to use. Default = all avaliable.')
+                      help='Number of cores to use. Default = all available.')
     parser.add_option('--onepass',dest='twopass',action='store_false', help='the opposite of twopass. default=False')
     parser.add_option('--twopass',dest='twopass',action='store_true',
                       help='Calculate the bkg and rms in a two passes instead of one. (when the bkg changes rapidly)')

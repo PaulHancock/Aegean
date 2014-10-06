@@ -378,6 +378,5 @@ if __name__=="__main__":
     test_renorm_demote_symmetric()
     test_add_circles_list_scalar()
     test_sky_within()
-    test_reg()
     test_pickle()
     test_sky2vec_corners()
