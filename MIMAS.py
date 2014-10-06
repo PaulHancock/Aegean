@@ -26,7 +26,7 @@ except ImportError:
 #globals
 filewcs=None
 
-@profile
+#@profile
 def maskfile(regionfile,infile,outfile):
     """
     Created a masked version of file, using region.
