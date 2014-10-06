@@ -46,7 +46,11 @@ def maskfile(regionfile,infile,outfile):
         wcs = pywcs.WCS(im[0].header, naxis=2)
     except:
         wcs = pywcs.WCS(str(im[0].header),naxis=2)
-    data = np.squeeze(im[0].data)
+
+    if len(im[0].data.shape)>2:
+        data = np.squeeze(im[0].data)
+    else:
+        data = im[0].data
 
     #easy/slow version
     #TODO: revise this to be faster if at all possible.
