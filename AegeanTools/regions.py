@@ -108,6 +108,7 @@ class Region():
                         self.pixeldict[d-1].add(p/4)
         return
 
+    #@profile
     def sky_within(self,ra,dec,degin=False):
         """
         Test whether a sky position is within this region
@@ -116,25 +117,19 @@ class Region():
         :param degin: True if the input parameters are in degrees instead of radians
         :return: True if RA/Dec is within this region
         """
-        #TODO allos this function to take a list of positions and return a list of True/False
         sky=self.radec2sky(ra,dec)
 
         if degin:
             sky=np.radians(sky)
 
-        theta_phi = self.sky2ang(sky)[0]
-
+        theta_phi = self.sky2ang(sky)
+        theta,phi = zip(*theta_phi)
         #pixel number at the maxdepth
-        pix = hp.ang2pix(2**self.maxdepth,*theta_phi,nest=True)
-        # print pix
-        #search from shallow -> deep since shallow levels have less pixels
-        for d in xrange(1,self.maxdepth+1):
-            #determine the pixel number when promoted to level d
-            dpix = pix//4**(self.maxdepth-d)
-            # print dpix,d,self.pixeldict[d]
-            if dpix in self.pixeldict[d]:
-                return True
-        return False
+        #pix = [ hp.ang2pix(2**self.maxdepth,*tp,nest=True) for tp in theta_phi ]
+        pix = hp.ang2pix(2**self.maxdepth,theta,phi,nest=True)
+        pixelset = self.get_demoted()
+        result = np.array( [p in pixelset for p in pix])
+        return result
 
     def union(self,other,renorm=True):
         """
@@ -333,8 +328,9 @@ def test_sky_within():
     radius=np.radians([0.1,0.1])
     region=Region(maxdepth=11)
     region.add_circles(ra,dec,radius)
-    assert region.sky_within(ra[0],dec[0]), "Failed on position at center of region"
-    assert not region.sky_within(ra[0]+5*radius[0],dec[0]), "Failed on position outside of region"
+    assert np.all(region.sky_within(ra[0],dec[0])), "Failed on position at center of region"
+    assert np.all(region.sky_within(ra,dec)), "Failed on list of positions"
+    assert not np.any(region.sky_within(ra[0]+5*radius[0],dec[0])), "Failed on position outside of region"
 
 def test_pickle():
     ra=66.38908
