@@ -26,7 +26,7 @@ except ImportError:
 #globals
 filewcs=None
 
-#@profile
+@profile
 def maskfile(regionfile,infile,outfile):
     """
     Created a masked version of file, using region.
@@ -54,11 +54,13 @@ def maskfile(regionfile,infile,outfile):
 
     #easy/slow version
     #TODO: revise this to be faster if at all possible.
-    bigmask=np.array([[ True for i in xrange(data.shape[1])] for j in xrange(data.shape[0])])
+    #create an array but don't set the values (they are random)
+    bigmask = np.empty( data.shape, dtype=bool)
     for i,row in enumerate(data):
-        skybox = wcs.wcs_pix2world([[j,i] for j in xrange(len(row))],1)
-        ra,dec = zip(*skybox)
-        mask = [ not a for a in region.sky_within(ra, dec, degin=True)]
+        ra,dec = wcs.wcs_pix2world([(j,i) for j in xrange(len(row))],1).transpose()
+        mask = region.sky_within(ra, dec, degin=True)
+        #mask = [ not a for a in mask]
+        mask = np.bitwise_not(mask)
         bigmask[i]=mask
     data[bigmask]=np.nan
 
