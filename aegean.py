@@ -798,7 +798,7 @@ def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False
     img = FitsImage(filename, hdu_index=hdu_index,beam=beam)
     beam=img.beam    
 
-    # Save global data for use by fitting subprocesses    
+    # Save global data for use by fitting sub-processes
     global_data = GlobalFittingData()
 
     if mask is not None:

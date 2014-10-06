@@ -16,8 +16,9 @@ from AegeanTools.running_percentile import RunningPercentiles as RP
 import AegeanTools.pprocess as pprocess
 
 import multiprocessing
+from blist import *
 
-version='0.1'
+version='v1.0'
 
 ###
 #
@@ -198,7 +199,7 @@ def filter_mc(data,step_size,box_size,cores):
         logging.info("using {0} cores".format(cores))
         nx,ny=optimum_sections(cores,data.shape)
 
-        #box widths should be multiples of the ste_size, and not zero
+        #box widths should be multiples of the step_size, and not zero
         width_x = max(img_x/nx/step_size[0],1)*step_size[0]
         width_y = max(img_y/ny/step_size[1],1)*step_size[1]
         
