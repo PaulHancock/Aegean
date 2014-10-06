@@ -15,7 +15,7 @@ from astropy.io import fits as pyfits
 from astropy.wcs import wcs as pywcs
 from AegeanTools.regions import Region
 
-version='0.2'
+version='v1.0'
 
 #seems like this fails sometimes
 try:
@@ -26,6 +26,7 @@ except ImportError:
 #globals
 filewcs=None
 
+#@profile
 def maskfile(regionfile,infile,outfile):
     """
     Created a masked version of file, using region.
@@ -51,11 +52,10 @@ def maskfile(regionfile,infile,outfile):
     #TODO: revise this to be faster if at all possible.
     print data.shape
     for i,row in enumerate(data):
-        for j,val in enumerate(row):
-            skybox = wcs.wcs_pix2world([[i,j]],1)
-            ra,dec = float(skybox[0][0]), float(skybox[0][1])
-            if not region.sky_within(ra,dec,degin=True):
-                data[j,i]=np.nan
+        skybox = wcs.wcs_pix2world([[i,j] for j in xrange(len(row))],1)
+        ra,dec = zip(*skybox)
+        mask = [ not a for a in region.sky_within(ra, dec, degin=True)]
+        data[mask]=np.nan
 
     im[0].data=data
     im.writeto(outfile,clobber=True)
