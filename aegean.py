@@ -24,8 +24,6 @@ from scipy.special import erf
 
 #fits and wcs handling
 import astropy
-#import astropy.wcs as pywcs
-#import astropy.io.fits as pyfits
 
 #tables and votables
 from astropy.table.table import Table 
@@ -805,7 +803,7 @@ def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False
     # Save global data for use by fitting sub-processes
     global_data = GlobalFittingData()
 
-    if mask is not None:
+    if mask is not None and region_available:
         if os.path.exists(mask):
             global_data.region=pickle.load(open(mask))
         else:
