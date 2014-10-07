@@ -467,6 +467,7 @@ def flood(data, rmsimg, status, bounds, peak, cutoffratio):
 
     return blob
 
+@profile
 def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,domask=False):
     """
     <a generator function>
@@ -488,7 +489,7 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,domask=False):
     # Selecting PEAKED pixels
     logging.debug("InnerClip: {0}".format(innerclip))
 
-    status += np.where(abspix/rmsimg>innerclip,flags.PEAKED,0)
+    status[np.where(abspix/rmsimg>innerclip)] = flags.PEAKED
     #logging.debug("status: {0}".format(status[1:5,1:5]))
     logging.debug("Peaked pixels: {0}/{1}".format(np.sum(status),len(data.pixels.ravel())))
     # making pixel list
@@ -500,7 +501,10 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,domask=False):
     #ignore pixels outside the masking region
     if global_data.region is not None and domask:
         logging.debug("masking pixels")
-        peaks = [p for p in peaks if global_data.region.sky_within(*pix2sky((p[1],p[2])),degin=True)]
+        yx = [ [p[2],p[1]] for p in peaks]
+        ra,dec = global_data.wcs.wcs_pix2world(yx, 1).transpose()
+        mask = global_data.region.sky_within(ra, dec, degin=True)
+        peaks = [peaks[i] for i in xrange(len(mask)) if mask[i]]
 
     if len(peaks) == 0:
         logging.debug("There are no pixels above the clipping limit")
