@@ -467,7 +467,7 @@ def flood(data, rmsimg, status, bounds, peak, cutoffratio):
 
     return blob
 
-@profile
+#@profile
 def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,domask=False):
     """
     <a generator function>
