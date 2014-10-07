@@ -7,6 +7,7 @@ class Region():
     def __init__(self,maxdepth=11):
         self.maxdepth=maxdepth
         self.pixeldict=dict( (i,set()) for i in xrange(1,maxdepth+1))
+        self.demoted=set()
         return
 
     def __repr__(self):
@@ -106,6 +107,8 @@ class Region():
                         self.pixeldict[d].difference_update(nset)
                         #add a new pixel to the next level up
                         self.pixeldict[d-1].add(p/4)
+        #store this for later
+        self.demoted = self.get_demoted()
         return
 
     #@profile
@@ -127,7 +130,7 @@ class Region():
         #pixel number at the maxdepth
         #pix = [ hp.ang2pix(2**self.maxdepth,*tp,nest=True) for tp in theta_phi ]
         pix = hp.ang2pix(2**self.maxdepth,theta,phi,nest=True)
-        pixelset = self.get_demoted()
+        pixelset = self.demoted
         result = np.array( [p in pixelset for p in pix])
         return result
 
