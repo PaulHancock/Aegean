@@ -16,7 +16,7 @@ from AegeanTools.running_percentile import RunningPercentiles as RP
 import AegeanTools.pprocess as pprocess
 
 import multiprocessing
-from blist import *
+#from blist import *
 
 version='v1.0'
 
