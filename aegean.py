@@ -399,15 +399,16 @@ class DummyMP():
 ######################################### FUNCTIONS ###############################
 
 ## floodfill functions
-def explore(data, rmsimg, status, queue, bounds, cutoffratio, pixel):
+def explore(snr,status,queue,bounds,pixel):
     """
     Look for pixels adjacent to <pixel> and add them to the queue
-    Don't include pixels that are in the queue or that are below
-    the cutoffratio
-    
-    This version requires an rms image to be present -PJH
-    
-    Returns: nothing
+    Don't include pixels that are in the queue
+    :param snr: array of bool that is true for pixels we are interested in
+    :param status: array that represents the status of pixels
+    :param queue: the queue of pixels that we are interested in
+    :param bounds: the bounds within which we can explore
+    :param pixel: the initial point to start from
+    :return: None
     """
     (x, y) = pixel
     if x < 0 or y < 0:
@@ -416,37 +417,39 @@ def explore(data, rmsimg, status, queue, bounds, cutoffratio, pixel):
 
     if x > 0:
         new = (x - 1, y)
-        if not status[new] & flags.QUEUED and data[new]/rmsimg[new] >= cutoffratio:
+        if snr[new] and (not status[new] & flags.QUEUED):
             queue.append(new)
             status[new] |= flags.QUEUED
 
     if x < bounds[0]:
         new = (x + 1, y)
-        if not status[new] & flags.QUEUED and data[new]/rmsimg[new] >= cutoffratio:
+        if snr[new] and (not status[new] & flags.QUEUED):
             queue.append(new)
             status[new] |= flags.QUEUED
 
     if y > 0:
         new = (x, y - 1)
-        if not status[new] & flags.QUEUED and data[new]/rmsimg[new] >= cutoffratio:
+        if snr[new] and (not status[new] & flags.QUEUED):
             queue.append(new)
             status[new] |= flags.QUEUED
 
     if y < bounds[1]:
-        new = (x, y + 1)
-        if not status[new] & flags.QUEUED and data[new]/rmsimg[new] >= cutoffratio:
+        new =  (x, y + 1)
+        if snr[new] and (not status[new] & flags.QUEUED):
             queue.append(new)
             status[new] |= flags.QUEUED
 
-def flood(data, rmsimg, status, bounds, peak, cutoffratio):
+def flood(snr,status,bounds,peak):
     """
     Start at pixel=peak and return all the pixels that belong to
     the same blob.
-
-    Returns: a list of pixels contiguous to <peak>
-
-    This version requires an rms image - PJH
+    :param snr: array of bool that is true for pixels we are interested in
+    :param status: array that represents the status of pixels
+    :param bounds: the bounds within which we can explore
+    :param peak: the initial point to start from
+    :return: None
     """
+
     if status[peak] & flags.VISITED:
         return []
 
@@ -457,15 +460,14 @@ def flood(data, rmsimg, status, bounds, peak, cutoffratio):
     for pixel in queue:
         if status[pixel] & flags.VISITED:
             continue
-    
+
         status[pixel] |= flags.VISITED
 
         blob.append(pixel)
-        explore(data, rmsimg, status, queue, bounds, cutoffratio, pixel)
+        explore(snr, status, queue, bounds, pixel)
 
     return blob
 
-#@profile
 def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,domask=False):
     """
     <a generator function>
@@ -516,9 +518,11 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,domask=False):
     logging.debug("Most negative peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[-1]], rmsimg[peaks[-1]]))
     bounds=(data.pixels.shape[0] - 1, data.pixels.shape[1] - 1)
 
+    snr = abspix/rmsimg >= outerclip
     # starting image segmentation
     for peak in peaks:
-        blob=flood(abspix,rmsimg,status,bounds,peak,cutoffratio=outerclip)
+        blob = flood(snr, status, bounds, peak)
+        #blob=flood(abspix,rmsimg,status,bounds,peak,cutoffratio=outerclip)
         npix=len(blob)
         if npix>=1:#islands with no pixels have length 1
             new_isle,xmin,xmax,ymin,ymax=data.list2map(blob)
