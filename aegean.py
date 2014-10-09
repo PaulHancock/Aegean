@@ -543,11 +543,12 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
     parinfo object for mpfit
     with all parameters in pixel coords    
     """
+    debug_on = logging.getLogger().isEnabledFor(logging.DEBUG)
     is_flag=0
 
     #is this a negative island?
     isnegative = max(data[np.where(np.isfinite(data))])<0
-    if isnegative:
+    if isnegative and debug_on:
         logging.debug("[is a negative island]")
 
     parinfo=[]
@@ -557,15 +558,17 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
 
     pixbeam = get_pixbeam(beam,offsets[0]+xo/2,offsets[1]+yo/2)
     if pixbeam is None:
-        logging.debug("WCSERR")
+        if debug_on:
+            logging.debug("WCSERR")
         is_flag=flags.WCSERR
         pixbeam=Beam(1,1,0)
     #The position cannot be more than a pixel beam from the initial location
     #Use abs so that these distances are always positive
     xo_lim=max( abs(pixbeam.a*np.cos(np.radians(pixbeam.pa))), abs(pixbeam.b*np.sin(np.radians(pixbeam.pa))))
     yo_lim=max( abs(pixbeam.a*np.sin(np.radians(pixbeam.pa))), abs(pixbeam.b*np.cos(np.radians(pixbeam.pa))))
-    logging.debug(" - shape {0}".format(data.shape))
-    logging.debug(" - xo_lim,yo_lim {0}, {1}".format(xo_lim,yo_lim))
+    if debug_on:
+        logging.debug(" - shape {0}".format(data.shape))
+        logging.debug(" - xo_lim,yo_lim {0}, {1}".format(xo_lim,yo_lim))
     
     if not data.shape == curve.shape:
         logging.error("data and curvature are mismatched")
@@ -583,12 +586,14 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
         is_flag|=flags.FITERRSMALL
     else:
         is_flag=0
-    logging.debug(" - size {0}".format(len(data.ravel())))
+    if debug_on:
+        logging.debug(" - size {0}".format(len(data.ravel())))
 
     if min(data.shape)<=2 or (is_flag & flags.FITERRSMALL):
         #1d islands or small islands only get one source
-        logging.debug("Tiny summit detected")
-        logging.debug("{0}".format(data))
+        if debug_on:
+            logging.debug("Tiny summit detected")
+            logging.debug("{0}".format(data))
         summits=[ [data,0,data.shape[0],0,data.shape[1]] ]
         #and are constrained to be point sources
         is_flag |= flags.FIXED2PSF
@@ -602,14 +607,17 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
     i=0
     for summit,xmin,xmax,ymin,ymax in summits:
         summit_flag = is_flag
-        logging.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape,xmin,xmax,ymin,ymax,i))
+        if debug_on:
+            logging.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape,xmin,xmax,ymin,ymax,i))
         if isnegative:
             amp=summit[np.isfinite(summit)].min()
         else:
             amp=summit[np.isfinite(summit)].max() #stupid NaNs break all my things
-        logging.debug(" - max is {0: 5.2f}".format(amp))
+
         (xpeak,ypeak)=np.where(summit==amp)
-        logging.debug(" - peak at {0},{1}".format(xpeak,ypeak))
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.debug(" - max is {0: 5.2f}".format(amp))
+            logging.debug(" - peak at {0},{1}".format(xpeak,ypeak))
         xo = xpeak[0]+xmin
         yo = ypeak[0]+ymin
         #allow amp to be 5% or (innerclip - 1)sigma higher
@@ -618,7 +626,9 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
             amp_min,amp_max= float(innerclip*rmsimg[xo,yo]), float(amp*1.05+(innerclip-1)*rmsimg[xo,yo])
         else:
             amp_max,amp_min= float(-1*innerclip*rmsimg[xo,yo]), float(amp*1.05-(innerclip-1)*rmsimg[xo,yo])
-        logging.debug("a_min {0}, a_max {1}".format(amp_min,amp_max))
+
+        if debug_on:
+            logging.debug("a_min {0}, a_max {1}".format(amp_min,amp_max))
         
         xo_min,xo_max = max(xmin,xo-xo_lim),min(xmax,xo+xo_lim)
         if xo_min==xo_max: #if we have a 1d summit then allow the position to vary by +/-0.5pix
@@ -649,7 +659,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
         
         pa=pixbeam.pa
         flag=summit_flag
-        if logging.getLogger().isEnabledFor(logging.DEBUG):
+        if debug_on:
             logging.debug(" - var val min max | min max")
             logging.debug(" - amp {0} {1} {2} ".format(amp,amp_min,amp_max))
             logging.debug(" - xo {0} {1} {2} ".format(xo,xo_min,xo_max))
@@ -692,7 +702,8 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
                          'limited':[False,False],
                          'flags':flag} )
         i+=1
-    logging.debug("Estimated sources: {0}".format(i))
+    if debug_on:
+        logging.debug("Estimated sources: {0}".format(i))
     return parinfo
 
 def ntwodgaussian(inpars):
@@ -707,13 +718,13 @@ def ntwodgaussian(inpars):
         logging.error("inpars requires a multiple of 6 parameters")
         logging.error("only {0} parameters supplied".format(len(inpars)))
         sys.exit()
-    pars=np.array(inpars).reshape(len(inpars)/6,6)
-    amp,xo,yo,major,minor,pa = zip(*pars)
+    #pars=np.array(inpars).reshape(len(inpars)/6,6)
+    amp,xo,yo,major,minor,pa = np.array(inpars).reshape(6,len(inpars)/6)
     #transform pa->-pa so that our angles are CW instead of CCW
     st,ct,s2t=zip(*[ (math.sin(np.radians(-p))**2,math.cos(np.radians(-p))**2,math.sin(2*np.radians(-p))) for p in pa])
-    a = [ (ct[i]/major[i]**2 + st[i]/minor[i]**2)/2 for i in range(len(amp))]
-    bb= [ s2t[i]/4 *(1/minor[i]**2-1/major[i]**2)   for i in range(len(amp))]
-    c = [ (st[i]/major[i]**2 + ct[i]/minor[i]**2)/2 for i in range(len(amp))]
+    a, bb, c = zip(*[ ((ct[i]/major[i]**2 + st[i]/minor[i]**2)/2,
+                       s2t[i]/4 *(1/minor[i]**2-1/major[i]**2),
+                       (st[i]/major[i]**2 + ct[i]/minor[i]**2)/2) for i in xrange(len(amp))])
 
     def rfunc(x,y):
         ans=0
@@ -753,14 +764,17 @@ def multi_gauss(data,rmsimg,parinfo):
     
     data=np.array(data)
     mask=np.where(np.isfinite(data)) #the indices of the *non* NaN values in data
-    
+
     def model(p):
         """Return a map with a number of gaussians determined by the input parameters."""
-        return ntwodgaussian(p)(*mask)
-        
+        f = ntwodgaussian(p)
+        ans = f(*mask)
+        return ans
+
     def erfunc(p,fjac=None):
         """The difference between the model and the data"""
-        return [0,np.ravel( (model(p)-data[mask] )/rmsimg[mask])]
+        ans = [0,np.ravel( (model(p)-data[mask] )/rmsimg[mask])]
+        return ans
     
     mp=mpfit(erfunc,parinfo=parinfo,quiet=True)
 
