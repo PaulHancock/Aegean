@@ -95,6 +95,8 @@ class Region():
         """
         #convert all to lowest level
         self._demote_all()
+        #store this for later
+        self.demoted=self.pixeldict
         #now promote as needed
         for d in xrange(self.maxdepth,2,-1):
             plist=self.pixeldict[d].copy()
@@ -107,8 +109,6 @@ class Region():
                         self.pixeldict[d].difference_update(nset)
                         #add a new pixel to the next level up
                         self.pixeldict[d-1].add(p/4)
-        #store this for later
-        self.demoted = self.get_demoted()
         return
 
     #@profile
@@ -130,7 +130,7 @@ class Region():
         #pixel number at the maxdepth
         #pix = [ hp.ang2pix(2**self.maxdepth,*tp,nest=True) for tp in theta_phi ]
         pix = hp.ang2pix(2**self.maxdepth,theta,phi,nest=True)
-        pixelset = self.demoted
+        pixelset = self.get_demoted()
         result = np.array( [p in pixelset for p in pix])
         return result
 
@@ -353,7 +353,7 @@ def test_pickle():
 def test_reg():
     ra=np.radians([285])
     dec=np.radians([-66])
-    radius=np.radians([0.1])
+    radius=np.radians([3])
     region=Region(maxdepth=9)
     region.add_circles(ra,dec,radius)
     region.write_reg('test.reg')
