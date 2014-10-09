@@ -189,11 +189,6 @@ if __name__=="__main__":
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is MIMAS {0}".format(version))
 
-    if len(results.mim2reg)>0:
-        for i,o in results.mim2reg:
-            mim2reg(i,o)
-        sys.exit()
-
     if len(results.mask)>0:
         m, i, o = results.mask
         maskfile(m, i, o)
@@ -202,3 +197,7 @@ if __name__=="__main__":
     if results.outfile is not None:
         region=combine_regions(results)
         save_region(region,results.outfile)
+
+    if len(results.mim2reg)>0:
+        for i,o in results.mim2reg:
+            mim2reg(i,o)
