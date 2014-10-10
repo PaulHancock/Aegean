@@ -11,6 +11,9 @@ import logging
 import numpy as np
 import sys
 import os
+import re
+from astropy.coordinates import Angle, SkyCoord
+import astropy.units as u
 from astropy.io import fits as pyfits
 from astropy.wcs import wcs as pywcs
 from AegeanTools.regions import Region
@@ -25,6 +28,17 @@ except ImportError:
 
 #globals
 filewcs=None
+
+class Dummy():
+    def __init__(self):
+        self.add_region=[]
+        self.rem_region=[]
+        self.include_circles=[]
+        self.exclude_circles=[]
+        self.include_polygons=[]
+        self.exclude_polygons=[]
+        self.maxdepth=8
+        return
 
 #@profile
 def maskfile(regionfile,infile,outfile):
@@ -71,6 +85,61 @@ def mim2reg(mimfile,regfile):
     logging.info("Converted {0} -> {1}".format(mimfile,regfile))
     return
 
+def box2poly(line):
+    words = re.split('[(\s,)]',line)
+    ra = words[1]
+    dec = words[2]
+    width = words[3]
+    height = words[4]
+    angle = words[5]
+    ra = Angle(ra,unit=u.hour)
+    dec = Angle(dec,unit=u.degree)
+    width = Angle(float(width[:-1])/2,unit=u.arcsecond) #strip the "
+    height = Angle(float(height[:-1])/2,unit=u.arcsecond) #strip the "
+    center=SkyCoord(ra,dec)
+    tl = center.ra.degree+width.degree, center.dec.degree+height.degree
+    tr = center.ra.degree-width.degree, center.dec.degree+height.degree
+    bl = center.ra.degree+width.degree, center.dec.degree-height.degree
+    br = center.ra.degree-width.degree, center.dec.degree-height.degree
+    return np.ravel([tl,tr,br,bl]).tolist()
+
+def circle2circle(line):
+    words = re.split('[(,\s)]',line)
+    ra = words[1]
+    dec = words[2]
+    radius = words[3][:-1] #strip the "
+    ra = Angle(ra,unit=u.hour)
+    dec = Angle(dec,unit=u.degree)
+    radius = Angle(radius,unit=u.arcsecond)
+    return [ra.degree,dec.degree,radius.degree]
+
+def reg2mim(regfile,mimfile):
+    """
+    Read a ds9 regions file and create a mim file from it
+    :param regfile:
+    :param mimfile:
+    :return:
+    """
+    logging.info("Reading regions from {0}".format(regfile))
+    lines = (l for l in open(regfile,'r'))
+    poly = []
+    circles = []
+    for line in lines:
+        if line.startswith('box'):
+            poly.append(box2poly(line))
+
+        elif line.startswith('circle'):
+            circles.append(circle2circle(line))
+        else:
+            logging.warn("Not sure what to do with {0}".format(line[:-1]))
+    container = Dummy()
+    container.include_circles = circles
+    container.include_polygons = poly
+
+    region = combine_regions(container)
+    save_region(region,mimfile)
+    return
+
 def combine_regions(container):
     """
     Return a region that is the combination of those specified in the container.
@@ -80,6 +149,8 @@ def combine_regions(container):
     :return: A region
     """
     #create empty region
+    # print container.include_circles
+    # print container.include_polygons
     region=Region(container.maxdepth)
 
     #add/rem all the regions from files
@@ -96,30 +167,34 @@ def combine_regions(container):
 
     #add circles
     if len(container.include_circles) > 0:
-        circles = np.radians(container.include_circles)
-        ras,decs,radii=zip(*circles)
-        region.add_circles(ras, decs, radii)
+        for c in container.include_circles:
+            circles = np.radians(np.array(c))
+            ras,decs,radii=circles.reshape(3,circles.shape[0]/3)
+            region.add_circles(ras, decs, radii)
 
     #remove circles
     if len(container.exclude_circles) > 0:
-        r2=Region(container.maxdepth)
-        circles = np.radians(container.include_circles)
-        ras,decs,radii=zip(*circles)
-        r2.add_circles(ras, decs, radii)
-        region.without(r2)
+        for c in container.exclude_circles:
+            r2=Region(container.maxdepth)
+            circles = np.radians(np.array(c))
+            ras,decs,radii=circles.reshape(3,circles.shape[0]/3)
+            r2.add_circles(ras, decs, radii)
+            region.without(r2)
 
     #add polygons
     if len(container.include_polygons) > 0:
-        poly = np.array(np.radians(container.include_polygons))
-        poly = poly.reshape((poly.shape[0]/2,2))
-        region.add_poly(poly)
+        for p in container.include_polygons:
+            poly = np.radians(np.array(p))
+            poly = poly.reshape((poly.shape[0]/2,2))
+            region.add_poly(poly)
 
     #remove polygons
     if len(container.exclude_polygons) > 0:
-        poly = np.radians(container.include_polygons)
-        r2 = Regions(container.maxdepth)
-        r2.add_poly(poly)
-        region.without(r2)
+        for p in container.include_polygons:
+            poly = np.array(np.radians(p))
+            r2 = Regions(container.maxdepth)
+            r2.add_poly(poly)
+            region.without(r2)
 
     return region
 
@@ -171,6 +246,9 @@ if __name__=="__main__":
     group2.add_argument('--mim2reg',dest='mim2reg', action='append',
                         type=str, metavar=('region.mim','region.reg'), nargs=2,
                         help='convert region.mim into region.reg', default=[])
+    group2.add_argument('--reg2mim',dest='reg2mim', action='append',
+                       type=str, metavar=('region.reg','region.mim'), nargs=2,
+                       help="Converta a .reg file into a .mim file", default=[])
     group2.add_argument('--mask',dest='mask', action='store',
                         type=str, metavar=('region.mim','file.fits','masked.fits'), nargs=3, default=[],
                         help='use region.mim to mask file.fits and write masekd.fits')
@@ -192,6 +270,11 @@ if __name__=="__main__":
     if len(results.mim2reg)>0:
         for i,o in results.mim2reg:
             mim2reg(i,o)
+        sys.exit()
+
+    if len(results.reg2mim)>0:
+        for i,o in results.reg2mim:
+            reg2mim(i,o)
         sys.exit()
 
     if len(results.mask)>0:
