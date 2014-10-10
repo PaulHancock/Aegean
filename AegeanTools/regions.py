@@ -2,6 +2,9 @@
 
 import healpy as hp #dev on 1.8.1
 import numpy as np #dev on 1.8.1
+from astropy.coordinates import SkyCoord
+import astropy.units as u
+
 
 class Region():
     def __init__(self,maxdepth=11):
@@ -178,13 +181,16 @@ class Region():
         with open(filename,'w') as out:
             for d in xrange(1,self.maxdepth+1):
                 for p in self.pixeldict[d]:
-                    line="fk5; polygon "
+                    line="fk5; polygon("
                     vectors = zip(*hp.boundaries(2**d,p,step=1,nest=True))
-                    #print p, vectors,
-                    #print self.vec2sky(np.array(vectors),degrees=True)
+                    positions=[]
                     for sky in self.vec2sky(np.array(vectors),degrees=True):
                         ra, dec = sky
-                        line += "{0} {1} ".format(ra,dec)
+                        pos= SkyCoord(ra/15,dec,unit=(u.degree,u.degree))
+                        positions.append( pos.ra.to_string(sep=':',precision=2))
+                        positions.append( pos.dec.to_string(sep=':',precision=2))
+                    line += ','.join(positions)
+                    line += ")"
                     print>>out, line
         return
 
