@@ -1202,93 +1202,12 @@ def writeDB(filename,catalog):
 
 #image manipulation
 def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
-    """
-    [legacy version used by the pipeline]
-
-    Calculate an rms image and a bkg image
-    
-    inputs:
-    data - np.ndarray of flux values
-    beam - beam object
-    mesh_size - number of beams per box
-                default = 20
-    forced_rms - the rms of the image
-                None => calculate the rms and bkg levels (default)
-                <float> => assume zero background and constant rms
-    return:
-    nothing
-
-    """
-    if forced_rms:
-        return np.zeros(data.shape),np.ones(data.shape)*forced_rms
-
-    
-    img_y,img_x = data.shape
-    xcen=int(img_x/2)
-    ycen=int(img_y/2)
-
-    #calculate a local beam from the center of the data
-    pixbeam=get_pixbeam(beam,xcen,ycen)
-    if pixbeam is None:
-        logging.error("Cannot calculate the beam shape at the image center")
-        sys.exit()
-    
-    width_x = mesh_size*max(abs(math.cos(np.radians(pixbeam.pa))*pixbeam.b),
-                            abs(math.sin(np.radians(pixbeam.pa))*pixbeam.a) )
-    width_x = int(width_x)
-    width_y = mesh_size*max(abs(math.sin(np.radians(pixbeam.pa))*pixbeam.b),
-                            abs(math.cos(np.radians(pixbeam.pa))*pixbeam.a) )
-    width_y = int(width_y)
-    
-    rmsimg = np.zeros(data.shape)
-    bkgimg = np.zeros(data.shape)
-    logging.debug("image size x,y:{0},{1}".format(img_x,img_y))
-    logging.debug("beam: {0}".format(beam))
-    logging.debug("mesh width (pix) x,y: {0},{1}".format(width_x,width_y))
-
-    #box centered at image center then tilling outwards
-    xstart=(xcen-width_x/2)%width_x #the starting point of the first "full" box
-    ystart=(ycen-width_y/2)%width_y
-    
-    xend=img_x - (img_x-xstart)%width_x #the end point of the last "full" box
-    yend=img_y - (img_y-ystart)%width_y
-      
-    xmins=[0]
-    xmins.extend(range(xstart,xend,width_x))
-    xmins.append(xend)
-    
-    xmaxs=[xstart]
-    xmaxs.extend(range(xstart+width_x,xend+1,width_x))
-    xmaxs.append(img_x)
-    
-    ymins=[0]
-    ymins.extend(range(ystart,yend,width_y))
-    ymins.append(yend)
-    
-    ymaxs=[ystart]
-    ymaxs.extend(range(ystart+width_y,yend+1,width_y))
-    ymaxs.append(img_y)
-
-    #if the image is smaller than our ideal mesh size, just use the whole image instead
-    if width_x >=img_x:
-        xmins=[0]
-        xmaxs=[img_x]
-    if width_y >=img_y:
-        ymins=[0]
-        ymaxs=[img_y]
-
-    for xmin,xmax in zip(xmins,xmaxs):
-        for ymin,ymax in zip(ymins,ymaxs):
-            bkg, rms = estimate_bkg_rms(data[ymin:ymax,xmin:xmax])
-            rmsimg[ymin:ymax,xmin:xmax] = rms
-            bkgimg[ymin:ymax,xmin:xmax] = bkg
-  
-    return bkgimg,rmsimg
+    logging.error("This function has been deprecated (make_bkg_rms_image)")
+    logging.error("Use make_bkg_rms_from_global instead")
+    sys.exit(1)
 
 def make_bkg_rms_from_global(mesh_size=20,forced_rms=None,cores=None):
     """
-    [Aegean specific version that uses multiple cores and global data]
-
     Calculate an rms image and a bkg image
     reads  data_pix, beam, rmsimg, bkgimg from global_data
     writes rmsimg, bkgimg to global_data
@@ -1312,7 +1231,8 @@ def make_bkg_rms_from_global(mesh_size=20,forced_rms=None,cores=None):
 
     data = global_data.data_pix
     beam = global_data.beam
-    img_y,img_x = data.shape
+
+    img_x,img_y = data.shape
     xcen=int(img_x/2)
     ycen=int(img_y/2)
 
@@ -1322,11 +1242,11 @@ def make_bkg_rms_from_global(mesh_size=20,forced_rms=None,cores=None):
         logging.error("Cannot calculate the beam shape at the image center")
         sys.exit()
 
-    width_x = mesh_size*max(abs(math.cos(np.radians(pixbeam.pa))*pixbeam.b),
-                            abs(math.sin(np.radians(pixbeam.pa))*pixbeam.a) )
+    width_x = mesh_size*max(abs(math.cos(np.radians(pixbeam.pa))*pixbeam.a),
+                            abs(math.sin(np.radians(pixbeam.pa))*pixbeam.b) )
     width_x = int(width_x)
-    width_y = mesh_size*max(abs(math.sin(np.radians(pixbeam.pa))*pixbeam.b),
-                            abs(math.cos(np.radians(pixbeam.pa))*pixbeam.a) )
+    width_y = mesh_size*max(abs(math.sin(np.radians(pixbeam.pa))*pixbeam.a),
+                            abs(math.cos(np.radians(pixbeam.pa))*pixbeam.b) )
     width_y = int(width_y)
     
     logging.debug("image size x,y:{0},{1}".format(img_x,img_y))
@@ -1376,9 +1296,7 @@ def make_bkg_rms_from_global(mesh_size=20,forced_rms=None,cores=None):
         queue=[]
         for xmin,xmax in zip(xmins,xmaxs):
             for ymin,ymax in zip(ymins,ymaxs):
-                queue.append(estimate_background_global(ymin,ymax,xmin,xmax))
-
-
+                queue.append(estimate_background_global(xmin,xmax,ymin,ymax))
 
     #construct the bkg and rms images
     if global_data.rmsimg is None:
@@ -1391,7 +1309,7 @@ def make_bkg_rms_from_global(mesh_size=20,forced_rms=None,cores=None):
         global_data.rmsimg[ymin:ymax,xmin:xmax]=rms
     return 
 
-def estimate_background_global(ymin,ymax,xmin,xmax):
+def estimate_background_global(xmin,xmax,ymin,ymax):
     '''
     Estimate the background noise mean and RMS.
     The mean is estimated as the median of data.
@@ -1494,8 +1412,7 @@ def pix2sky(pixel):
     """
     x,y=pixel
     #wcs and pyfits have oposite ideas of x/y
-    skybox = global_data.wcs.wcs_pix2world([[y,x]],1)
-    return [float(skybox[0][0]), float(skybox[0][1])]
+    return global_data.wcs.wcs_pix2world([[y,x]],1)[0]
 
 def sky2pix(pos):
     """
