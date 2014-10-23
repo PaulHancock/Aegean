@@ -16,8 +16,9 @@ from AegeanTools.running_percentile import RunningPercentiles as RP
 import AegeanTools.pprocess as pprocess
 
 import multiprocessing
+#from blist import *
 
-version='0.1'
+version='v1.0'
 
 ###
 #
@@ -198,7 +199,7 @@ def filter_mc(data,step_size,box_size,cores):
         logging.info("using {0} cores".format(cores))
         nx,ny=optimum_sections(cores,data.shape)
 
-        #box widths should be multiples of the ste_size, and not zero
+        #box widths should be multiples of the step_size, and not zero
         width_x = max(img_x/nx/step_size[0],1)*step_size[0]
         width_y = max(img_y/ny/step_size[1],1)*step_size[1]
         
@@ -377,7 +378,7 @@ if __name__=="__main__":
     parser.add_option('--box',dest='box_size',type='int',nargs=2,
                       help='The [x,y] size of the box over which the rms/bkg is calculated. Default = 5*grid.')
     parser.add_option('--cores',dest='cores',type='int',
-                      help='Number of corse to use. Default = all avaliable.')
+                      help='Number of cores to use. Default = all available.')
     parser.add_option('--onepass',dest='twopass',action='store_false', help='the opposite of twopass. default=False')
     parser.add_option('--twopass',dest='twopass',action='store_true',
                       help='Calculate the bkg and rms in a two passes instead of one. (when the bkg changes rapidly)')

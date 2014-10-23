@@ -19,13 +19,11 @@ import math
 
 import scipy
 from scipy import ndimage as ndi
-from scipy import stats
+#from scipy import stats
 from scipy.special import erf
 
 #fits and wcs handling
 import astropy
-import astropy.wcs as pywcs
-import astropy.io.fits as pyfits
 
 #tables and votables
 from astropy.table.table import Table 
@@ -37,6 +35,17 @@ try:
 except:
     votables_supported=False
 import sqlite3
+
+#need Region in the name space in order to be able to unpickle it
+try:
+    from AegeanTools.regions import Region
+    region_available=True
+    try:
+        import cPickle as pickle
+    except ImportError:
+        import pickle
+except ImportError:
+    region_available=False
 
 #logging and nice options
 import logging
@@ -53,15 +62,14 @@ import AegeanTools.flags as flags
 import AegeanTools.pprocess as pprocess
 import multiprocessing
 
-version='1.8'
+version = '1.8.1'
 
-header="""#Aegean version {0}
+header = """#Aegean version {0}
 # on dataset: {1}"""
 
 #global constants
 fwhm2cc = 1/(2*math.sqrt(2*math.log(2)))
 cc2fwhm = (2*math.sqrt(2*math.log(2)))
-ascii_table_formats={'csv':'csv','tex':'latex','tab':'tab'}
 
 #Note this is now done in AegeanTools.flags but repeated here for reference
 ## Set some bitwise logic for flood routines
@@ -346,6 +354,7 @@ class GlobalFittingData:
     wcs = None
     data_pix = None
     dtype = None
+    region = None
     
 class IslandFittingData:
     '''
@@ -390,15 +399,16 @@ class DummyMP():
 ######################################### FUNCTIONS ###############################
 
 ## floodfill functions
-def explore(data, rmsimg, status, queue, bounds, cutoffratio, pixel):
+def explore(snr,status,queue,bounds,pixel):
     """
     Look for pixels adjacent to <pixel> and add them to the queue
-    Don't include pixels that are in the queue or that are below
-    the cutoffratio
-    
-    This version requires an rms image to be present -PJH
-    
-    Returns: nothing
+    Don't include pixels that are in the queue
+    :param snr: array of bool that is true for pixels we are interested in
+    :param status: array that represents the status of pixels
+    :param queue: the queue of pixels that we are interested in
+    :param bounds: the bounds within which we can explore
+    :param pixel: the initial point to start from
+    :return: None
     """
     (x, y) = pixel
     if x < 0 or y < 0:
@@ -407,37 +417,39 @@ def explore(data, rmsimg, status, queue, bounds, cutoffratio, pixel):
 
     if x > 0:
         new = (x - 1, y)
-        if not status[new] & flags.QUEUED and data[new]/rmsimg[new] >= cutoffratio:
+        if snr[new] and (not status[new] & flags.QUEUED):
             queue.append(new)
             status[new] |= flags.QUEUED
 
     if x < bounds[0]:
         new = (x + 1, y)
-        if not status[new] & flags.QUEUED and data[new]/rmsimg[new] >= cutoffratio:
+        if snr[new] and (not status[new] & flags.QUEUED):
             queue.append(new)
             status[new] |= flags.QUEUED
 
     if y > 0:
         new = (x, y - 1)
-        if not status[new] & flags.QUEUED and data[new]/rmsimg[new] >= cutoffratio:
+        if snr[new] and (not status[new] & flags.QUEUED):
             queue.append(new)
             status[new] |= flags.QUEUED
 
     if y < bounds[1]:
-        new = (x, y + 1)
-        if not status[new] & flags.QUEUED and data[new]/rmsimg[new] >= cutoffratio:
+        new =  (x, y + 1)
+        if snr[new] and (not status[new] & flags.QUEUED):
             queue.append(new)
             status[new] |= flags.QUEUED
 
-def flood(data, rmsimg, status, bounds, peak, cutoffratio):
+def flood(snr,status,bounds,peak):
     """
     Start at pixel=peak and return all the pixels that belong to
     the same blob.
-
-    Returns: a list of pixels contiguous to <peak>
-
-    This version requires an rms image - PJH
+    :param snr: array of bool that is true for pixels we are interested in
+    :param status: array that represents the status of pixels
+    :param bounds: the bounds within which we can explore
+    :param peak: the initial point to start from
+    :return: None
     """
+
     if status[peak] & flags.VISITED:
         return []
 
@@ -448,15 +460,15 @@ def flood(data, rmsimg, status, bounds, peak, cutoffratio):
     for pixel in queue:
         if status[pixel] & flags.VISITED:
             continue
-    
+
         status[pixel] |= flags.VISITED
 
         blob.append(pixel)
-        explore(data, rmsimg, status, queue, bounds, cutoffratio, pixel)
+        explore(snr, status, queue, bounds, pixel)
 
     return blob
 
-def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=False):
+def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,domask=False):
     """
     <a generator function>
     Find all the sub islands in data.
@@ -470,39 +482,49 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,expand=False):
     if outerclip is None:
         outerclip=innerclip
     #somehow this avoids problems with multiple cores not working properly!?!?
+    #TODO figure out why this is so.
     abspix=abs(data.pixels)
         
     status=np.zeros(data.pixels.shape,dtype=np.uint8)
     # Selecting PEAKED pixels
     logging.debug("InnerClip: {0}".format(innerclip))
 
-    status += np.where(abspix/rmsimg>innerclip,flags.PEAKED,0)
+    status[np.where(abspix/rmsimg>innerclip)] = flags.PEAKED
     #logging.debug("status: {0}".format(status[1:5,1:5]))
     logging.debug("Peaked pixels: {0}/{1}".format(np.sum(status),len(data.pixels.ravel())))
     # making pixel list
     ax,ay=np.where(abspix/rmsimg>innerclip)
+
+    #TODO: change this so that I can sort without having to decorate/undecorate
     peaks=[(data.pixels[ax[i],ay[i]],ax[i],ay[i]) for i in range(len(ax))]
-    if len(peaks)==0:
+
+    #ignore pixels outside the masking region
+    if global_data.region is not None and domask:
+        logging.debug("masking pixels")
+        yx = [ [p[2],p[1]] for p in peaks]
+        ra,dec = global_data.wcs.wcs_pix2world(yx, 1).transpose()
+        mask = global_data.region.sky_within(ra, dec, degin=True)
+        peaks = [peaks[i] for i in xrange(len(mask)) if mask[i]]
+
+    if len(peaks) == 0:
         logging.debug("There are no pixels above the clipping limit")
         return
     # sorting pixel list - strongest peak should be found first
-    peaks.sort(reverse=True)
-    if peaks[0][0]<0: 
+    peaks.sort(reverse = True)
+    if peaks[0][0] < 0:
         peaks.reverse()
     peaks=map(lambda x:x[1:],peaks) #strip the flux data so we are left with just the positions
-    logging.debug("Most positive peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[0]],rmsimg[peaks[0]]))
-    logging.debug("Most negative peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[-1]],rmsimg[peaks[-1]]))
-    bounds=(data.pixels.shape[0]-1,data.pixels.shape[1]-1)
-    
+    logging.debug("Most positive peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[0]], rmsimg[peaks[0]]))
+    logging.debug("Most negative peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[-1]], rmsimg[peaks[-1]]))
+    bounds=(data.pixels.shape[0] - 1, data.pixels.shape[1] - 1)
+
+    snr = abspix/rmsimg >= outerclip
     # starting image segmentation
     for peak in peaks:
-        blob=flood(abspix,rmsimg,status,bounds,peak,cutoffratio=outerclip)
+        blob = flood(snr, status, bounds, peak)
+        #blob=flood(abspix,rmsimg,status,bounds,peak,cutoffratio=outerclip)
         npix=len(blob)
         if npix>=1:#islands with no pixels have length 1
-            if expand:
-                #I forgot what I was going to do here I should just remove it
-                logging.error("You said ''expand'' but this is not yet working!")
-                sys.exit(1)
             new_isle,xmin,xmax,ymin,ymax=data.list2map(blob)
             if new_isle is not None:
                 yield new_isle,xmin,xmax,ymin,ymax
@@ -525,11 +547,12 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
     parinfo object for mpfit
     with all parameters in pixel coords    
     """
+    debug_on = logging.getLogger().isEnabledFor(logging.DEBUG)
     is_flag=0
 
     #is this a negative island?
     isnegative = max(data[np.where(np.isfinite(data))])<0
-    if isnegative:
+    if isnegative and debug_on:
         logging.debug("[is a negative island]")
 
     parinfo=[]
@@ -539,15 +562,17 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
 
     pixbeam = get_pixbeam(beam,offsets[0]+xo/2,offsets[1]+yo/2)
     if pixbeam is None:
-        logging.debug("WCSERR")
+        if debug_on:
+            logging.debug("WCSERR")
         is_flag=flags.WCSERR
         pixbeam=Beam(1,1,0)
     #The position cannot be more than a pixel beam from the initial location
     #Use abs so that these distances are always positive
     xo_lim=max( abs(pixbeam.a*np.cos(np.radians(pixbeam.pa))), abs(pixbeam.b*np.sin(np.radians(pixbeam.pa))))
     yo_lim=max( abs(pixbeam.a*np.sin(np.radians(pixbeam.pa))), abs(pixbeam.b*np.cos(np.radians(pixbeam.pa))))
-    logging.debug(" - shape {0}".format(data.shape))
-    logging.debug(" - xo_lim,yo_lim {0}, {1}".format(xo_lim,yo_lim))
+    if debug_on:
+        logging.debug(" - shape {0}".format(data.shape))
+        logging.debug(" - xo_lim,yo_lim {0}, {1}".format(xo_lim,yo_lim))
     
     if not data.shape == curve.shape:
         logging.error("data and curvature are mismatched")
@@ -565,12 +590,14 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
         is_flag|=flags.FITERRSMALL
     else:
         is_flag=0
-    logging.debug(" - size {0}".format(len(data.ravel())))
+    if debug_on:
+        logging.debug(" - size {0}".format(len(data.ravel())))
 
     if min(data.shape)<=2 or (is_flag & flags.FITERRSMALL):
         #1d islands or small islands only get one source
-        logging.debug("Tiny summit detected")
-        logging.debug("{0}".format(data))
+        if debug_on:
+            logging.debug("Tiny summit detected")
+            logging.debug("{0}".format(data))
         summits=[ [data,0,data.shape[0],0,data.shape[1]] ]
         #and are constrained to be point sources
         is_flag |= flags.FIXED2PSF
@@ -579,19 +606,22 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
             kappa_sigma=Island( np.where( curve>0.5, np.where(data+innerclip*rmsimg<0, data, np.nan) ,np.nan) )
         else:
             kappa_sigma=Island( np.where( -1*curve>0.5, np.where(data-innerclip*rmsimg>0, data, np.nan) ,np.nan) )     
-        summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0)
+        summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0,domask=False)
 
     i=0
     for summit,xmin,xmax,ymin,ymax in summits:
         summit_flag = is_flag
-        logging.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape,xmin,xmax,ymin,ymax,i))
+        if debug_on:
+            logging.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape,xmin,xmax,ymin,ymax,i))
         if isnegative:
             amp=summit[np.isfinite(summit)].min()
         else:
             amp=summit[np.isfinite(summit)].max() #stupid NaNs break all my things
-        logging.debug(" - max is {0: 5.2f}".format(amp))
+
         (xpeak,ypeak)=np.where(summit==amp)
-        logging.debug(" - peak at {0},{1}".format(xpeak,ypeak))
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.debug(" - max is {0: 5.2f}".format(amp))
+            logging.debug(" - peak at {0},{1}".format(xpeak,ypeak))
         xo = xpeak[0]+xmin
         yo = ypeak[0]+ymin
         #allow amp to be 5% or (innerclip - 1)sigma higher
@@ -600,7 +630,9 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
             amp_min,amp_max= float(innerclip*rmsimg[xo,yo]), float(amp*1.05+(innerclip-1)*rmsimg[xo,yo])
         else:
             amp_max,amp_min= float(-1*innerclip*rmsimg[xo,yo]), float(amp*1.05-(innerclip-1)*rmsimg[xo,yo])
-        logging.debug("a_min {0}, a_max {1}".format(amp_min,amp_max))
+
+        if debug_on:
+            logging.debug("a_min {0}, a_max {1}".format(amp_min,amp_max))
         
         xo_min,xo_max = max(xmin,xo-xo_lim),min(xmax,xo+xo_lim)
         if xo_min==xo_max: #if we have a 1d summit then allow the position to vary by +/-0.5pix
@@ -631,7 +663,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
         
         pa=pixbeam.pa
         flag=summit_flag
-        if logging.getLogger().isEnabledFor(logging.DEBUG):
+        if debug_on:
             logging.debug(" - var val min max | min max")
             logging.debug(" - amp {0} {1} {2} ".format(amp,amp_min,amp_max))
             logging.debug(" - xo {0} {1} {2} ".format(xo,xo_min,xo_max))
@@ -674,7 +706,8 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
                          'limited':[False,False],
                          'flags':flag} )
         i+=1
-    logging.debug("Estimated sources: {0}".format(i))
+    if debug_on:
+        logging.debug("Estimated sources: {0}".format(i))
     return parinfo
 
 def ntwodgaussian(inpars):
@@ -689,13 +722,13 @@ def ntwodgaussian(inpars):
         logging.error("inpars requires a multiple of 6 parameters")
         logging.error("only {0} parameters supplied".format(len(inpars)))
         sys.exit()
-    pars=np.array(inpars).reshape(len(inpars)/6,6)
-    amp,xo,yo,major,minor,pa = zip(*pars)
+    #pars=np.array(inpars).reshape(len(inpars)/6,6)
+    amp,xo,yo,major,minor,pa = np.array(inpars).reshape(6,len(inpars)/6)
     #transform pa->-pa so that our angles are CW instead of CCW
     st,ct,s2t=zip(*[ (math.sin(np.radians(-p))**2,math.cos(np.radians(-p))**2,math.sin(2*np.radians(-p))) for p in pa])
-    a = [ (ct[i]/major[i]**2 + st[i]/minor[i]**2)/2 for i in range(len(amp))]
-    bb= [ s2t[i]/4 *(1/minor[i]**2-1/major[i]**2)   for i in range(len(amp))]
-    c = [ (st[i]/major[i]**2 + ct[i]/minor[i]**2)/2 for i in range(len(amp))]
+    a, bb, c = zip(*[ ((ct[i]/major[i]**2 + st[i]/minor[i]**2)/2,
+                       s2t[i]/4 *(1/minor[i]**2-1/major[i]**2),
+                       (st[i]/major[i]**2 + ct[i]/minor[i]**2)/2) for i in xrange(len(amp))])
 
     def rfunc(x,y):
         ans=0
@@ -735,14 +768,17 @@ def multi_gauss(data,rmsimg,parinfo):
     
     data=np.array(data)
     mask=np.where(np.isfinite(data)) #the indices of the *non* NaN values in data
-    
+
     def model(p):
         """Return a map with a number of gaussians determined by the input parameters."""
-        return ntwodgaussian(p)(*mask)
-        
+        f = ntwodgaussian(p)
+        ans = f(*mask)
+        return ans
+
     def erfunc(p,fjac=None):
         """The difference between the model and the data"""
-        return [0,np.ravel( (model(p)-data[mask] )/rmsimg[mask])]
+        ans = [0,np.ravel( (model(p)-data[mask] )/rmsimg[mask])]
+        return ans
     
     mp=mpfit(erfunc,parinfo=parinfo,quiet=True)
 
@@ -773,7 +809,7 @@ def load_bkg_rms_image(image,bkgfile,rmsfile):
     rmsimg = load_aux_image(image,rmsfile)
     return bkgimg,rmsimg
 
-def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False,rms=None,cores=1,csigma=None):
+def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False,rms=None,cores=1,csigma=None,do_curve=True,mask=None):
     """
     populate the global_data object by loading or calculating the various components
     """
@@ -781,9 +817,18 @@ def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False
     
     img = FitsImage(filename, hdu_index=hdu_index,beam=beam)
     beam=img.beam    
-    
-    # Save global data for use by fitting subprocesses    
+
+    # Save global data for use by fitting sub-processes
     global_data = GlobalFittingData()
+
+    if mask is not None and region_available:
+        if os.path.exists(mask):
+            global_data.region=pickle.load(open(mask))
+        else:
+            logging.error("File {0} not found for loading".format(mask))
+    else:
+        global_data.region=None
+
     global_data.beam = beam
     global_data.hdu_header = img.get_hdu_header()
     global_data.wcs = img.wcs
@@ -794,17 +839,19 @@ def load_globals(filename,hdu_index=0,bkgin=None,rmsin=None,beam=None,verb=False
     global_data.bkgimg = np.zeros(global_data.data_pix.shape,dtype=global_data.dtype)
     global_data.rmsimg = np.zeros(global_data.data_pix.shape,dtype=global_data.dtype)
     global_data.pixarea = img.pixarea
-    #calculate curvature but store it as -1,0,+1
-    cimg = curvature(global_data.data_pix,dtype=global_data.dtype)
-    if csigma is None:
-        logging.info("Calculating curvature csigma")
-        _,csigma = estimate_bkg_rms(cimg)
-    dcurve = np.zeros(global_data.data_pix.shape,dtype=np.int8)
-    dcurve[np.where(cimg<=-abs(csigma))]=-1
-    dcurve[np.where(cimg>=abs(csigma))]=1
-    del cimg
+    global_data.dcurve = None
+    if do_curve:
+        #calculate curvature but store it as -1,0,+1
+        cimg = curvature(global_data.data_pix,dtype=global_data.dtype)
+        if csigma is None:
+            logging.info("Calculating curvature csigma")
+            _,csigma = estimate_bkg_rms(cimg)
+        dcurve = np.zeros(global_data.data_pix.shape,dtype=np.int8)
+        dcurve[np.where(cimg<=-abs(csigma))]=-1
+        dcurve[np.where(cimg>=abs(csigma))]=1
+        del cimg
 
-    global_data.dcurve=dcurve
+        global_data.dcurve=dcurve
 
     #if either of rms or bkg images are not supplied then caclucate them both
     if not (rmsin and bkgin):
@@ -893,7 +940,7 @@ def get_table_formats():
     if astropy.__version__.startswith('0.2') or astropy.__version__.startswith('0.3'):
         logging.info("Ascii tables are not supported with this version of Astropy ({0})".format(astropy.__version__))
     else:
-        fmts.extend(['csv','tab','tex'])
+        fmts.extend(['csv','tab','tex','html'])
     #assume this is always possible -> though it may not be on some systems
     fmts.extend(['db','sqlite'])
     return fmts
@@ -906,6 +953,7 @@ def save_catalog(filename,catalog):
     returns:
         nothing
     '''
+    ascii_table_formats={'csv':'csv','tab':'tab','tex':'latex','html':'html'}
     #.ann and .reg are handled by me
     extension=os.path.splitext(filename)[1][1:].lower()
     if extension in ['ann','reg']:
@@ -1158,7 +1206,7 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
     [legacy version used by the pipeline]
 
     Calculate an rms image and a bkg image
-    
+
     inputs:
     data - np.ndarray of flux values
     beam - beam object
@@ -1239,8 +1287,6 @@ def make_bkg_rms_image(data,beam,mesh_size=20,forced_rms=None):
 
 def make_bkg_rms_from_global(mesh_size=20,forced_rms=None,cores=None):
     """
-    [Aegean specific version that uses multiple cores and global data]
-
     Calculate an rms image and a bkg image
     reads  data_pix, beam, rmsimg, bkgimg from global_data
     writes rmsimg, bkgimg to global_data
@@ -1445,8 +1491,7 @@ def pix2sky(pixel):
     """
     x,y=pixel
     #wcs and pyfits have oposite ideas of x/y
-    skybox = global_data.wcs.wcs_pix2world([[y,x]],1)
-    return [float(skybox[0][0]), float(skybox[0][1])]
+    return global_data.wcs.wcs_pix2world([[y,x]],1)[0]
 
 def sky2pix(pos):
     """
@@ -1707,7 +1752,6 @@ def fit_island(island_data):
         # Clamp the pixel location to the edge of the background map (see Trac #51)
         y = max(min(int(round(y_pix-ymin)), bkg.shape[1]-1),0)
         x = max(min(int(round(x_pix-xmin)), bkg.shape[0]-1),0)
-        #FIXME check that these x,y are correct. maybe = y-1,x-1
         source.background=bkg[x,y]
         source.local_rms=rms[x,y]
         source.peak_flux = amp
@@ -1835,7 +1879,7 @@ def fit_islands(islands):
         sources.extend(res)
     return sources
 
-def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None, innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,returnrms=False,nopositive=False,nonegative=False):
+def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summits=None, csigma=None, innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,returnrms=False,nopositive=False,nonegative=False,mask=None):
     """
     Run the Aegean source finder.
     Inputs:
@@ -1877,7 +1921,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     if cores is not None:
         assert(cores >= 1), "cores must be one or more"
         
-    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,beam=beam,rms=rms,cores=cores,csigma=csigma,verb=True)
+    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,beam=beam,rms=rms,cores=cores,csigma=csigma,verb=True,mask=mask)
     
     #we now work with the updated versions of the three images
     bkgimg = global_data.bkgimg
@@ -1920,7 +1964,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         print >>outfile,OutputSource.header
     island_group = []
     group_size = 20
-    for i,xmin,xmax,ymin,ymax in gen_flood_wrap(data,rmsimg,innerclip,outerclip,expand=False):
+    for i,xmin,xmax,ymin,ymax in gen_flood_wrap(data,rmsimg,innerclip,outerclip,domask=True):
         if len(i)<=1:
             #empty islands have length 1
             continue 
@@ -2013,7 +2057,9 @@ def force_measure_flux(radec):
             #logging.warn("Source at {0} {1} is outside of image bounds".format(ra,dec))
             #logging.warn("No measurements made - dummy source created")
             dummy = SimpleSource()
-            dummy.ra=-1
+            dummy.peak_flux = np.nan
+            dummy.peak_pixel = np.nan
+            dummy.flags=flags.FITERR
             catalog.append(dummy)
             continue
 
@@ -2051,9 +2097,20 @@ def force_measure_flux(radec):
         # for each pixel. Error is stddev.
         # Only use pixels within the FWHM, ie value>=0.5. Set the others to NaN
         ratios = np.where(gaussian_data>=0.5, data/gaussian_data, np.nan)
-        ratios_no_nans = np.extract(np.isfinite(ratios), ratios) # get rid of NaNs
-        flux = np.average(ratios_no_nans)
-        error = np.std(ratios_no_nans)
+        #ratios_no_nans = np.extract(np.isfinite(ratios), ratios) # get rid of NaNs
+        #flux = np.average(ratios_no_nans)
+        #error = np.std(ratios_no_nans)
+        lratios=np.log(ratios)
+        flux = np.exp(np.nanmean(lratios))
+        error = np.nanstd(lratios)*flux
+
+        if not np.isfinite(flux) or not np.isfinite(error):
+            dummy = SimpleSource()
+            dummy.peak_flux = np.nan
+            dummy.peak_pixel = np.nan
+            dummy.flags=flags.FITERR
+            catalog.append(dummy)
+            continue
         source = SimpleSource()
         source.ra=ra
         source.dec=dec
@@ -2092,7 +2149,7 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
         beam - beam parameters to overide those given in fits header
         
     '''
-    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,rms=rms,cores=cores,verb=True)
+    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,rms=rms,cores=cores,verb=True,do_curve=False)
     
     #load catalog
     radec= load_catalog(catfile)
@@ -2119,7 +2176,7 @@ def VASTP_measure_catalog_fluxes(filename, positions, hdu_index=0,bkgin=None,rms
         rms - forced rms value
         beam - beam parameters to overide those given in fits header
     """
-    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,rms=rms,cores=cores,beam=beam,verb=True)
+    load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,rms=rms,cores=cores,beam=beam,verb=True,do_curve=False)
     #measure fluxes
     sources = force_measure_flux(positions)
     return sources
@@ -2205,6 +2262,8 @@ if __name__=="__main__":
     parser.add_option('--negative', dest='negative',action="store_true",default=False,
                                     help="Report sources with negative fluxes. [default: false]")
 
+    parser.add_option('--region',dest='region',default=None,
+                                    help="Use this regions file to restrict source finding in this image.")
 
     parser.add_option('--save', dest='save', action="store_true",default=False,
                                 help='Enable the saving of the background and noise images. Sets --find to false. [default: false]')
@@ -2273,7 +2332,8 @@ if __name__=="__main__":
             if 'poll' in e.message:
                 logging.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
                 cores=1
-                queue=[]
+                queue=None
+                temp=None
             else:
                 logging.error("Your system can't seem to make a queue, try using --cores=1")
                 raise e
@@ -2320,6 +2380,15 @@ if __name__=="__main__":
     else:
         options.outfile=open(options.outfile,'w')
 
+    if options.region is not None:
+        if not os.path.exists(options.region):
+            logging.error("Region file {0} not found")
+            sys.exit()
+        if not region_available:
+            logging.error("Could not import AegeanTools/Region.py")
+            logging.error("(you probably need to install HealPy)")
+            sys.exit()
+
     #do forced measurements using catfile
     sources = []
     if options.measure:
@@ -2342,7 +2411,7 @@ if __name__=="__main__":
                                     max_summits=options.max_summits,csigma=options.csigma,innerclip=options.innerclip,
                                     outerclip=options.outerclip, cores=options.cores, rmsin=options.noiseimg, 
                                     bkgin=options.backgroundimg,beam=options.beam, doislandflux=options.doislandflux,
-                                    nonegative= not options.negative,nopositive=options.nopositive)
+                                    nonegative= not options.negative,nopositive=options.nopositive,mask=options.region)
         if len(detections)==0:
             logging.info("No sources found in image")
         sources.extend(detections)
