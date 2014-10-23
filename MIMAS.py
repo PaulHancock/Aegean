@@ -86,6 +86,11 @@ def mim2reg(mimfile,regfile):
     return
 
 def box2poly(line):
+    """
+    Convert a line that describes a box in ds9 format, into a polygon that is given by the corners of the box
+    :param line: text
+    :return: list of [ ra,dec,ra,dec, ...  ]
+    """
     words = re.split('[(\s,)]',line)
     ra = words[1]
     dec = words[2]
@@ -113,6 +118,24 @@ def circle2circle(line):
     radius = Angle(radius,unit=u.arcsecond)
     return [ra.degree,dec.degree,radius.degree]
 
+def poly2poly(line):
+    """
+    This function works but the resulting polygons break healpy.
+    :param line:
+    :return:
+    """
+    words = re.split('[(\s,)]',line)
+    ras = np.array(words[1::2])
+    decs = np.array(words[2::2])
+    coords = []
+    for ra,dec in zip(ras,decs):
+        if ra.strip() == '' or dec.strip() == '':
+            continue
+        pos= SkyCoord(Angle(ra,unit=u.hour), Angle(dec,unit=u.degree))
+        #only add this point if it is some distance from the previous one
+        coords.extend( [pos.ra.degree, pos.dec.degree] )
+    return coords
+
 def reg2mim(regfile,mimfile):
     """
     Read a ds9 regions file and create a mim file from it
@@ -121,15 +144,17 @@ def reg2mim(regfile,mimfile):
     :return:
     """
     logging.info("Reading regions from {0}".format(regfile))
-    lines = (l for l in open(regfile,'r'))
+    lines = (l for l in open(regfile,'r') if not l.startswith('#'))
     poly = []
     circles = []
     for line in lines:
         if line.startswith('box'):
             poly.append(box2poly(line))
-
         elif line.startswith('circle'):
             circles.append(circle2circle(line))
+        elif line.startswith('polygon'):
+            logging.warn("Polygons break a lot, but I'll try this one anyway.")
+            poly.append(poly2poly(line))
         else:
             logging.warn("Not sure what to do with {0}".format(line[:-1]))
     container = Dummy()
