@@ -144,7 +144,7 @@ class Region():
         """
         #merge the pixels that are common to both
         for d in xrange(1,min(self.maxdepth,other.maxdepth)+1):
-            self.add_pixels(other.pixdict[d],d)
+            self.add_pixels(other.pixeldict[d],d)
 
         #if the other region is at higher resolution, then include a degraded version of the remaining pixels.
         if self.maxdepth<other.maxdepth:
