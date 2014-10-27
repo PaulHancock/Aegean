@@ -181,12 +181,12 @@ def combine_regions(container):
     #add/rem all the regions from files
     for r in container.add_region:
         logging.info("adding region from {0}".format(r))
-        r2=pickle.load(r)
+        r2=pickle.load(open(r[0],'r'))
         region.union(r2)
 
     for r in container.rem_region:
         logging.info("removing region from {0}".format(r))
-        r2=pickle.load(r)
+        r2=pickle.load(open(r[0],'r'))
         region.without(r2)
 
 
