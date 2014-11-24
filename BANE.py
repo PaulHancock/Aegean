@@ -268,9 +268,13 @@ def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False,cor
 
     if step_size is None:
         pix_scale = np.sqrt(abs(fits[0].header['CDELT1']*fits[0].header['CDELT2']))
-        beam_size = np.sqrt(abs(fits[0].header['BMAJ']*fits[0].header['BMIN']))
-        #default to 4x the synthesized beam width               
-        step_size = int(np.ceil(4*beam_size/pix_scale))
+        if 'BMAJ' in fits[0].header and 'BMIN' in fits[0].header:
+            beam_size = np.sqrt(abs(fits[0].header['BMAJ']*fits[0].header['BMIN']))
+            #default to 4x the synthesized beam width
+            step_size = int(np.ceil(4*beam_size/pix_scale))
+        else:
+            logging.info("BMAJ and/or BMIN not in fits header. Using step_size = 4 pixels")
+            step_size = 4
         step_size = (step_size,step_size)
 
     if box_size is None:
@@ -295,7 +299,6 @@ def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False,cor
 # Alternate Filters
 # Used only for testing algorithm speeds, not really useful
 ###
-
 def scipy_filter(im_name,out_base,step_size,box_size,cores=None):
     from scipy.ndimage.filters import generic_filter
     from scipy.stats import nanmedian,nanstd,scoreatpercentile

@@ -224,7 +224,9 @@ class IslandSource(SimpleSource):
     Each island of pixels can be characterised in a basic manner.
     This class contains info relevant to such objects.
     """
-    names=['island','components','background','local_rms','ra_str','dec_str','ra','dec','peak_flux','int_flux','err_int_flux','eta','x_width','y_width','pixels','flags']
+    names=['island','components','background','local_rms','ra_str','dec_str','ra','dec',
+           'peak_flux','int_flux','err_int_flux','eta','x_width','y_width','max_angular_size',
+           'pixels','area','beam_area','flags']
     def __init__(self):
         SimpleSource.__init__(self)
         self.island = 0 # island number
@@ -239,7 +241,10 @@ class IslandSource(SimpleSource):
         self.err_int_flux= 0.0 #Jy
         self.x_width = 0
         self.y_width = 0
+        self.max_angular_size = 0
         self.pixels = 0
+        self.area = 0
+        self.beam_area = 0 # at the brightest pixel
         self.components =0
         self.eta = 0.0
         #not included in 'names' and thus not included by default in most output
@@ -1820,8 +1825,8 @@ def fit_island(island_data):
         #check for negative islands
         if source.peak_flux<0:
             source.peak_flux = np.nanmin(kappa_sigma)
-        logging.debug("- peak flux {0}".format(source.peak_flux))        
-        source.extent = [xmin,xmax,ymin,ymax]
+        logging.debug("- peak flux {0}".format(source.peak_flux))
+
         #positions and background
         positions = np.where(kappa_sigma == source.peak_flux)
         xy=positions[0][0] +xmin, positions[1][0]+ymin
@@ -1836,17 +1841,37 @@ def fit_island(island_data):
         source.background = bkg[positions[0][0],positions[1][0]]
         source.local_rms = rms[positions[0][0],positions[1][0]]
         source.x_width,source.y_width = isle.pixels.shape
-        source.pixels=sum(np.isfinite(isle.pixels).ravel()*1)
+        source.pixels = int(sum(np.isfinite(kappa_sigma).ravel()*1.0))
         source.extent=[xmin,xmax,ymin,ymax]
+        #calculate the area of the island as a fraction of the area of the bounding box
+        #br = pix2sky([xmin,ymin])
+        bl = pix2sky([xmax,ymin])
+        tl = pix2sky([xmax,ymax])
+        tr = pix2sky([xmin,ymax])
+        height = gcd(tl[0],tl[1],bl[0],bl[1])
+        width = gcd(tl[0],tl[1],tr[0],tr[1])
+        area = height*width
+        #print tl,br,height,width, area, source.pixels, source.x_width,source.y_width
+        source.area = area * source.pixels/source.x_width/source.y_width
+        #create contours
         msq=MarchingSquares(idata)
         source.contour = [(a[0]+xmin,a[1]+ymin) for a in msq.perimeter]
+        #calculate the maximum angular size of this island, brute force method
+        source.max_angular_size = 0
+        for i,pos1 in enumerate(msq.perimeter):
+            radec1=pix2sky(pos1)
+            for j,pos2 in enumerate(msq.perimeter[i:]):
+                radec2 = pix2sky(pos2)
+                dist = gcd(radec1[0], radec1[1], radec2[0], radec2[1])
+                source.max_angular_size = max(source.max_angular_size,dist)
 
         logging.debug("- peak position {0}, {1} [{2},{3}]".format(source.ra_str,source.dec_str,positions[0][0],positions[1][0]))
 
+        pixbeam = get_pixbeam(beam,xy[0],xy[1])
         #integrated flux
         if pixbeam is not None:
             beam_volume = 2*np.pi*pixbeam.a*pixbeam.b/cc2fwhm**2
-            isize = len(np.isfinite(kappa_sigma)[0]) #number of non zero pixels
+            isize = source.pixels #number of non zero pixels
             logging.debug("- pixels used {0}".format(isize))
             source.int_flux = np.nansum(kappa_sigma) #total flux Jy/beam
             logging.debug("- sum of pixles {0}".format(source.int_flux))
@@ -1857,10 +1882,12 @@ def fit_island(island_data):
             logging.debug("- eta {0}".format(eta))
             source.eta = eta
             logging.debug("- corrected integrated flux {0}".format(source.int_flux))
+            source.beam_area = beam_volume
         else:
             source.flags|=flags.WCSERR
             source.int_flux=np.nan
             source.eta=np.nan
+            source.beam_area = np.nan
         #somehow I don't trust this but w/e
         source.err_int_flux =np.nan
         sources.append(source)
