@@ -2120,8 +2120,8 @@ def force_measure_flux(radec):
         source.flags = flag
         source.peak_pixel = np.nanmax(data)
         source.local_rms =global_data.rmsimg[x,y]
-        source.a = global_data.beam.a *3600 #arcsec
-        source.b = global_data.beam.b *3600
+        source.a = global_data.beam.a
+        source.b = global_data.beam.b
         source.pa = global_data.beam.pa
 
         catalog.append(source)
