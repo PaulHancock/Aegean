@@ -797,7 +797,7 @@ def load_aux_image(image,auxfile):
     image = main image object
     auxfile = filename of auxiliary file
     """
-    auximg=FitsImage(auxfile).get_pixels()
+    auximg=FitsImage(auxfile,beam=global_data.beam).get_pixels()
     if auximg.shape != image.get_pixels().shape:
         logging.error("file {0} is not the same size as the image map".format(auxfile))
         logging.error("{0}= {1}, image = {2}".format(auxfile,auximg.shape, image.get_pixels().shape))
