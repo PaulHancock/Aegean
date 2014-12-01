@@ -265,11 +265,20 @@ def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False,cor
 
     """
     fits,data = load_image(im_name)
-
+    #TODO: if CDELT1 is not found, then look for CD1_1 instead, etc for CDELT2
     if step_size is None:
-        pix_scale = np.sqrt(abs(fits[0].header['CDELT1']*fits[0].header['CDELT2']))
         if 'BMAJ' in fits[0].header and 'BMIN' in fits[0].header:
             beam_size = np.sqrt(abs(fits[0].header['BMAJ']*fits[0].header['BMIN']))
+            if 'CDELT1' in fits[0].header:
+                pix_scale = np.sqrt(abs(fits[0].header['CDELT1']*fits[0].header['CDELT2']))
+            elif 'CD1_1' in fits[0].header:
+                pix_scale = np.sqrt(abs(fits[0].header['CD1_1']*fits[0].header['CD2_2']))
+                if fits[0].header['CD1_2'] != 0 or fits[0].header['CD2_1']!=0:
+                    logging.warn("CD1_2 and/or CD2_1 are non-zero and I don't know what to do with them")
+                    logging.warn("Ingoring them")
+            else:
+                logging.warn("Cannot determine pixel scale, assuming 4 pixels per beam")
+                pix_scale = beam_size/4.
             #default to 4x the synthesized beam width
             step_size = int(np.ceil(4*beam_size/pix_scale))
         else:
