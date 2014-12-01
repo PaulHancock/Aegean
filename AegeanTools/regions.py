@@ -10,7 +10,7 @@ class Region():
     def __init__(self,maxdepth=11):
         self.maxdepth=maxdepth
         self.pixeldict=dict( (i,set()) for i in xrange(1,maxdepth+1))
-        self.demoted=set()
+        self.demoted=[]
         return
 
     def __repr__(self):
@@ -75,20 +75,18 @@ class Region():
         """
         :return: Return a set of pixels that represent this region at maxdepth
         """
-        pd = self.pixeldict.copy()
-        for d in xrange(1,self.maxdepth):
-            for p in pd[d]:
-                pd[d+1].update(set([4*p,4*p+1,4*p+2,4*p+3]))
-        return pd[self.maxdepth]
+        self._demote_all()
+        return self.demoted
 
     def _demote_all(self):
         """
         Represent this region as pixels at maxdepth only
         """
+        pd = self.pixeldict.copy()
         for d in xrange(1,self.maxdepth):
-            for p in self.pixeldict[d]:
-                self.pixeldict[d+1].update(set([4*p,4*p+1,4*p+2,4*p+3]))
-            self.pixeldict[d]=set()
+            for p in pd[d]:
+                pd[d+1].update(set([4*p,4*p+1,4*p+2,4*p+3]))
+        self.demoted = list(pd[d+1])
         return
 
     def _renorm(self):
@@ -129,12 +127,10 @@ class Region():
             sky=np.radians(sky)
 
         theta_phi = self.sky2ang(sky)
-        theta,phi = zip(*theta_phi)
-        #pixel number at the maxdepth
-        #pix = [ hp.ang2pix(2**self.maxdepth,*tp,nest=True) for tp in theta_phi ]
+        theta,phi = theta_phi.transpose()
         pix = hp.ang2pix(2**self.maxdepth,theta,phi,nest=True)
         pixelset = self.get_demoted()
-        result = np.array( [p in pixelset for p in pix])
+        result = np.in1d(pix,list(pixelset))
         return result
 
     def union(self,other,renorm=True):
@@ -144,7 +140,7 @@ class Region():
         """
         #merge the pixels that are common to both
         for d in xrange(1,min(self.maxdepth,other.maxdepth)+1):
-            self.add_pixels(other.pixdict[d],d)
+            self.add_pixels(other.pixeldict[d],d)
 
         #if the other region is at higher resolution, then include a degraded version of the remaining pixels.
         if self.maxdepth<other.maxdepth:
@@ -202,10 +198,9 @@ class Region():
         :param dec:
         :return:
         """
-        try:
-            sky=zip(ra,dec)
-        except TypeError:
-            sky= [[ra,dec]]
+        sky=np.empty((len(ra),2),dtype=type(ra[0]))
+        sky[:,0]=ra
+        sky[:,1]=dec
         return sky
 
     @classmethod
@@ -217,7 +212,12 @@ class Region():
         :param sky: float [(ra,dec),...]
         :return: A list of [(theta,phi), ...]
         """
-        theta_phi = [ (np.pi/2 - s[1], s[0]) for s in sky]
+        try:
+            theta_phi = sky.copy()
+        except AttributeError, e:
+            theta_phi = np.array(sky)
+        theta_phi[:,[1,0]] = theta_phi[:,[0,1]]
+        theta_phi[:,0] = np.pi/2 -theta_phi[:,0]
         return theta_phi
 
     @classmethod
@@ -256,7 +256,8 @@ def test_radec2sky():
     ra = [0,10]
     dec = [-45,45]
     sky = Region.radec2sky(ra,dec)
-    assert sky == [(ra[0],dec[0]),(ra[1],dec[1])], 'radec2sky broken on list input'
+    answer = np.array([(ra[0],dec[0]),(ra[1],dec[1])])
+    assert np.all(sky == answer), 'radec2sky broken on list input'
 
 def test_sky2ang_symmetric():
     sky = np.radians(np.array([[15,-45]]))
@@ -264,7 +265,7 @@ def test_sky2ang_symmetric():
     tp = np.array([ [tp[0][1],tp[0][0]]])
     sky2 = Region.sky2ang(tp)
     sky2 = np.array([ [sky2[0][1],sky2[0][0]]])
-    assert np.all(sky-sky2<1e-9), "sky2ang failed to be symmetric"
+    assert np.all(abs(sky-sky2)<1e-9), "sky2ang failed to be symmetric"
     return
 
 def test_sky2ang_corners():

@@ -40,7 +40,6 @@ class Dummy():
         self.maxdepth=8
         return
 
-#@profile
 def maskfile(regionfile,infile,outfile):
     """
     Created a masked version of file, using region.
@@ -66,12 +65,22 @@ def maskfile(regionfile,infile,outfile):
         data = im[0].data
 
     #create an array but don't set the values (they are random)
-    bigmask = np.empty( data.shape, dtype=bool)
-    for i,row in enumerate(data):
-        ra,dec = wcs.wcs_pix2world([(j,i) for j in xrange(len(row))],1).transpose()
-        mask = region.sky_within(ra, dec, degin=True)
-        mask = np.bitwise_not(mask)
-        bigmask[i]=mask
+    indexes = np.empty( (data.shape[0]*data.shape[1],2),dtype=int)
+    #since I know exactly what the index array needs to look like i can construct
+    # it faster than list comprehension would allow
+    #we do this only once and then recycle it
+    idx = np.array([ (j,0) for j in xrange(data.shape[1])])
+    j=data.shape[1]
+    for i in xrange(data.shape[0]):
+        idx[:,1]=i
+        indexes[i*j:(i+1)*j] = idx
+
+    #put ALL the pixles into our vectorized functions and minimised our overheads
+    ra,dec = wcs.wcs_pix2world(indexes,1).transpose()
+    bigmask = np.bitwise_not(region.sky_within(ra,dec,degin=True))
+    #rework our 1d list into a 2d array
+    bigmask = bigmask.reshape(data.shape)
+    #and apply the mask
     data[bigmask]=np.nan
 
     im[0].data=data
@@ -181,12 +190,12 @@ def combine_regions(container):
     #add/rem all the regions from files
     for r in container.add_region:
         logging.info("adding region from {0}".format(r))
-        r2=pickle.load(r)
+        r2=pickle.load(open(r[0],'r'))
         region.union(r2)
 
     for r in container.rem_region:
         logging.info("removing region from {0}".format(r))
-        r2=pickle.load(r)
+        r2=pickle.load(open(r[0],'r'))
         region.without(r2)
 
 

@@ -48,7 +48,21 @@ class FitsImage():
         self.x = self._header['NAXIS1']
         self.y = self._header['NAXIS2']
         #this is correct at the center of the image for all images, and everywhere for conformal projections
-        self.pixarea = abs(self._header["CDELT1"]*self._header["CDELT2"])
+        if all( [ a in self._header for a in ["CDELT1","CDELT2"]]):
+            self.pixarea = abs(self._header["CDELT1"]*self._header["CDELT2"])
+        elif all( [a in self._header for a in ["CD1_1","CD1_2","CD2_1","CD2_2"]]):
+            if self._header["CD1_2"] ==0 and self._header["CD2_1"]==0:
+                pass
+            else:
+                logging.warn("Pixels don't appear to be square")
+            self.pixarea = abs(self._header["CD1_1"]*self._header["CD2_2"])
+        elif all([a in self._header for a in ["CD1_1","CD2_2"]]):
+            self.pixarea = abs(self._header["CD1_1"]*self._header["CD2_2"])
+        else:
+            logging.warn("cannot determine pixel area, using zero")
+            self.pixarea=0
+
+
         
         if beam is None:
             #if the bpa isn't specified add it as zero
