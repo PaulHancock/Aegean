@@ -1937,6 +1937,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     returnrms   - if true, also return the rms image. Default=False
     nopositive  - if true, sources with positive fluxes will not be reported
     nonegative  - if true, sources with negative fluxes will not be reported
+    mask        - the filename of a region file created by MIMAS. Islands outside of this region will be ignored.
 
     Return:
     if returnrms:
