@@ -225,7 +225,7 @@ class IslandSource(SimpleSource):
     This class contains info relevant to such objects.
     """
     names=['island','components','background','local_rms','ra_str','dec_str','ra','dec',
-           'peak_flux','int_flux','err_int_flux','eta','x_width','y_width','max_angular_size',
+           'peak_flux','int_flux','err_int_flux','eta','x_width','y_width','max_angular_size', 'pa',
            'pixels','area','beam_area','flags']
     def __init__(self):
         SimpleSource.__init__(self)
@@ -242,14 +242,16 @@ class IslandSource(SimpleSource):
         self.x_width = 0
         self.y_width = 0
         self.max_angular_size = 0
+        self.pa = 0
         self.pixels = 0
         self.area = 0
         self.beam_area = 0 # at the brightest pixel
         self.components =0
         self.eta = 0.0
         #not included in 'names' and thus not included by default in most output
-        self.extent =0
-        self.contours=[]
+        self.extent = 0
+        self.contours = []
+        self.max_angular_size_anchors = []
 
     def __repr__(self):
         return "({0:d})".format(self.island)
@@ -1863,7 +1865,10 @@ def fit_island(island_data):
             for j,pos2 in enumerate(msq.perimeter[i:]):
                 radec2 = pix2sky(pos2)
                 dist = gcd(radec1[0], radec1[1], radec2[0], radec2[1])
-                source.max_angular_size = max(source.max_angular_size,dist)
+                if dist > source.max_angular_size:
+                    source.max_angular_size = dist
+                    source.pa = bear(radec1[0], radec1[1], radec2[0], radec2[1])
+                    source.max_angular_size_anchors = [radec1[0], radec1[1], radec2[0], radec2[1]]
 
         logging.debug("- peak position {0}, {1} [{2},{3}]".format(source.ra_str,source.dec_str,positions[0][0],positions[1][0]))
 
