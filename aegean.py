@@ -1035,10 +1035,11 @@ def writeIslandContours(filename,catalog,fmt):
     if fmt=='reg':
         line_fmt = 'image;line({0},{1},{2},{3})'
         text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
+        mas_fmt  = 'image; line({1},{0},{3},{2}) #color = yellow'
     if fmt=='ann':
-        print >>out, "COORD P"
-        text_fmt=None
         logging.warn("Kvis not yet supported")
+        logging.warn("not writing anything")
+        return
     for c in catalog:
         contour = c.contour
         for p1,p2 in zip(contour[:-1],contour[1:]):
@@ -1048,6 +1049,8 @@ def writeIslandContours(filename,catalog,fmt):
         if np.nan in [c.ra,c.dec]:
             print >>out,'#',
         print >>out, text_fmt.format(c.ra,c.dec,c.island)
+        print >>out, mas_fmt.format(*[a+0.5 for a in c.max_angular_size_anchors])
+
     out.close()
     return
 
@@ -1860,15 +1863,15 @@ def fit_island(island_data):
         source.contour = [(a[0]+xmin,a[1]+ymin) for a in msq.perimeter]
         #calculate the maximum angular size of this island, brute force method
         source.max_angular_size = 0
-        for i,pos1 in enumerate(msq.perimeter):
+        for i,pos1 in enumerate(source.contour):
             radec1=pix2sky(pos1)
-            for j,pos2 in enumerate(msq.perimeter[i:]):
+            for j,pos2 in enumerate(source.contour[i:]):
                 radec2 = pix2sky(pos2)
                 dist = gcd(radec1[0], radec1[1], radec2[0], radec2[1])
                 if dist > source.max_angular_size:
                     source.max_angular_size = dist
                     source.pa = bear(radec1[0], radec1[1], radec2[0], radec2[1])
-                    source.max_angular_size_anchors = [radec1[0], radec1[1], radec2[0], radec2[1]]
+                    source.max_angular_size_anchors = [pos1[0], pos1[1], pos2[0], pos2[1]]
 
         logging.debug("- peak position {0}, {1} [{2},{3}]".format(source.ra_str,source.dec_str,positions[0][0],positions[1][0]))
 
