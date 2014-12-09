@@ -362,7 +362,14 @@ def load_image(im_name):
     """
     Generic helper function to load a fits file
     """
-    fits = pyfits.open(im_name)
+    try:
+        fits = pyfits.open(im_name)
+    except IOError,e:
+        if "END" in e.message:
+            logging.warn(e.message)
+            logging.warn("trying to ignore this, but you should really fix it")
+            fits = pyfits.open(im_name,ignore_missing_end=True)
+
     data = fits[0].data 
     if fits[0].header['NAXIS']>2:
         data = data.squeeze() #remove axes with dimension 1
@@ -375,7 +382,13 @@ def save_image(fits,data,im_name):
     This function modifies the fits object!
     """
     fits[0].data = data
-    fits.writeto(im_name,clobber=True)
+    try:
+        fits.writeto(im_name,clobber=True)
+    except pyfits.verify.VerifyError,e:
+        if "DATAMAX" in e.message or "DATAMIN" in e.message:
+            logging.warn(e.message)
+            logging.warn("I will fix this but it will cause some programs to break")
+            fits.writeto(im_name,clobber=True,output_verify="silentfix")
     logging.info("wrote {0}".format(im_name))
     return
 
