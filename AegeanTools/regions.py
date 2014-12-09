@@ -178,7 +178,8 @@ class Region():
             for d in xrange(1,self.maxdepth+1):
                 for p in self.pixeldict[d]:
                     line="fk5; polygon("
-                    vectors = zip(*hp.boundaries(2**d,p,step=1,nest=True))
+                    #the following int() gets around some problems with np.int64 that exist prior to numpy v 1.8.1
+                    vectors = zip(*hp.boundaries(2**d,int(p),step=1,nest=True))
                     positions=[]
                     for sky in self.vec2sky(np.array(vectors),degrees=True):
                         ra, dec = sky
