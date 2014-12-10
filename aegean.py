@@ -899,7 +899,6 @@ def load_catalog(filename):
     returns [(ra,dec),...]
     '''
     fmt = os.path.splitext(filename)[-1]
-    print fmt
     if fmt=='.csv':
         logging.info("Reading first two columns of csv file")
         lines=[a.strip().split(',') for a in open(filename,'r').readlines() if not a.startswith('#') ]
