@@ -1491,6 +1491,29 @@ def pa_limit(pa):
         pa-=180
     return pa
 
+def gmean(indata):
+    """
+    Calculate the geometric mean of a data set taking account of
+    values that may be negative, zero, or nan
+    :param data: a list of floats or ints
+    :return: the geometric mean of the data
+    """
+    data = np.ravel(indata)
+    if np.inf in data:
+        return np.inf, np.inf
+
+    finite = data[np.isfinite(data)]
+    if len(finite)<1:
+        return np.nan, np.nan
+    #determine the zero point and scale all values to be 1 or greater
+    scale = abs(np.min(finite))+1
+    finite+=scale
+    #calculate the geometric mean of the scaled data and scale back
+    lfinite=np.log(finite)
+    flux = np.exp(np.mean(lfinite))-scale
+    error = np.nanstd(lfinite)*flux
+    return flux, abs(error)
+
 #WCS helper functions
 
 def pix2sky(pixel):
@@ -2132,13 +2155,7 @@ def force_measure_flux(radec):
         # for each pixel. Error is stddev.
         # Only use pixels within the FWHM, ie value>=0.5. Set the others to NaN
         ratios = np.where(gaussian_data>=0.5, data/gaussian_data, np.nan)
-        #ratios_no_nans = np.extract(np.isfinite(ratios), ratios) # get rid of NaNs
-        #flux = np.average(ratios_no_nans)
-        #error = np.std(ratios_no_nans)
-        lratios=np.log(ratios)
-        flux = np.exp(np.nanmean(lratios))
-        error = np.nanstd(lratios)*flux
-
+        flux,error = gmean(ratios)
         if not np.isfinite(flux) or not np.isfinite(error):
             dummy = SimpleSource()
             dummy.peak_flux = np.nan
@@ -2149,7 +2166,7 @@ def force_measure_flux(radec):
         source = SimpleSource()
         source.ra=ra
         source.dec=dec
-        source.peak_flux=flux
+        source.peak_flux=flux #* isnegative
         source.err_peak_flux=error
         source.background=global_data.bkgimg[x,y]
         source.flags = flag
