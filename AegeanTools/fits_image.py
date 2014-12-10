@@ -14,12 +14,15 @@ from math import pi,cos,sin,sqrt
 class FitsImage():
     def __init__(self, filename=None, hdu_index=0, hdu=None, beam=None):
         """
-        filename: the name of the fits image file
+        filename: the name of the fits image file or an instance of astropy.io.fits.HDUList
         hdu_index = index of FITS HDU when extensions are used (0 is primary HDU)
         hdu = a pyfits hdu. if provided the object is constructed from this instead of
               opening the file (filename is ignored)  
         """
-        if hdu:
+        if isinstance(filename,pyfits.HDUList):
+            logging.debug("accepting already loaded file {0}".format(filename.filename()))
+            self.hdu = filename[hdu_index]
+        elif hdu:
             self.hdu = hdu
         else:
             logging.debug("Loading HDU {0} from {1}".format(hdu_index, filename))
