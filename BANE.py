@@ -265,6 +265,11 @@ def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False,cor
 
     """
     fits,data = load_image(im_name)
+    #remove spurious dimensions of this array
+    newshape = [a for a in data.shape if a>1]
+    if len(newshape) < len(data.shape):
+        data = data.copy()
+        data.resize(newshape)
     #TODO: if CDELT1 is not found, then look for CD1_1 instead, etc for CDELT2
     if step_size is None:
         if 'BMAJ' in fits[0].header and 'BMIN' in fits[0].header:
