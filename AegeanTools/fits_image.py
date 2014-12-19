@@ -54,15 +54,13 @@ class FitsImage():
         if all( [ a in self._header for a in ["CDELT1","CDELT2"]]):
             self.pixarea = abs(self._header["CDELT1"]*self._header["CDELT2"])
         elif all( [a in self._header for a in ["CD1_1","CD1_2","CD2_1","CD2_2"]]):
-            if self._header["CD1_2"] ==0 and self._header["CD2_1"]==0:
-                pass
-            else:
-                logging.warn("Pixels don't appear to be square")
-            self.pixarea = abs(self._header["CD1_1"]*self._header["CD2_2"])
+            self.pixarea = abs( self._header["CD1_1"]*self._header["CD2_2"] - self._header["CD1_2"]*self._header["CD2_1"])
+            if not (self._header["CD1_2"] ==0 and self._header["CD2_1"]==0):
+                logging.warn("Pixels don't appear to be square -> entering uncharted waters")
         elif all([a in self._header for a in ["CD1_1","CD2_2"]]):
             self.pixarea = abs(self._header["CD1_1"]*self._header["CD2_2"])
         else:
-            logging.warn("cannot determine pixel area, using zero")
+            logging.warn("cannot determine pixel area, using zero EVEN THOUGH THIS IS WRONG!")
             self.pixarea=0
 
 
