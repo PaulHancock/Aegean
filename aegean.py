@@ -729,19 +729,31 @@ def ntwodgaussian(inpars):
         logging.error("inpars requires a multiple of 6 parameters")
         logging.error("only {0} parameters supplied".format(len(inpars)))
         sys.exit()
-    #pars=np.array(inpars).reshape(len(inpars)/6,6)
-    amp,xo,yo,major,minor,pa = np.array(inpars).reshape(6,len(inpars)/6)
-    #transform pa->-pa so that our angles are CW instead of CCW
-    st,ct,s2t=zip(*[ (math.sin(np.radians(-p))**2,math.cos(np.radians(-p))**2,math.sin(2*np.radians(-p))) for p in pa])
-    a, bb, c = zip(*[ ((ct[i]/major[i]**2 + st[i]/minor[i]**2)/2,
-                       s2t[i]/4 *(1/minor[i]**2-1/major[i]**2),
-                       (st[i]/major[i]**2 + ct[i]/minor[i]**2)/2) for i in xrange(len(amp))])
+    amp = inpars[::6]
+    xo = inpars[1::6]
+    yo = inpars[2::6]
+    major = inpars[3::6]
+    minor = inpars[4::6]
+    pa = np.radians(inpars[5::6])
+    
+    def two_d_gaussian(x, y, amp, xo, yo, major, minor, pa):
+        """
+        x,y -> pixels
+        xo,yo -> location
+        major,minor -> axes in pixels
+        pa -> radians
+        """
+        st, ct, s2t = math.sin(pa)**2,math.cos(pa)**2, math.sin(2*pa)
+        a, bb, c = (ct/major**2 + st/minor**2)/2, \
+                    s2t/4 *(1/minor**2-1/major**2),\
+                    (st/major**2 + ct/minor**2)/2
+        return amp*np.exp(-1*(a*(x-xo)**2 + 2*bb*(x-xo)*(y-yo) + c*(y-yo)**2) )
 
     def rfunc(x,y):
         ans=0
         #list comprehension just breaks here, something to do with scope i think
         for i in range(len(amp)):
-            ans+= amp[i]*np.exp(-1*(a[i]*(x-xo[i])**2 + 2*bb[i]*(x-xo[i])*(y-yo[i]) + c[i]*(y-yo[i])**2) )
+            ans+= two_d_gaussian(x,y,amp[i], xo[i], yo[i], major[i], minor[i], pa[i])
         return ans
     return rfunc
 
