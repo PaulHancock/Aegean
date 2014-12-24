@@ -1,5 +1,7 @@
 #! /usr/bin/env python
-'''This module contains functions for converting coordinates between epochs
+
+"""
+This module contains functions for converting coordinates between epochs
 and between different representations. All conversions are done in house so 
 as to avoid dependancies on other modules or external code. This will be at
 the cost of speed but will give increased portability.
@@ -10,7 +12,7 @@ eg
 >>> convert.ra_to_dec(12,34,45.5)
 ???
 
-'''
+"""
 
 import math
 import numpy as np
@@ -30,6 +32,7 @@ def ra2dec(ra):
 
 def dec2dec(dec):
     """
+    sex2dec for declination
     Accepts a string declination and converts it to decimal degrees
     requires +/-dd:mm[:ss.s]
     """
@@ -84,7 +87,8 @@ def gcd(ra1, dec1, ra2, dec2):
     Great circle distance as calculated by the haversine formula
     ra/dec in degrees
     returns:
-    sep in degrees"""
+    sep in degrees
+    """
     dlon = ra2 - ra1
     dlat = dec2 - dec1
     a = np.sin(np.radians(dlat) / 2) ** 2
@@ -94,7 +98,8 @@ def gcd(ra1, dec1, ra2, dec2):
 
 
 def bear(ra1, dec1, ra2, dec2):
-    """Calculate the bearing of point b from point a.
+    """
+    Calculate the bearing of point b from point a.
     bearing is East of North [0,360)
     position angle is East of North (-180,180]
     """
