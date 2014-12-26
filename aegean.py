@@ -55,14 +55,14 @@ from optparse import OptionParser
 from AegeanTools.fits_image import FitsImage, Beam
 from AegeanTools.msq2 import MarchingSquares
 from AegeanTools.mpfit import mpfit
-from AegeanTools.convert import ra2dec, dec2dec, dec2hms, dec2dms, gcd, bear, translate
+from AegeanTools.convert import dec2hms, dec2dms, gcd, bear, translate
 import AegeanTools.flags as flags
 
 #multiple cores support
 import AegeanTools.pprocess as pprocess
 import multiprocessing
 
-version = '1.8.1'
+version = '1.9'
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -1452,7 +1452,7 @@ def estimate_bkg_rms(data):
     iqr = p75 - p25
     return p50, iqr / 1.34896
 
-def estimate_background(data):
+def DEP_estimate_background(data):
     logging.warn("This function has been deprecated and should no longer be used")
     logging.warn("use estimate_background_global or estimate_bkg_rms instead")
     return None, None
@@ -1477,10 +1477,7 @@ def curvature(data,aspect=None,dtype=None):
     return ndi.convolve(data,kern)
 
 ##Nifty helpers
-def within(x,xm,xx):
-    """Enforce xm<= x <=xx"""
-    return min(max(x,xm),xx)
-
+#TODO: re-parameterise the fitting so that this is not required
 def fix_shape(source):
     """
     Ensure that a>=b
@@ -1774,8 +1771,8 @@ def fit_island(island_data):
 
         #calculate ra,dec errors from the pixel error
         #limit the errors to be the width of the island
-        x_err_pix=x_pix + within(xo_err,-1,isle.pixels.shape[0])
-        y_err_pix=y_pix + within(yo_err,-1,isle.pixels.shape[1])
+        x_err_pix=x_pix + np.clip(xo_err,-1,isle.pixels.shape[0])
+        y_err_pix=y_pix + np.clip(yo_err,-1,isle.pixels.shape[1])
         err_coords = pix2sky([x_err_pix, y_err_pix])
         source.err_ra = abs(ra_orig - err_coords[0])   if xo_err>0 else -1
         source.err_dec = abs(source.dec - err_coords[1]) if yo_err>0 else -1
