@@ -1,15 +1,14 @@
-'''
-Created on 18/07/2011
+"""
+Based on fits_image.py by Jay Banyer (from vast pipeline)
 
-@author: jay
-'''
+Re-written by Paul Hancock for Aegean specific use.
+"""
 
 import astropy.io.fits as pyfits
 import numpy
 import astropy.wcs as pywcs
 import scipy.stats
-import logging,sys
-from math import pi,cos,sin,sqrt
+import logging, sys
 
 class FitsImage():
     def __init__(self, filename=None, hdu_index=0, hdu=None, beam=None):
@@ -108,14 +107,12 @@ class FitsImage():
         assert pixels.shape == self._pixels.shape, "Shape mismatch between pixels supplied {0} and existing image pixels {1}".format(pixels.shape,self._pixels.shape)
         self._pixels = pixels
             
-    def get_background_rms(self):
-        '''
+    #TODO: This may be redundant for Aegean, and should be removed if so
+    def DEP_get_background_rms(self):
+        """
         Return the background RMS (Jy)
         NB - value is calculated on first request then cached for speed
-        '''
-        #TODO: return a proper background RMS ignoring the sources
-        # This is an approximate method suggested by PaulH.
-        # I have no idea where this magic 1.34896 number comes from...
+        """
         if self._rms is None:
             # Get the pixels values without the NaNs
             data = numpy.extract(self.hdu.data>-9999999, self.hdu.data)
@@ -124,9 +121,10 @@ class FitsImage():
             iqr = p75 - p25
             self._rms = iqr / 1.34896
         return self._rms
-    
-    def pix2sky(self, pixel):
-        '''Get the sky coordinates [ra,dec] (degrees) given pixel [x,y] (float)'''
+
+    #TODO: This may be redundant for Aegean, and should be removed if so
+    def DEP_pix2sky(self, pixel):
+        """Get the sky coordinates [ra,dec] (degrees) given pixel [x,y] (float)"""
         pixbox = numpy.array([pixel, pixel])
         skybox = self.wcs.wcs_pix2sky(pixbox, 1)
         return [float(skybox[0][0]), float(skybox[0][1])]
@@ -134,8 +132,9 @@ class FitsImage():
     def get_hdu_header(self):
         return self._header
 
-    def sky2pix(self, skypos):
-        '''Get the pixel coordinates [x,y] (floats) given skypos [ra,dec] (degrees)'''
+    #TODO: This may be redundant for Aegean, and should be removed if so
+    def DEP_sky2pix(self, skypos):
+        """Get the pixel coordinates [x,y] (floats) given skypos [ra,dec] (degrees)"""
         skybox = [skypos, skypos]
         pixbox = self.wcs.wcs_sky2pix(skybox, 1)
         return [float(pixbox[0][0]), float(pixbox[0][1])] 
