@@ -21,6 +21,7 @@ import scipy
 from scipy import ndimage as ndi
 #from scipy import stats
 from scipy.special import erf
+from scipy.ndimage import label, find_objects
 
 #fits and wcs handling
 import astropy
@@ -405,137 +406,38 @@ class DummyMP():
 
 ######################################### FUNCTIONS ###############################
 
-## floodfill functions
-def explore(snr,status,queue,bounds,pixel):
+def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
     """
-    Look for pixels adjacent to <pixel> and add them to the queue
-    Don't include pixels that are in the queue
-    :param snr: array of bool that is true for pixels we are interested in
-    :param status: array that represents the status of pixels
-    :param queue: the queue of pixels that we are interested in
-    :param bounds: the bounds within which we can explore
-    :param pixel: the initial point to start from
-    :return: None
-    """
-    (x, y) = pixel
-    if x < 0 or y < 0:
-        logging.error("Floodfill tried to look at a pixel at {0}, which is off the map.")
-        sys.exit()
-
-    if x > 0:
-        new = (x - 1, y)
-        if snr[new] and (not status[new] & flags.QUEUED):
-            queue.append(new)
-            status[new] |= flags.QUEUED
-
-    if x < bounds[0]:
-        new = (x + 1, y)
-        if snr[new] and (not status[new] & flags.QUEUED):
-            queue.append(new)
-            status[new] |= flags.QUEUED
-
-    if y > 0:
-        new = (x, y - 1)
-        if snr[new] and (not status[new] & flags.QUEUED):
-            queue.append(new)
-            status[new] |= flags.QUEUED
-
-    if y < bounds[1]:
-        new =  (x, y + 1)
-        if snr[new] and (not status[new] & flags.QUEUED):
-            queue.append(new)
-            status[new] |= flags.QUEUED
-
-def flood(snr,status,bounds,peak):
-    """
-    Start at pixel=peak and return all the pixels that belong to
-    the same blob.
-    :param snr: array of bool that is true for pixels we are interested in
-    :param status: array that represents the status of pixels
-    :param bounds: the bounds within which we can explore
-    :param peak: the initial point to start from
-    :return: None
-    """
-
-    if status[peak] & flags.VISITED:
-        return []
-
-    blob = []
-    queue = [peak]
-    status[peak] |= flags.QUEUED
-
-    for pixel in queue:
-        if status[pixel] & flags.VISITED:
-            continue
-
-        status[pixel] |= flags.VISITED
-
-        blob.append(pixel)
-        explore(snr, status, queue, bounds, pixel)
-
-    return blob
-
-def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,domask=False):
-    """
-    <a generator function>
-    Find all the sub islands in data.
-    Detect islands with innerclip.
-    Report islands with outerclip
-
-    type(data) = Island
-    return = [(pixels,xmin,ymin)[,(pixels,xmin,ymin)] ]
-    where xmin,ymin is the offset of the subisland
+    Needs to work for entire image, and also for components within an island.
+    :param data: 2d array of pixel values
+    :param rmsimg: 2d array of rms values
+    :param innerclip: seed clip value
+    :param outerclip: flood clip value
+    :param domask: look for a region mask in globals, and only return islands that are within the mask
+    :return:
     """
     if outerclip is None:
-        outerclip=innerclip
-    #somehow this avoids problems with multiple cores not working properly!?!?
-    #TODO figure out why this is so.
-    abspix=abs(data.pixels)
-        
-    status=np.zeros(data.pixels.shape,dtype=np.uint8)
-    # Selecting PEAKED pixels
-    logging.debug("InnerClip: {0}".format(innerclip))
+        outerclip = innerclip
 
-    status[np.where(abspix/rmsimg>innerclip)] = flags.PEAKED
-    #logging.debug("status: {0}".format(status[1:5,1:5]))
-    logging.debug("Peaked pixels: {0}/{1}".format(np.sum(status),len(data.pixels.ravel())))
-    # making pixel list
-    ax,ay=np.where(abspix/rmsimg>innerclip)
+    #compute snr image
+    snr = abs(data)/rmsimg
+    #mask of pixles that are above the outerclip
+    a =  snr >= outerclip
+    #segmentation a la scipy
+    l, n = label(a)
+    f = find_objects(l)
 
-    #TODO: change this so that I can sort without having to decorate/undecorate
-    peaks=[(data.pixels[ax[i],ay[i]],ax[i],ay[i]) for i in range(len(ax))]
+    #return values as before
+    #TODO: rewrite code in other parts so that I don't have to add +1 to the max values
+    for i in range(n):
+        xmin,xmax = f[i][0].start, f[i][0].stop
+        ymin,ymax = f[i][1].start, f[i][1].stop
+        if np.any(snr[xmin:xmax+1,ymin:ymax+1]>innerclip): #obey inner clip constraint
+            data_box = data[xmin:xmax+1,ymin:ymax+1]
+            data_box[np.where(snr[xmin:xmax+1,ymin:ymax+1] < outerclip)] = np.nan
+            logging.info("returned island {0}<x<{1},{2}<y<{3}".format(xmin,xmax,ymin,ymax))
+            yield data_box, xmin, xmax, ymin, ymax
 
-    #ignore pixels outside the masking region
-    if global_data.region is not None and domask:
-        logging.debug("masking pixels")
-        yx = [ [p[2],p[1]] for p in peaks]
-        ra,dec = global_data.wcs.wcs_pix2world(yx, 1).transpose()
-        mask = global_data.region.sky_within(ra, dec, degin=True)
-        peaks = [peaks[i] for i in xrange(len(mask)) if mask[i]]
-
-    if len(peaks) == 0:
-        logging.debug("There are no pixels above the clipping limit")
-        return
-    # sorting pixel list - strongest peak should be found first
-    peaks.sort(reverse = True)
-    if peaks[0][0] < 0:
-        peaks.reverse()
-    peaks=map(lambda x:x[1:],peaks) #strip the flux data so we are left with just the positions
-    logging.debug("Most positive peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[0]], rmsimg[peaks[0]]))
-    logging.debug("Most negative peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[-1]], rmsimg[peaks[-1]]))
-    bounds=(data.pixels.shape[0] - 1, data.pixels.shape[1] - 1)
-
-    snr = abspix/rmsimg >= outerclip
-    # starting image segmentation
-    for peak in peaks:
-        blob = flood(snr, status, bounds, peak)
-        #blob=flood(abspix,rmsimg,status,bounds,peak,cutoffratio=outerclip)
-        npix=len(blob)
-        if npix>=1:#islands with no pixels have length 1
-            new_isle,xmin,xmax,ymin,ymax=data.list2map(blob)
-            if new_isle is not None:
-                yield new_isle,xmin,xmax,ymin,ymax
-    
 ##parameter estimates
 def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
     """Estimates the number of sources in an island and returns initial parameters for the fit as well as
@@ -584,7 +486,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
     if not data.shape == curve.shape:
         logging.error("data and curvature are mismatched")
         logging.error("data:{0} curve:{1}".format(data.shape,curve.shape))
-        sys.exit()
+        raise AssertionError()
 
     #For small islands we can't do a 6 param fit
     #Don't count the NaN values as part of the island
@@ -610,10 +512,10 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
         is_flag |= flags.FIXED2PSF
     else:
         if isnegative:
-            kappa_sigma=Island( np.where( curve>0.5, np.where(data+innerclip*rmsimg<0, data, np.nan) ,np.nan) )
+            kappa_sigma = np.where( curve>0.5, np.where(data+innerclip*rmsimg<0, data, np.nan) ,np.nan)
         else:
-            kappa_sigma=Island( np.where( -1*curve>0.5, np.where(data-innerclip*rmsimg>0, data, np.nan) ,np.nan) )     
-        summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0,domask=False)
+            kappa_sigma = np.where( -1*curve>0.5, np.where(data-innerclip*rmsimg>0, data, np.nan) ,np.nan)
+        summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.shape),0,domask=False)
 
     i=0
     for summit,xmin,xmax,ymin,ymax in summits:
@@ -1993,7 +1895,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
     #we now work with the updated versions of the three images
     bkgimg = global_data.bkgimg
     rmsimg = global_data.rmsimg
-    data = Island(global_data.data_pix) #not a FitsImage
+    data = global_data.data_pix #not a FitsImage
     beam=global_data.beam
 
     logging.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a*3600,beam.b*3600,beam.pa))
@@ -2031,6 +1933,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None,rms=None, max_summ
         print >>outfile,OutputSource.header
     island_group = []
     group_size = 20
+    #TODO: change data to np.array
     for i,xmin,xmax,ymin,ymax in gen_flood_wrap(data,rmsimg,innerclip,outerclip,domask=True):
         if len(i)<=1:
             #empty islands have length 1
