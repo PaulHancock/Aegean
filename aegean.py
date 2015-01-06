@@ -29,7 +29,7 @@ import astropy
 from astropy.table.table import Table 
 from astropy.io import ascii
 try:
-    from astropy.io.votable import from_table
+    from astropy.io.votable import from_table, parse_single_table
     from astropy.io.votable import writeto as writetoVO
     votables_supported=True
 except:
@@ -894,16 +894,26 @@ def load_catalog(filename):
     '''
     load a catalog and extract the source positions
     acceptable formats are:
-    csv - ra, dec as decimal degrees in FIRST two columns
+    csv,tab,tex - from astropy.io.ascii
+    vo,vot,xml - votable format
     cat - format created by Aegean
     returns [(ra,dec),...]
     '''
-    fmt = os.path.splitext(filename)[-1]
-    if fmt=='.csv':
-        logging.info("Reading first two columns of csv file")
-        lines=[a.strip().split(',') for a in open(filename,'r').readlines() if not a.startswith('#') ]
-        catalog=[ (float(a[0]),float(a[1])) for a in lines]      
-    elif fmt=='.cat':
+    supported = get_table_formats()
+
+    fmt = os.path.splitext(filename)[-1][1:].lower() #extension sans '.'
+
+    if fmt in ['csv','tab','tex'] and fmt in supported:
+        logging.info("Reading file {0}".format(filename))
+        t = ascii.read(filename)
+        catalog = zip(t.columns['ra'],t.columns['dec'])
+
+    elif fmt in ['vo','vot','xml'] and fmt in supported:
+        logging.info("Reading file {0}".format(filename))
+        t = parse_single_table(filename)
+        catalog = zip( t.array['ra'].tolist(),t.array['dec'].tolist())
+
+    elif fmt=='cat':
         logging.info("Reading ra/dec columns of Aegean catalog")
         lines = [a.strip().split() for a in open(filename,'r').readlines() if not a.startswith('#') ]
         catalog = [ (float(a[5]),float(a[7])) for a in lines]
@@ -916,6 +926,7 @@ def load_catalog(filename):
             logging.error("Expecting two columns of floats but failed to parse")
             logging.error("Catalog file {0} not loaded".format(filename))
             sys.exit()
+
     return catalog
 
 #writing table formats   
