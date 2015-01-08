@@ -575,8 +575,13 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
         pixbeam=Beam(1,1,0)
     #The position cannot be more than a pixel beam from the initial location
     #Use abs so that these distances are always positive
-    xo_lim=max( abs(pixbeam.a*np.cos(np.radians(pixbeam.pa))), abs(pixbeam.b*np.sin(np.radians(pixbeam.pa))))
-    yo_lim=max( abs(pixbeam.a*np.sin(np.radians(pixbeam.pa))), abs(pixbeam.b*np.cos(np.radians(pixbeam.pa))))
+    # xo_lim=max( abs(pixbeam.a*np.cos(np.radians(pixbeam.pa))), abs(pixbeam.b*np.sin(np.radians(pixbeam.pa))))
+    # yo_lim=max( abs(pixbeam.a*np.sin(np.radians(pixbeam.pa))), abs(pixbeam.b*np.cos(np.radians(pixbeam.pa))))
+
+    #set a circular limit based on the size of the pixbeam
+    xo_lim=int(round(0.5*np.hypot(pixbeam.a*np.cos(np.radians(pixbeam.pa)), pixbeam.b*np.sin(np.radians(pixbeam.pa)))))
+    yo_lim=xo_lim
+
     if debug_on:
         logging.debug(" - shape {0}".format(data.shape))
         logging.debug(" - xo_lim,yo_lim {0}, {1}".format(xo_lim,yo_lim))
@@ -627,7 +632,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
 
         (xpeak,ypeak)=np.where(summit==amp)
         if logging.getLogger().isEnabledFor(logging.DEBUG):
-            logging.debug(" - max is {0: 5.2f}".format(amp))
+            logging.debug(" - max is {0:f}".format(amp))
             logging.debug(" - peak at {0},{1}".format(xpeak,ypeak))
         xo = xpeak[0]+xmin
         yo = ypeak[0]+ymin
@@ -667,7 +672,7 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
         #if the min/max of either major,minor are equal then use a PSF fit
         if minor_min==minor_max or major_min==major_max:
             summit_flag|=flags.FIXED2PSF
-        
+
         pa=pixbeam.pa
         flag=summit_flag
         if debug_on:
@@ -2116,19 +2121,23 @@ def force_measure_flux(radec):
     '''
     catalog = []
 
+    #this is what we use to denote sources that are we are not able to measure
+    dummy = SimpleSource()
+    dummy.peak_flux = np.nan
+    dummy.peak_pixel = np.nan
+    dummy.flags=flags.FITERR
+
     shape = global_data.data_pix.shape
     for ra,dec in radec:
         #find the right pixels from the ra/dec
         source_x, source_y = sky2pix([ra,dec])
         x = int(round(source_x))
         y = int(round(source_y))
-        if not 0<=x<shape[0] or not 0<=y<shape[1]:
-            #logging.warn("Source at {0} {1} is outside of image bounds".format(ra,dec))
-            #logging.warn("No measurements made - dummy source created")
-            dummy = SimpleSource()
-            dummy.peak_flux = np.nan
-            dummy.peak_pixel = np.nan
-            dummy.flags=flags.FITERR
+
+        #reject sources that are outside the image bounds, or which have nan data/rms values
+        if not 0<=x<shape[0] or not 0<=y<shape[1] or \
+                not np.isfinite(global_data.data_pix[x,y]) or \
+                not np.isfinite(global_data.rmsimg[x,y]):
             catalog.append(dummy)
             continue
 
@@ -2167,13 +2176,13 @@ def force_measure_flux(radec):
         # Only use pixels within the FWHM, ie value>=0.5. Set the others to NaN
         ratios = np.where(gaussian_data>=0.5, data/gaussian_data, np.nan)
         flux,error = gmean(ratios)
-        if not np.isfinite(flux) or not np.isfinite(error):
-            dummy = SimpleSource()
-            dummy.peak_flux = np.nan
-            dummy.peak_pixel = np.nan
-            dummy.flags=flags.FITERR
+
+        #sources with fluxes or flux errors that are not finite are not valid
+        # an error of identically zero is also not valid.
+        if not np.isfinite(flux) or not np.isfinite(error) or error==0.0:
             catalog.append(dummy)
             continue
+
         source = SimpleSource()
         source.ra=ra
         source.dec=dec
@@ -2193,7 +2202,9 @@ def force_measure_flux(radec):
             logging.debug("  used area = [{0}:{1},{2}:{3}]".format(xmin,xmax, ymin,ymax))
             logging.debug("  xo,yo = {0},{1}".format(xo,yo))
             logging.debug("  params = {0}".format(params))
-            logging.debug("  flux at [xmin+xo,ymin+yo]' = {0} Jy".format(data[int(xo),int(yo)]))
+            logging.debug("  flux at [xmin+xo,ymin+yo] = {0} Jy".format(data[int(xo),int(yo)]))
+            logging.debug("  error = {0}".format(error))
+            logging.debug("  rms = {0}".format(source.local_rms))
     return catalog
 
 def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=None, rmsin=None, cores=1, rms=None, beam=None):
@@ -2225,7 +2236,8 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0,outfile=None, bkgin=No
         print >>outfile, str(source)
     return sources
 
-def VASTP_measure_catalog_fluxes(filename, positions, hdu_index=0,bkgin=None,rmsin=None,rms=None,cores=1,beam=None):
+def VASTP_measure_catalog_fluxes(filename, positions, hdu_index=0, bkgin=None, rmsin=None,
+                                 rms=None, cores=1, beam=None, debug=False):
     """
     A version of measure_catalog_fluxes that will accept a list of pisitions instead of reading from a file.
     Input:
@@ -2241,7 +2253,12 @@ def VASTP_measure_catalog_fluxes(filename, positions, hdu_index=0,bkgin=None,rms
     """
     load_globals(filename,hdu_index=hdu_index,bkgin=bkgin,rmsin=rmsin,rms=rms,cores=cores,beam=beam,verb=True,do_curve=False)
     #measure fluxes
+    if debug:
+        level = logging.getLogger().getEffectiveLevel()
+        logging.getLogger().setLevel(logging.DEBUG)
     sources = force_measure_flux(positions)
+    if debug:
+        logging.getLogger().setLevel(level)
     return sources
     
 #secondary capabilities
