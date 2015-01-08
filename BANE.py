@@ -330,7 +330,7 @@ def scipy_filter(im_name,out_base,step_size,box_size,cores=None):
         #default to 5x the step size
         box_size = (step_size[0]*5,step_size[1]*5)
 
-    logging.info("using step_size {0}, box_size {1}".format(step_size,box_size))
+    logging.info("using grid {0}, box {1}".format(step_size,box_size))
     logging.info("on data shape {0}".format(data.shape))
     logging.info("with scipy generic filter median/std")
     #scipy can't handle nan values when using score at percentile
