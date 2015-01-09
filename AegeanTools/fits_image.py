@@ -26,7 +26,13 @@ class FitsImage():
             self.hdu = hdu
         else:
             logging.debug("Loading HDU {0} from {1}".format(hdu_index, filename))
-            hdus = pyfits.open(filename)
+            try:
+                hdus = pyfits.open(filename)
+            except IOError,e:
+                if "END" in e.message:
+                    logging.warn(e.message)
+                logging.warn("trying to ignore this, but you should really fix it")
+                hdus = pyfits.open(filename,ignore_missing_end=True)
             self.hdu = hdus[hdu_index]
             del hdus
         
