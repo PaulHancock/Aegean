@@ -758,8 +758,7 @@ def ntwodgaussian(inpars):
         logging.error("inpars requires a multiple of 6 parameters")
         logging.error("only {0} parameters supplied".format(len(inpars)))
         sys.exit()
-    #pars=np.array(inpars).reshape(len(inpars)/6,6)
-    amp,xo,yo,major,minor,pa = np.array(inpars).reshape(6,len(inpars)/6)
+    amp,xo,yo,major,minor,pa = zip(*np.array(inpars).reshape(len(inpars)/6,6))
     #transform pa->-pa so that our angles are CW instead of CCW
     rads = [np.radians(-p) for p in pa]
     st = np.sin(rads)**2
