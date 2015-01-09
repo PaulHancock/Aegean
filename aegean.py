@@ -537,7 +537,7 @@ def gen_flood_wrap(data,rmsimg,innerclip,outerclip=None,domask=False):
                 yield new_isle,xmin,xmax,ymin,ymax
     
 ##parameter estimates
-def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
+def estimate_parinfo(data, rmsimg, curve, beam, innerclip,outerclip=None, offsets=(0,0), max_summits=None):
     """Estimates the number of sources in an island and returns initial parameters for the fit as well as
     limits on those parameters.
 
@@ -563,7 +563,11 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
         logging.debug("[is a negative island]")
 
     parinfo=[]
-    
+
+    #TODO: remove this later.
+    if outerclip is None:
+        outerclip = innerclip
+
     #calculate a local beam from the center of the data
     xo,yo= data.shape
 
@@ -615,9 +619,10 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
         is_flag |= flags.FIXED2PSF
     else:
         if isnegative:
-            kappa_sigma=Island( np.where( curve>0.5, np.where(data+innerclip*rmsimg<0, data, np.nan) ,np.nan) )
+            #the summit should be able to include all pixels within the island not just those above innerclip
+            kappa_sigma=Island( np.where( curve>0.5, np.where(data+outerclip*rmsimg<0, data, np.nan) ,np.nan) )
         else:
-            kappa_sigma=Island( np.where( -1*curve>0.5, np.where(data-innerclip*rmsimg>0, data, np.nan) ,np.nan) )     
+            kappa_sigma=Island( np.where( -1*curve>0.5, np.where(data-outerclip*rmsimg>0, data, np.nan) ,np.nan) )
         summits=gen_flood_wrap(kappa_sigma,np.ones(kappa_sigma.pixels.shape),0,domask=False)
 
     i=0
@@ -636,12 +641,20 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
             logging.debug(" - peak at {0},{1}".format(xpeak,ypeak))
         xo = xpeak[0]+xmin
         yo = ypeak[0]+ymin
-        #allow amp to be 5% or (innerclip - 1)sigma higher
+
+        #check to ensure that this summit is brighter than innerclip
+        snr = data[xo,yo]/rmsimg[xo,yo]
+        if snr<innerclip:
+            continue
+
+
+        #allow amp to be 5% or (innerclip) sigma higher
         #TODO: the 5% should depend on the beam sampling
+        #TODO: when innerclip is 400 this becomes rather stupid
         if amp>0:
-            amp_min,amp_max= float(innerclip*rmsimg[xo,yo]), float(amp*1.05+(innerclip-1)*rmsimg[xo,yo])
+            amp_min,amp_max= 0.95*min(outerclip*rmsimg[xo,yo],amp), amp*1.05+innerclip*rmsimg[xo,yo]
         else:
-            amp_max,amp_min= float(-1*innerclip*rmsimg[xo,yo]), float(amp*1.05-(innerclip-1)*rmsimg[xo,yo])
+            amp_max,amp_min= 0.95*max(-outerclip*rmsimg[xo,yo],amp), amp*1.05-innerclip*rmsimg[xo,yo]
 
         if debug_on:
             logging.debug("a_min {0}, a_max {1}".format(amp_min,amp_max))
@@ -675,6 +688,15 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
 
         pa=pixbeam.pa
         flag=summit_flag
+
+        #check to see if we are going to fit this source
+        if max_summits is not None:
+            maxxed = i>=max_summits
+        else:
+            maxxed = False
+
+        # if maxxed:
+        #     break
         if debug_on:
             logging.debug(" - var val min max | min max")
             logging.debug(" - amp {0} {1} {2} ".format(amp,amp_min,amp_max))
@@ -684,35 +706,37 @@ def estimate_parinfo(data,rmsimg,curve,beam,innerclip,offsets=(0,0)):
             logging.debug(" - minor {0} {1} {2} | {3} {4}".format(minor,minor_min,minor_max,minor_min/fwhm2cc,minor_max/fwhm2cc))
             logging.debug(" - pa {0} {1} {2}".format(pa,-180,180))
             logging.debug(" - flags {0}".format(flag))
+            logging.debug(" - fit?  {0}".format(not maxxed))
+
         parinfo.append( {'value':amp,
-                         'fixed':False,
+                         'fixed':False or maxxed,
                          'parname':'{0}:amp'.format(i),
                          'limits':[amp_min,amp_max],
                          'limited':[True,True]} )
         parinfo.append( {'value':xo,
-                         'fixed':False,
+                         'fixed':False or maxxed,
                          'parname':'{0}:xo'.format(i),
                          'limits':[xo_min,xo_max],
                          'limited':[True,True]} )
         parinfo.append( {'value':yo,
-                         'fixed':False,
+                         'fixed':False or maxxed,
                          'parname':'{0}:yo'.format(i),
                          'limits':[yo_min,yo_max],
                          'limited':[True,True]} )
         parinfo.append( {'value':major,
-                         'fixed': (flag & flags.FIXED2PSF)>0,
+                         'fixed': (flag & flags.FIXED2PSF)>0  or maxxed,
                          'parname':'{0}:major'.format(i),
                          'limits':[major_min,major_max],
                          'limited':[True,True],
                          'flags':flag})
         parinfo.append( {'value':minor,
-                         'fixed': (flag & flags.FIXED2PSF)>0,
+                         'fixed': (flag & flags.FIXED2PSF)>0  or maxxed,
                          'parname':'{0}:minor'.format(i),
                          'limits':[minor_min,minor_max],
                          'limited':[True,True],
                          'flags':flag} )
         parinfo.append( {'value':pa,
-                         'fixed': (flag & flags.FIXED2PSF)>0,
+                         'fixed': (flag & flags.FIXED2PSF)>0  or maxxed,
                          'parname':'{0}:pa'.format(i),
                          'limits':[-180,180],
                          'limited':[False,False],
@@ -1677,7 +1701,7 @@ def fit_island(island_data):
     logging.debug("=====")
     logging.debug("Island ({0})".format(isle_num))
 
-    parinfo= estimate_parinfo(isle.pixels,rms,icurve,beam,innerclip,offsets=[xmin,ymin])
+    parinfo= estimate_parinfo(isle.pixels,rms,icurve,beam,innerclip,outerclip,offsets=[xmin,ymin],max_summits=max_summits)
 
     logging.debug("Rms is {0}".format(np.shape(rms)) )
     logging.debug("Isle is {0}".format(np.shape(isle.pixels)) )
@@ -1702,8 +1726,8 @@ def fit_island(island_data):
                 break
     #limit the number of components to fit
     if (max_summits is not None) and (num_summits > max_summits):
-        logging.info("Island has too many summits ({0}), not fitting anything".format(num_summits))
-        is_flag=flags.NOTFIT
+        logging.info("Island has too many summits ({0}), not fitting everything".format(num_summits))
+        #is_flag=flags.NOTFIT
 
     #supply dummy info if there is no fitting
     if is_flag & flags.NOTFIT:
@@ -1712,6 +1736,15 @@ def fit_island(island_data):
     else:
         #do the fitting
         mp,info=multi_gauss(isle.pixels,rms,parinfo)
+        logging.debug(" mp {0}".format(dir(mp)))
+        logging.debug(" niter: {0}".format(mp.niter))
+        logging.debug(" fnorm: {0}".format(mp.fnorm))
+        logging.debug(" nfev: {0}".format(mp.nfev))
+        logging.debug(" perror: {0}".format(mp.perror))
+        # logging.debug("mp.params: {0}".format(mp.params))
+        # logging.debug("info: {0}".format(info))
+        # logging.debug(" fixed: {0}".format( [ f['fixed'] for f in info]))
+
 
     logging.debug("Source 0 pa={0} [pixel coords]".format(mp.params[5]))
     
