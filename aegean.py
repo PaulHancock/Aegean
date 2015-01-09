@@ -686,7 +686,7 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip,outerclip=None, offset
         if minor_min==minor_max or major_min==major_max:
             summit_flag|=flags.FIXED2PSF
 
-        pa=pixbeam.pa
+        pa=pa_limit(pixbeam.pa)
         flag=summit_flag
 
         #check to see if we are going to fit this source
@@ -761,17 +761,17 @@ def ntwodgaussian(inpars):
     #pars=np.array(inpars).reshape(len(inpars)/6,6)
     amp,xo,yo,major,minor,pa = np.array(inpars).reshape(6,len(inpars)/6)
     #transform pa->-pa so that our angles are CW instead of CCW
-    st,ct,s2t=zip(*[ (math.sin(np.radians(-p))**2,math.cos(np.radians(-p))**2,math.sin(2*np.radians(-p))) for p in pa])
-    a, bb, c = zip(*[ ((ct[i]/major[i]**2 + st[i]/minor[i]**2)/2,
-                       s2t[i]/4 *(1/minor[i]**2-1/major[i]**2),
-                       (st[i]/major[i]**2 + ct[i]/minor[i]**2)/2) for i in xrange(len(amp))])
+    rads = [np.radians(-p) for p in pa]
+    st = np.sin(rads)**2
+    ct = np.cos(rads)**2
+    s2t = np.sin( [2*r for r in rads] )
+    a = [ (ct[i]/major[i]**2 + st[i]/minor[i]**2)/2  for i in xrange(len(amp)) ]
+    bb= [ s2t[i]/4 *(1/minor[i]**2-1/major[i]**2)    for i in xrange(len(amp)) ]
+    c = [ (st[i]/major[i]**2 + ct[i]/minor[i]**2)/2  for i in xrange(len(amp)) ]
 
     def rfunc(x,y):
-        ans=0
-        #list comprehension just breaks here, something to do with scope i think
-        for i in range(len(amp)):
-            ans+= amp[i]*np.exp(-1*(a[i]*(x-xo[i])**2 + 2*bb[i]*(x-xo[i])*(y-yo[i]) + c[i]*(y-yo[i])**2) )
-        return ans
+        return sum(amp[i]*np.exp(-1*(a[i]*(x-xo[i])**2 + 2*bb[i]*(x-xo[i])*(y-yo[i]) + c[i]*(y-yo[i])**2) ) for i in xrange(len(amp)) )
+
     return rfunc
 
 def twodgaussian(params, shape):
@@ -1637,14 +1637,9 @@ def get_pixbeam(beam,x,y):
     ra,dec = pix2sky([x,y])
     major,pa =sky2pix_vec([ra,dec],beam.a,beam.pa)[2:4]
     minor = abs(sky2pix_vec([ra,dec],beam.b,beam.pa + 90)[2])
-    if major<0:
-        major*=-1
-        pa-=180
-    if pa<0:
-        pa+=360
-    if not major>0:
+    if major == 0 or minor == 0:
         return None
-    return Beam(major,minor,pa)
+    return Beam(abs(major),minor,pa)
 
 def sky_sep(pix1,pix2):
     """
@@ -1736,12 +1731,12 @@ def fit_island(island_data):
     else:
         #do the fitting
         mp,info=multi_gauss(isle.pixels,rms,parinfo)
-        logging.debug(" mp {0}".format(dir(mp)))
-        logging.debug(" niter: {0}".format(mp.niter))
-        logging.debug(" fnorm: {0}".format(mp.fnorm))
-        logging.debug(" nfev: {0}".format(mp.nfev))
-        logging.debug(" perror: {0}".format(mp.perror))
-        # logging.debug("mp.params: {0}".format(mp.params))
+        # logging.debug(" mp {0}".format(dir(mp)))
+        # logging.debug(" niter: {0}".format(mp.niter))
+        # logging.debug(" fnorm: {0}".format(mp.fnorm))
+        # logging.debug(" nfev: {0}".format(mp.nfev))
+        # logging.debug(" perror: {0}".format(mp.perror))
+        logging.debug("mp.params: {0}".format(mp.params))
         # logging.debug("info: {0}".format(info))
         # logging.debug(" fixed: {0}".format( [ f['fixed'] for f in info]))
 
