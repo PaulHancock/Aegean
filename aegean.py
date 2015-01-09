@@ -62,7 +62,7 @@ import AegeanTools.flags as flags
 import AegeanTools.pprocess as pprocess
 import multiprocessing
 
-version = '1.8.1'
+version = '1.9.0'
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
