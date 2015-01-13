@@ -66,7 +66,7 @@ import AegeanTools.pprocess as pprocess
 import multiprocessing
 
 # Aegean version [Updated via script]
-version = 'v1.9rc1-59-gbdee736'
+version = 'v1.9rc1-64-g0d56f6d'
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -1046,18 +1046,19 @@ def write_table(filename, catalog, fmt=None):
     """
 
     def writer(filename, catalog, fmt=None):
-        #construct a dict of the data
-        #this method preserves the data types in the VOTable
+        # construct a dict of the data
+        # this method preserves the data types in the VOTable
         tab_dict = {}
         for name in catalog[0].names:
             tab_dict[name] = [getattr(c, name, None) for c in catalog]
         t = Table(tab_dict)
-        #re-order the columns
+        # re-order the columns
         t = t[[n for n in catalog[0].names]]
-
         if fmt is not None:
             if fmt.lower() in ["vot", "vo", "xml"]:
                 vot = from_table(t)
+                # description of this votable
+                vot.description = "Aegean version {0}".format(version)
                 writetoVO(vot, filename)
             else:
                 ascii.write(t, filename, fmt)
@@ -1099,6 +1100,7 @@ def writeIslandContours(filename, catalog, fmt):
     """
     out = open(filename, 'w')
     print >> out, "#Aegean island contours"
+    print >> out, "#Aegean version {0}".format(version)
     if fmt == 'reg':
         line_fmt = 'image;line({0},{1},{2},{3})'
         text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
@@ -1134,6 +1136,7 @@ def writeIslandBoxes(filename, catalog, fmt):
     out = open(filename, 'w')
 
     print >> out, "#Aegean Islands"
+    print >> out, "#Aegean version {0}".format(version)
     if fmt == 'reg':
         print >> out, "IMAGE"
         box_fmt = 'box({0},{1},{2},{3}) #{4}'
@@ -1193,11 +1196,13 @@ def writeAnn(filename, catalog, fmt):
         if fmt == 'ann':
             new_file = re.sub('.ann$', '_{0}.ann'.format(suffix), filename)
             out = open(new_file, 'w')
+            print >> out, "#Aegean version {0}".format(version)
             print >> out, 'PA SKY'
             formatter = "ellipse {0} {1} {2} {3} {4:+07.3f} #{5}"
         elif fmt == 'reg':
             new_file = re.sub('.reg$', '_{0}.reg'.format(suffix), filename)
             out = open(new_file, 'w')
+            print >> out, "#Aegean version {0}".format(version)
             print >> out, "fk5"
             formatter = 'ellipse {0} {1} {2}d {3}d {4:+07.3f}d # text="{5}"'
             #DS9 has some strange ideas about position angle
@@ -1209,7 +1214,7 @@ def writeAnn(filename, catalog, fmt):
                 print >> out, '#',
             print >> out, formatter.format(ra, dec, bmaj, bmin, pa, name)
         out.close()
-        logging.info("wrote {0}".format(filename))
+        logging.info("wrote {0}".format(new_file))
     if len(islands) > 0:
         if fmt == 'reg':
             new_file = re.sub('.reg$', '_isle.reg', filename)
@@ -1245,7 +1250,7 @@ def writeDB(filename, catalog):
                 types.append("BOOL")
             elif isinstance(val, int):
                 types.append("INT")
-            elif isinstance(val, (float, np.float32)):  #float32 is bugged and claims not to be a float
+            elif isinstance(val, (float, np.float32)):  # float32 is bugged and claims not to be a float
                 types.append("FLOAT")
             elif isinstance(val, (str, unicode)):
                 types.append("VARCHAR")
@@ -1260,7 +1265,7 @@ def writeDB(filename, catalog):
         os.remove(filename)
     conn = sqlite3.connect(filename)
     db = conn.cursor()
-    #determine the column names by inspecting the catalog class
+    # determine the column names by inspecting the catalog class
     for t, tn in zip(classify_catalog(catalog), ["components", "islands", "simples"]):
         if len(t) < 1:
             continue  #don't write empty tables
@@ -1269,10 +1274,13 @@ def writeDB(filename, catalog):
         stmnt = ','.join(["{0} {1}".format(a, b) for a, b in zip(col_names, col_types)])
         db.execute('CREATE TABLE {0} ({1})'.format(tn, stmnt))
         stmnt = 'INSERT INTO {0} ({1}) VALUES ({2})'.format(tn, ','.join(col_names), ','.join(['?' for i in col_names]))
-        #convert values of -1 into None
+        # convert values of -1 into None
         nulls = lambda x: [x, None][x == -1]
         db.executemany(stmnt, [map(nulls, r.as_list()) for r in t])
         logging.info("Created table {0}".format(tn))
+    # metadata add some meta data
+    db.execute("CREATE TABLE meta (author VARCHAR, version VARCHAR)")
+    db.execute("INSERT INTO meta (author,version) VALUES (?,?)",('Aegean',version))
     conn.commit()
     logging.info(db.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall())
     conn.close()
