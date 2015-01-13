@@ -30,14 +30,14 @@ except ImportError:
 filewcs=None
 
 class Dummy():
-    def __init__(self):
+    def __init__(self,maxdepth=8):
         self.add_region=[]
         self.rem_region=[]
         self.include_circles=[]
         self.exclude_circles=[]
         self.include_polygons=[]
         self.exclude_polygons=[]
-        self.maxdepth=8
+        self.maxdepth=maxdepth
         return
 
 def maskfile(regionfile,infile,outfile):
@@ -106,8 +106,11 @@ def box2poly(line):
     width = words[3]
     height = words[4]
     angle = words[5]
-    ra = Angle(ra,unit=u.hour)
-    dec = Angle(dec,unit=u.degree)
+    if ":" in ra:
+        ra = Angle(ra, unit=u.hour)
+    else:
+        ra = Angle(ra, unit=u.degree)
+    dec = Angle(dec, unit=u.degree)
     width = Angle(float(width[:-1])/2,unit=u.arcsecond) #strip the "
     height = Angle(float(height[:-1])/2,unit=u.arcsecond) #strip the "
     center=SkyCoord(ra,dec)
@@ -122,7 +125,10 @@ def circle2circle(line):
     ra = words[1]
     dec = words[2]
     radius = words[3][:-1] #strip the "
-    ra = Angle(ra,unit=u.hour)
+    if ":" in ra:
+        ra = Angle(ra,unit=u.hour)
+    else:
+        ra = Angle(ra,unit=u.degree)
     dec = Angle(dec,unit=u.degree)
     radius = Angle(radius,unit=u.arcsecond)
     return [ra.degree,dec.degree,radius.degree]
@@ -140,12 +146,15 @@ def poly2poly(line):
     for ra,dec in zip(ras,decs):
         if ra.strip() == '' or dec.strip() == '':
             continue
-        pos= SkyCoord(Angle(ra,unit=u.hour), Angle(dec,unit=u.degree))
+        if ":" in ra:
+            pos = SkyCoord(Angle(ra,unit=u.hour), Angle(dec,unit=u.degree))
+        else:
+            pos = SkyCoord(Angle(ra,unit=u.degree), Angle(dec,unit=u.degree))
         #only add this point if it is some distance from the previous one
         coords.extend( [pos.ra.degree, pos.dec.degree] )
     return coords
 
-def reg2mim(regfile,mimfile):
+def reg2mim(regfile,mimfile,maxdepth):
     """
     Read a ds9 regions file and create a mim file from it
     :param regfile:
@@ -166,7 +175,7 @@ def reg2mim(regfile,mimfile):
             poly.append(poly2poly(line))
         else:
             logging.warn("Not sure what to do with {0}".format(line[:-1]))
-    container = Dummy()
+    container = Dummy(maxdepth=maxdepth)
     container.include_circles = circles
     container.include_polygons = poly
 
@@ -308,7 +317,7 @@ if __name__=="__main__":
 
     if len(results.reg2mim)>0:
         for i,o in results.reg2mim:
-            reg2mim(i,o)
+            reg2mim(i,o,results.maxdepth)
         sys.exit()
 
     if len(results.mask)>0:

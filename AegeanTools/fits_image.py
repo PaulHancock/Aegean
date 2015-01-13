@@ -14,16 +14,25 @@ from math import pi,cos,sin,sqrt
 class FitsImage():
     def __init__(self, filename=None, hdu_index=0, hdu=None, beam=None):
         """
-        filename: the name of the fits image file
+        filename: the name of the fits image file or an instance of astropy.io.fits.HDUList
         hdu_index = index of FITS HDU when extensions are used (0 is primary HDU)
         hdu = a pyfits hdu. if provided the object is constructed from this instead of
               opening the file (filename is ignored)  
         """
-        if hdu:
+        if isinstance(filename,pyfits.HDUList):
+            logging.debug("accepting already loaded file {0}".format(filename.filename()))
+            self.hdu = filename[hdu_index]
+        elif hdu:
             self.hdu = hdu
         else:
             logging.debug("Loading HDU {0} from {1}".format(hdu_index, filename))
-            hdus = pyfits.open(filename)
+            try:
+                hdus = pyfits.open(filename)
+            except IOError,e:
+                if "END" in e.message:
+                    logging.warn(e.message)
+                logging.warn("trying to ignore this, but you should really fix it")
+                hdus = pyfits.open(filename,ignore_missing_end=True)
             self.hdu = hdus[hdu_index]
             del hdus
         
@@ -51,15 +60,13 @@ class FitsImage():
         if all( [ a in self._header for a in ["CDELT1","CDELT2"]]):
             self.pixarea = abs(self._header["CDELT1"]*self._header["CDELT2"])
         elif all( [a in self._header for a in ["CD1_1","CD1_2","CD2_1","CD2_2"]]):
-            if self._header["CD1_2"] ==0 and self._header["CD2_1"]==0:
-                pass
-            else:
-                logging.warn("Pixels don't appear to be square")
-            self.pixarea = abs(self._header["CD1_1"]*self._header["CD2_2"])
+            self.pixarea = abs( self._header["CD1_1"]*self._header["CD2_2"] - self._header["CD1_2"]*self._header["CD2_1"])
+            if not (self._header["CD1_2"] ==0 and self._header["CD2_1"]==0):
+                logging.warn("Pixels don't appear to be square -> entering uncharted waters")
         elif all([a in self._header for a in ["CD1_1","CD2_2"]]):
             self.pixarea = abs(self._header["CD1_1"]*self._header["CD2_2"])
         else:
-            logging.warn("cannot determine pixel area, using zero")
+            logging.warn("cannot determine pixel area, using zero EVEN THOUGH THIS IS WRONG!")
             self.pixarea=0
 
 
@@ -97,26 +104,6 @@ class FitsImage():
 
         
     def get_pixels(self):
-        '''
-        Returns all pixel values.
-        Returns a numpy array with [y,x] as per pyfits.
-        NB - value is calculated on first request then cached for speed
-        '''
-        # FIXME: this is specific to MWA files which have frequency and stokes
-        # dimensions of length 1
-        if self._pixels is None:
-            if len(self.hdu.data.shape) == 2:
-                self._pixels = self.hdu.data
-            elif len(self.hdu.data.shape) == 3:
-                
-                self._pixels = self.hdu.data[0]
-            elif len(self.hdu.data.shape) == 4:
-                self._pixels = self.hdu.data[0][0]
-            else:
-                raise Exception("Can't handle {0} dimensions".format(len(self.hdu.data.shape)))
-            logging.debug("Using axes {0} and {1}".format(self.hdu.header['CTYPE1'],self.hdu.header['CTYPE2']))
-            #convert +/- inf to nan
-            self._pixels[numpy.where(numpy.isinf(self._pixels))] = numpy.nan
         return self._pixels
 
     def set_pixels(self,pixels):

@@ -265,6 +265,11 @@ def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False,cor
 
     """
     fits,data = load_image(im_name)
+    #remove spurious dimensions of this array
+    newshape = [a for a in data.shape if a>1]
+    if len(newshape) < len(data.shape):
+        data = data.copy()
+        data.resize(newshape)
     #TODO: if CDELT1 is not found, then look for CD1_1 instead, etc for CDELT2
     if step_size is None:
         if 'BMAJ' in fits[0].header and 'BMIN' in fits[0].header:
@@ -325,7 +330,7 @@ def scipy_filter(im_name,out_base,step_size,box_size,cores=None):
         #default to 5x the step size
         box_size = (step_size[0]*5,step_size[1]*5)
 
-    logging.info("using step_size {0}, box_size {1}".format(step_size,box_size))
+    logging.info("using grid {0}, box {1}".format(step_size,box_size))
     logging.info("on data shape {0}".format(data.shape))
     logging.info("with scipy generic filter median/std")
     #scipy can't handle nan values when using score at percentile
@@ -362,7 +367,14 @@ def load_image(im_name):
     """
     Generic helper function to load a fits file
     """
-    fits = pyfits.open(im_name)
+    try:
+        fits = pyfits.open(im_name)
+    except IOError,e:
+        if "END" in e.message:
+            logging.warn(e.message)
+            logging.warn("trying to ignore this, but you should really fix it")
+            fits = pyfits.open(im_name,ignore_missing_end=True)
+
     data = fits[0].data 
     if fits[0].header['NAXIS']>2:
         data = data.squeeze() #remove axes with dimension 1
@@ -375,7 +387,13 @@ def save_image(fits,data,im_name):
     This function modifies the fits object!
     """
     fits[0].data = data
-    fits.writeto(im_name,clobber=True)
+    try:
+        fits.writeto(im_name,clobber=True)
+    except pyfits.verify.VerifyError,e:
+        if "DATAMAX" in e.message or "DATAMIN" in e.message:
+            logging.warn(e.message)
+            logging.warn("I will fix this but it will cause some programs to break")
+            fits.writeto(im_name,clobber=True,output_verify="silentfix")
     logging.info("wrote {0}".format(im_name))
     return
 
