@@ -1692,7 +1692,7 @@ def get_pixbeam(beam, x, y):
     ra, dec = pix2sky([x, y])
     major, pa = sky2pix_vec([ra, dec], beam.a, beam.pa)[2:4]
     minor = abs(sky2pix_vec([ra, dec], beam.b, beam.pa + 90)[2])
-    if major == 0 or minor == 0:
+    if not (major > 0 and minor > 0):
         return None  # This can occur even when we don't have a WCS error (somehow)
     return Beam(abs(major), minor, pa)
 
