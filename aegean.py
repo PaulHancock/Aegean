@@ -203,7 +203,7 @@ class SimpleSource():
         A string representation of the name of this source
         which is always just an empty string
         """
-        return ''
+        return self.__str__()
 
     def as_list(self):
         """
@@ -878,7 +878,10 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
     global_data = GlobalFittingData()
 
     if mask is not None and region_available:
-        if os.path.exists(mask):
+        # allow users to supply and object instead of a filename
+        if isinstance(mask,Region):
+            global_data.region = mask
+        elif os.path.exists(mask):
             global_data.region = pickle.load(open(mask))
         else:
             logging.error("File {0} not found for loading".format(mask))
