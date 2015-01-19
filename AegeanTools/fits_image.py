@@ -59,17 +59,19 @@ class FitsImage():
         #this is correct at the center of the image for all images, and everywhere for conformal projections
         if all( [ a in self._header for a in ["CDELT1","CDELT2"]]):
             self.pixarea = abs(self._header["CDELT1"]*self._header["CDELT2"])
+            self.pixscale = (self._header["CDELT1"], self._header["CDELT2"])
         elif all( [a in self._header for a in ["CD1_1","CD1_2","CD2_1","CD2_2"]]):
             self.pixarea = abs( self._header["CD1_1"]*self._header["CD2_2"] - self._header["CD1_2"]*self._header["CD2_1"])
+            self.pixscale = (self._header["CD1_1"], self._header["CD2_2"])
             if not (self._header["CD1_2"] ==0 and self._header["CD2_1"]==0):
-                logging.warn("Pixels don't appear to be square -> entering uncharted waters")
+                logging.warn("Pixels don't appear to be square -> pixscale is wrong")
         elif all([a in self._header for a in ["CD1_1","CD2_2"]]):
             self.pixarea = abs(self._header["CD1_1"]*self._header["CD2_2"])
+            self.pixscale = (self._header["CD1_1"], self._header["CD2_2"])
         else:
             logging.warn("cannot determine pixel area, using zero EVEN THOUGH THIS IS WRONG!")
-            self.pixarea=0
-
-
+            self.pixarea = 0
+            self.pixscale = (0,0)
         
         if beam is None:
             #if the bpa isn't specified add it as zero
@@ -151,12 +153,14 @@ class Beam():
     """
     Small class to hold the properties of the beam
     """
-    def __init__(self,a,b,pa):
+    def __init__(self, a, b, pa, pixa=None, pixb=None):
         assert a>0, "major axis must be >0"
         assert b>0, "minor axis must be >0"
         self.a=a
         self.b=b
         self.pa=pa
+        self.pixa=pixa
+        self.pixb=pixb
     
     def __str__(self):
         return "a={0} b={1} pa={2}".format(self.a, self.b, self.pa)
