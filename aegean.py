@@ -1688,14 +1688,13 @@ def get_pixbeam(beam, x, y):
         a beam where beam.a, beam.b are in pixels
         and beam.pa is in degrees
     """
+    global global_data
 
-    ra, dec = pix2sky([x, y])
-    major, pa = sky2pix_vec([ra, dec], beam.a, beam.pa)[2:4]
-    minor = abs(sky2pix_vec([ra, dec], beam.b, beam.pa + 90)[2])
-    if not (major > 0 and minor > 0):
-        return None  # This can occur even when we don't have a WCS error (somehow)
-    return Beam(abs(major), minor, pa)
-
+    #TODO: Check that this is correct, update if neccessary
+    #TODO: Move this function call to a one-off calculation done in load_globals
+    major = abs(beam.a/global_data.img.pixscale[0])
+    minor = abs(beam.b/global_data.img.pixscale[1])
+    return Beam(major,minor,beam.pa)
 
 def sky_sep(pix1, pix2):
     """
@@ -1917,6 +1916,7 @@ def fit_island(island_data):
                                                               + (max(source.err_a, 0) / source.a) ** 2
                                                               + (max(source.err_b, 0) / source.b) ** 2)
         else:
+            #this doesn't happen any more but i'll leave it in in-case I update get_pixbeam
             source.flags |= flags.WCSERR
             source.int_flux = np.nan
             source.err_int_flux = np.nan
