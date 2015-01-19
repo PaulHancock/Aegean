@@ -66,7 +66,7 @@ import AegeanTools.pprocess as pprocess
 import multiprocessing
 
 # Aegean version [Updated via script]
-version = 'v1.9rc1-70-gbcd531d'
+version = 'v1.9rc1-75-gac488ac'
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
