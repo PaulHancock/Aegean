@@ -578,7 +578,7 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
     #calculate a local beam from the center of the data
     xo, yo = data.shape
 
-    pixbeam = get_pixbeam(beam, offsets[0] + xo / 2, offsets[1] + yo / 2)
+    pixbeam = global_data.pixbeam #get_pixbeam(beam, offsets[0] + xo / 2, offsets[1] + yo / 2)
     if pixbeam is None:
         if debug_on:
             logging.debug("WCSERR")
@@ -940,6 +940,8 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
     global_data.data_pix = img.get_pixels()
     if verb and logging.getLogger().isEnabledFor(logging.DEBUG):
         logging.debug("Data max is {0}".format(img.get_pixels()[np.isfinite(img.get_pixels())].max()))
+
+    global_data.pixbeam = get_pixbeam(global_data.beam,img._header["CRPIX1"],img._header["CRPIX2"])
     return
 
 
@@ -1407,7 +1409,7 @@ def make_bkg_rms_from_global(mesh_size=20, forced_rms=None, cores=None):
     ycen = int(img_y / 2)
 
     #calculate a local beam from the center of the data
-    pixbeam = get_pixbeam(beam, xcen, ycen)
+    pixbeam = global_data.pixbeam #get_pixbeam(beam, xcen, ycen)
     if pixbeam is None:
         logging.error("Cannot calculate the beam shape at the image center")
         sys.exit()
@@ -1692,9 +1694,12 @@ def get_pixbeam(beam, x, y):
 
     #TODO: Check that this is correct, update if neccessary
     #TODO: Move this function call to a one-off calculation done in load_globals
-    major = abs(beam.a/global_data.img.pixscale[0])
-    minor = abs(beam.b/global_data.img.pixscale[1])
-    return Beam(major,minor,beam.pa)
+    major = abs(beam.a/global_data.img.pixscale[0])*math.sin(math.radians(beam.pa)) \
+          + abs(beam.b/global_data.img.pixscale[1])*math.cos(math.radians(beam.pa))
+
+    minor = abs(beam.b/global_data.img.pixscale[1]) * math.sin(math.radians(beam.pa)) \
+          + abs(beam.a/global_data.img.pixscale[0])*math.cos(math.radians(beam.pa))
+    return Beam(major,minor,0)
 
 def sky_sep(pix1, pix2):
     """
@@ -1741,7 +1746,7 @@ def fit_island(island_data):
     bkg = bkgimg[xmin:xmax + 1, ymin:ymax + 1]
 
     is_flag = 0
-    pixbeam = get_pixbeam(beam, (xmin + xmax) / 2, (ymin + ymax) / 2)
+    pixbeam = global_data.pixbeam #get_pixbeam(beam, (xmin + xmax) / 2, (ymin + ymax) / 2)
     if pixbeam is None:
         is_flag |= flags.WCSERR
 
@@ -1907,7 +1912,7 @@ def fit_island(island_data):
             logging.debug('min_err_dec {0}'.format(min_err_dec))
         logging.debug("errors after fixing {0},{1}".format(source.err_ra, source.err_dec))
 
-        pixbeam = get_pixbeam(beam, x_pix, y_pix)
+        pixbeam = global_data.pixbeam #get_pixbeam(beam, x_pix, y_pix)
         #integrated flux is calculated not fit or measured
         if pixbeam is not None:
             source.int_flux = source.peak_flux * major * minor * cc2fwhm ** 2 / (pixbeam.a * pixbeam.b)
@@ -2004,7 +2009,7 @@ def fit_island(island_data):
         logging.debug("- peak position {0}, {1} [{2},{3}]".format(source.ra_str, source.dec_str, positions[0][0],
                                                                   positions[1][0]))
 
-        pixbeam = get_pixbeam(beam, xy[0], xy[1])
+        pixbeam = global_data.pixbeam #get_pixbeam(beam, xy[0], xy[1])
         #integrated flux
         if pixbeam is not None:
             beam_volume = 2 * np.pi * pixbeam.a * pixbeam.b / cc2fwhm ** 2
@@ -2241,7 +2246,7 @@ def force_measure_flux(radec):
 
         flag = 0
         #make a pixbeam at this location
-        pixbeam = get_pixbeam(global_data.beam, source_x, source_y)
+        pixbeam = global_data.pixbeam #get_pixbeam(global_data.beam, source_x, source_y)
         if pixbeam is None:
             flag |= flags.WCSERR
             pixbeam = Beam(1, 1, 0)
