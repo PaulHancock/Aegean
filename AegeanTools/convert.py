@@ -165,6 +165,7 @@ def bear(ra1,dec1,ra2,dec2):
 def translate(ra,dec,r,theta):
     """
     Translate the point (ra,dec) a distance r (degrees) along angle theta (degrees)
+    The translation is taken along an arc of a great circle.
     Return the (ra,dec) of the translated point.
     """
     factor = np.sin(np.radians(dec))*np.cos(np.radians(r))
