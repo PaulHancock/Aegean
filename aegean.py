@@ -2435,7 +2435,9 @@ if __name__ == "__main__":
     parser.add_option("--noise", dest='noiseimg', default=None,
                       help="A .fits file that represents the image noise (rms), created from Aegean with --save or BANE. [default: none]")
     parser.add_option('--background', dest='backgroundimg', default=None,
-                      help="A .fits file that represents the background level,, created from Aegean with --save or BANE. [default: none]")
+                      help="A .fits file that represents the background level, created from Aegean with --save or BANE. [default: none]")
+    parser.add_option('--autoload', dest='autoload', action="store_true", default=False,
+                      help="Automatically look for background, noise, and region files using the input filename as a hint. [default: False]")
     parser.add_option("--maxsummits", dest='max_summits', type='float', default=None,
                       help="If more than *maxsummits* summits are detected in an island, no fitting is done, only estimation. [default: no limit]")
     parser.add_option("--csigma", dest='csigma', type='float', default=None,
@@ -2554,6 +2556,20 @@ if __name__ == "__main__":
     if options.save:
         save_background_files(filename, hdu_index=hdu_index, cores=options.cores, beam=options.beam,
                               outbase=options.outbase)
+
+    # autoload bakground, noise and regio files
+    if options.autoload:
+        basename = os.path.splitext(filename)[0]
+        if os.path.exists(basename+'_bkg.fits'):
+            options.backgroundimg = basename+'_bkg.fits'
+            logging.info("Found background {0}".format(options.backgroundimg))
+        if os.path.exists(basename+"_rms.fits"):
+            options.noiseimg = basename+'_rms.fits'
+            logging.info("Found noise {0}".format(options.noiseimg))
+        if os.path.exists(basename+".mim"):
+            options.region = basename+".mim"
+            logging.info("Found region {0}".format(options.region))
+
 
     #check that the background and noise files exist
     if options.backgroundimg and not os.path.exists(options.backgroundimg):
