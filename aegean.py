@@ -833,7 +833,7 @@ def multi_gauss(data, rmsimg, parinfo):
         return ans
 
     mp = mpfit(erfunc, parinfo=parinfo, quiet=True)
-
+    mp.dof = len(np.ravel(mask)) - len(parinfo)
     return mp, parinfo
 
 
@@ -1783,15 +1783,20 @@ def fit_island(island_data):
     if is_flag & flags.NOTFIT:
         mp = DummyMP(parinfo=parinfo, perror=None)
         info = parinfo
+        err_scale = 1
     else:
         #do the fitting
         mp, info = multi_gauss(isle.pixels, rms, parinfo)
+        # This scales the errors to be 1sigma.
+        # see the .perror documentation in mpfit.mpfit
+        err_scale = np.sqrt(mp.fnorm/mp.dof)
+        # logging.debug("mp.fnorm, mp.dof {0} {1}".format(mp.fnorm, mp.dof))
         # logging.debug(" mp {0}".format(dir(mp)))
         # logging.debug(" niter: {0}".format(mp.niter))
         # logging.debug(" fnorm: {0}".format(mp.fnorm))
         # logging.debug(" nfev: {0}".format(mp.nfev))
         # logging.debug(" perror: {0}".format(mp.perror))
-        logging.debug("mp.params: {0}".format(mp.params))
+        # logging.debug("mp.params: {0}".format(mp.params))
         # logging.debug("info: {0}".format(info))
         # logging.debug(" fixed: {0}".format( [ f['fixed'] for f in info]))
 
@@ -1820,7 +1825,7 @@ def fit_island(island_data):
         if val == 0.0:
             mp.perror[k] = -1
 
-    err_matrix = np.asarray(mp.perror).reshape(parlen / 6, 6)
+    err_matrix = np.asarray(mp.perror*err_scale).reshape(parlen / 6, 6)
     components = parlen / 6
     for j, (
             (amp, xo, yo, major, minor, theta),
