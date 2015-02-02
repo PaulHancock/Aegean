@@ -1789,7 +1789,7 @@ def fit_island(island_data):
         mp, info = multi_gauss(isle.pixels, rms, parinfo)
         # This scales the errors to be 1sigma.
         # see the .perror documentation in mpfit.mpfit
-        err_scale = np.sqrt(mp.fnorm/mp.dof)
+        err_scale = np.sqrt(mp.fnorm/mp.dof) if mp.fnorm > 0 else 1
         # logging.debug("mp.fnorm, mp.dof {0} {1}".format(mp.fnorm, mp.dof))
         # logging.debug(" mp {0}".format(dir(mp)))
         # logging.debug(" niter: {0}".format(mp.niter))
@@ -1805,11 +1805,11 @@ def fit_island(island_data):
     params = mp.params
     #report the source parameters
     sources = []
-    parlen = len(params)
+    components = len(params) / 6
 
     #fix_shape(mp)
     par_matrix = np.asarray(params, dtype=np.float64)  #float32's give string conversion errors.
-    par_matrix = par_matrix.reshape(parlen / 6, 6)
+    par_matrix = par_matrix.reshape(components, 6)
 
     #if there was a fitting error create an mp.perror matrix full of zeros
     if mp.perror is None:
@@ -1825,8 +1825,7 @@ def fit_island(island_data):
         if val == 0.0:
             mp.perror[k] = -1
 
-    err_matrix = np.asarray(mp.perror*err_scale).reshape(parlen / 6, 6)
-    components = parlen / 6
+    err_matrix = np.asarray(mp.perror*err_scale).reshape(components, 6)
     for j, (
             (amp, xo, yo, major, minor, theta),
             (amp_err, xo_err, yo_err, major_err, minor_err, theta_err)) in enumerate(
