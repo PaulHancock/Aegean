@@ -575,15 +575,13 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
     if outerclip is None:
         outerclip = innerclip
 
-    #calculate a local beam from the center of the data
-    xo, yo = data.shape
-
     pixbeam = global_data.pixbeam
     if pixbeam is None:
         if debug_on:
             logging.debug("WCSERR")
         is_flag = flags.WCSERR
         pixbeam = Beam(1, 1, 0)
+
     #The position cannot be more than a pixel beam from the initial location
     #Use abs so that these distances are always positive
     # xo_lim=max( abs(pixbeam.a*np.cos(np.radians(pixbeam.pa))), abs(pixbeam.b*np.sin(np.radians(pixbeam.pa))))
@@ -653,8 +651,9 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
         yo = ypeak[0] + ymin
 
         #check to ensure that this summit is brighter than innerclip
-        snr = data[xo, yo] / rmsimg[xo, yo]
+        snr = abs(data[xo, yo] / rmsimg[xo, yo])
         if snr < innerclip:
+            logging.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
             continue
 
 
@@ -2617,6 +2616,7 @@ if __name__ == "__main__":
 
     if options.find:
         logging.info("Finding sources.")
+        logging.info(" find neg sources? {0}".format(options.negative))
         detections = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,
                                            rms=options.rms,
                                            max_summits=options.max_summits, csigma=options.csigma,
