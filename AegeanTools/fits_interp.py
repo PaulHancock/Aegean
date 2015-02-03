@@ -92,7 +92,7 @@ def compress(datafile, factor, outfile=None):
     header['HISTORY'] = "Compressed by a factor of {0}".format(factor)
 
     # save the changes
-    hdulist[0].data = new_data
+    hdulist[0].data = np.array(new_data, dtype=np.float32)
     hdulist[0].header = header
     if outfile is not None:
         hdulist.writeto(outfile, clobber=True)
@@ -133,7 +133,7 @@ def expand(datafile, outfile=None, method='linear'):
     points = zip(np.ravel(grid[0]*factor),np.ravel(grid[1]*factor))
 
     # Do the interpolation
-    hdulist[0].data = griddata(points,values,(gx,gy),method=method)
+    hdulist[0].data = np.array(griddata(points,values,(gx,gy),method=method), dtype=np.float32)
 
     #update the fits keywords so that the WCS is correct
     header['CRPIX1'] = (header['CRPIX1'] - 1)*factor + 1
