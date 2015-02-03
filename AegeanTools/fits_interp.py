@@ -45,7 +45,29 @@ def reduce(datafile, factor, outfile=None):
     header = hdulist[0].header
     data = hdulist[0].data
     cx, cy = data.shape[0], data.shape[1]
-    new_data = data[::factor,::factor]
+
+
+    nx = cx/factor
+    ny = cy/factor
+    # check to see if we will have some residual data points
+    lcx = cx%factor
+    lcy = cy%factor
+    if lcx > 0 or lcy > 0:
+        print nx, ny, lcx, lcy, factor, data[::factor,::factor].shape
+        if lcx > 0:
+            nx += 1
+        if lcy > 0:
+            ny += 1
+        new_data = np.empty((nx+1,ny+1))
+        new_data[:nx,:ny] = data[::factor,::factor]
+        if lcx > 0:
+            new_data[-1,:ny] = data[-1,::factor]
+        if lcy > 0:
+            new_data[:nx,-1] = data[::factor,-1]
+        if lcx> 0 and lcy>0:
+            new_data[-1,-1] = data[-1,-1]
+    else:
+        new_data = data[::factor,::factor]
 
     # TODO: Figure out what to do when CD2_1 and CD1_2 are non-zero
     if 'CDELT1' in header:
@@ -63,13 +85,15 @@ def reduce(datafile, factor, outfile=None):
         logging.error("Error: Can't find CDELT2 or CD2_2")
         return None
     # Move the reference pixel so that the WCS is correct
-    header['CRPIX1'] = (header['CRPIX1'] + factor - 1 - cx%factor)/factor
-    header['CRPIX2'] = (header['CRPIX2'] + factor - 1 - cx%factor)/factor
+    header['CRPIX1'] = (header['CRPIX1'] + factor - 1)/factor
+    header['CRPIX2'] = (header['CRPIX2'] + factor - 1)/factor
 
     # Update the header so that we can do the correct interpolation later on
     header['BN_CFAC'] = (factor,"Compression factor (grid size) used by BANE")
     header['BN_NPX1'] = (header['NAXIS1'], 'original NAXIS1 value')
     header['BN_NPX2'] = (header['NAXIS2'], 'original NAXIS2 value')
+    header['BN_RPX1'] = (lcx ,'Residual on axis 1')
+    header['BN_RPX2'] = (lcy ,'Residual on axis 2')
     header['HISTORY'] = "Compressed by a factor of {0}".format(factor)
 
     # save the changes
@@ -97,8 +121,8 @@ def expand(datafile, outfile=None, method='linear'):
     header = hdulist[0].header
     data = hdulist[0].data
     # Check for the required key words
-    if not all( [a in header for a in ['BN_CFAC','BN_NPX1','BN_NPX2']]):
-        logging.error("This file doesn't appear to have been created by BANE")
+    if not all( [a in header for a in ['BN_CFAC','BN_NPX1','BN_NPX2','BN_RPX1','BN_RPX2']]):
+        logging.error("This file doesn't have all the right header information")
         return None
 
     factor = header['BN_CFAC']
@@ -106,6 +130,11 @@ def expand(datafile, outfile=None, method='linear'):
     # Extract the data and create the array of indices
     values = np.ravel(data)
     grid = np.indices(data.shape)
+    # fix the last column of the grid to account for residuals
+    lcx = header['BN_RPX1']
+    lcy = header['BN_RPX2']
+    grid[0,:] += 1.*lcx/factor
+    grid[1,:] += 1.*lcy/factor
     points = zip(np.ravel(grid[0]*factor),np.ravel(grid[1]*factor))
 
     # Do the interpolation
