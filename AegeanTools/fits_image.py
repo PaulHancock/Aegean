@@ -27,7 +27,7 @@ def load_safe(filename):
     return hdus
 
 class FitsImage():
-    def __init__(self, filename=None, hdu_index=0, hdu=None, beam=None):
+    def __init__(self, filename=None, hdu_index=0, beam=None):
         """
         filename: the name of the fits image file or an instance of astropy.io.fits.HDUList
         hdu_index = index of FITS HDU when extensions are used (0 is primary HDU)
@@ -36,15 +36,18 @@ class FitsImage():
         """
         if isinstance(filename,pyfits.HDUList):
             logging.debug("accepting already loaded file {0}".format(filename.filename()))
-            self.hdu = filename[hdu_index]
-        elif hdu:
-            self.hdu = hdu
+            # check to see if this image has been compressed
+            # and expand if neccessary
+            if 'BN_CFAC' in filename.header:
+                logging.debug("Expanding file")
+                self.hdu = expand(filename)[hdu_index]
+            else:
+                self.hdu = filename[hdu_index]
         else:
             logging.debug("Loading HDU {0} from {1}".format(hdu_index, filename))
             hdulist = load_safe(filename)
             self.hdu = hdulist[hdu_index]
-            # check to see if this image has been compressed
-            # and expand if neccessary
+            # check for a compressed file
             if 'BN_CFAC' in self.hdu.header:
                 logging.debug("Expanding file")
                 self.hdu = expand(hdulist)[hdu_index]
