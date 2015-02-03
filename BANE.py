@@ -6,6 +6,7 @@ import sys, os
 from optparse import OptionParser
 from time import gmtime, strftime
 import logging
+import copy
 
 #image manipulation 
 from scipy.interpolate import griddata
@@ -14,6 +15,7 @@ from astropy.io import fits as pyfits
 #Aegean tools
 from AegeanTools.running_percentile import RunningPercentiles as RP
 import AegeanTools.pprocess as pprocess
+from AegeanTools.fits_interp import compress
 
 import multiprocessing
 #from blist import *
@@ -267,7 +269,7 @@ def filter_mc(data,step_size,box_size,cores):
         del queue, parfilt
     return interpolated_bkg,interpolated_rms
 
-def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True):
+def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False):
     """
 
     :param im_name:
@@ -277,6 +279,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
     :param twopass:
     :param cores:
     :param mask:
+    :param compress:
     :return:
     """
     fits,data = load_image(im_name)
@@ -310,7 +313,12 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         #default to 5x the step size
         box_size = (step_size[0]*5,step_size[1]*5)
 
-    logging.info("using step_size {0}, box_size {1}".format(step_size,box_size))
+    if compressed:
+        if not step_size[0] == step_size[1]:
+            step_size = (min(step_size),min(step_size))
+            logging.info("Changing grid to be {0} so we can compress the output".format(step_size))
+
+    logging.info("using grid_size {0}, box_size {1}".format(step_size,box_size))
     logging.info("on data shape {0}".format(data.shape))
     bkg,rms = filter_mc(data,step_size=step_size,box_size=box_size,cores=cores)
     logging.info("done")
@@ -321,11 +329,25 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 
     bkg_out = '_'.join([os.path.expanduser(out_base),'bkg.fits'])
     rms_out = '_'.join([os.path.expanduser(out_base),'rms.fits'])
+
+    # force float 32s to avoid bloat
+    bkg = np.array(bkg, dtype=np.float32)
+    rms = np.array(rms, dtype=np.float32)
+
+    if compressed:
+        #need to copy since compress will mess with the header
+        old_header= copy.deepcopy(fits[0].header)
+        fits[0].data = bkg
+        compress(fits, step_size[0], bkg_out)
+        fits[0].header = old_header
+        fits[0].data = rms
+        compress(fits, step_size[0], rms_out)
+        return
     if mask:
         mask_img(bkg, data)
         mask_img(rms, data)
-    save_image(fits,np.array(bkg,dtype=np.float32),bkg_out)
-    save_image(fits,np.array(rms,dtype=np.float32),rms_out)
+    save_image(fits, bkg, bkg_out)
+    save_image(fits, rms, rms_out)
 
 ###
 # Alternate Filters
@@ -435,6 +457,8 @@ if __name__=="__main__":
     parser.add_option('--scipy',dest='usescipy',action='store_true',
                       help='Use scipy generic filter instead of the running percentile filter. (for testing/timing)')
     parser.add_option('--debug',dest='debug',action='store_true',help='debug mode, default=False')
+    parser.add_option('--compress', dest='compress', action='store_true',default=False,
+                      help='Produce a compressed output file.')
     parser.set_defaults(out_base='out',step_size=None,box_size=None,twopass=True,cores=None,usescipy=False,debug=False)
     (options, args) = parser.parse_args()
 
@@ -454,5 +478,5 @@ if __name__=="__main__":
     else:
         filter_image(im_name=filename, out_base=options.out_base, step_size=options.step_size,
                      box_size=options.box_size, twopass=options.twopass, cores=options.cores,
-                     mask=options.mask)
+                     mask=options.mask, compressed=options.compress)
 
