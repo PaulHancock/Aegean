@@ -1,8 +1,19 @@
 #! /usr/bin/evn python
 
+"""
+A module to allow fits files to be shrunk in size using decimation, and to be
+grown in size using interpolation.
+
+@author: Paul Hancock
+
+Created:
+3rd Feb 2015
+"""
+
 import numpy as np
 from astropy.io import fits
 from scipy.interpolate import griddata
+import logging
 
 def load_file_or_hdu(filename):
     """
@@ -42,14 +53,14 @@ def reduce(datafile, factor, outfile=None):
     elif 'CD1_1' in header:
         header['CD1_1'] *=factor
     else:
-        print "Error: Can't find CDELT1 or CD1_1"
+        logging.error("Error: Can't find CDELT1 or CD1_1")
         return None
     if 'CDELT2' in header:
         header['CDELT2'] *=factor
     elif "CD2_2" in header:
         header['CD2_2'] *=factor
     else:
-        print "Error: Can't find CDELT2 or CD2_2"
+        logging.error("Error: Can't find CDELT2 or CD2_2")
         return None
     # Move the reference pixel so that the WCS is correct
     header['CRPIX1'] = (header['CRPIX1'] + factor - 1 - cx%factor)/factor
@@ -66,7 +77,7 @@ def reduce(datafile, factor, outfile=None):
     hdulist[0].header = header
     if outfile is not None:
         hdulist.writeto(outfile, clobber=True)
-        print "Wrote: {0}".format(outfile)
+        logging.info("Wrote: {0}".format(outfile))
     return hdulist
 
 def expand(datafile, outfile=None, method='linear'):
@@ -87,7 +98,7 @@ def expand(datafile, outfile=None, method='linear'):
     data = hdulist[0].data
     # Check for the required key words
     if not all( [a in header for a in ['BN_CFAC','BN_NPX1','BN_NPX2']]):
-        print "Error: This file doesn't appear to have been created by BANE"
+        logging.error("This file doesn't appear to have been created by BANE")
         return None
 
     factor = header['BN_CFAC']
@@ -109,7 +120,7 @@ def expand(datafile, outfile=None, method='linear'):
     elif 'CD1_1' in header:
         header['CD1_1'] /=factor
     else:
-        print "Error: Can't find CD1_1 or CDELT1"
+        logging.error("Error: Can't find CD1_1 or CDELT1")
         return None
 
     if 'CDELT2' in header:
@@ -117,7 +128,7 @@ def expand(datafile, outfile=None, method='linear'):
     elif "CD2_2" in header:
         header['CD2_2'] /=factor
     else:
-        print "Error: Can't find CDELT2 or CD2_2"
+        logging.error("Error: Can't find CDELT2 or CD2_2")
         return None
 
     header['BN_INTP'] = (method, 'BANE interpolation method')
@@ -128,7 +139,7 @@ def expand(datafile, outfile=None, method='linear'):
     hdulist[0].header = header
     if outfile is not None:
         hdulist.writeto(outfile, clobber=True)
-        print "Wrote: {0}".format(outfile)
+        logging.info("Wrote: {0}".format(outfile))
     return hdulist
 
 if __name__=="__main__":
