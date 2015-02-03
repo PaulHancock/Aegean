@@ -52,21 +52,17 @@ def compress(datafile, factor, outfile=None):
     # check to see if we will have some residual data points
     lcx = cx%factor
     lcy = cy%factor
-    if lcx > 0 or lcy > 0:
-        if lcx > 0:
-            nx += 1
-        if lcy > 0:
-            ny += 1
-        new_data = np.empty((nx+1,ny+1))
-        new_data[:nx,:ny] = data[::factor,::factor]
-        if lcx > 0:
-            new_data[-1,:ny] = data[-1,::factor]
-        if lcy > 0:
-            new_data[:nx,-1] = data[::factor,-1]
-        if lcx> 0 and lcy>0:
-            new_data[-1,-1] = data[-1,-1]
-    else:
-        new_data = data[::factor,::factor]
+    if lcx > 0:
+        nx += 1
+    if lcy > 0:
+        ny += 1
+    # decimate the data
+    new_data = np.empty((nx+1,ny+1))
+    new_data[:nx,:ny] = data[::factor,::factor]
+    # copy the last row/col across
+    new_data[-1,:ny] = data[-1,::factor]
+    new_data[:nx,-1] = data[::factor,-1]
+    new_data[-1,-1] = data[-1,-1]
 
     # TODO: Figure out what to do when CD2_1 and CD1_2 are non-zero
     if 'CDELT1' in header:
