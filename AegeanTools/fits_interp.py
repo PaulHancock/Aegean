@@ -53,7 +53,6 @@ def compress(datafile, factor, outfile=None):
     lcx = cx%factor
     lcy = cy%factor
     if lcx > 0 or lcy > 0:
-        print nx, ny, lcx, lcy, factor, data[::factor,::factor].shape
         if lcx > 0:
             nx += 1
         if lcy > 0:
