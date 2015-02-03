@@ -171,6 +171,16 @@ def optimum_sections(cores,data_shape):
     logging.debug("Sectioning chosen to be {0[0]}x{0[1]} for a score of {1}".format(best,min_overlap))
     return best
 
+def mask_img(data,mask_data):
+    """
+
+    :param data:
+    :param mask_data:
+    :return:
+    """
+    mask = np.where(np.isnan(mask_data))
+    data[mask]=np.NaN
+
 def filter_mc(data,step_size,box_size,cores):
     """
     Perform a running filter over multiple cores
@@ -252,17 +262,22 @@ def filter_mc(data,step_size,box_size,cores):
         interpolated_rms = griddata(rms_points,rms_values,(gx,gy),method='linear')
     else:
         interpolated_rms=gx*np.nan
-    #mask the output image as per the input image
-    mask = np.where(np.isnan(data))
-    interpolated_bkg[mask]=np.NaN
-    interpolated_rms[mask]=np.NaN
+
     if cores>1:
         del queue, parfilt
     return interpolated_bkg,interpolated_rms
 
-def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False,cores=None):
+def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True):
     """
 
+    :param im_name:
+    :param out_base:
+    :param step_size:
+    :param box_size:
+    :param twopass:
+    :param cores:
+    :param mask:
+    :return:
     """
     fits,data = load_image(im_name)
     #remove spurious dimensions of this array
@@ -306,6 +321,9 @@ def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False,cor
 
     bkg_out = '_'.join([os.path.expanduser(out_base),'bkg.fits'])
     rms_out = '_'.join([os.path.expanduser(out_base),'rms.fits'])
+    if mask:
+        mask_img(bkg, data)
+        mask_img(rms, data)
     save_image(fits,np.array(bkg,dtype=np.float32),bkg_out)
     save_image(fits,np.array(rms,dtype=np.float32),rms_out)
 
@@ -412,6 +430,8 @@ if __name__=="__main__":
     parser.add_option('--onepass',dest='twopass',action='store_false', help='the opposite of twopass. default=False')
     parser.add_option('--twopass',dest='twopass',action='store_true',
                       help='Calculate the bkg and rms in a two passes instead of one. (when the bkg changes rapidly)')
+    parser.add_option('--nomask', dest='mask', action='store_false', default=True,
+                      help="Don't mask the output array [default=True]")
     parser.add_option('--scipy',dest='usescipy',action='store_true',
                       help='Use scipy generic filter instead of the running percentile filter. (for testing/timing)')
     parser.add_option('--debug',dest='debug',action='store_true',help='debug mode, default=False')
@@ -432,5 +452,7 @@ if __name__=="__main__":
     if options.usescipy:
         scipy_filter(im_name=filename,out_base=options.out_base,step_size=options.step_size,box_size=options.box_size,cores=options.cores)
     else:
-        filter_image(im_name=filename,out_base=options.out_base,step_size=options.step_size,box_size=options.box_size,twopass=options.twopass,cores=options.cores)
+        filter_image(im_name=filename, out_base=options.out_base, step_size=options.step_size,
+                     box_size=options.box_size, twopass=options.twopass, cores=options.cores,
+                     mask=options.mask)
 
