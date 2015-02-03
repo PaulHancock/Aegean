@@ -15,7 +15,7 @@ import os
 import sys
 import numpy as np
 from astropy.io import fits
-from AegeanTools.fits_interp import reduce, expand
+from AegeanTools.fits_interp import compress, expand
 
 version = '1.0'
 
@@ -75,4 +75,4 @@ if __name__ == "__main__":
             logging.error("Can't find {0}".format(results.maskfile))
 
     else:
-        reduce(results.infile, results.factor, results.outfile)
+        compress(results.infile, results.factor, results.outfile)
