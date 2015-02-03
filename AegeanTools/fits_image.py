@@ -9,7 +9,22 @@ import numpy
 import astropy.wcs as pywcs
 import scipy.stats
 import logging,sys
-from math import pi,cos,sin,sqrt
+from fits_interp import expand
+
+def load_safe(filename):
+    """
+
+    :param filename:
+    :return:
+    """
+    try:
+        hdus = pyfits.open(filename)
+    except IOError,e:
+        if "END" in e.message:
+            logging.warn(e.message)
+        logging.warn("trying to ignore this, but you should really fix it")
+        hdus = pyfits.open(filename,ignore_missing_end=True)
+    return hdus
 
 class FitsImage():
     def __init__(self, filename=None, hdu_index=0, hdu=None, beam=None):
@@ -26,15 +41,14 @@ class FitsImage():
             self.hdu = hdu
         else:
             logging.debug("Loading HDU {0} from {1}".format(hdu_index, filename))
-            try:
-                hdus = pyfits.open(filename)
-            except IOError,e:
-                if "END" in e.message:
-                    logging.warn(e.message)
-                logging.warn("trying to ignore this, but you should really fix it")
-                hdus = pyfits.open(filename,ignore_missing_end=True)
-            self.hdu = hdus[hdu_index]
-            del hdus
+            hdulist = load_safe(filename)
+            self.hdu = hdulist[hdu_index]
+            # check to see if this image has been compressed
+            # and expand if neccessary
+            if 'BN_CFAC' in self.hdu.header:
+                logging.debug("Expanding file")
+                self.hdu = expand(hdulist)[hdu_index]
+            del hdulist
         
         self._header=self.hdu.header
         #need to read these headers before we 'touch' the data or they dissappear
