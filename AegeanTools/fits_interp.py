@@ -1,4 +1,4 @@
-#! /usr/bin/evn python
+#! /usr/bin/env python
 
 """
 A module to allow fits files to be shrunk in size using decimation, and to be

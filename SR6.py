@@ -1,4 +1,4 @@
-#! /usr/bin/evn python
+#! /usr/bin/env python
 
 """
 A program to provide a command line interface to the AegeanTools.fits_interp module
