@@ -45,7 +45,7 @@ def reduce(datafile, factor, outfile=None):
     header = hdulist[0].header
     data = hdulist[0].data
     cx, cy = data.shape[0], data.shape[1]
-    new_data = data[cx%factor::factor,cy%factor::factor]
+    new_data = data[::factor,::factor]
 
     # TODO: Figure out what to do when CD2_1 and CD1_2 are non-zero
     if 'CDELT1' in header:
