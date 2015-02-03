@@ -13,7 +13,8 @@ import logging
 import argparse
 import os
 import sys
-
+import numpy as np
+from astropy.io import fits
 from AegeanTools.fits_interp import reduce, expand
 
 version = '1.0'
@@ -29,7 +30,7 @@ if __name__ == "__main__":
     group1.add_argument('infile', type=str,
                         help="input filename")
     group1.add_argument('-o', dest='outfile', action='store',
-                        default=None, type=str, metavar='outputfile',
+                        default=None, type=str, metavar='OutputFile',
                         help='output filename')
     group1.add_argument('-f', dest='factor', action='store',
                         default=None, type=int, metavar='factor',
@@ -37,6 +38,12 @@ if __name__ == "__main__":
     group1.add_argument('-x', dest='expand', action='store_true',
                         default=False,
                         help='Operation is expand instead of compress.')
+    group1.add_argument('-i', dest='mode', choices=['linear','nearest'],
+                        default='linear',
+                        help='Interpolation method')
+    group1.add_argument('-m', dest='maskfile',action='store',
+                        default=None, type=str, metavar='MaskFile',
+                        help="File to use for masking pixels.")
     # TODO: move these to be in a different group. (The same as help).
     group1.add_argument('--debug', dest='debug', action='store_true',
                         default=False,
@@ -55,6 +62,17 @@ if __name__ == "__main__":
         sys.exit()
 
     if results.expand:
-        expand(results.infile, results.outfile)
+        if results.maskfile and os.path.exists(results.maskfile):
+            maskdata = fits.open(results.maskfile)[0].data
+            mask = np.where(np.isnan(maskdata))
+            hdulist = expand(results.infile, method=results.mode)
+            hdulist[0].data[mask]=np.nan
+            hdulist.writeto(results.outfile,clobber=True)
+            logging.info("Wrote masked file: {0}".format(results.outfile))
+        elif results.maskfile is None:
+            expand(results.infile, results.outfile, method=results.mode)
+        else:
+            logging.error("Can't find {0}".format(results.maskfile))
+
     else:
         reduce(results.infile, results.factor, results.outfile)
