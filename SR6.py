@@ -38,7 +38,7 @@ if __name__ == "__main__":
     group1.add_argument('-x', dest='expand', action='store_true',
                         default=False,
                         help='Operation is expand instead of compress.')
-    group1.add_argument('-i', dest='mode', choices=['linear','nearest'],
+    group1.add_argument('-i', dest='mode', choices=['linear','nearest','cubic'],
                         default='linear',
                         help='Interpolation method')
     group1.add_argument('-m', dest='maskfile',action='store',
