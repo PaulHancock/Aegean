@@ -2616,7 +2616,6 @@ if __name__ == "__main__":
 
     if options.find:
         logging.info("Finding sources.")
-        logging.info(" find neg sources? {0}".format(options.negative))
         detections = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,
                                            rms=options.rms,
                                            max_summits=options.max_summits, csigma=options.csigma,
