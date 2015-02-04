@@ -123,13 +123,13 @@ def expand(datafile, outfile=None, method='linear'):
         return None
 
     factor = header['BN_CFAC']
-    (gx, gy) = np.mgrid[0:header['BN_NPX1'], 0:header['BN_NPX2']]
+    (gx, gy) = np.mgrid[0:header['BN_NPX2'], 0:header['BN_NPX1']]
     # Extract the data and create the array of indices
     values = np.ravel(data)
     grid = np.indices(data.shape)
     # fix the last column of the grid to account for residuals
-    lcx = header['BN_RPX1']
-    lcy = header['BN_RPX2']
+    lcx = header['BN_RPX2']
+    lcy = header['BN_RPX1']
     grid[0, :] += 1. * lcx / factor
     grid[1, :] += 1. * lcy / factor
     points = zip(np.ravel(grid[0] * factor), np.ravel(grid[1] * factor))
