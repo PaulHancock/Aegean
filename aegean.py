@@ -2345,7 +2345,7 @@ def force_measure_flux(radec):
 
 
 def measure_catalog_fluxes(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
-                           beam=None):
+                           beam=None, lat=None):
     """
     Measure the flux at a given set of locations, assuming point sources.
 
@@ -2362,7 +2362,7 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0, outfile=None, bkgin=N
 
     """
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
-                 do_curve=False,beam=beam)
+                 do_curve=False, beam=beam, lat=lat)
 
     #load catalog
     radec = load_catalog(catfile)
@@ -2654,7 +2654,7 @@ if __name__ == "__main__":
         logging.info("Measuring fluxes of input catalog.")
         measurements = measure_catalog_fluxes(filename, catfile=options.input, hdu_index=options.hdu_index,
                                               outfile=options.outfile, bkgin=options.backgroundimg,
-                                              rmsin=options.noiseimg, beam=options.beam)
+                                              rmsin=options.noiseimg, beam=options.beam, lat=lat)
         if len(measurements) == 0:
             logging.info("No measurements made")
         sources.extend(measurements)
