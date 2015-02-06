@@ -1718,6 +1718,8 @@ def scope2lat(telescope):
     :param telescope:
     :return:
     """
+    # TODO: look at http://en.wikipedia.org/wiki/List_of_radio_telescopes
+    # and add some more telescopes to this list
     if telescope.lower() == 'mwa':
         return -26.703319 # Hopefully wikipedia is correct
     elif telescope.lower() == 'atca':
