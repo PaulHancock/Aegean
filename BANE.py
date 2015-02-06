@@ -453,7 +453,7 @@ if __name__=="__main__":
     parser.add_option('--twopass',dest='twopass',action='store_true',
                       help='Calculate the bkg and rms in a two passes instead of one. (when the bkg changes rapidly)')
     parser.add_option('--nomask', dest='mask', action='store_false', default=True,
-                      help="Don't mask the output array [default=True]")
+                      help="Don't mask the output array [default = mask]")
     parser.add_option('--scipy',dest='usescipy',action='store_true',
                       help='Use scipy generic filter instead of the running percentile filter. (for testing/timing)')
     parser.add_option('--debug',dest='debug',action='store_true',help='debug mode, default=False')
