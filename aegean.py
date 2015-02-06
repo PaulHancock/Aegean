@@ -686,6 +686,10 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
         #initial shape is the pix beam
         major = pixbeam.a * fwhm2cc
         minor = pixbeam.b * fwhm2cc
+        # this will make the beam slightly bigger as we move away from zenith
+        if global_data.telescope_lat is not None:
+            _, dec = pix2sky([xo+offsets[0],yo+offsets[1]])
+            major /= np.cos(np.radians(dec-global_data.telescope_lat))
 
         #constraints are based on the shape of the island
         major_min, major_max = major * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * fwhm2cc, major * 1.1)
@@ -1689,8 +1693,6 @@ def get_pixbeam():
     Calculate a beam in pixel scale, pa is always zero
     :return: A beam in pixel scale
     """
-    # This version gives the right int/peak ratio
-    # Don't try to use WCS for something that is inherently an image domain problem!
     global global_data
     beam = global_data.beam
     pixscale = global_data.img.pixscale
@@ -1701,15 +1703,19 @@ def get_pixbeam():
 
 def get_beamarea(ra,dec):
     """
-    Calculate the area of the beam at location ra,dec
+    Calculate the area of the beam at a given location
+    scale area based on elevation if the telescope latitude is known.
     :param ra:
     :param dec:
-    :return: area in deg^2
+    :return:
     """
-    area = global_data.img.beam.a * global_data.img.beam.b * np.pi
+    pixscale = global_data.img.pixscale
+    beam = global_data.beam
+    parea = abs(pixscale[0] * pixscale[1]) # in deg**2 at reference coords
+    barea = abs(beam.a * beam.b * np.pi) # in deg**2 at reference coords
     if global_data.telescope_lat is not None:
-        area /= np.cos(np.radians(dec-global_data.telescope_lat))
-    return area
+        barea /= np.cos(np.radians(dec-global_data.telescope_lat))
+    return barea/parea
 
 
 def scope2lat(telescope):
@@ -1949,21 +1955,14 @@ def fit_island(island_data):
             logging.debug('min_err_dec {0}'.format(min_err_dec))
         logging.debug("errors after fixing {0},{1}".format(source.err_ra, source.err_dec))
 
-        pixbeam = global_data.pixbeam
-        #integrated flux is calculated not fit or measured
-        if pixbeam is not None:
-            # source.int_flux = source.peak_flux * major * minor * cc2fwhm ** 2 / (pixbeam.a * pixbeam.b)
-            source.int_flux = source.peak_flux * source.a * source.b / get_beamarea(source.ra, source.dec)
-            source.int_flux *= np.pi / 60**4
-            #The error is never -1, but may be zero.
-            source.err_int_flux = source.int_flux * math.sqrt((max(source.err_peak_flux, 0) / source.peak_flux) ** 2
-                                                              + (max(source.err_a, 0) / source.a) ** 2
-                                                              + (max(source.err_b, 0) / source.b) ** 2)
-        else:
-            #this doesn't happen any more but i'll leave it in in-case I update get_pixbeam
-            source.flags |= flags.WCSERR
-            source.int_flux = np.nan
-            source.err_int_flux = np.nan
+        # integrated flux is calculated not fit or measured
+        source.int_flux = source.peak_flux * major * minor * cc2fwhm ** 2 * np.pi
+        # scale Jy/beam -> Jy
+        source.int_flux /= get_beamarea(source.ra,source.dec)
+        # The error is never -1, but may be zero.
+        source.err_int_flux = source.int_flux * math.sqrt((max(source.err_peak_flux, 0) / source.peak_flux) ** 2
+                                                          + (max(source.err_a, 0) / source.a) ** 2
+                                                          + (max(source.err_b, 0) / source.b) ** 2)
 
         #fiddle all the errors to be larger by sqrt(npix)
         rt_npix = np.sqrt(sum(np.isfinite(isle.pixels).ravel() * 1) / components)
