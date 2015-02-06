@@ -2047,28 +2047,20 @@ def fit_island(island_data):
         logging.debug("- peak position {0}, {1} [{2},{3}]".format(source.ra_str, source.dec_str, positions[0][0],
                                                                   positions[1][0]))
 
-        pixbeam = global_data.pixbeam
-        #integrated flux
-        if pixbeam is not None:
-            beam_volume = 2 * np.pi * pixbeam.a * pixbeam.b / cc2fwhm ** 2
-            isize = source.pixels  #number of non zero pixels
-            logging.debug("- pixels used {0}".format(isize))
-            source.int_flux = np.nansum(kappa_sigma)  #total flux Jy/beam
-            logging.debug("- sum of pixles {0}".format(source.int_flux))
-            source.int_flux /= beam_volume
-            logging.debug("- pixbeam {0},{1}".format(pixbeam.a, pixbeam.b))
-            logging.debug("- raw integrated flux {0}".format(source.int_flux))
-            eta = erf(np.sqrt(-1 * np.log(abs(source.local_rms * outerclip / source.peak_flux)))) ** 2
-            logging.debug("- eta {0}".format(eta))
-            source.eta = eta
-            logging.debug("- corrected integrated flux {0}".format(source.int_flux))
-            source.beam_area = beam_volume
-        else:
-            source.flags |= flags.WCSERR
-            source.int_flux = np.nan
-            source.eta = np.nan
-            source.beam_area = np.nan
-        #somehow I don't trust this but w/e
+        # integrated flux
+        beam_area = get_beamarea(source.ra,source.dec)
+        isize = source.pixels  #number of non zero pixels
+        logging.debug("- pixels used {0}".format(isize))
+        source.int_flux = np.nansum(kappa_sigma)  #total flux Jy/beam
+        logging.debug("- sum of pixles {0}".format(source.int_flux))
+        source.int_flux /= beam_area
+        logging.debug("- integrated flux {0}".format(source.int_flux))
+        eta = erf(np.sqrt(-1 * np.log(abs(source.local_rms * outerclip / source.peak_flux)))) ** 2
+        logging.debug("- eta {0}".format(eta))
+        source.eta = eta
+        source.beam_area = beam_area
+
+        # somehow I don't trust this but w/e
         source.err_int_flux = np.nan
         sources.append(source)
     return sources
@@ -2269,6 +2261,9 @@ def force_measure_flux(radec):
     dummy.flags = flags.FITERR
 
     shape = global_data.data_pix.shape
+
+    if global_data.telescope_lat is not None:
+        logging.warn("No account is being made for telescope latitude, even though it has been supplied")
     for ra, dec in radec:
         #find the right pixels from the ra/dec
         source_x, source_y = sky2pix([ra, dec])
