@@ -1720,6 +1720,12 @@ def scope2lat(telescope):
     """
     if telescope.lower() == 'mwa':
         return -26.703319 # Hopefully wikipedia is correct
+    elif telescope.lower() == 'atca':
+        return -30.3128 # From google
+    elif telescope.lower() == 'vla':
+        return 34.0790 # From google
+    elif telescope.lower() == 'lofar':
+        return 52.9088 # From google
     else:
         logging.warn("Telescope {0} is unknown".format(telescope))
         logging.warn("integrated fluxes may be incorrect")
@@ -2478,7 +2484,7 @@ if __name__ == "__main__":
     parser.add_option('--beam', dest='beam', type='float', nargs=3, default=None,
                       help='The beam parameters to be used is "--beam major minor pa" all in degrees. [default: read from fits header].')
     parser.add_option('--telescope', dest='telescope', type=str, default=None,
-                      help='The name of the telescope used to collect data.\n[MWA] -> used to lookup telescope latitude')
+                      help='The name of the telescope used to collect data. [MWA|VLA|ATCA|LOFAR]')
     parser.add_option('--lat', dest='lat', type=float, default=None,
                       help='The latitude of the tlescope used to collect data.')
     parser.add_option('--versions', dest='file_versions', action="store_true", default=False,
