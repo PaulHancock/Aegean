@@ -360,6 +360,7 @@ class GlobalFittingData:
     data_pix = None
     dtype = None
     region = None
+    telescope_lat = None
 
     def __init__(self):
         return
@@ -864,7 +865,7 @@ def load_bkg_rms_image(image, bkgfile, rmsfile):
 
 
 def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, cores=1, csigma=None,
-                 do_curve=True, mask=None):
+                 do_curve=True, mask=None, lat=None):
     """
     populate the global_data object by loading or calculating the various components
     """
@@ -897,6 +898,7 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
     global_data.bkgimg = np.zeros(global_data.data_pix.shape, dtype=global_data.dtype)
     global_data.rmsimg = np.zeros(global_data.data_pix.shape, dtype=global_data.dtype)
     global_data.pixarea = img.pixarea
+    global_data.telescope_lat = lat
     global_data.dcurve = None
     if do_curve:
         #calculate curvature but store it as -1,0,+1
@@ -1688,13 +1690,40 @@ def get_pixbeam():
     :return: A beam in pixel scale
     """
     # This version gives the right int/peak ratio
-    # Don't try to use WCS for somthing that is inherantly an image domain problem!
+    # Don't try to use WCS for something that is inherently an image domain problem!
     global global_data
     beam = global_data.beam
     pixscale = global_data.img.pixscale
     major = beam.a/(pixscale[0]*math.sin(math.radians(beam.pa)) +pixscale[1]*math.cos(math.radians(beam.pa)) )
     minor = beam.b/(pixscale[1]*math.sin(math.radians(beam.pa)) +pixscale[0]*math.cos(math.radians(beam.pa)) )
     return Beam(abs(major),abs(minor),0)
+
+
+def get_beamarea(ra,dec):
+    """
+    Calculate the area of the beam at location ra,dec
+    :param ra:
+    :param dec:
+    :return: area in deg^2
+    """
+    area = global_data.img.beam.a * global_data.img.beam.b * np.pi
+    if global_data.telescope_lat is not None:
+        area /= np.cos(np.radians(dec-global_data.telescope_lat))
+    return area
+
+
+def scope2lat(telescope):
+    """
+    Convert a telescope name into a latitude
+    :param telescope:
+    :return:
+    """
+    if telescope.lower() == 'mwa':
+        return -26.703319 # Hopefully wikipedia is correct
+    else:
+        logging.warn("Telescope {0} is unknown".format(telescope))
+        logging.warn("integrated fluxes may be incorrect")
+        return None
 
 
 def sky_sep(pix1, pix2):
@@ -1915,7 +1944,9 @@ def fit_island(island_data):
         pixbeam = global_data.pixbeam
         #integrated flux is calculated not fit or measured
         if pixbeam is not None:
-            source.int_flux = source.peak_flux * major * minor * cc2fwhm ** 2 / (pixbeam.a * pixbeam.b)
+            # source.int_flux = source.peak_flux * major * minor * cc2fwhm ** 2 / (pixbeam.a * pixbeam.b)
+            source.int_flux = source.peak_flux * source.a * source.b / get_beamarea(source.ra, source.dec)
+            source.int_flux *= np.pi / 60**4
             #The error is never -1, but may be zero.
             source.err_int_flux = source.int_flux * math.sqrt((max(source.err_peak_flux, 0) / source.peak_flux) ** 2
                                                               + (max(source.err_a, 0) / source.a) ** 2
@@ -2052,7 +2083,7 @@ def fit_islands(islands):
 
 def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_summits=None, csigma=None, innerclip=5,
                           outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
-                          returnrms=False, nopositive=False, nonegative=False, mask=None):
+                          returnrms=False, nopositive=False, nonegative=False, mask=None, lat=None):
     """
     Run the Aegean source finder.
     Inputs:
@@ -2096,7 +2127,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
         assert (cores >= 1), "cores must be one or more"
 
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, cores=cores,
-                 csigma=csigma, verb=True, mask=mask)
+                 csigma=csigma, verb=True, mask=mask, lat=lat)
 
     #we now work with the updated versions of the three images
     rmsimg = global_data.rmsimg
@@ -2446,6 +2477,10 @@ if __name__ == "__main__":
                       help='The clipping value (in sigmas) for growing islands. [default: 4]')
     parser.add_option('--beam', dest='beam', type='float', nargs=3, default=None,
                       help='The beam parameters to be used is "--beam major minor pa" all in degrees. [default: read from fits header].')
+    parser.add_option('--telescope', dest='telescope', type=str, default=None,
+                      help='The name of the telescope used to collect data.\n[MWA] -> used to lookup telescope latitude')
+    parser.add_option('--lat', dest='lat', type=float, default=None,
+                      help='The latitude of the tlescope used to collect data.')
     parser.add_option('--versions', dest='file_versions', action="store_true", default=False,
                       help='Show the file versions of relevant modules. [default: false]')
     parser.add_option('--island', dest='doislandflux', action="store_true", default=False,
@@ -2550,6 +2585,14 @@ if __name__ == "__main__":
         logging.info("Using user supplied beam parameters")
         logging.info("Beam is {0} deg x {1} deg with pa {2}".format(options.beam.a, options.beam.b, options.beam.pa))
 
+    # determine the latitude of the telescope
+    if options.telescope is not None:
+        lat = scope2lat(options.telescope)
+    elif options.lat is not None:
+        lat = options.lat
+    else:
+        lat = None
+
     # Generate and save the background FITS files
     if options.save:
         save_background_files(filename, hdu_index=hdu_index, cores=options.cores, beam=options.beam,
@@ -2624,7 +2667,7 @@ if __name__ == "__main__":
                                            bkgin=options.backgroundimg, beam=options.beam,
                                            doislandflux=options.doislandflux,
                                            nonegative=not options.negative, nopositive=options.nopositive,
-                                           mask=options.region)
+                                           mask=options.region, lat=lat)
         if len(detections) == 0:
             logging.info("No sources found in image")
         sources.extend(detections)
