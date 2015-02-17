@@ -130,6 +130,10 @@ def running_filter(xmn,xmx,ymn,ymx):
         if (p75 is not None) and (p25 is not None):
             rms_points.append((x,y))
             rms_values.append((p75-p25)/1.34896)
+            # if rms_values[-1]<0 and logging.getLogger().isEnabledFor(logging.DEBUG):
+            #     logging.debug("RMS: {0}".format(rms_values[-1]))
+            #     logging.debug("percentiles: {0}".format([p0,p25,p50,p75,p100]))
+            #     logging.debug("rp {0}".format(rp.slist))
     #return our lists, the interpolation will be done on the master node
     #also tell the master node where the data came from
     logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
