@@ -6,6 +6,7 @@ import math
 import sys
 from AegeanTools.mpfit import mpfit
 import logging
+from scipy.ndimage.filters import gaussian_filter1d
 
 def unravel_nans(arr,mask,shape):
     """
@@ -398,8 +399,63 @@ def compare():
     ax.set_title('MP Fit')
 
     pyplot.show()
+    return
 
+def test_lm_corr_noise():
+    """
+    :return:
+    """
+    nx = 20
+    smoothing = 3
+    y = gaussian(np.arange(nx), 1, nx/2, smoothing)
+    y = np.roll(y,nx/2)
+    C = np.vstack((y,)*nx)
+    for i in range(nx):
+        C[i] = np.roll(C[i],i)
+
+    Ci = np.matrix(C).I
+    #Ci = np.matrix(np.diag(np.ones(nx)))
+    def residual(pars,x,data=None):
+        amp = pars['amp'].value
+        cen = pars['cen'].value
+        wid = pars['wid'].value
+        model = gaussian(x, amp, cen, wid)
+        if data is None:
+            return model
+        resid = (model-data) * Ci # * np.matrix(model-data).T
+        return resid.tolist()[0]
+
+    x = np.arange(nx)
+
+    params = lmfit.Parameters()
+    params.add('amp', value=10.0, min=9, max=11)
+    params.add('cen', value=1.0*nx/2, min=0.8*nx/2, max=1.2*nx/2)
+    params.add('wid', value=2.0*smoothing, min=smoothing, max=3.0*smoothing)
+
+    signal = gaussian(x, params['amp'].value, params['cen'].value, params['wid'].value)
+
+    np.random.seed(1234567)
+    noise = np.random.random(nx)
+    noise = gaussian_filter1d(noise, sigma=smoothing)
+    noise -= np.mean(noise)
+    noise /= np.std(noise)
+
+    data = signal + noise
+
+    mi = lmfit.minimize(residual, params, args=(x,data))
+    model = gaussian(x, params['amp'].value, params['cen'].value, params['wid'].value)
+    print params
+    from matplotlib import pyplot
+    fig = pyplot.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(x,signal, label='signal')
+    ax.plot(x,noise, label='noise')
+    ax.plot(x,data, label='data')
+    ax.plot(x,model, label='model')
+    ax.legend()
+    pyplot.show()
 
 if __name__ == '__main__':
     # test2d2()
-    compare()
+    # compare()
+    test_lm_corr_noise()
