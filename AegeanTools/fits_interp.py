@@ -13,6 +13,7 @@ Created:
 import numpy as np
 from astropy.io import fits
 from scipy.interpolate import griddata
+from math import floor
 import logging
 
 
@@ -130,9 +131,11 @@ def expand(datafile, outfile=None, method='linear'):
     # fix the last column of the grid to account for residuals
     lcx = header['BN_RPX2']
     lcy = header['BN_RPX1']
-    grid[0, :] += 1. * lcx / factor
-    grid[1, :] += 1. * lcy / factor
-    points = zip(np.ravel(grid[0] * factor), np.ravel(grid[1] * factor))
+
+    grid[0, :] += lcx/factor
+    grid[1, :] += lcy/factor
+    grid  *= factor
+    points = zip(np.ravel(grid[0]), np.ravel(grid[1]))
 
     # Do the interpolation
     hdulist[0].data = np.array(griddata(points, values, (gx, gy), method=method), dtype=np.float32)
@@ -161,7 +164,7 @@ def expand(datafile, outfile=None, method='linear'):
     header['HISTORY'] = 'Expanded by factor {0}'.format(factor)
 
     # don't need these any more so delete them.
-    del header['BN_CFAC'], header['BN_NPX1'], header['BN_NPX2']
+    del header['BN_CFAC'], header['BN_NPX1'], header['BN_NPX2'], header['BN_RPX1'], header['BN_RPX2']
     hdulist[0].header = header
     if outfile is not None:
         hdulist.writeto(outfile, clobber=True)
