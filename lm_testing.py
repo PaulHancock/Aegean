@@ -6,7 +6,7 @@ import math
 import sys
 from AegeanTools.mpfit import mpfit
 import logging
-from scipy.ndimage.filters import gaussian_filter1d
+from scipy.ndimage.filters import gaussian_filter1d, gaussian_filter
 
 def unravel_nans(arr,mask,shape):
     """
@@ -455,7 +455,83 @@ def test_lm_corr_noise():
     ax.legend()
     pyplot.show()
 
+def test_lm_corr_noise_2d():
+    """
+    :return:
+    """
+    nx = 20
+    smoothing = 3
+    x, y = np.meshgrid(range(nx),range(nx))
+    z = np.ravel(two_d_gaussian(x, y, 1, 0, 0, smoothing, smoothing, 0))
+    C = np.vstack((z,)*nx*nx)
+    for i in range(nx*nx):
+        C[i] = np.roll(C[i],i)
+
+    Ci = np.matrix(C).I
+    Ci = np.matrix(np.diag(np.ones(nx*nx)))
+    def residual(pars,x,y,data=None):
+        amp = pars['amp'].value
+        xo = pars['xo'].value
+        yo = pars['yo'].value
+        major = pars['major'].value
+        minor = pars['minor'].value
+        pa = pars['pa'].value
+        model = np.ravel(two_d_gaussian(x, y, amp, xo, yo, major, minor, pa))
+        if data is None:
+            return model
+        resid = (model-data) * Ci # * np.matrix(model-data).T
+        return resid.tolist()[0]
+
+    params = lmfit.Parameters()
+    params.add('amp', value=10.0, min=9, max=11)
+    params.add('xo', value=1.0*nx/2, min=0.8*nx/2, max=1.2*nx/2)
+    params.add('yo', value=1.0*nx/2, min=0.8*nx/2, max=1.2*nx/2)
+    params.add('major', value=smoothing, min=0.8*smoothing, max=1.2*smoothing)
+    params.add('minor', value=smoothing, min=0.8*smoothing, max=1.2*smoothing)
+    params.add('pa', value=0, min=-1.*np.pi, max=np.pi)
+
+
+    signal = residual(params, x, y) # returns model
+    signal = signal.reshape(nx,nx)
+
+    np.random.seed(1234567)
+    noise = np.random.random((nx,nx))
+    noise = gaussian_filter(noise, sigma=smoothing)
+    noise -= np.mean(noise)
+    noise /= np.std(noise)
+
+    data = np.ravel(signal + noise)
+
+    mi = lmfit.minimize(residual, params, args=(x, y, data))
+    data = data.reshape(nx,nx)
+    model = residual(params, x, y).reshape(nx,nx)
+    print params
+
+    kwargs = {'vmin':-1, 'vmax':10, 'interpolation':'nearest'}
+    from matplotlib import pyplot
+    fig = pyplot.figure()
+    ax = fig.add_subplot(221)
+    ax.imshow(noise, **kwargs)
+    ax.set_title('noise')
+    print "noise rms: {0}".format(np.std(noise))
+
+    ax = fig.add_subplot(222)
+    ax.imshow(data, **kwargs)
+    ax.set_title('data')
+
+    ax = fig.add_subplot(223)
+    ax.imshow(model, **kwargs)
+    ax.set_title('model')
+
+    ax = fig.add_subplot(224)
+    ax.imshow(data-model, **kwargs)
+    ax.set_title('residual')
+    print "resid rms: {0}".format(np.std(model-data))
+
+    pyplot.show()
+
+
 if __name__ == '__main__':
     # test2d2()
     # compare()
-    test_lm_corr_noise()
+    test_lm_corr_noise_2d()
