@@ -1831,7 +1831,7 @@ def fit_island(island_data):
         mp, info = multi_gauss(isle.pixels, rms, parinfo)
         # This scales the errors to be 1sigma.
         # see the .perror documentation in mpfit.mpfit
-        err_scale = np.sqrt(mp.fnorm/mp.dof) if mp.fnorm > 0 else 1
+        err_scale = 1 #np.sqrt(mp.fnorm/mp.dof) if mp.fnorm > 0 else 1
         # logging.debug("mp.fnorm, mp.dof {0} {1}".format(mp.fnorm, mp.dof))
         # logging.debug(" mp {0}".format(dir(mp)))
         # logging.debug(" niter: {0}".format(mp.niter))
@@ -1965,21 +1965,21 @@ def fit_island(island_data):
                                                           + (max(source.err_b, 0) / source.b) ** 2)
 
         #fiddle all the errors to be larger by sqrt(npix)
-        rt_npix = np.sqrt(sum(np.isfinite(isle.pixels).ravel() * 1) / components)
-        if source.err_ra > 0:
-            source.err_ra *= rt_npix
-        if source.err_dec > 0:
-            source.err_dec *= rt_npix
-        if source.err_peak_flux > 0:
-            source.err_peak_flux *= rt_npix
-        if source.err_int_flux > 0:
-            source.err_int_flux *= rt_npix
-        if source.err_a > 0:
-            source.err_a *= rt_npix
-        if source.err_b > 0:
-            source.err_b *= rt_npix
-        if source.err_pa > 0:
-            source.err_pa *= rt_npix
+        # rt_npix = np.sqrt(sum(np.isfinite(isle.pixels).ravel() * 1) / components)
+        # if source.err_ra > 0:
+        #     source.err_ra *= rt_npix
+        # if source.err_dec > 0:
+        #     source.err_dec *= rt_npix
+        # if source.err_peak_flux > 0:
+        #     source.err_peak_flux *= rt_npix
+        # if source.err_int_flux > 0:
+        #     source.err_int_flux *= rt_npix
+        # if source.err_a > 0:
+        #     source.err_a *= rt_npix
+        # if source.err_b > 0:
+        #     source.err_b *= rt_npix
+        # if source.err_pa > 0:
+        #     source.err_pa *= rt_npix
 
             #set the flags
         source.flags = src_flags
