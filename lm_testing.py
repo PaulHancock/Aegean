@@ -401,6 +401,29 @@ def compare():
     pyplot.show()
     return
 
+def gmean(indata):
+    """
+    Calculate the geometric mean of a data set taking account of
+    values that may be negative, zero, or nan
+    :param data: a list of floats or ints
+    :return: the geometric mean of the data
+    """
+    data = np.ravel(indata)
+    if np.inf in data:
+        return np.inf, np.inf
+
+    finite = data[np.isfinite(data)]
+    if len(finite) < 1:
+        return np.nan, np.nan
+    #determine the zero point and scale all values to be 1 or greater
+    scale = abs(np.min(finite)) + 1
+    finite += scale
+    #calculate the geometric mean of the scaled data and scale back
+    lfinite = np.log(finite)
+    flux = np.exp(np.mean(lfinite)) - scale
+    error = np.nanstd(lfinite) * flux
+    return flux, abs(error)
+
 def test_lm_corr_noise():
     """
     :return:
@@ -459,7 +482,7 @@ def test_lm_corr_noise_2d():
     """
     :return:
     """
-    nx = 20
+    nx = 15
     smoothing = 3
     x, y = np.meshgrid(range(nx),range(nx))
     z = np.ravel(two_d_gaussian(x, y, 1, 0, 0, smoothing, smoothing, 0))
@@ -468,7 +491,7 @@ def test_lm_corr_noise_2d():
         C[i] = np.roll(C[i],i)
 
     Ci = np.matrix(C).I
-    Ci = np.matrix(np.diag(np.ones(nx*nx)))
+    #Ci = np.matrix(np.diag(np.ones(nx*nx)))
     def residual(pars,x,y,data=None):
         amp = pars['amp'].value
         xo = pars['xo'].value
@@ -530,8 +553,85 @@ def test_lm_corr_noise_2d():
 
     pyplot.show()
 
+def test_lm2d_errs():
+    """
+    :return:
+    """
+    import copy
+
+    nx = 30
+    smoothing = 5./(2*np.sqrt(2*np.log(2))) #5 pixels per beam
+    x, y = np.meshgrid(range(nx),range(nx))
+    z = np.ravel(two_d_gaussian(x, y, 1, 0, 0, smoothing, smoothing, 0))
+    C = np.vstack((z,)*nx*nx)
+    for i in range(nx*nx):
+        C[i] = np.roll(C[i],i)
+
+    Ci = np.matrix(C).I
+    Ci2 = np.matrix(np.diag(np.ones(nx*nx)))
+
+    def residual(pars,x,y,data=None):
+            amp = pars['amp'].value
+            xo = pars['xo'].value
+            yo = pars['yo'].value
+            major = pars['major'].value
+            minor = pars['minor'].value
+            pa = pars['pa'].value
+            model = np.ravel(two_d_gaussian(x, y, amp, xo, yo, major, minor, pa))
+            if data is None:
+                return model
+            resid = (model-data) * Ci  #* np.matrix(model-data).T
+            return resid.tolist()[0]
+
+    params = lmfit.Parameters()
+    params.add('amp', value=10.0, min=9, max=11)
+    params.add('xo', value=1.0*nx/2, min=0.8*nx/2, max=1.2*nx/2)
+    params.add('yo', value=1.0*nx/2, min=0.8*nx/2, max=1.2*nx/2)
+    params.add('major', value=smoothing, min=0.8*smoothing, max=1.2*smoothing)
+    params.add('minor', value=smoothing, min=0.8*smoothing, max=1.2*smoothing)
+    params.add('pa', value=0, min=-1.*np.pi, max=np.pi)
+
+    signal = residual(params, x, y) # returns model
+    signal = signal.reshape(nx,nx)
+
+    ratios = []
+
+    for n in xrange(50):
+        # need to re-init this.
+
+        pars = copy.deepcopy(params)
+
+        np.random.seed(1234567 + n)
+        noise = np.random.random((nx,nx))
+        noise = gaussian_filter(noise, sigma=smoothing)
+        noise -= np.mean(noise)
+        noise /= np.std(noise)
+
+        data = np.ravel(signal + noise)
+
+        mi = lmfit.minimize(residual, pars, args=(x, y, data))
+        if np.all( [pars[i].stderr >0 for i in params.valuesdict().keys()]):
+            ratios.append( [ abs(params[i].value -pars[i].value)/pars[i].stderr for i in params.valuesdict().keys()])
+
+    ratios = np.array(ratios)
+    print ratios
+
+    from matplotlib import pyplot
+    fig = pyplot.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(ratios[:,0], label='amp')
+    ax.plot(ratios[:,1]*10, label='xo')
+    ax.plot(ratios[:,2]*1e2, label='yo')
+    ax.plot(ratios[:,3]*1e3, label='major')
+    ax.plot(ratios[:,4]*1e4, label='minor')
+    ax.set_yscale('log')
+    ax.legend()
+    for i,val in enumerate(params.valuesdict().keys()):
+        print "{0}: {1}".format(val,gmean(ratios[:,i]))
+    pyplot.show()
 
 if __name__ == '__main__':
     # test2d2()
     # compare()
-    test_lm_corr_noise_2d()
+    # test_lm_corr_noise_2d()
+    test_lm2d_errs()
