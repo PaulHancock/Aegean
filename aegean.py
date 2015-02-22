@@ -1831,7 +1831,7 @@ def fit_island(island_data):
         mp, info = multi_gauss(isle.pixels, rms, parinfo)
         # This scales the errors to be 1sigma.
         # see the .perror documentation in mpfit.mpfit
-        err_scale = 1 #np.sqrt(mp.fnorm/mp.dof) if mp.fnorm > 0 else 1
+        err_scale = np.sqrt(mp.fnorm/mp.dof) if mp.fnorm > 0 else 1
         # logging.debug("mp.fnorm, mp.dof {0} {1}".format(mp.fnorm, mp.dof))
         # logging.debug(" mp {0}".format(dir(mp)))
         # logging.debug(" niter: {0}".format(mp.niter))
