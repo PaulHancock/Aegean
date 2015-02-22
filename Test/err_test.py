@@ -10,16 +10,18 @@ sys.path.append("../.")
 
 import aegean as ae
 from astropy.io import fits
+import astropy.units as u
+from astropy.coordinates import SkyCoord
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter
+from scipy.linalg import sqrtm
 from math import floor
 from AegeanTools.mpfit import mpfit
-from scipy.linalg import sqrtm
-import logging
+from matplotlib import pyplot
 
+smoothing = 1
 
-
-def multi_gauss(data, rmsimg, parinfo):
+def new_multi_gauss(data, rmsimg, parinfo):
     """
     Fit multiple gaussian components to data using the information provided by parinfo.
     data may contain 'flagged' or 'masked' data with the value of np.NaN
@@ -57,72 +59,197 @@ def multi_gauss(data, rmsimg, parinfo):
     mp.dof = len(data) - len(parinfo)
     return mp, parinfo
 
+def test_corr_noise_error():
+    # sub the new version in
+    ae.multi_gauss = new_multi_gauss
 
-# sub the new version in
-ae.multi_gauss = multi_gauss
+    # load file to get wcs
+    hdulist = fits.open('Images/1904-66_SIN.fits')
 
-# load file to get wcs
-hdulist = fits.open('Images/1904-66_SIN.fits')
+    shape = hdulist[0].data.shape
+    # create boring background/rms
+    background = np.zeros(shape)
+    rms = np.ones(shape)
 
-shape = hdulist[0].data.shape
-# create boring background/rms
-background = np.zeros(shape)
-rms = np.ones(shape)
+    # figure out the smoothing for our noise
+    scale = abs(hdulist[0].header['CDELT1']*hdulist[0].header['CDELT2'])
+    smoothing = hdulist[0].header['BMAJ'] * hdulist[0].header['BMIN'] / scale
+    smoothing = np.sqrt(smoothing) * ae.fwhm2cc
+    print smoothing
 
-# figure out the smoothing for our noise
-scale = abs(hdulist[0].header['CDELT1']*hdulist[0].header['CDELT2'])
-smoothing = hdulist[0].header['BMAJ'] * hdulist[0].header['BMIN'] / scale
-smoothing = np.sqrt(smoothing) * ae.fwhm2cc
-print smoothing
+    # create some correlated noise
+    np.random.seed(1234567890)
+    noise = np.random.random(shape)
+    noise = gaussian_filter(noise, sigma=smoothing)
+    noise -= np.mean(noise) # zero mean
+    noise /= np.std(noise) # unit rms
 
-# create some correlated noise
-np.random.seed(1234567890)
-noise = np.random.random(shape)
-noise = gaussian_filter(noise, sigma=smoothing)
-noise -= np.mean(noise) # zero mean
-noise /= np.std(noise) # unit rms
+    # make a bunch of sources within the image
+    stepsize = smoothing * 10
+    xlocs = np.arange(int(floor(stepsize)), shape[0], int(floor(stepsize)))
+    ylocs = np.arange(int(floor(stepsize)), shape[1], int(floor(stepsize)))
 
-# make a bunch of sources within the image
-stepsize = smoothing * 10
-xlocs = np.arange(int(floor(stepsize)), shape[0], int(floor(stepsize)))
-ylocs = np.arange(int(floor(stepsize)), shape[1], int(floor(stepsize)))
+    fluxes = []
+    rapix = []
+    decpix = []
+    signal = np.zeros(shape)
+    xos, yos = np.meshgrid(xlocs,ylocs)
 
-fluxes = []
-rapix = []
-decpix = []
-signal = np.zeros(shape)
-xos, yos = np.meshgrid(xlocs,ylocs)
+    xpix, ypix = np.meshgrid(range(shape[0]),range(shape[1]))
+    for f, loc in enumerate(zip(np.ravel(xos),np.ravel(yos))):
+        flux = 5+f*2
+        xo, yo = loc
+        major, minor = smoothing, smoothing
+        pa = 0
+        src = ae.ntwodgaussian([flux, xo, yo, major, minor, pa])(xpix,ypix)
+        fluxes.append(flux)
+        rapix.append(xo)
+        decpix.append(yo)
+        signal += src
 
-xpix, ypix = np.meshgrid(range(shape[0]),range(shape[1]))
-for f, loc in enumerate(zip(np.ravel(xos),np.ravel(yos))):
-    flux = 5+f*2
-    xo, yo = loc
+    hdulist[0].data = signal + noise
+
+    hdulist.writeto('test.fits',clobber=True)
+
+    sources = ae.find_sources_in_image(hdulist, max_summits=2, rms=1, cores=1)
+    print "found {0}/{1} sources".format(len(sources),f+1)
+    ae.save_catalog('test_m.vot',sources)
+    ae.save_catalog('test_m.reg',sources)
+
+
+    out = open('test.csv','w')
+    print >>out, ','.join(['flux', 'ra', 'dec', 'major', 'minor', 'pa'])
+    for f, xo, yo in zip(fluxes, rapix, decpix):
+        major, minor = smoothing, smoothing
+        pa = 0
+        ra, dec = ae.pix2sky([yo+1,xo+1]) # not sure why I need +1 here
+        print xo,yo,"->",ra,dec
+        print >>out, ','.join(map(str,[f, ra, dec, major*np.sqrt(scale)*ae.cc2fwhm *3600, minor*np.sqrt(scale)*ae.cc2fwhm *3600, pa]))
+    out.close()
+
+def dk_error_comp():
+    global smoothing
+
+    print "loading data"
+    # load file to get wcs
+    hdulist = fits.open('Images/1904-66_SIN.fits')
+
+    shape = hdulist[0].data.shape
+
+    # figure out the smoothing for our noise
+    scale = abs(hdulist[0].header['CDELT1']*hdulist[0].header['CDELT2'])
+    smoothing = hdulist[0].header['BMAJ'] * hdulist[0].header['BMIN'] / scale
+    smoothing = np.sqrt(smoothing) * ae.fwhm2cc
+    print smoothing
+
+    print "making noises"
+    # create some correlated noise
+    np.random.seed(1234567890)
+    noise = np.random.random(shape)
+    cnoise = gaussian_filter(noise, sigma=smoothing)
+    cnoise -= np.mean(cnoise) # zero mean
+    cnoise /= np.std(cnoise) # unit rms
+
+    # make a bunch of sources within the image
+    stepsize = smoothing * 10
+    xlocs = np.arange(int(floor(stepsize)), shape[0], int(floor(stepsize)))
+    ylocs = np.arange(int(floor(stepsize)), shape[1], int(floor(stepsize)))
+
+    fluxes = []
+    rapix = []
+    decpix = []
+    signal = np.zeros(shape)
+    xos, yos = np.meshgrid(xlocs,ylocs)
+
+    print "making signal"
+    xpix, ypix = np.meshgrid(range(shape[0]),range(shape[1]))
+    for f, loc in enumerate(zip(np.ravel(xos),np.ravel(yos))):
+        flux = 5 + f*2
+        xo, yo = loc
+        major, minor = smoothing, smoothing
+        pa = 0
+        src = ae.ntwodgaussian([flux, xo, yo, major, minor, pa])(xpix,ypix)
+        fluxes.append(flux)
+        rapix.append(xo)
+        decpix.append(yo)
+        signal += src
+
+    print "source finding"
+
+    hdulist[0].data = signal + noise
+    sources = ae.find_sources_in_image(hdulist, max_summits=2, rms=1)
+    # sub the new version in
+    ae.multi_gauss = new_multi_gauss
+    csources = ae.find_sources_in_image(hdulist, max_summits=2, rms=1)
+
+
+
+
+    # convert all sources into something that I can crossmatch
+    print "converting and xmatching"
+    refsources = []
     major, minor = smoothing, smoothing
     pa = 0
-    src = ae.ntwodgaussian([flux, xo, yo, major, minor, pa])(xpix,ypix)
-    fluxes.append(flux)
-    rapix.append(xo)
-    decpix.append(yo)
-    signal += src
+    for f, xo, yo in zip(fluxes, rapix, decpix):
+        ra, dec = ae.pix2sky([yo+1,xo+1]) # not sure why I need +1 here
+        s = ae.SimpleSource() # careful to use ()!
+        s.peak_flux = f
+        s.ra = ra
+        s.dec = dec
+        s.a = major
+        s.b = minor
+        s.pa = pa
+        refsources.append(s)
 
-hdulist[0].data = signal + noise
+    # now do some crossmatching
+    cpositions = SkyCoord([c.ra  for c in csources]*u.degree, [c.dec  for c in csources]*u.degree, frame='icrs')
+    #print cpositions
+    positions = SkyCoord([c.ra for c in sources]*u.degree, [c.dec for c in sources]*u.degree, frame='icrs')
+    #print positions
+    refpositions = SkyCoord([c.ra for c in refsources]*u.degree, [c.dec for c in refsources]*u.degree, frame='icrs')
+    #print refpositions
 
-hdulist.writeto('test.fits',clobber=True)
+    # uncorr noise
+    index, dist2d, _ = refpositions.match_to_catalog_sky(positions)
+    cindex, cdist2d, _ = refpositions.match_to_catalog_sky(cpositions)
+    # print index, dist2d
 
-sources = ae.find_sources_in_image(hdulist, max_summits=2, rms=1, cores=1)
-print "found {0}/{1} sources".format(len(sources),f+1)
-ae.save_catalog('test_m.vot',sources)
-ae.save_catalog('test_m.reg',sources)
+    cflux, cflux_err, cflux_diff = [], [], []
+    for i,j in enumerate(cindex):
+        cflux.append(fluxes[i])
+        cflux_err.append(csources[j].err_peak_flux)
+        cflux_diff.append(abs(csources[j].peak_flux - refsources[i].peak_flux))
+
+    flux, flux_err, flux_diff = [], [], []
+    for i,j in enumerate(index):
+        flux.append(fluxes[i])
+        flux_err.append(sources[j].err_peak_flux)
+        flux_diff.append(abs(sources[j].peak_flux - refsources[i].peak_flux))
+
+    print "plotting"
+    # plot the results
+    fig = pyplot.figure()
+    ax1 = fig.add_subplot(121)
+    ax1.plot(flux, flux_err, 'bo-')
+    ax1.plot(flux, flux_diff, 'ro-')
+    ax1.set_title('uncorr errors')
+    print "uncorr diff/err", ae.gmean(np.array(flux_diff)/np.array(flux_err))
+
+    ax2 = fig.add_subplot(122)
+    ax2.plot(cflux, cflux_err, 'bo-')
+    ax2.plot(cflux, cflux_diff, 'ro-')
+    ax2.set_title('corr errors')
+    print "corr diff/err", ae.gmean(np.array(cflux_diff)/np.array(cflux_err))
 
 
-out = open('test.csv','w')
-print >>out, ','.join(['flux', 'ra', 'dec', 'major', 'minor', 'pa'])
-for f, xo, yo in zip(fluxes, rapix, decpix):
-    major, minor = smoothing, smoothing
-    pa = 0
-    ra, dec = ae.pix2sky([yo+1,xo+1]) # not sure why I need +1 here
-    print xo,yo,"->",ra,dec
-    print >>out, ','.join(map(str,[f, ra, dec, major*np.sqrt(scale)*ae.cc2fwhm *3600, minor*np.sqrt(scale)*ae.cc2fwhm *3600, pa]))
-out.close
-# now compare the various parameters to the known values.
+    for a in [ax1,ax2]:
+        a.set_xscale('log')
+        a.set_yscale('log')
+        a.legend(['reported','actual'],loc='lower left')
+        a.set_ylim([1e-3,1e1])
 
+    pyplot.show()
+
+
+if __name__ == "__main__":
+    dk_error_comp()
