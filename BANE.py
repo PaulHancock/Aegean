@@ -446,7 +446,7 @@ if __name__=="__main__":
     usage="usage: %prog [options] FileName.fits"
     parser = OptionParser(usage=usage)
     parser.add_option("--out",dest='out_base',
-                      help="Basename for output images default = 'out'. eg out_rms.fits, out_bkg.fits")
+                      help="Basename for output images default: FileName_{bkg,rms}.fits")
     parser.add_option('--grid',dest='step_size',type='int',nargs=2,
                       help='The [x,y] size of the grid to use. Default = ~4* beam size square.')
     parser.add_option('--box',dest='box_size',type='int',nargs=2,
@@ -463,7 +463,7 @@ if __name__=="__main__":
     parser.add_option('--debug',dest='debug',action='store_true',help='debug mode, default=False')
     parser.add_option('--compress', dest='compress', action='store_true',default=False,
                       help='Produce a compressed output file.')
-    parser.set_defaults(out_base='out',step_size=None,box_size=None,twopass=True,cores=None,usescipy=False,debug=False)
+    parser.set_defaults(out_base=None,step_size=None,box_size=None,twopass=True,cores=None,usescipy=False,debug=False)
     (options, args) = parser.parse_args()
 
     logging_level = logging.DEBUG if options.debug else logging.INFO
@@ -477,6 +477,10 @@ if __name__=="__main__":
     if not os.path.exists(filename):
         logging.error("{0} does not exist".format(filename))
         sys.exit()
+
+    if options.out_base is None:
+        options.out_base = os.path.splitext(options.out_base)[0]
+
     if options.usescipy:
         scipy_filter(im_name=filename,out_base=options.out_base,step_size=options.step_size,box_size=options.box_size,cores=options.cores)
     else:
