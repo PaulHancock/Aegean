@@ -1696,6 +1696,7 @@ def get_pixbeam():
     global global_data
     beam = global_data.beam
     pixscale = global_data.img.pixscale
+    # TODO: update this to incorporate elevation scaling when needed
     major = beam.a/(pixscale[0]*math.sin(math.radians(beam.pa)) +pixscale[1]*math.cos(math.radians(beam.pa)) )
     minor = beam.b/(pixscale[1]*math.sin(math.radians(beam.pa)) +pixscale[0]*math.cos(math.radians(beam.pa)) )
     return Beam(abs(major),abs(minor),0)
@@ -1832,15 +1833,6 @@ def fit_island(island_data):
         # This scales the errors to be 1sigma.
         # see the .perror documentation in mpfit.mpfit
         err_scale = np.sqrt(mp.fnorm/mp.dof) if mp.fnorm > 0 else 1
-        # logging.debug("mp.fnorm, mp.dof {0} {1}".format(mp.fnorm, mp.dof))
-        # logging.debug(" mp {0}".format(dir(mp)))
-        # logging.debug(" niter: {0}".format(mp.niter))
-        # logging.debug(" fnorm: {0}".format(mp.fnorm))
-        # logging.debug(" nfev: {0}".format(mp.nfev))
-        # logging.debug(" perror: {0}".format(mp.perror))
-        # logging.debug("mp.params: {0}".format(mp.params))
-        # logging.debug("info: {0}".format(info))
-        # logging.debug(" fixed: {0}".format( [ f['fixed'] for f in info]))
 
     logging.debug("Source 0 pa={0} [pixel coords]".format(mp.params[5]))
 
@@ -1964,24 +1956,7 @@ def fit_island(island_data):
                                                           + (max(source.err_a, 0) / source.a) ** 2
                                                           + (max(source.err_b, 0) / source.b) ** 2)
 
-        #fiddle all the errors to be larger by sqrt(npix)
-        # rt_npix = np.sqrt(sum(np.isfinite(isle.pixels).ravel() * 1) / components)
-        # if source.err_ra > 0:
-        #     source.err_ra *= rt_npix
-        # if source.err_dec > 0:
-        #     source.err_dec *= rt_npix
-        # if source.err_peak_flux > 0:
-        #     source.err_peak_flux *= rt_npix
-        # if source.err_int_flux > 0:
-        #     source.err_int_flux *= rt_npix
-        # if source.err_a > 0:
-        #     source.err_a *= rt_npix
-        # if source.err_b > 0:
-        #     source.err_b *= rt_npix
-        # if source.err_pa > 0:
-        #     source.err_pa *= rt_npix
-
-            #set the flags
+        # set the flags
         source.flags = src_flags
 
         sources.append(source)
@@ -2060,7 +2035,7 @@ def fit_island(island_data):
         source.eta = eta
         source.beam_area = beam_area
 
-        # somehow I don't trust this but w/e
+        # I don't know how to calculate this error so we'll set it to nan
         source.err_int_flux = np.nan
         sources.append(source)
     return sources
