@@ -479,7 +479,7 @@ if __name__=="__main__":
         sys.exit()
 
     if options.out_base is None:
-        options.out_base = os.path.splitext(options.out_base)[0]
+        options.out_base = os.path.splitext(filename)[0]
 
     if options.usescipy:
         scipy_filter(im_name=filename,out_base=options.out_base,step_size=options.step_size,box_size=options.box_size,cores=options.cores)
