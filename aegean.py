@@ -65,6 +65,8 @@ import AegeanTools.flags as flags
 import AegeanTools.pprocess as pprocess
 import multiprocessing
 
+__author__ = 'Paul Hancock'
+
 # Aegean version [Updated via script]
 version = 'v1.9rc1-114-g337ef50'
 
@@ -1800,7 +1802,7 @@ def fit_island(island_data):
     logging.debug("Isle is {0}".format(np.shape(isle.pixels)))
     logging.debug(" of which {0} are masked".format(sum(np.isnan(isle.pixels).ravel() * 1)))
 
-    # skip islands with too many summits (Gaussians)
+    # there are 6 params per summit
     num_summits = len(parinfo) / 6  # there are 6 params per Guassian
     logging.debug("max_summits, num_summits={0},{1}".format(max_summits, num_summits))
 
@@ -1817,10 +1819,9 @@ def fit_island(island_data):
                 logging.debug("Island is too small for a fit, not fitting anything")
                 is_flag |= flags.NOTFIT
                 break
-    #limit the number of components to fit
+    # report that some components may not be fit [ limitations are imposed in estimate_parinfo ]
     if (max_summits is not None) and (num_summits > max_summits):
         logging.info("Island has too many summits ({0}), not fitting everything".format(num_summits))
-        #is_flag=flags.NOTFIT
 
     #supply dummy info if there is no fitting
     if is_flag & flags.NOTFIT:
@@ -1837,15 +1838,15 @@ def fit_island(island_data):
     logging.debug("Source 0 pa={0} [pixel coords]".format(mp.params[5]))
 
     params = mp.params
-    #report the source parameters
+    # report the source parameters
     sources = []
     components = len(params) / 6
 
-    #fix_shape(mp)
+    # fix_shape(mp)
     par_matrix = np.asarray(params, dtype=np.float64)  #float32's give string conversion errors.
     par_matrix = par_matrix.reshape(components, 6)
 
-    #if there was a fitting error create an mp.perror matrix full of zeros
+    # if there was a fitting error create an mp.perror matrix full of zeros
     if mp.perror is None:
         mp.perror = [0 for a in mp.params]
         is_flag |= flags.FIXED2PSF
@@ -1854,16 +1855,13 @@ def fit_island(island_data):
         for i in info:
             logging.debug("{0}".format(i))
 
-    #anything that has an error of zero should be converted to -1
+    # anything that has an error of zero should be converted to -1
     for k, val in enumerate(mp.perror):
         if val == 0.0:
             mp.perror[k] = -1
 
-    err_matrix = np.asarray(mp.perror*err_scale).reshape(components, 6)
-    for j, (
-            (amp, xo, yo, major, minor, theta),
-            (amp_err, xo_err, yo_err, major_err, minor_err, theta_err)) in enumerate(
-            zip(par_matrix, err_matrix)):
+    # TODO: figure out what to do with the -1 errors. They are still important.
+    for j, (amp, xo, yo, major, minor, theta) in enumerate(par_matrix):
         source = OutputSource()
         source.island = isle_num
         source.source = j
@@ -1882,79 +1880,60 @@ def fit_island(island_data):
         x_pix = xo + xmin + 1
         y_pix = yo + ymin + 1
 
-        (source.ra, source.dec, source.a, source.pa) = pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
-        #if one of these values are nan then there has been some problem with the WCS handling
-        if not all(np.isfinite([source.ra, source.dec, source.a, source.pa])):
-            src_flags |= flags.WCSERR
-        #negative degrees is valid for RA, but I don't want them.
-        ra_orig = source.ra  #need the original RA for error calculations
-        if source.ra < 0:
-            source.ra += 360
-        source.ra_str = dec2hms(source.ra)
-        source.dec_str = dec2dms(source.dec)
-        logging.debug("Source {0} Extracted pa={1}deg [pixel] -> {2}deg [sky]".format(j, theta, source.pa))
+        # ------ extract source parameters ------
 
-        #calculate minor axis and convert a/b to arcsec
-        source.a *= 3600  #arcseconds
-        source.b = pix2sky_vec((x_pix, y_pix), minor * cc2fwhm, theta + 90)[2] * 3600  #arcseconds
-
-        #calculate ra,dec errors from the pixel error
-        #limit the errors to be the width of the island
-        x_err_pix = x_pix + within(xo_err, -1, isle.pixels.shape[0])
-        y_err_pix = y_pix + within(yo_err, -1, isle.pixels.shape[1])
-        err_coords = pix2sky([x_err_pix, y_err_pix])
-        source.err_ra = abs(ra_orig - err_coords[0]) if xo_err > 0 else -1
-        source.err_dec = abs(source.dec - err_coords[1]) if yo_err > 0 else -1
-        source.err_a = abs(source.a - pix2sky_vec((x_pix, y_pix), (major + major_err) * cc2fwhm, theta)[
-            2] * 3600) if major_err > 0 else -1
-        source.err_b = abs(source.b - pix2sky_vec((x_pix, y_pix), (minor + minor_err) * cc2fwhm, theta + 90)[
-            2] * 3600) if minor_err > 0 else -1
-        source.err_pa = abs(
-            source.pa - pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta + theta_err)[3]) if theta_err > 0 else -1
-
-        #ensure a>=b
-        fix_shape(source)
-        #fix the pa to be between -90<pa<=90
-        source.pa = pa_limit(source.pa)
-        if source.err_pa > 0:
-            # pa-err_pa = 180degrees is the same as 0degrees so change it
-            source.err_pa = abs(pa_limit(source.err_pa))
-
-        # flux values
-        #the background is taken from background map
+        # fluxes
+        # the background is taken from background map
         # Clamp the pixel location to the edge of the background map (see Trac #51)
         y = max(min(int(round(y_pix - ymin)), bkg.shape[1] - 1), 0)
         x = max(min(int(round(x_pix - xmin)), bkg.shape[0] - 1), 0)
         source.background = bkg[x, y]
         source.local_rms = rms[x, y]
         source.peak_flux = amp
-        source.err_peak_flux = amp_err
+        # source.err_peak_flux = amp_err
 
-        #ensure that the ra/dec errors are not smaller than Condon_error_1997 suggests
-        logging.debug("errors in ra/dec {0},{1}".format(source.err_ra, source.err_dec))
-        pix_spacing = np.sqrt(global_data.pixarea)
-        if source.err_ra > 0:
-            min_err_ra = abs((pix_spacing * source.local_rms / source.peak_flux) * np.sqrt(
-                2 * major / minor * np.sin(np.radians(theta)) ** 2 + 2 * minor / major * np.cos(
-                    np.radians(theta)) ** 2))
-            logging.debug('min_err_ra {0}'.format(min_err_ra))
-            source.err_ra = max(source.err_ra, min_err_ra)
-        if source.err_dec > 0:
-            min_err_dec = abs((pix_spacing * source.local_rms / source.peak_flux) * np.sqrt(
-                2 * major / minor * np.cos(np.radians(theta)) ** 2 + 2 * minor / major * np.sin(
-                    np.radians(theta)) ** 2))
-            source.err_dec = max(source.err_dec, min_err_dec)
-            logging.debug('min_err_dec {0}'.format(min_err_dec))
-        logging.debug("errors after fixing {0},{1}".format(source.err_ra, source.err_dec))
+        # position and shape
+        (source.ra, source.dec, source.a, source.pa) = pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
+        # if one of these values are nan then there has been some problem with the WCS handling
+        if not all(np.isfinite([source.ra, source.dec, source.a, source.pa])):
+            src_flags |= flags.WCSERR
+        # negative degrees is valid for RA, but I don't want them.
+        if source.ra < 0:
+            source.ra += 360
+        source.ra_str = dec2hms(source.ra)
+        source.dec_str = dec2dms(source.dec)
+        logging.debug("Source {0} Extracted pa={1}deg [pixel] -> {2}deg [sky]".format(j, theta, source.pa))
 
-        # integrated flux is calculated not fit or measured
+        # calculate minor axis and convert a/b to arcsec
+        source.a *= 3600  # arcseconds
+        source.b = pix2sky_vec((x_pix, y_pix), minor * cc2fwhm, theta + 90)[2] * 3600  # arcseconds
+        # ensure a>=b
+        fix_shape(source)
+        # fix the pa to be between -90<pa<=90
+        source.pa = pa_limit(source.pa)
+
+        # calculate integrated flux
         source.int_flux = source.peak_flux * major * minor * cc2fwhm ** 2 * np.pi
-        # scale Jy/beam -> Jy
-        source.int_flux /= get_beamarea(source.ra,source.dec)
-        # The error is never -1, but may be zero.
-        source.err_int_flux = source.int_flux * math.sqrt((max(source.err_peak_flux, 0) / source.peak_flux) ** 2
-                                                          + (max(source.err_a, 0) / source.a) ** 2
-                                                          + (max(source.err_b, 0) / source.b) ** 2)
+        source.int_flux /= get_beamarea(source.ra,source.dec) # scale Jy/beam -> Jy
+
+        # ------ calculate errors for each parameter ------
+        s_x = source.a/3600*fwhm2cc
+        s_y = source.b/3600*fwhm2cc
+        phi = np.radians(source.pa)
+        rho_sq = np.pi*s_x*s_y  / global_data.pixarea * (source.peak_flux/source.local_rms)**2
+        # I insert a factor of two here to get the erros in flux to be approx the local rms.
+        # TODO: Understand if/why we need the following factor of 2
+        err_scale = np.sqrt(2/rho_sq) * 2
+        # using relations in Condon'97
+        source.err_ra = err_scale * np.sqrt((s_x*np.sin(phi))**2 + (s_x*np.cos(phi))**2)
+        source.err_dec = err_scale * np.sqrt((s_x*np.cos(phi))**2 + (s_x*np.sin(phi))**2)
+        source.err_peak_flux = err_scale * source.peak_flux
+        source.err_int_flux = err_scale * source.int_flux
+        source.err_a = err_scale * source.a
+        source.err_b = err_scale * source.b
+        source.err_pa = np.degrees(err_scale * s_x*s_y/(s_x**2 - s_y**2)) # asssuming err <<1
+
+        # TODO: inspect residuals to get an idea of how good our fit was
 
         # set the flags
         source.flags = src_flags
