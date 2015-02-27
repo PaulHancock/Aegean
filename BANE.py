@@ -458,6 +458,8 @@ if __name__=="__main__":
                       help='Calculate the bkg and rms in a two passes instead of one. (when the bkg changes rapidly)')
     parser.add_option('--nomask', dest='mask', action='store_false', default=True,
                       help="Don't mask the output array [default = mask]")
+    parser.add_option('--noclobber', dest='clobber',action='store_false', default=True,
+                      help="Don't run if output files already exist. Default is to run+overwrite.")
     parser.add_option('--scipy',dest='usescipy',action='store_true',
                       help='Use scipy generic filter instead of the running percentile filter. (for testing/timing)')
     parser.add_option('--debug',dest='debug',action='store_true',help='debug mode, default=False')
@@ -476,10 +478,18 @@ if __name__=="__main__":
         filename = args[0]
     if not os.path.exists(filename):
         logging.error("{0} does not exist".format(filename))
-        sys.exit()
+        sys.exit(1)
 
     if options.out_base is None:
         options.out_base = os.path.splitext(filename)[0]
+
+    if not options.clobber:
+        bkgout, rmsout = options.out_base+'_bkg.fits', options.out_base+'_rms.fits'
+        if os.path.exists(bkgout) and os.path.exists(rmsout):
+            logging.error("{0} and {1} exist and you said noclobber".format(bkgout,rmsout))
+            logging.error("Not running")
+            sys.exit(1)
+
 
     if options.usescipy:
         scipy_filter(im_name=filename,out_base=options.out_base,step_size=options.step_size,box_size=options.box_size,cores=options.cores)
