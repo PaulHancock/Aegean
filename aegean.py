@@ -288,7 +288,7 @@ class OutputSource(SimpleSource):
                 "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:06b}"
     names = ['island', 'source', 'background', 'local_rms', 'ra_str', 'dec_str', 'ra', 'err_ra', 'dec', 'err_dec',
              'peak_flux', 'err_peak_flux', 'int_flux', 'err_int_flux', 'a', 'err_a', 'b', 'err_b', 'pa', 'err_pa',
-             'flags']
+             'flags','residual_mean','residual_std']
 
     def __init__(self):
         SimpleSource.__init__(self)
@@ -312,6 +312,9 @@ class OutputSource(SimpleSource):
         self.err_b = 0.0  # arcsecs
         #self.pa = 0.0 # position angle (degrees - WHAT??)
         self.err_pa = 0.0  # degrees
+        self.flags = 0x0
+        self.residual_mean = 0
+        self.residual_std = 0
 
     def __str__(self):
         self.sanitise()
@@ -840,7 +843,8 @@ def multi_gauss(data, rmsimg, parinfo):
 
     mp = mpfit(erfunc, parinfo=parinfo, quiet=True)
     mp.dof = len(np.ravel(mask)) - len(parinfo)
-    return mp, parinfo
+    residual = np.ravel((model(mp.params) - data[mask] ) / rmsimg[mask])
+    return mp, parinfo, (np.median(residual),np.std(residual))
 
 
 #load and save external files
@@ -1827,13 +1831,10 @@ def fit_island(island_data):
     if is_flag & flags.NOTFIT:
         mp = DummyMP(parinfo=parinfo, perror=None)
         info = parinfo
-        err_scale = 1
+        residual = (None, None)
     else:
         #do the fitting
-        mp, info = multi_gauss(isle.pixels, rms, parinfo)
-        # This scales the errors to be 1sigma.
-        # see the .perror documentation in mpfit.mpfit
-        err_scale = np.sqrt(mp.fnorm/mp.dof) if mp.fnorm > 0 else 1
+        mp, info, residual = multi_gauss(isle.pixels, rms, parinfo)
 
     logging.debug("Source 0 pa={0} [pixel coords]".format(mp.params[5]))
 
@@ -1933,8 +1934,9 @@ def fit_island(island_data):
         source.err_b = err_scale * source.b
         source.err_pa = np.degrees(err_scale * s_x*s_y/(s_x**2 - s_y**2)) # asssuming err <<1
 
-        # TODO: inspect residuals to get an idea of how good our fit was
-
+        # these are goodness of fit statistics
+        source.residual_mean = residual[0]
+        source.residual_std = residual[1]
         # set the flags
         source.flags = src_flags
 
