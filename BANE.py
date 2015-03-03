@@ -20,7 +20,8 @@ from AegeanTools.fits_interp import compress
 import multiprocessing
 #from blist import *
 
-version='v1.0'
+__version__ = 'v1.0'
+__date__ = '<date>'
 
 ###
 #
