@@ -17,7 +17,8 @@ import numpy as np
 from astropy.io import fits
 from AegeanTools.fits_interp import compress, expand
 
-version = '1.0'
+__version__ = 'v1.0'
+__date__ = '2015-02-03'
 
 # command line version of this program runs from here.
 if __name__ == "__main__":
@@ -48,13 +49,13 @@ if __name__ == "__main__":
     group1.add_argument('--debug', dest='debug', action='store_true',
                         default=False,
                         help='Debug output')
-    group1.add_argument('--version', action='version', version='%(prog)s '+version)
+    group1.add_argument('--version', action='version', version='%(prog)s '+__version__+"-({0})".format(__date__))
 
     results = parser.parse_args()
 
     logging_level = logging.DEBUG if results.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
-    logging.info("This is SR6 {0}".format(version))
+    logging.info("This is SR6 {0}-({1})".format(__version__,__date__))
 
 
     if not os.path.exists(results.infile):

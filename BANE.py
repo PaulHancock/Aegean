@@ -20,7 +20,7 @@ from AegeanTools.fits_interp import compress
 import multiprocessing
 #from blist import *
 
-__version__ = 'v1.9rc1-134-gc4faca2'
+__version__ = 'v1.0'
 __date__ = '2015-03-03'
 
 ###
@@ -432,6 +432,7 @@ def save_image(fits,data,im_name):
     This function modifies the fits object!
     """
     fits[0].data = data
+    fits[0].header['HISTORY']='BANE {0}-({1})'.format(__version__,__date__)
     try:
         fits.writeto(im_name,clobber=True)
     except pyfits.verify.VerifyError,e:
@@ -471,7 +472,7 @@ if __name__=="__main__":
 
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
-    logging.info("This is BANE {0}".format(version))
+    logging.info("This is BANE {0}-({1})".format(__version__,__date__))
     if len(args)<1:
         parser.print_help()
         sys.exit()

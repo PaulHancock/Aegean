@@ -18,7 +18,7 @@ from astropy.io import fits as pyfits
 from astropy.wcs import wcs as pywcs
 from AegeanTools.regions import Region
 
-__version__ = 'v1.9rc1-134-gc4faca2'
+__version__ = 'v1.0'
 __date__ = '2015-03-03'
 
 #seems like this fails sometimes
@@ -299,7 +299,7 @@ if __name__=="__main__":
     group3 = parser.add_argument_group('Extra options')
     #extras
     group3.add_argument('--debug', dest='debug', action='store_true', help='debug mode [default=False]', default=False)
-    group3.add_argument('--version', action='version', version='%(prog)s '+__version__)
+    group3.add_argument('--version', action='version', version='%(prog)s '+__version__+"-({0})".format(__date__))
     results = parser.parse_args()
 
     #TODO: see if there is an 'argparse' way of detecting no input
@@ -309,7 +309,7 @@ if __name__=="__main__":
 
     logging_level = logging.DEBUG if results.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
-    logging.info("This is MIMAS {0}".format(__version__))
+    logging.info("This is MIMAS {0}-({1})".format(__version__,__date__))
 
     if len(results.mim2reg)>0:
         for i,o in results.mim2reg:

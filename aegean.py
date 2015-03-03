@@ -68,7 +68,7 @@ import multiprocessing
 __author__ = 'Paul Hancock'
 
 # Aegean version [Updated via script]
-__version__ = 'v1.9rc1-134-gc4faca2'
+__version__ = 'v1.9rc1-135-ge8bf2dd'
 __date__ = '2015-03-03'
 
 header = """#Aegean version {0}
@@ -1078,7 +1078,7 @@ def write_table(filename, catalog, fmt=None):
             if fmt.lower() in ["vot", "vo", "xml"]:
                 vot = from_table(t)
                 # description of this votable
-                vot.description = "Aegean version {0}".format(__version__)
+                vot.description = "Aegean version {0}-({1})".format(__version__,__date__)
                 writetoVO(vot, filename)
             else:
                 ascii.write(t, filename, fmt)
@@ -1120,7 +1120,7 @@ def writeIslandContours(filename, catalog, fmt):
     """
     out = open(filename, 'w')
     print >> out, "#Aegean island contours"
-    print >> out, "#Aegean version {0}".format(__version__)
+    print >> out, "#Aegean version {0}-({1})".format(__version__,__date__)
     if fmt == 'reg':
         line_fmt = 'image;line({0},{1},{2},{3})'
         text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
@@ -1156,7 +1156,7 @@ def writeIslandBoxes(filename, catalog, fmt):
     out = open(filename, 'w')
 
     print >> out, "#Aegean Islands"
-    print >> out, "#Aegean version {0}".format(__version__)
+    print >> out, "#Aegean version {0}-({1})".format(__version__,__date__)
     if fmt == 'reg':
         print >> out, "IMAGE"
         box_fmt = 'box({0},{1},{2},{3}) #{4}'
@@ -1216,13 +1216,13 @@ def writeAnn(filename, catalog, fmt):
         if fmt == 'ann':
             new_file = re.sub('.ann$', '_{0}.ann'.format(suffix), filename)
             out = open(new_file, 'w')
-            print >> out, "#Aegean version {0}".format(__version__)
+            print >> out, "#Aegean version {0}-({1})".format(__version__,__date__)
             print >> out, 'PA SKY'
             formatter = "ellipse {0} {1} {2} {3} {4:+07.3f} #{5}"
         elif fmt == 'reg':
             new_file = re.sub('.reg$', '_{0}.reg'.format(suffix), filename)
             out = open(new_file, 'w')
-            print >> out, "#Aegean version {0}".format(__version__)
+            print >> out, "#Aegean version {0}-({1})".format(__version__,__date__)
             print >> out, "fk5"
             formatter = 'ellipse {0} {1} {2}d {3}d {4:+07.3f}d # text="{5}"'
             #DS9 has some strange ideas about position angle
@@ -1300,7 +1300,7 @@ def writeDB(filename, catalog):
         logging.info("Created table {0}".format(tn))
     # metadata add some meta data
     db.execute("CREATE TABLE meta (author VARCHAR, version VARCHAR)")
-    db.execute("INSERT INTO meta (author,version) VALUES (?,?)",('Aegean',__version__))
+    db.execute("INSERT INTO meta (author,version) VALUES (?,?)",('Aegean',"{0}-({1})".format(__version__,__date__)))
     conn.commit()
     logging.info(db.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall())
     conn.close()
@@ -2121,7 +2121,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
     sources = []
 
     if outfile:
-        print >> outfile, header.format(__version__, filename)
+        print >> outfile, header.format("{0}-({1})".format(__version__,__date__), filename)
         print >> outfile, OutputSource.header
     island_group = []
     group_size = 20
@@ -2326,7 +2326,7 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0, outfile=None, bkgin=N
     #measure fluxes
     sources = force_measure_flux(radec)
     #write output
-    print >> outfile, header.format(__version__, filename)
+    print >> outfile, header.format("{0}-({1})".format(__version__,__date__), filename)
     print >> outfile, SimpleSource.header
     for source in sources:
         print >> outfile, str(source)
@@ -2383,7 +2383,7 @@ def save_background_files(image_filename, hdu_index=0, bkgin=None, rmsin=None, b
     # This gives the new files the same WCS projection and other header fields.
     new_hdu = img.hdu
     # Set the ORIGIN to indicate Aegean made this file
-    new_hdu.header["ORIGIN"] = "Aegean {0}".format(__version__)
+    new_hdu.header["ORIGIN"] = "Aegean {0}-({1})".format(__version__,__date__)
     for c in ['CRPIX3', 'CRPIX4', 'CDELT3', 'CDELT4', 'CRVAL3', 'CRVAL4', 'CTYPE3', 'CTYPE4']:
         if c in new_hdu.header:
             del new_hdu.header[c]
@@ -2468,7 +2468,7 @@ if __name__ == "__main__":
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
-    logging.info("This is Aegean {0}".format(__version__))
+    logging.info("This is Aegean {0}-({1})".format(__version__,__date__))
 
     if options.file_versions:
         logging.info("Numpy {0} from {1} ".format(np.__version__, np.__file__))
