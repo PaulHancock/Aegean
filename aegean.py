@@ -1709,7 +1709,21 @@ def get_pixbeam():
     return Beam(abs(major),abs(minor),0)
 
 
-def get_beamarea(ra,dec):
+def get_beamarea_deg2(ra,dec):
+    """
+
+    :param ra:
+    :param dec:
+    :return:
+    """
+    beam = global_data.beam
+    barea = abs(beam.a * beam.b * np.pi) # in deg**2 at reference coords
+    if global_data.telescope_lat is not None:
+        barea /= np.cos(np.radians(dec-global_data.telescope_lat))
+    return barea
+
+
+def get_beamarea_pix(ra,dec):
     """
     Calculate the area of the beam at a given location
     scale area based on elevation if the telescope latitude is known.
@@ -1718,11 +1732,8 @@ def get_beamarea(ra,dec):
     :return:
     """
     pixscale = global_data.img.pixscale
-    beam = global_data.beam
     parea = abs(pixscale[0] * pixscale[1]) # in deg**2 at reference coords
-    barea = abs(beam.a * beam.b * np.pi) # in deg**2 at reference coords
-    if global_data.telescope_lat is not None:
-        barea /= np.cos(np.radians(dec-global_data.telescope_lat))
+    barea = get_beamarea_deg2(ra,dec)
     return barea/parea
 
 
@@ -1761,6 +1772,60 @@ def sky_sep(pix1, pix2):
     pos2 = pix2sky(pix2)
     sep = gcd(pos1[0], pos1[1], pos2[0], pos2[1])
     return sep
+
+
+def calc_errors(source):
+    """
+    Calculate the parameter errors for a fitted source
+    using the description of Condon'97
+    :param source:
+    :return:
+    """
+    alphas = {'amp':(3./2, 3./2),
+    'major':(5./2, 1./2), 'xo':(5./2, 1./2),
+    'minor':(1./2, 5./2), 'yo':(1./2, 5./2), 'pa':(1./2, 5./2)}
+
+    major = source.a/3600 # degrees
+    minor = source.b/3600 # degrees
+    phi = np.radians(source.pa)
+
+    print "major, minor, phi", major, minor, phi
+
+    thetaN = np.sqrt(get_beamarea_deg2(source.ra,source.dec)/np.pi)
+    smoothing = major*minor / (thetaN**2)
+    factor1 = (1 + (major / thetaN))
+    factor2 = (1 + (minor / thetaN))
+    snr = source.peak_flux/source.local_rms
+    # calculation of rho2 depends on the parameter being used so we lambda this
+    rho2 = lambda x: smoothing/4 *factor1**alphas[x][0] * factor2**alphas[x][1] *snr**2
+
+    print "thetaN, smoothing, factor1, factor2, snr",thetaN, smoothing, factor1, factor2, snr
+    print "alphas['amp']",alphas['amp']
+    print "rho2('amp')",rho2('amp')
+    source.err_peak_flux = source.peak_flux * np.sqrt(2/rho2('amp'))
+    source.err_a = major * np.sqrt(2/rho2('major')) *3600 # arcsec
+    source.err_b = minor * np.sqrt(2/rho2('minor')) *3600 # arcsec
+
+    print 'peak, a, b',source.peak_flux,source.a,source.b
+    print 'errs', source.err_peak_flux, source.err_a, source.err_b
+
+    err_xo2 = 2./rho2('xo')*major**2/(8*np.log(2))
+    err_yo2 = 2./rho2('yo')*minor**2/(8*np.log(2))
+    source.err_ra = np.sqrt( err_xo2*np.sin(phi)**2 + err_yo2*np.cos(phi)**2)
+    source.err_dec = np.sqrt( err_xo2*np.cos(phi)**2 + err_yo2*np.sin(phi)**2)
+
+    # if major/minor are very similar then we should not be able to figure out what pa is.
+    if abs((major/minor)**2+(minor/major)**2 -2) < 0.01:
+        source.err_pa = -1
+    else:
+        source.err_pa = np.degrees(np.sqrt(4/rho2('pa')) * (major*minor/(major**2-minor**2)))
+
+    # integrated flux error
+    err2 = (source.err_peak_flux/source.peak_flux)**2
+    err2 += (thetaN**2/(major*minor)) *( (source.err_a/source.a)**2 + (source.err_b/source.b)**2)
+    source.err_int_flux =source.int_flux * np.sqrt(err2)
+    #sys.exit()
+    return
 
 
 ######################################### THE MAIN DRIVING FUNCTIONS ###############
@@ -1916,24 +1981,10 @@ def fit_island(island_data):
 
         # calculate integrated flux
         source.int_flux = source.peak_flux * major * minor * cc2fwhm ** 2 * np.pi
-        source.int_flux /= get_beamarea(source.ra,source.dec) # scale Jy/beam -> Jy
+        source.int_flux /= get_beamarea_pix(source.ra,source.dec) # scale Jy/beam -> Jy
 
         # ------ calculate errors for each parameter ------
-        s_x = source.a/3600*fwhm2cc
-        s_y = source.b/3600*fwhm2cc
-        phi = np.radians(source.pa)
-        rho_sq = np.pi*s_x*s_y  / global_data.pixarea * (source.peak_flux/source.local_rms)**2
-        # I insert a factor of two here to get the erros in flux to be approx the local rms.
-        # TODO: Understand if/why we need the following factor of 2
-        err_scale = np.sqrt(2/rho_sq) * 2
-        # using relations in Condon'97
-        source.err_ra = err_scale * np.sqrt((s_x*np.sin(phi))**2 + (s_x*np.cos(phi))**2)
-        source.err_dec = err_scale * np.sqrt((s_x*np.cos(phi))**2 + (s_x*np.sin(phi))**2)
-        source.err_peak_flux = err_scale * source.peak_flux
-        source.err_int_flux = err_scale * source.int_flux
-        source.err_a = err_scale * source.a
-        source.err_b = err_scale * source.b
-        source.err_pa = np.degrees(err_scale * s_x*s_y/(s_x**2 - s_y**2)) # asssuming err <<1
+        calc_errors(source)
 
         # these are goodness of fit statistics
         source.residual_mean = residual[0]
@@ -2005,7 +2056,7 @@ def fit_island(island_data):
                                                                   positions[1][0]))
 
         # integrated flux
-        beam_area = get_beamarea(source.ra,source.dec)
+        beam_area = get_beamarea_pix(source.ra,source.dec)
         isize = source.pixels  #number of non zero pixels
         logging.debug("- pixels used {0}".format(isize))
         source.int_flux = np.nansum(kappa_sigma)  #total flux Jy/beam
