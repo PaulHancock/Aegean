@@ -1789,8 +1789,6 @@ def calc_errors(source):
     minor = source.b/3600 # degrees
     phi = np.radians(source.pa)
 
-    print "major, minor, phi", major, minor, phi
-
     thetaN = np.sqrt(get_beamarea_deg2(source.ra,source.dec)/np.pi)
     smoothing = major*minor / (thetaN**2)
     factor1 = (1 + (major / thetaN))
@@ -1799,15 +1797,9 @@ def calc_errors(source):
     # calculation of rho2 depends on the parameter being used so we lambda this
     rho2 = lambda x: smoothing/4 *factor1**alphas[x][0] * factor2**alphas[x][1] *snr**2
 
-    print "thetaN, smoothing, factor1, factor2, snr",thetaN, smoothing, factor1, factor2, snr
-    print "alphas['amp']",alphas['amp']
-    print "rho2('amp')",rho2('amp')
     source.err_peak_flux = source.peak_flux * np.sqrt(2/rho2('amp'))
     source.err_a = major * np.sqrt(2/rho2('major')) *3600 # arcsec
     source.err_b = minor * np.sqrt(2/rho2('minor')) *3600 # arcsec
-
-    print 'peak, a, b',source.peak_flux,source.a,source.b
-    print 'errs', source.err_peak_flux, source.err_a, source.err_b
 
     err_xo2 = 2./rho2('xo')*major**2/(8*np.log(2))
     err_yo2 = 2./rho2('yo')*minor**2/(8*np.log(2))
