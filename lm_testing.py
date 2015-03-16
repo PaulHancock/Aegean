@@ -7,6 +7,7 @@ import sys
 from AegeanTools.mpfit import mpfit
 import logging
 from scipy.ndimage.filters import gaussian_filter1d, gaussian_filter
+from scipy.linalg import sqrtm
 
 def unravel_nans(arr,mask,shape):
     """
@@ -430,14 +431,14 @@ def test_lm_corr_noise():
     """
     nx = 20
     smoothing = 3
-    y = gaussian(np.arange(nx), 1, nx/2, smoothing)
-    y = np.roll(y,nx/2)
-    C = np.vstack((y,)*nx)
-    for i in range(nx):
-        C[i] = np.roll(C[i],i)
+    x  = np.arange(nx)
+    C = np.vstack( [ gaussian(x,1, i, smoothing)
+                             for i in x ])
 
-    Ci = np.matrix(C).I
-    #Ci = np.matrix(np.diag(np.ones(nx)))
+    # The square root should give a matrix of real values, so the inverse should all be real
+    # Some kind of round off effect stops this from being true so we enforce it.
+    Ci = abs(np.matrix(sqrtm(C)).I)
+    # Ci = np.matrix(np.diag(np.ones(nx)))
     def residual(pars,x,data=None):
         amp = pars['amp'].value
         cen = pars['cen'].value
@@ -465,8 +466,11 @@ def test_lm_corr_noise():
 
     data = signal + noise
 
+    #data, mask, shape = ravel_nans(data)
     mi = lmfit.minimize(residual, params, args=(x,data))
     model = gaussian(x, params['amp'].value, params['cen'].value, params['wid'].value)
+    #data = unravel_nans(data,mask,shape)
+ 
     print params
     from matplotlib import pyplot
     fig = pyplot.figure()
@@ -482,16 +486,17 @@ def test_lm_corr_noise_2d():
     """
     :return:
     """
+    from cmath import phase
     nx = 15
     smoothing = 3
     x, y = np.meshgrid(range(nx),range(nx))
-    z = np.ravel(two_d_gaussian(x, y, 1, 0, 0, smoothing, smoothing, 0))
-    C = np.vstack((z,)*nx*nx)
-    for i in range(nx*nx):
-        C[i] = np.roll(C[i],i)
+    C = np.vstack( [ np.ravel(two_d_gaussian(x,y,1, i, j, smoothing, smoothing, 0))
+                             for i,j in zip(x.ravel(),y.ravel())])
 
-    Ci = np.matrix(C).I
-    #Ci = np.matrix(np.diag(np.ones(nx*nx)))
+    # The square root should give a matrix of real values, so the inverse should all be real
+    # Some kind of round off effect stops this from being true so we enforce it.
+    Ci = abs(np.matrix(sqrtm(C)).I)
+    # Ci = np.matrix(np.diag(np.ones(nx**2)))
     def residual(pars,x,y,data=None):
         amp = pars['amp'].value
         xo = pars['xo'].value
@@ -506,12 +511,12 @@ def test_lm_corr_noise_2d():
         return resid.tolist()[0]
 
     params = lmfit.Parameters()
-    params.add('amp', value=10.0, min=9, max=11)
-    params.add('xo', value=1.0*nx/2, min=0.8*nx/2, max=1.2*nx/2)
-    params.add('yo', value=1.0*nx/2, min=0.8*nx/2, max=1.2*nx/2)
+    params.add('amp', value=5, min=3, max=7)
+    params.add('xo', value=nx/2, min=0.8*nx/2, max=1.2*nx/2)
+    params.add('yo', value=nx/2, min=0.8*nx/2, max=1.2*nx/2)
     params.add('major', value=smoothing, min=0.8*smoothing, max=1.2*smoothing)
     params.add('minor', value=smoothing, min=0.8*smoothing, max=1.2*smoothing)
-    params.add('pa', value=0, min=-1.*np.pi, max=np.pi)
+    params.add('pa', value=0)#, min=-1.*np.pi, max=np.pi)
 
 
     signal = residual(params, x, y) # returns model
@@ -530,7 +535,7 @@ def test_lm_corr_noise_2d():
     model = residual(params, x, y).reshape(nx,nx)
     print params
 
-    kwargs = {'vmin':-1, 'vmax':10, 'interpolation':'nearest'}
+    kwargs = {'vmin':-1, 'vmax':6, 'interpolation':'nearest'}
     from matplotlib import pyplot
     fig = pyplot.figure()
     ax = fig.add_subplot(221)
@@ -559,17 +564,16 @@ def test_lm2d_errs():
     """
     import copy
 
-    nx = 30
-    smoothing = 5./(2*np.sqrt(2*np.log(2))) #5 pixels per beam
+    nx = 10
+    smoothing = 3./(2*np.sqrt(2*np.log(2))) #5 pixels per beam
+
     x, y = np.meshgrid(range(nx),range(nx))
-    z = np.ravel(two_d_gaussian(x, y, 1, 0, 0, smoothing, smoothing, 0))
-    C = np.vstack((z,)*nx*nx)
-    for i in range(nx*nx):
-        C[i] = np.roll(C[i],i)
+    C = np.vstack( [ np.ravel(two_d_gaussian(x,y,1, i, j, smoothing, smoothing, 0))
+                             for i,j in zip(x.ravel(),y.ravel())])
 
-    Ci = np.matrix(C).I
-    Ci2 = np.matrix(np.diag(np.ones(nx*nx)))
-
+    # The square root should give a matrix of real values, so the inverse should all be real
+    # Some kind of round off effect stops this from being true so we enforce it.
+    Ci = abs(np.matrix(sqrtm(C)).I)
     def residual(pars,x,y,data=None):
             amp = pars['amp'].value
             xo = pars['xo'].value
@@ -594,10 +598,12 @@ def test_lm2d_errs():
     signal = residual(params, x, y) # returns model
     signal = signal.reshape(nx,nx)
 
-    ratios = []
+    diffs = []
+    errs = []
 
     for n in xrange(50):
         # need to re-init this.
+        print n
 
         pars = copy.deepcopy(params)
 
@@ -611,27 +617,33 @@ def test_lm2d_errs():
 
         mi = lmfit.minimize(residual, pars, args=(x, y, data))
         if np.all( [pars[i].stderr >0 for i in params.valuesdict().keys()]):
-            ratios.append( [ abs(params[i].value -pars[i].value)/pars[i].stderr for i in params.valuesdict().keys()])
+            diffs.append([ params[i].value -pars[i].value for i in params.valuesdict().keys()])
+            errs.append( [pars[i].stderr for i in params.valuesdict().keys()])
 
-    ratios = np.array(ratios)
-    print ratios
+    diffs = np.array(diffs)
+    errs = np.array(errs)
+    # print diffs
 
-    from matplotlib import pyplot
-    fig = pyplot.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(ratios[:,0], label='amp')
-    ax.plot(ratios[:,1]*10, label='xo')
-    ax.plot(ratios[:,2]*1e2, label='yo')
-    ax.plot(ratios[:,3]*1e3, label='major')
-    ax.plot(ratios[:,4]*1e4, label='minor')
-    ax.set_yscale('log')
-    ax.legend()
+    # ratios = np.array(ratios)
+    # print ratios
+
+    # from matplotlib import pyplot
+    # fig = pyplot.figure()
+    # ax = fig.add_subplot(111)
+    # ax.plot(diffs[:,0], label='amp')
+    # ax.plot(diffs[:,1]*10, label='xo')
+    # ax.plot(diffs[:,2]*1e2, label='yo')
+    # ax.plot(diffs[:,3]*1e3, label='major')
+    # ax.plot(diffs[:,4]*1e4, label='minor')
+    # ax.set_yscale('log')
+    # ax.legend()
     for i,val in enumerate(params.valuesdict().keys()):
-        print "{0}: {1}".format(val,gmean(ratios[:,i]))
-    pyplot.show()
+        print "{0}: rms(diff) {1}, mean(err) {2}".format(val,np.std(diffs[:,i]), np.mean(errs[:,i]))
+    # pyplot.show()
 
 if __name__ == '__main__':
     # test2d2()
     # compare()
+    # test_lm_corr_noise()
     # test_lm_corr_noise_2d()
     test_lm2d_errs()
