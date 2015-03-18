@@ -236,7 +236,7 @@ def combine_regions(container):
     if len(container.exclude_polygons) > 0:
         for p in container.include_polygons:
             poly = np.array(np.radians(p))
-            r2 = Regions(container.maxdepth)
+            r2 = Region(container.maxdepth)
             r2.add_poly(poly)
             region.without(r2)
 
@@ -278,10 +278,10 @@ if __name__=="__main__":
                         help='exclude the given circles from a region')
 
     #add/remove polygons
-    group1.add_argument('+p', dest='include_polygons', action='store',
+    group1.add_argument('+p', dest='include_polygons', action='append',
                         default=[], type=float, metavar=('ra','dec'), nargs='*',
                         help='add a polygon to this region ( decimal degrees)')
-    group1.add_argument('-p', dest='exclude_polygons', action='store',
+    group1.add_argument('-p', dest='exclude_polygons', action='append',
                         default=[], type=float, metavar=('ra','dec'), nargs='*',
                         help='remove a polygon from this region ( decimal degrees)')
 
