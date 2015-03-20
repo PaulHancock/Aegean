@@ -7,7 +7,8 @@ import sys
 from AegeanTools.mpfit import mpfit
 import logging
 from scipy.ndimage.filters import gaussian_filter1d, gaussian_filter
-from scipy.linalg import sqrtm
+from scipy.linalg import sqrtm, eigh, inv
+import copy
 
 def unravel_nans(arr,mask,shape):
     """
@@ -46,8 +47,8 @@ def two_d_gaussian(x, y, amp, xo, yo, major, minor, pa):
                 (st/major**2 + ct/minor**2)/2
     return amp*np.exp(-1*(a*(x-xo)**2 + 2*bb*(x-xo)*(y-yo) + c*(y-yo)**2) )
 
-def gaussian(x, amp, cen, wid):
-    return amp * np.exp(-(x-cen)**2 / wid)
+def gaussian(x, amp, cen, sigma):
+    return amp * np.exp(-0.5*((x-cen)/sigma)**2)
 
 
 def ntwodgaussian(inpars):
@@ -105,6 +106,64 @@ def multi_gauss(data,parinfo):
 
     return mp,parinfo
 
+
+def Bmatrix(x,sigma):
+    C = np.vstack( [ gaussian(x,1., i, 1.*sigma)
+                     for i in x ])
+    # The square root should give a matrix of real values, so the inverse should all be real
+    # Some kind of round off effect stops this from being true so we enforce it.
+    #C[C<1e-2]=0.
+    #Ci = inv(np.real(sqrtm(C)))
+
+    # this version of finding the square root of the inverse matrix
+    # suggested by Cath,
+    L,Q = eigh(C)
+    # The abs(L) converts negative eigenvalues into positive ones, and stops the B matrix from having nans
+    if not all(L>0):
+        print "at least one eigenvalue is negative, this will cause problems!"
+        sys.exit(-1)
+    S = np.diag(1/np.sqrt(L))
+    B = Q.dot(S)
+    return B
+
+def jacobian(pars,x,data=None):
+    amp = pars['amp'].value
+    cen = pars['cen'].value
+    sigma = pars['sigma'].value
+
+    model = gaussian(x,amp,cen,sigma)
+
+    dmds = model/amp
+    dmdx = -1.*model/sigma**2*(x-cen)
+    dmdsigma = model*(x-cen)**2/sigma**3
+    matrix = np.transpose(np.vstack((dmds,dmdx,dmdsigma)))
+    return matrix
+
+
+def dmdtheta(pars,x,data):
+    """
+    Calculate the error matrix defined by Cath, but for the 1d gaussian case
+    :param pars:
+    :param x:
+    :return:
+    """
+    #The matrix is just the jacobian!
+    return jacobian(pars,x,data)
+
+def CRB_errs(errmat, cinv):
+    """
+
+    :param errmat:
+    :param cinv:
+    :return:
+    """
+    # cinv is actually only a square root of the inverse covariance matrix
+    fim =  np.transpose(errmat).dot(cinv).dot(np.transpose(cinv)).dot(errmat)
+    # print errmat
+    # print cinv.dot(np.transpose(cinv))
+    # print inv(fim)
+    errs = np.sqrt(np.diag(inv(fim)))
+    return errs
 
 def test1d():
     x = np.linspace(-5,5,100)
@@ -429,34 +488,41 @@ def test_lm_corr_noise():
     """
     :return:
     """
-    nx = 20
+    nx = 50
     smoothing = 3
     x  = np.arange(nx)
-    C = np.vstack( [ gaussian(x,1, i, smoothing)
-                             for i in x ])
+    Ci = cinverse(x,smoothing)
 
-    # The square root should give a matrix of real values, so the inverse should all be real
-    # Some kind of round off effect stops this from being true so we enforce it.
-    Ci = abs(np.matrix(sqrtm(C)).I)
-    # Ci = np.matrix(np.diag(np.ones(nx)))
     def residual(pars,x,data=None):
         amp = pars['amp'].value
         cen = pars['cen'].value
-        wid = pars['wid'].value
-        model = gaussian(x, amp, cen, wid)
+        sigma = pars['sigma'].value
+        model = gaussian(x, amp, cen, sigma)
         if data is None:
             return model
         resid = (model-data) * Ci # * np.matrix(model-data).T
         return resid.tolist()[0]
 
+    def residual_nocorr(pars,x,data=None):
+        amp = pars['amp'].value
+        cen = pars['cen'].value
+        sigma = pars['sigma'].value
+        model = gaussian(x, amp, cen, sigma)
+        if data is None:
+            return model
+        resid = model-data
+        return resid
+
     x = np.arange(nx)
 
     params = lmfit.Parameters()
-    params.add('amp', value=10.0, min=9, max=11)
+    params.add('amp', value=5.0)#, min=9, max=11)
     params.add('cen', value=1.0*nx/2, min=0.8*nx/2, max=1.2*nx/2)
-    params.add('wid', value=2.0*smoothing, min=smoothing, max=3.0*smoothing)
+    params.add('sigma', value=1.5*smoothing, min=smoothing, max=3.0*smoothing)
 
-    signal = gaussian(x, params['amp'].value, params['cen'].value, params['wid'].value)
+    iparams = copy.deepcopy(params)
+
+    signal = gaussian(x, iparams['amp'].value, iparams['cen'].value, iparams['sigma'].value)
 
     np.random.seed(1234567)
     noise = np.random.random(nx)
@@ -468,10 +534,15 @@ def test_lm_corr_noise():
 
     #data, mask, shape = ravel_nans(data)
     mi = lmfit.minimize(residual, params, args=(x,data))
-    model = gaussian(x, params['amp'].value, params['cen'].value, params['wid'].value)
+    model = gaussian(x, params['amp'].value, params['cen'].value, params['sigma'].value)
     #data = unravel_nans(data,mask,shape)
+    mi2 = lmfit.minimize(residual_nocorr,iparams,args=(x,data))
+    model_nocor = gaussian(x, iparams['amp'].value, iparams['cen'].value, iparams['sigma'].value)
+
+    print CRB_errs(dmdtheta(params,x),Ci)
  
     print params
+    print iparams
     from matplotlib import pyplot
     fig = pyplot.figure()
     ax = fig.add_subplot(111)
@@ -479,8 +550,166 @@ def test_lm_corr_noise():
     ax.plot(x,noise, label='noise')
     ax.plot(x,data, label='data')
     ax.plot(x,model, label='model')
+    ax.plot(x,model_nocor, label='model_nocor')
     ax.legend()
+    ax.set_xlabel('x')
+    ax.set_ylabel("'flux'")
     pyplot.show()
+
+
+def print_par(params):
+    print ','.join("{0}: {1:5.2f}".format(k,params[k].value) for k in params.valuesdict().keys())
+
+
+def test_lm1d_errs():
+    """
+    :return:
+    """
+
+    nx = 50
+    smoothing = 2.12 # FWHM ~ 5pixels
+    x  = 1.*np.arange(nx)
+    B = Bmatrix(x,smoothing)
+
+    def residual(pars,x,data=None):
+        amp = pars['amp'].value
+        cen = pars['cen'].value
+        sigma = pars['sigma'].value
+        model = gaussian(x, amp, cen, sigma)
+        if data is None:
+            return model
+        resid = (model-data).dot(B)
+        return resid
+
+    def residual_nocorr(pars,x,data=None):
+        amp = pars['amp'].value
+        cen = pars['cen'].value
+        sigma = pars['sigma'].value
+        model = gaussian(x, amp, cen, sigma)
+        if data is None:
+            return model
+        resid = model-data
+        return resid
+
+    x = np.arange(nx)
+
+
+    # Create the signal
+    s_params = lmfit.Parameters()
+    s_params.add('amp', value=5.0)#, min=9, max=11)
+    s_params.add('cen', value=1.0*nx/2, min=0.8*nx/2, max=1.2*nx/2)
+    s_params.add('sigma', value=smoothing, min=0.5*smoothing, max=2.0*smoothing)
+    print_par(s_params)
+    signal = gaussian(x,s_params['amp'].value, s_params['cen'].value,s_params['sigma'].value)
+
+    # create the initial guess
+    iparams = copy.deepcopy(s_params)
+    iparams['amp'].value+=1
+    iparams['cen'].value-=1
+    iparams['sigma'].value+=0.5
+
+
+    diffs_corr = []
+    errs_corr = []
+    diffs_nocorr = []
+    errs_nocorr = []
+    crb_corr = []
+
+    for n in xrange(100):
+        # need to re-init this.
+        # print n
+
+
+        np.random.seed(23423 + n)
+        noise = np.random.random(nx)
+        noise = gaussian_filter(noise, sigma=smoothing)
+        noise -= np.mean(noise)
+        noise /= np.std(noise)
+
+        data = signal + noise
+
+        pars_corr = copy.deepcopy(iparams)
+        mi_corr = lmfit.minimize(residual, pars_corr, args=(x, data))#,Dfun=dmdtheta)
+        pars_nocorr = copy.deepcopy(iparams)
+        mi_nocorr = lmfit.minimize(residual_nocorr, pars_nocorr, args=(x, data))#,Dfun=dmdtheta)
+
+
+        if np.all( [pars_corr[i].stderr >0 for i in pars_corr.valuesdict().keys()]):
+            diffs_corr.append([ s_params[i].value -pars_corr[i].value for i in pars_corr.valuesdict().keys()])
+            errs_corr.append( [pars_corr[i].stderr for i in pars_corr.valuesdict().keys()])
+            crb_corr.append( CRB_errs(dmdtheta(pars_corr,x,None),B))
+        #print mi_corr.nfev, mi_nocorr.nfev
+        print_par(pars_corr)
+
+        if np.all( [pars_nocorr[i].stderr >0 for i in pars_nocorr.valuesdict().keys()]):
+            diffs_nocorr.append([ s_params[i].value -pars_nocorr[i].value for i in pars_nocorr.valuesdict().keys()])
+            errs_nocorr.append( [pars_nocorr[i].stderr for i in pars_nocorr.valuesdict().keys()])
+
+    diffs_corr = np.array(diffs_corr)
+    errs_corr = np.array(errs_corr)
+    diffs_nocorr = np.array(diffs_nocorr)
+    errs_nocorr = np.array(errs_nocorr)
+    crb_corr = np.array(crb_corr)
+
+
+    many = True
+    from matplotlib import pyplot
+    if many:
+        fig = pyplot.figure(1)
+        ax = fig.add_subplot(121)
+        ax.plot(diffs_corr[:,0], label='amp')
+        ax.plot(diffs_corr[:,1], label='cen')
+        ax.plot(diffs_corr[:,2], label='sigma')
+        ax.legend()
+
+        ax = fig.add_subplot(122)
+        ax.plot(diffs_nocorr[:,0], label='amp')
+        ax.plot(diffs_nocorr[:,1], label='cen')
+        ax.plot(diffs_nocorr[:,2], label='sigma')
+        ax.legend()
+
+    if not many:
+        model_nocor = gaussian(x, pars_nocorr['amp'].value, pars_nocorr['cen'].value, pars_nocorr['sigma'].value)
+        model = gaussian(x, pars_corr['amp'].value, pars_corr['cen'].value, pars_corr['sigma'].value)
+
+        fig = pyplot.figure(2)
+        ax = fig.add_subplot(111)
+        ax.plot(x,signal, label='signal')
+        ax.plot(x,noise, label='noise')
+        ax.plot(x,data, label='data')
+        ax.plot(x,model, label='model')
+        ax.plot(x,model_nocor, label='model_nocor')
+        ax.legend()
+        ax.set_xlabel('x')
+        ax.set_ylabel("'flux'")
+
+    if False:
+        fig = pyplot.figure(3)
+        C = np.vstack( [ gaussian(x,1., i, 1.*smoothing) for i in x ])
+        #C[C<1e-3]=0.0
+        ax = fig.add_subplot(121)
+        cb = ax.imshow(C,interpolation='nearest',cmap=pyplot.cm.cubehelix)
+        pyplot.colorbar(cb)
+
+        L,Q = eigh(C)
+        print L
+        S = np.diag(1/np.sqrt(abs(L)))
+        B = Q.dot(S)
+
+        ax = fig.add_subplot(122)
+        cb = ax.imshow(B,interpolation='nearest',cmap=pyplot.cm.cubehelix)
+        pyplot.colorbar(cb)
+
+    if many:
+        print " -- corr --"
+        for i,val in enumerate(pars_corr.valuesdict().keys()):
+            print "{0}: diff {1:6.4f}+/-{2:6.4f}, mean(err) {3}, mean(crb_err) {4}".format(val,np.mean(diffs_corr[:,i]),np.std(diffs_corr[:,i]), np.mean(errs_corr[:,i]),np.mean(crb_corr[:,i]))
+        print "-- no corr --"
+        for i,val in enumerate(pars_nocorr.valuesdict().keys()):
+            print "{0}: diff {1:6.4f}+/-{2:6.4f}, mean(err) {3}".format(val,np.mean(diffs_nocorr[:,i]), np.std(diffs_nocorr[:,i]), np.mean(errs_nocorr[:,i]))
+
+    pyplot.show()
+
 
 def test_lm_corr_noise_2d():
     """
@@ -646,4 +875,5 @@ if __name__ == '__main__':
     # compare()
     # test_lm_corr_noise()
     # test_lm_corr_noise_2d()
-    test_lm2d_errs()
+    # test_lm2d_errs()
+    test_lm1d_errs()
