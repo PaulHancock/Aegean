@@ -106,15 +106,10 @@ def multi_gauss(data,parinfo):
 
     return mp,parinfo
 
+def Cmatrix(x,sigma):
+    return np.vstack( [ gaussian(x,1., i, 1.*sigma) for i in x ])
 
-def Bmatrix(x,sigma):
-    C = np.vstack( [ gaussian(x,1., i, 1.*sigma)
-                     for i in x ])
-    # The square root should give a matrix of real values, so the inverse should all be real
-    # Some kind of round off effect stops this from being true so we enforce it.
-    #C[C<1e-2]=0.
-    #Ci = inv(np.real(sqrtm(C)))
-
+def Bmatrix(C):
     # this version of finding the square root of the inverse matrix
     # suggested by Cath,
     L,Q = eigh(C)
@@ -134,9 +129,9 @@ def jacobian(pars,x,data=None):
     model = gaussian(x,amp,cen,sigma)
 
     dmds = model/amp
-    dmdx = -1.*model/sigma**2*(x-cen)
+    dmdcen = model/sigma**2*(x-cen)
     dmdsigma = model*(x-cen)**2/sigma**3
-    matrix = np.transpose(np.vstack((dmds,dmdx,dmdsigma)))
+    matrix = np.transpose(np.vstack((dmds,dmdcen,dmdsigma)))
     return matrix
 
 
@@ -150,19 +145,23 @@ def dmdtheta(pars,x,data):
     #The matrix is just the jacobian!
     return jacobian(pars,x,data)
 
-def CRB_errs(errmat, cinv):
+def CRB_errs(jac, C, B=None):
     """
 
-    :param errmat:
-    :param cinv:
+    :param jac: the jacobian
+    :param C: the correlation matrix
+    :param B: B.dot(B') should = inv(C), ie B ~ sqrt(inv(C))
     :return:
     """
-    # cinv is actually only a square root of the inverse covariance matrix
-    fim =  np.transpose(errmat).dot(cinv).dot(np.transpose(cinv)).dot(errmat)
-    # print errmat
-    # print cinv.dot(np.transpose(cinv))
-    # print inv(fim)
-    errs = np.sqrt(np.diag(inv(fim)))
+    if B is not None:
+        # B is actually only a square root of the inverse covariance matrix
+        fim_inv =  inv(np.transpose(jac).dot(B).dot(np.transpose(B)).dot(jac))
+    else:
+        fim_inv = inv(np.transpose(jac).dot(inv(C)).dot(jac) )
+        # print inv(jac).shape, C.shape, inv(np.transpose(jac)).shape
+        # fim_inv = np.linalg.pinv(jac).dot(C).dot(np.linalg.pinv(np.transpose(jac)))
+
+    errs = np.sqrt(np.diag(fim_inv))
     return errs
 
 def test1d():
@@ -568,8 +567,10 @@ def test_lm1d_errs():
 
     nx = 50
     smoothing = 2.12 # FWHM ~ 5pixels
+
     x  = 1.*np.arange(nx)
-    B = Bmatrix(x,smoothing)
+    C = Cmatrix(x,smoothing)
+    B = Bmatrix(C)
 
     def residual(pars,x,data=None):
         amp = pars['amp'].value
@@ -591,12 +592,9 @@ def test_lm1d_errs():
         resid = model-data
         return resid
 
-    x = np.arange(nx)
-
-
     # Create the signal
     s_params = lmfit.Parameters()
-    s_params.add('amp', value=5.0)#, min=9, max=11)
+    s_params.add('amp', value=50.0)#, min=9, max=11)
     s_params.add('cen', value=1.0*nx/2, min=0.8*nx/2, max=1.2*nx/2)
     s_params.add('sigma', value=smoothing, min=0.5*smoothing, max=2.0*smoothing)
     print_par(s_params)
@@ -627,19 +625,29 @@ def test_lm1d_errs():
         noise /= np.std(noise)
 
         data = signal + noise
+        #mask the data
+        data[data<3] = np.nan
+        data, mask, shape = ravel_nans(data)
+        x_mask = x[mask]
+        if len(x_mask) <=4:
+            continue
+        C = Cmatrix(x_mask,smoothing)
+        B = Bmatrix(C)
+
+        #print np.max(B.dot(np.transpose(B)) - inv(C))
 
         pars_corr = copy.deepcopy(iparams)
-        mi_corr = lmfit.minimize(residual, pars_corr, args=(x, data))#,Dfun=dmdtheta)
+        mi_corr = lmfit.minimize(residual, pars_corr, args=(x_mask, data))#,Dfun=jacobian)
         pars_nocorr = copy.deepcopy(iparams)
-        mi_nocorr = lmfit.minimize(residual_nocorr, pars_nocorr, args=(x, data))#,Dfun=dmdtheta)
+        mi_nocorr = lmfit.minimize(residual_nocorr, pars_nocorr, args=(x_mask, data))#,Dfun=jacobian)
 
 
         if np.all( [pars_corr[i].stderr >0 for i in pars_corr.valuesdict().keys()]):
             diffs_corr.append([ s_params[i].value -pars_corr[i].value for i in pars_corr.valuesdict().keys()])
             errs_corr.append( [pars_corr[i].stderr for i in pars_corr.valuesdict().keys()])
-            crb_corr.append( CRB_errs(dmdtheta(pars_corr,x,None),B))
+            crb_corr.append( CRB_errs(jacobian(s_params,x_mask),C))
         #print mi_corr.nfev, mi_nocorr.nfev
-        print_par(pars_corr)
+        #print_par(pars_corr)
 
         if np.all( [pars_nocorr[i].stderr >0 for i in pars_nocorr.valuesdict().keys()]):
             diffs_nocorr.append([ s_params[i].value -pars_nocorr[i].value for i in pars_nocorr.valuesdict().keys()])
@@ -676,7 +684,7 @@ def test_lm1d_errs():
         ax = fig.add_subplot(111)
         ax.plot(x,signal, label='signal')
         ax.plot(x,noise, label='noise')
-        ax.plot(x,data, label='data')
+        ax.plot(x_mask,data, label='data')
         ax.plot(x,model, label='model')
         ax.plot(x,model_nocor, label='model_nocor')
         ax.legend()
