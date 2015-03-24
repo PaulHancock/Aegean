@@ -22,6 +22,7 @@ import math
 import scipy
 from scipy import ndimage as ndi
 from scipy.special import erf
+from scipy.ndimage import label, find_objects
 
 # the glory of astropy
 import astropy
@@ -416,79 +417,56 @@ class DummyMP():
 
 ######################################### FUNCTIONS ###############################
 
-## floodfill functions
-def explore(snr, status, queue, bounds, pixel):
-    """
-    Look for pixels adjacent to <pixel> and add them to the queue
-    Don't include pixels that are in the queue
-    :param snr: array of bool that is true for pixels we are interested in
-    :param status: array that represents the status of pixels
-    :param queue: the queue of pixels that we are interested in
-    :param bounds: the bounds within which we can explore
-    :param pixel: the initial point to start from
-    :return: None
-    """
-    (x, y) = pixel
-    if x < 0 or y < 0:
-        logging.error("Floodfill tried to look at a pixel at {0}, which is off the map.")
-        sys.exit()
-
-    if x > 0:
-        new = (x - 1, y)
-        if snr[new] and (not status[new] & flags.QUEUED):
-            queue.append(new)
-            status[new] |= flags.QUEUED
-
-    if x < bounds[0]:
-        new = (x + 1, y)
-        if snr[new] and (not status[new] & flags.QUEUED):
-            queue.append(new)
-            status[new] |= flags.QUEUED
-
-    if y > 0:
-        new = (x, y - 1)
-        if snr[new] and (not status[new] & flags.QUEUED):
-            queue.append(new)
-            status[new] |= flags.QUEUED
-
-    if y < bounds[1]:
-        new = (x, y + 1)
-        if snr[new] and (not status[new] & flags.QUEUED):
-            queue.append(new)
-            status[new] |= flags.QUEUED
-
-
-def flood(snr, status, bounds, peak):
-    """
-    Start at pixel=peak and return all the pixels that belong to
-    the same blob.
-    :param snr: array of bool that is true for pixels we are interested in
-    :param status: array that represents the status of pixels
-    :param bounds: the bounds within which we can explore
-    :param peak: the initial point to start from
-    :return: None
-    """
-
-    if status[peak] & flags.VISITED:
-        return []
-
-    blob = []
-    queue = [peak]
-    status[peak] |= flags.QUEUED
-
-    for pixel in queue:
-        if status[pixel] & flags.VISITED:
-            continue
-
-        status[pixel] |= flags.VISITED
-
-        blob.append(pixel)
-        explore(snr, status, queue, bounds, pixel)
-
-    return blob
-
-
 def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
+    """
+    Generator function.
+    Segment an image into islands and return one island at a time.
+
+    Needs to work for entire image, and also for components within an island.
+
+    :param data: and island not a 2d array of pixel values
+    :param rmsimg: 2d array of rms values
+    :param innerclip: seed clip value
+    :param outerclip: flood clip value
+    :param domask: look for a region mask in globals, and only return islands that are within the mask
+    :return:
+    """
+    # TODO: rewrite other functions so that data is just 2d array, instead of an island.
+    if outerclip is None:
+        outerclip = innerclip
+
+    # compute SNR image
+    snr = abs(data.pixels)/rmsimg
+    # mask of pixles that are above the outerclip
+    a =  snr >= outerclip
+    # segmentation a la scipy
+    l, n = label(a)
+    f = find_objects(l)
+
+    if n == 0:
+        logging.debug("There are no pixels above the clipping limit")
+        return
+
+    # Yield values as before, though they are not sorted by flux
+    for i in range(n):
+        xmin,xmax = f[i][0].start, f[i][0].stop
+        ymin,ymax = f[i][1].start, f[i][1].stop
+        if np.any(snr[xmin:xmax+1,ymin:ymax+1]>innerclip): # obey inner clip constraint
+            data_box = data.pixels[xmin:xmax+1,ymin:ymax+1]
+            data_box[np.where(snr[xmin:xmax+1,ymin:ymax+1] < outerclip)] = np.nan
+            if domask and global_data.region is not None:
+                y,x = np.where(snr[xmin:xmax+1,ymin:ymax+1] >= outerclip)
+                # convert indices of this sub region to indices in the greater image
+                yx = zip(y+ymin,x+xmin)
+                ra, dec = global_data.wcs.wcs_pix2world(yx, 1).transpose()
+                mask = global_data.region.sky_within(ra, dec, degin=True)
+                # if there are no un-masked pixels within the region then we skip this island.
+                if not np.any(mask):
+                    continue
+                logging.debug("Mask {0}".format(mask))
+            yield data_box, xmin, xmax, ymin, ymax
+
+def gen_flood_wrap_dep(data, rmsimg, innerclip, outerclip=None, domask=False):
     """
     <a generator function>
     Find all the sub islands in data.
