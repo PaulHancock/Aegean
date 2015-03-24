@@ -24,6 +24,9 @@ from scipy import ndimage as ndi
 from scipy.special import erf
 from scipy.ndimage import label, find_objects
 
+# fitting
+import lmfit
+
 # the glory of astropy
 import astropy
 from astropy.table.table import Table
@@ -55,10 +58,9 @@ except ImportError:
 import logging
 from optparse import OptionParser
 
-# external and support programs
+# support modules
 from AegeanTools.fits_image import FitsImage, Beam
 from AegeanTools.msq2 import MarchingSquares
-from AegeanTools.mpfit import mpfit
 from AegeanTools.convert import dec2hms, dec2dms, gcd, bear, translate
 import AegeanTools.flags as flags
 
@@ -417,6 +419,7 @@ class DummyMP():
 
 ######################################### FUNCTIONS ###############################
 
+# flood fill functions
 def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
     """
     Generator function.
@@ -424,19 +427,18 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
 
     Needs to work for entire image, and also for components within an island.
 
-    :param data: and island not a 2d array of pixel values
+    :param data: a 2d array of pixel values
     :param rmsimg: 2d array of rms values
     :param innerclip: seed clip value
     :param outerclip: flood clip value
     :param domask: look for a region mask in globals, and only return islands that are within the mask
     :return:
     """
-    # TODO: rewrite other functions so that data is just 2d array, instead of an island.
     if outerclip is None:
         outerclip = innerclip
 
     # compute SNR image
-    snr = abs(data.pixels)/rmsimg
+    snr = abs(data)/rmsimg
     # mask of pixles that are above the outerclip
     a =  snr >= outerclip
     # segmentation a la scipy
@@ -453,7 +455,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
         xmin,xmax = f[i][0].start, f[i][0].stop
         ymin,ymax = f[i][1].start, f[i][1].stop
         if np.any(snr[xmin:xmax+1,ymin:ymax+1]>innerclip): # obey inner clip constraint
-            data_box = data.pixels[xmin:xmax+1,ymin:ymax+1]
+            data_box = data[xmin:xmax+1,ymin:ymax+1]
             data_box[np.where(snr[xmin:xmax+1,ymin:ymax+1] < outerclip)] = np.nan
             if domask and global_data.region is not None:
                 y,x = np.where(snr[xmin:xmax+1,ymin:ymax+1] >= outerclip)
@@ -467,7 +469,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
                 logging.debug("Mask {0}".format(mask))
             yield data_box, xmin, xmax, ymin, ymax
 
-##parameter estimates
+# parameter estimates
 def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offsets=(0, 0), max_summits=None):
     """Estimates the number of sources in an island and returns initial parameters for the fit as well as
     limits on those parameters.
@@ -493,7 +495,7 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
     if isnegative and debug_on:
         logging.debug("[is a negative island]")
 
-    parinfo = []
+    model = None
 
     #TODO: remove this later.
     if outerclip is None:
@@ -505,11 +507,6 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
             logging.debug("WCSERR")
         is_flag = flags.WCSERR
         pixbeam = Beam(1, 1, 0)
-
-    #The position cannot be more than a pixel beam from the initial location
-    #Use abs so that these distances are always positive
-    # xo_lim=max( abs(pixbeam.a*np.cos(np.radians(pixbeam.pa))), abs(pixbeam.b*np.sin(np.radians(pixbeam.pa))))
-    # yo_lim=max( abs(pixbeam.a*np.sin(np.radians(pixbeam.pa))), abs(pixbeam.b*np.cos(np.radians(pixbeam.pa))))
 
     #set a circular limit based on the size of the pixbeam
     xo_lim = int(
@@ -523,7 +520,7 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
     if not data.shape == curve.shape:
         logging.error("data and curvature are mismatched")
         logging.error("data:{0} curve:{1}".format(data.shape, curve.shape))
-        sys.exit()
+        raise AssertionError()
 
     #For small islands we can't do a 6 param fit
     #Don't count the NaN values as part of the island
@@ -550,11 +547,10 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
     else:
         if isnegative:
             #the summit should be able to include all pixels within the island not just those above innerclip
-            kappa_sigma = Island(np.where(curve > 0.5, np.where(data + outerclip * rmsimg < 0, data, np.nan), np.nan))
+            kappa_sigma = np.where(curve > 0.5, np.where(data + outerclip * rmsimg < 0, data, np.nan), np.nan)
         else:
-            kappa_sigma = Island(
-                np.where(-1 * curve > 0.5, np.where(data - outerclip * rmsimg > 0, data, np.nan), np.nan))
-        summits = gen_flood_wrap(kappa_sigma, np.ones(kappa_sigma.pixels.shape), 0, domask=False)
+            kappa_sigma = np.where(-1 * curve > 0.5, np.where(data - outerclip * rmsimg > 0, data, np.nan), np.nan)
+        summits = gen_flood_wrap(kappa_sigma, np.ones(kappa_sigma.shape), 0, domask=False)
 
     i = 0
     for summit, xmin, xmax, ymin, ymax in summits:
@@ -647,46 +643,27 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
             logging.debug(" - flags {0}".format(flag))
             logging.debug(" - fit?  {0}".format(not maxxed))
 
-        parinfo.append({'value': amp,
-                        'fixed': False or maxxed,
-                        'parname': '{0}:amp'.format(i),
-                        'limits': [amp_min, amp_max],
-                        'limited': [True, True]})
-        parinfo.append({'value': xo,
-                        'fixed': False or maxxed,
-                        'parname': '{0}:xo'.format(i),
-                        'limits': [xo_min, xo_max],
-                        'limited': [True, True]})
-        parinfo.append({'value': yo,
-                        'fixed': False or maxxed,
-                        'parname': '{0}:yo'.format(i),
-                        'limits': [yo_min, yo_max],
-                        'limited': [True, True]})
-        parinfo.append({'value': major,
-                        'fixed': (flag & flags.FIXED2PSF) > 0 or maxxed,
-                        'parname': '{0}:major'.format(i),
-                        'limits': [major_min, major_max],
-                        'limited': [True, True],
-                        'flags': flag})
-        parinfo.append({'value': minor,
-                        'fixed': (flag & flags.FIXED2PSF) > 0 or maxxed,
-                        'parname': '{0}:minor'.format(i),
-                        'limits': [minor_min, minor_max],
-                        'limited': [True, True],
-                        'flags': flag})
-        parinfo.append({'value': pa,
-                        'fixed': (flag & flags.FIXED2PSF) > 0 or maxxed,
-                        'parname': '{0}:pa'.format(i),
-                        'limits': [-180, 180],
-                        'limited': [False, False],
-                        'flags': flag})
+        #TODO: figure out how to incorporate island flags.
+        g = lmfit.Model(two_d_gaussian,independent_vars=['x','y'],prefix="c{0}_".format(i))
+        g.set_param_hint('amp',value=amp, min=amp_min, max=amp_max)
+        g.set_param_hint('xo',value=xo, min=xo_min, max=xo_max)
+        g.set_param_hint('yo',value=yo, min=yo_min, max=yo_max)
+        g.set_param_hint('major', value=major, min=major_min, max=major_max)
+        g.set_param_hint('minor', value=minor, min=minor_min, max=minor_max)
+        g.set_param_hint('pa', value = pa , min=-math.pi/2, max=math.pi/2)
+
+        if model  is None:
+            model =g
+        else:
+            model = model + g
+
         i += 1
     if debug_on:
         logging.debug("Estimated sources: {0}".format(i))
-    return parinfo
+    return model 
 
 
-def ntwodgaussian(inpars):
+def ntwodgaussian_dep(inpars):
     """
     Return an array of values represented by multiple Gaussians as parametrized
     by params = [amp,x0,y0,major,minor,pa]{n}
@@ -716,7 +693,7 @@ def ntwodgaussian(inpars):
     return rfunc
 
 
-def twodgaussian(params, shape):
+def twodgaussian_dep(params, shape):
     """
     Build a (single) 2D Gaussian ellipse as parametrized by "params" for a region with "shape"
         params - [amp, xo, yo, cx, cy, pa] where:
@@ -735,34 +712,48 @@ def twodgaussian(params, shape):
     return ntwodgaussian(params)(*np.indices(shape))
 
 
-def multi_gauss(data, rmsimg, parinfo):
+def two_d_gaussian(x, y, amp, xo, yo, major, minor, pa):
     """
-    Fit multiple gaussian components to data using the information provided by parinfo.
+    Generate a model 2d Gaussian with the given parameters.
+    Evaluate this model at the given locations x,y.
+
+    :param x,y: locations at which to calculate values
+    :param amp: amplitude of Gaussian
+    :param xo,yo: position of Gaussian
+    :param major,minor: axes (sigmas)
+    :param pa: position angle (radians)
+    :return: Gaussian function evaluated at x,y locations
+    """
+    sint, cost = math.sin(pa), math.cos(pa)
+    xxo = x-xo
+    yyo = y-yo
+    exp = (xxo*cost + yyo*sint)**2/major**2
+    exp+= (xxo*sint - yyo*cost)**2/minor**2
+    return amp*np.exp(-0.5*exp)
+
+
+def do_lmfit(data, model):
+    """
+    Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
     input: data - pixel information
-           rmsimg - image containing 1sigma values
-           parinfo - initial parameters for mpfit
-    return: mpfit object, parameter info
+           model - and lmfit.Model instance
+    return: fit results, modified model
     """
+    # convert 2d data into 1d lists, masking out nans in the process
+    x,y = np.indices(data.shape)
+    data, mask, shape = ravel_nans(data)
+    x = np.ravel(x[mask])
+    y = np.ravel(y[mask])
 
-    data = np.array(data)
-    mask = np.where(np.isfinite(data))  #the indices of the *non* NaN values in data
+    initparams = model.make_params()
+    logging.debug(initparams)
+    if len(data)<=len(initparams):
+        return None, None
 
-    def model(p):
-        """Return a map with a number of Gaussians determined by the input parameters."""
-        f = ntwodgaussian(p)
-        ans = f(*mask)
-        return ans
+    result = model.fit(data,x=x,y=y,params=initparams)
 
-    def erfunc(p, fjac=None):
-        """The difference between the model and the data"""
-        ans = [0, np.ravel((model(p) - data[mask] ) / rmsimg[mask])]
-        return ans
-
-    mp = mpfit(erfunc, parinfo=parinfo, quiet=True)
-    mp.dof = len(np.ravel(mask)) - len(parinfo)
-    residual = np.ravel((model(mp.params) - data[mask] ) / rmsimg[mask])
-    return mp, parinfo, (np.median(residual),np.std(residual))
+    return result, model
 
 
 #load and save external files
@@ -1484,13 +1475,7 @@ def curvature(data, aspect=None):
         kern = 0.25 * np.array([[b, a, b], [1, c, 1], [b, a, b]])
     return ndi.convolve(data, kern)
 
-
-##Nifty helpers
-def within(x, xm, xx):
-    """Enforce xm<= x <=xx"""
-    return min(max(x, xm), xx)
-
-
+# Nifty helpers
 def fix_shape(source):
     """
     Ensure that a>=b
@@ -1539,7 +1524,7 @@ def gmean(indata):
     return flux, abs(error)
 
 
-#WCS helper functions
+# WCS helper functions
 
 def pix2sky(pixel):
     """
@@ -1690,6 +1675,41 @@ def sky_sep(pix1, pix2):
     sep = gcd(pos1[0], pos1[1], pos2[0], pos2[1])
     return sep
 
+# helper functions for fitting functions
+def ravel_nans(arr):
+    """
+    Convert a 2d array that contains nans into a 1d array with no nans
+    Remember the location of the nans and the shape of the array so that
+    it can be reconstructed later using unravel_nans(arr1d,mask,shape)
+
+    I suspect that this function may work on arrays with larger than 2 dimensions.
+
+    :param arr: 2d array that may contain nans
+    :return:
+    arr1d - a 1d array without nans
+    mask - a mask of the location of the non-nan values
+    shape - the shape of the original 2d array
+    """
+    shape = arr.shape
+    mask = np.where(np.isfinite(arr))
+    arr1d = np.ravel(arr[mask])
+    return arr1d, mask, shape
+
+def unravel_nans(arr,mask,shape):
+    """
+    Assume that arr,mask,shape have been created from
+    ravel_nans(out), and reconstruct the 2d array 'out'
+
+    :param arr: 1d array of non-nan data
+    :param mask: mask the represents the 2d indicies of these data
+    :param shape: the shape of the 2d array
+    :return: A masked 2d array
+    """
+    # make an array of all nans
+    out = np.empty(shape)*np.nan
+    # and fill it with the array values according to mask
+    out[mask] = arr
+    return out
 
 def calc_errors(source):
     """
@@ -1776,78 +1796,68 @@ def fit_island(island_data):
 
     parinfo = estimate_parinfo(isle.pixels, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
                                max_summits=max_summits)
+    #TODO: handle islands with estimated sources=0
+    if parinfo is None:
+        logging.info("skipped island {0} due to lack of components".format(isle_num))
+        return []
 
     logging.debug("Rms is {0}".format(np.shape(rms)))
     logging.debug("Isle is {0}".format(np.shape(isle.pixels)))
     logging.debug(" of which {0} are masked".format(sum(np.isnan(isle.pixels).ravel() * 1)))
 
-    # there are 6 params per summit
-    num_summits = len(parinfo) / 6  # there are 6 params per Guassian
-    logging.debug("max_summits, num_summits={0},{1}".format(max_summits, num_summits))
+    # # there are 6 params per summit
+    # num_summits = len(parinfo) / 6  # there are 6 params per Guassian
+    # logging.debug("max_summits, num_summits={0},{1}".format(max_summits, num_summits))
+    #
+    # # Islands may have no summits if the curvature is not steep enough.
+    # if num_summits < 1:
+    #     logging.debug("Island {0} has no summits!".format(isle_num))
+    #     return []
+    #
+    # #determine if the island is big enough to fit
+    # for src in parinfo:
+    #     if src['parname'].split(":")[-1] in ['minor', 'major', 'pa']:
+    #         if src['flags'] & flags.FITERRSMALL:
+    #             is_flag |= flags.FITERRSMALL
+    #             logging.debug("Island is too small for a fit, not fitting anything")
+    #             is_flag |= flags.NOTFIT
+    #             break
+    # # report that some components may not be fit [ limitations are imposed in estimate_parinfo ]
+    # if (max_summits is not None) and (num_summits > max_summits):
+    #     logging.info("Island has too many summits ({0}), not fitting everything".format(num_summits))
 
-    # Islands may have no summits if the curvature is not steep enough.
-    if num_summits < 1:
-        logging.debug("Island {0} has no summits!".format(isle_num))
+
+    result, model = do_lmfit(isle.pixels, parinfo)
+
+    #TODO: Figure out how to dummy results or to not fit anything.
+    if result is None:
+        logging.info("skipped island {0} due to fit failure".format(isle_num))
         return []
+    logging.debug(result)
 
-    #determine if the island is big enough to fit
-    for src in parinfo:
-        if src['parname'].split(":")[-1] in ['minor', 'major', 'pa']:
-            if src['flags'] & flags.FITERRSMALL:
-                is_flag |= flags.FITERRSMALL
-                logging.debug("Island is too small for a fit, not fitting anything")
-                is_flag |= flags.NOTFIT
-                break
-    # report that some components may not be fit [ limitations are imposed in estimate_parinfo ]
-    if (max_summits is not None) and (num_summits > max_summits):
-        logging.info("Island has too many summits ({0}), not fitting everything".format(num_summits))
-
-    #supply dummy info if there is no fitting
-    if is_flag & flags.NOTFIT:
-        mp = DummyMP(parinfo=parinfo, perror=None)
-        info = parinfo
-        residual = (None, None)
-    else:
-        #do the fitting
-        mp, info, residual = multi_gauss(isle.pixels, rms, parinfo)
-
-    logging.debug("Source 0 pa={0} [pixel coords]".format(mp.params[5]))
-
-    params = mp.params
+    residual = result.residual
     # report the source parameters
     sources = []
-    components = len(params) / 6
 
-    # fix_shape(mp)
-    par_matrix = np.asarray(params, dtype=np.float64)  #float32's give string conversion errors.
-    par_matrix = par_matrix.reshape(components, 6)
+    if model.is_composite:
+        clist = model.components
+    else:
+        clist = [model]
 
-    # if there was a fitting error create an mp.perror matrix full of zeros
-    if mp.perror is None:
-        mp.perror = [0 for a in mp.params]
-        is_flag |= flags.FIXED2PSF
-        logging.debug("FitError: {0}".format(mp.errmsg))
-        logging.debug("info:")
-        for i in info:
-            logging.debug("{0}".format(i))
-
-    # anything that has an error of zero should be converted to -1
-    for k, val in enumerate(mp.perror):
-        if val == 0.0:
-            mp.perror[k] = -1
-
-    # TODO: figure out what to do with the -1 errors. They are still important.
-    for j, (amp, xo, yo, major, minor, theta) in enumerate(par_matrix):
+    for j,comp in enumerate(clist):
+        src_flags = 0
         source = OutputSource()
         source.island = isle_num
         source.source = j
+        logging.debug(" component {0}".format(comp))
+        xo, xo_err = result.params['c{0}_xo'.format(j)].value, result.params['c{0}_xo'.format(j)].stderr
+        yo, yo_err = result.params['c{0}_yo'.format(j)].value, result.params['c{0}_yo'.format(j)].stderr
+        major, major_err = result.params['c{0}_major'.format(j)].value, result.params['c{0}_major'.format(j)].stderr
+        minor, minor_err = result.params['c{0}_minor'.format(j)].value, result.params['c{0}_minor'.format(j)].stderr
+        theta, theta_err = result.params['c{0}_pa'.format(j)].value, result.params['c{0}_pa'.format(j)].stderr
+        amp, amp_err = result.params['c{0}_amp'.format(j)].value, result.params['c{0}_amp'.format(j)].stderr
 
-        #take general flags from the island
-        src_flags = is_flag
-        #and specific flags from the source
-        src_flags |= info[j * 6 + 5]['flags']
 
-        #params = [amp,x0,y0,major,minor,pa]{n}
         #pixel pos within island +
         # island offset within region +
         # region offset within image +
@@ -1866,7 +1876,6 @@ def fit_island(island_data):
         source.background = bkg[x, y]
         source.local_rms = rms[x, y]
         source.peak_flux = amp
-        # source.err_peak_flux = amp_err
 
         # position and shape
         (source.ra, source.dec, source.a, source.pa) = pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
@@ -1878,7 +1887,6 @@ def fit_island(island_data):
             source.ra += 360
         source.ra_str = dec2hms(source.ra)
         source.dec_str = dec2dms(source.dec)
-        logging.debug("Source {0} Extracted pa={1}deg [pixel] -> {2}deg [sky]".format(j, theta, source.pa))
 
         # calculate minor axis and convert a/b to arcsec
         source.a *= 3600  # arcseconds
@@ -1904,7 +1912,7 @@ def fit_island(island_data):
         sources.append(source)
         logging.debug(source)
 
-    #calculate the integrated island flux if required
+    # calculate the integrated island flux if required
     if island_data.doislandflux:
         logging.debug("Integrated flux for island {0}".format(isle_num))
         kappa_sigma = np.where(abs(idata) - outerclip * rms > 0, idata, np.NaN)
@@ -1915,19 +1923,21 @@ def fit_island(island_data):
         source.island = isle_num
         source.components = j + 1
         source.peak_flux = np.nanmax(kappa_sigma)
-        #check for negative islands
+        # check for negative islands
         if source.peak_flux < 0:
             source.peak_flux = np.nanmin(kappa_sigma)
         logging.debug("- peak flux {0}".format(source.peak_flux))
 
-        #positions and background
+        # positions and background
         positions = np.where(kappa_sigma == source.peak_flux)
         xy = positions[0][0] + xmin, positions[1][0] + ymin
         radec = pix2sky(xy)
         source.ra = radec[0]
-        #convert negative ra's to positive ones
+
+        # convert negative ra's to positive ones
         if source.ra < 0:
             source.ra += 360
+
         source.dec = radec[1]
         source.ra_str = dec2hms(source.ra)
         source.dec_str = dec2dms(source.dec)
@@ -1936,20 +1946,20 @@ def fit_island(island_data):
         source.x_width, source.y_width = isle.pixels.shape
         source.pixels = int(sum(np.isfinite(kappa_sigma).ravel() * 1.0))
         source.extent = [xmin, xmax, ymin, ymax]
-        #calculate the area of the island as a fraction of the area of the bounding box
-        #br = pix2sky([xmin,ymin])
+
+        # calculate the area of the island as a fraction of the area of the bounding box
         bl = pix2sky([xmax, ymin])
         tl = pix2sky([xmax, ymax])
         tr = pix2sky([xmin, ymax])
         height = gcd(tl[0], tl[1], bl[0], bl[1])
         width = gcd(tl[0], tl[1], tr[0], tr[1])
         area = height * width
-        #print tl,br,height,width, area, source.pixels, source.x_width,source.y_width
         source.area = area * source.pixels / source.x_width / source.y_width
-        #create contours
+
+        # create contours
         msq = MarchingSquares(idata)
         source.contour = [(a[0] + xmin, a[1] + ymin) for a in msq.perimeter]
-        #calculate the maximum angular size of this island, brute force method
+        # calculate the maximum angular size of this island, brute force method
         source.max_angular_size = 0
         for i, pos1 in enumerate(source.contour):
             radec1 = pix2sky(pos1)
@@ -2047,7 +2057,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
 
     #we now work with the updated versions of the three images
     rmsimg = global_data.rmsimg
-    data = Island(global_data.data_pix)  #not a FitsImage
+    data = global_data.data_pix
     beam = global_data.beam
 
     logging.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a * 3600, beam.b * 3600, beam.pa))
