@@ -18,7 +18,7 @@ from astropy.io import fits
 from AegeanTools.fits_interp import compress, expand
 
 __version__ = 'v1.0'
-__date__ = '2015-02-03'
+__date__ = '2015-03-03'
 
 # command line version of this program runs from here.
 if __name__ == "__main__":

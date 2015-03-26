@@ -19,7 +19,7 @@ from astropy.wcs import wcs as pywcs
 from AegeanTools.regions import Region
 
 __version__ = 'v1.0'
-__date__ = '2015-03-03'
+__date__ = '2015-03-18'
 
 #seems like this fails sometimes
 try:

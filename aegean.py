@@ -72,8 +72,8 @@ import multiprocessing
 __author__ = 'Paul Hancock'
 
 # Aegean version [Updated via script]
-__version__ = 'v1.9rc1-135-ge8bf2dd'
-__date__ = '2015-03-03'
+__version__ = 'v1.9rc1-150-ge9e65ae'
+__date__ = '2015-03-26'
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -1825,27 +1825,6 @@ def fit_island(island_data):
     logging.debug("Isle is {0}".format(np.shape(idata)))
     logging.debug(" of which {0} are masked".format(sum(np.isnan(idata).ravel() * 1)))
 
-    # # there are 6 params per summit
-    # num_summits = len(parinfo) / 6  # there are 6 params per Guassian
-    # logging.debug("max_summits, num_summits={0},{1}".format(max_summits, num_summits))
-    #
-    # # Islands may have no summits if the curvature is not steep enough.
-    # if num_summits < 1:
-    #     logging.debug("Island {0} has no summits!".format(isle_num))
-    #     return []
-    #
-    # #determine if the island is big enough to fit
-    # for src in parinfo:
-    #     if src['parname'].split(":")[-1] in ['minor', 'major', 'pa']:
-    #         if src['flags'] & flags.FITERRSMALL:
-    #             is_flag |= flags.FITERRSMALL
-    #             logging.debug("Island is too small for a fit, not fitting anything")
-    #             is_flag |= flags.NOTFIT
-    #             break
-    # # report that some components may not be fit [ limitations are imposed in estimate_parinfo ]
-    # if (max_summits is not None) and (num_summits > max_summits):
-    #     logging.info("Island has too many summits ({0}), not fitting everything".format(num_summits))
-
     # Check that there is enough data to do the fit
     free_vars = len( [ 1 for a in params.keys() if params[a].vary])
     if len(idata)<free_vars:
@@ -1860,9 +1839,10 @@ def fit_island(island_data):
         residual = np.array(result.residual).ravel()
         residual = residual[np.isfinite(residual)]
         residual = [ np.median(residual),np.std(residual)]
+        if not result.success:
+            is_flag = flags.FITERR
 
     logging.debug(result)
-
 
     # report the source parameters
     sources = []
@@ -1880,7 +1860,7 @@ def fit_island(island_data):
         minor = model[prefix+'minor'].value
         theta = model[prefix+'pa'].value
         amp = model[prefix+'amp'].value
-        # These flags are only meaningful if we actually do a fit.
+        # These flags are only meaningful if we actually tried to do a fit.
         if not(is_flag & flags.NOTFIT):
             src_flags |= model[prefix+'flags'].value
 
@@ -1970,7 +1950,7 @@ def fit_island(island_data):
         source.dec_str = dec2dms(source.dec)
         source.background = bkg[positions[0][0], positions[1][0]]
         source.local_rms = rms[positions[0][0], positions[1][0]]
-        source.x_width, source.y_width = isle.pixels.shape
+        source.x_width, source.y_width = idata.shape
         source.pixels = int(sum(np.isfinite(kappa_sigma).ravel() * 1.0))
         source.extent = [xmin, xmax, ymin, ymax]
 
