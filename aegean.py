@@ -17,6 +17,7 @@ import os
 import re
 import numpy as np
 import math
+import copy
 
 # scipy things
 import scipy
@@ -398,23 +399,15 @@ class IslandFittingData:
         self.doislandflux = doislandflux
 
 
-class DummyMP():
+class DummyLM():
     """
     A dummy copy of the mpfit class that just holds the parinfo variables
     This class doesn't do a great deal, but it makes it 'looks' like the mpfit class
     and makes it easy to estimate source parameters when you don't want to do any fitting.
     """
 
-    def __init__(self, parinfo, perror):
-        self.params = []
-        for var in parinfo:
-            try:
-                val = var['value'][0]
-            except:
-                val = var['value']
-            self.params.append(val)
-        self.perror = perror
-        self.errmsg = "There is no error, I just didn't bother fitting anything!"
+    def __init__(self):
+        self.residual = [np.nan,np.nan]
 
 
 ######################################### FUNCTIONS ###############################
@@ -454,7 +447,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
     for i in range(n):
         xmin,xmax = f[i][0].start, f[i][0].stop
         ymin,ymax = f[i][1].start, f[i][1].stop
-        if np.any(snr[xmin:xmax+1,ymin:ymax+1]>innerclip): # obey inner clip constraint
+        if np.any(snr[xmin:xmax+1,ymin:ymax+1]>=innerclip): # obey inner clip constraint
             data_box = data[xmin:xmax+1,ymin:ymax+1]
             data_box[np.where(snr[xmin:xmax+1,ymin:ymax+1] < outerclip)] = np.nan
             if domask and global_data.region is not None:
@@ -465,6 +458,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
                 mask = global_data.region.sky_within(ra, dec, degin=True)
                 # if there are no un-masked pixels within the region then we skip this island.
                 if not np.any(mask):
+                    logging.info("no pixels within mask region")
                     continue
                 logging.debug("Mask {0}".format(mask))
             yield data_box, xmin, xmax, ymin, ymax
@@ -476,16 +470,14 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
 
     input:
     data   - np.ndarray of flux values
-    rmsimg - np.ndarray of 1sigmas values
+    rmsimg - np.ndarray of 1sigma values
     curve  - np.ndarray of curvature values
     beam   - beam object
     innerclip - the inner clipping level for flux data, in sigmas
     offsets - the (x,y) offset of data within it's parent image
               this is required for proper WCS conversions
 
-    returns:
-    parinfo object for mpfit
-    with all parameters in pixel coords
+    returns: an instance of lmfit.Parameters()
     """
     debug_on = logging.getLogger().isEnabledFor(logging.DEBUG)
     is_flag = 0
@@ -494,8 +486,6 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
     isnegative = max(data[np.where(np.isfinite(data))]) < 0
     if isnegative and debug_on:
         logging.debug("[is a negative island]")
-
-    model = None
 
     #TODO: remove this later.
     if outerclip is None:
@@ -536,7 +526,7 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
     if debug_on:
         logging.debug(" - size {0}".format(len(data.ravel())))
 
-    if min(data.shape) <= 2 or (is_flag & flags.FITERRSMALL):
+    if min(data.shape) <= 2 or (is_flag & flags.FITERRSMALL) or (is_flag & flags.FIXED2PSF):
         #1d islands or small islands only get one source
         if debug_on:
             logging.debug("Tiny summit detected")
@@ -552,12 +542,13 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
             kappa_sigma = np.where(-1 * curve > 0.5, np.where(data - outerclip * rmsimg > 0, data, np.nan), np.nan)
         summits = gen_flood_wrap(kappa_sigma, np.ones(kappa_sigma.shape), 0, domask=False)
 
+    params = lmfit.Parameters()
     i = 0
-    for summit, xmin, xmax, ymin, ymax in summits:
+    # add summits in order of peak SNR
+    for summit, xmin, xmax, ymin, ymax in sorted(summits, key=lambda x: np.nanmax(abs(x[0]))):
         summit_flag = is_flag
         if debug_on:
-            logging.debug(
-                "Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape, xmin, xmax, ymin, ymax, i))
+            logging.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape, xmin, xmax, ymin, ymax, i))
         if isnegative:
             amp = summit[np.isfinite(summit)].min()
         else:
@@ -570,8 +561,10 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
         xo = xpeak[0] + xmin
         yo = ypeak[0] + ymin
 
-        #check to ensure that this summit is brighter than innerclip
-        snr = abs(data[xo, yo] / rmsimg[xo, yo])
+        # Summits are allowed to include pixels that are between the outer and inner clip
+        # This means that sometimes we get a summit that has all it's pixels below the inner clip
+        # So we test for that here.
+        snr = np.nanmax(abs(data[xmin:xmax+1,ymin:ymax+1] / rmsimg[xmin:xmax+1,ymin:ymax+1]))
         if snr < innerclip:
             logging.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
             continue
@@ -643,24 +636,20 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
             logging.debug(" - flags {0}".format(flag))
             logging.debug(" - fit?  {0}".format(not maxxed))
 
-        #TODO: figure out how to incorporate island flags.
-        g = lmfit.Model(two_d_gaussian,independent_vars=['x','y'],prefix="c{0}_".format(i))
-        g.set_param_hint('amp',value=amp, min=amp_min, max=amp_max)
-        g.set_param_hint('xo',value=xo, min=xo_min, max=xo_max)
-        g.set_param_hint('yo',value=yo, min=yo_min, max=yo_max)
-        g.set_param_hint('major', value=major, min=major_min, max=major_max)
-        g.set_param_hint('minor', value=minor, min=minor_min, max=minor_max)
-        g.set_param_hint('pa', value = pa , min=-math.pi/2, max=math.pi/2)
-
-        if model  is None:
-            model =g
-        else:
-            model = model + g
-
+        prefix = "c{0}_".format(i)
+        params.add(prefix+'amp',value=amp, min=amp_min, max=amp_max)
+        params.add(prefix+'xo',value=xo, min=xo_min, max=xo_max)
+        params.add(prefix+'yo',value=yo, min=yo_min, max=yo_max)
+        params.add(prefix+'major', value=major, min=major_min, max=major_max, vary=summit_flag & flags.FIXED2PSF)
+        params.add(prefix+'minor', value=minor, min=minor_min, max=minor_max, vary=summit_flag & flags.FIXED2PSF)
+        params.add(prefix+'pa', value=pa , min=-math.pi/2, max=math.pi/2, vary=summit_flag & flags.FIXED2PSF)
+        params.add(prefix+'flags',value=summit_flag, vary=False)
         i += 1
     if debug_on:
         logging.debug("Estimated sources: {0}".format(i))
-    return model 
+    # remember how many components are fit.
+    params.components=i
+    return params
 
 
 def ntwodgaussian_dep(inpars):
@@ -731,8 +720,30 @@ def two_d_gaussian(x, y, amp, xo, yo, major, minor, pa):
     exp+= (xxo*sint - yyo*cost)**2/minor**2
     return amp*np.exp(-0.5*exp)
 
+def multi_gaussian(x,y,params):
+    """
 
-def do_lmfit(data, model):
+    :param x: x-coords
+    :param y: y-coords
+    :param params: model parameters (can be multiple)
+    :return: model data
+    """
+    model=None
+    for i in range(params.components):
+        prefix = "c{0}_".format(i)
+        amp = params[prefix+'amp'].value
+        xo = params[prefix+'xo'].value
+        yo = params[prefix+'yo'].value
+        major = params[prefix+'major'].value
+        minor = params[prefix+'minor'].value
+        pa = params[prefix+'pa'].value
+        if model is None:
+            model = two_d_gaussian(x,y,amp,xo,yo,major,minor,pa)
+        else:
+            model +=two_d_gaussian(x,y,amp,xo,yo,major,minor,pa)
+    return model
+
+def do_lmfit(data, params):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
@@ -740,20 +751,26 @@ def do_lmfit(data, model):
            model - and lmfit.Model instance
     return: fit results, modified model
     """
+    # copy the params so as not to change the initial conditions
+    # in case we want to use them elsewhere
+    params = copy.deepcopy(params)
+    def residual(params,x,y,data=None):
+        model= multi_gaussian(y,x,params)
+        if data is None:
+            return model
+        resid = (model-data)
+        return resid
+
     # convert 2d data into 1d lists, masking out nans in the process
     x,y = np.indices(data.shape)
     data, mask, shape = ravel_nans(data)
     x = np.ravel(x[mask])
     y = np.ravel(y[mask])
 
-    initparams = model.make_params()
-    logging.debug(initparams)
-    if len(data)<=len(initparams):
-        return None, None
+    result = lmfit.minimize(residual,params, args=(x,y,data))#,Dfun=jacobian2d)
+    #result = model.fit(data,x=x,y=y,params=initparams)
 
-    result = model.fit(data,x=x,y=y,params=initparams)
-
-    return result, model
+    return result, params
 
 
 #load and save external files
@@ -1744,10 +1761,12 @@ def calc_errors(source):
     source.err_dec = np.sqrt( err_xo2*np.cos(phi)**2 + err_yo2*np.sin(phi)**2)
 
     # if major/minor are very similar then we should not be able to figure out what pa is.
-    if abs((major/minor)**2+(minor/major)**2 -2) < 0.01:
-        source.err_pa = -1
-    else:
-        source.err_pa = np.degrees(np.sqrt(4/rho2('pa')) * (major*minor/(major**2-minor**2)))
+    # if abs((major/minor)**2+(minor/major)**2 -2) < 0.01:
+    #     source.err_pa = -1
+    # else:
+    source.err_pa = np.degrees(np.sqrt(4/rho2('pa')) * (major*minor/(major**2-minor**2)))
+    if source.err_pa> 90:
+        source.err_pa = 90
 
     # integrated flux error
     err2 = (source.err_peak_flux/source.peak_flux)**2
@@ -1781,7 +1800,7 @@ def fit_island(island_data):
     innerclip, outerclip, max_summits = island_data.scalars
     xmin, xmax, ymin, ymax = island_data.offsets
 
-    isle = Island(idata)
+    # isle = Island(idata)
     icurve = dcurve[xmin:xmax + 1, ymin:ymax + 1]
     rms = rmsimg[xmin:xmax + 1, ymin:ymax + 1]
     bkg = bkgimg[xmin:xmax + 1, ymin:ymax + 1]
@@ -1794,16 +1813,17 @@ def fit_island(island_data):
     logging.debug("=====")
     logging.debug("Island ({0})".format(isle_num))
 
-    parinfo = estimate_parinfo(isle.pixels, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
+    params = estimate_parinfo(idata, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
                                max_summits=max_summits)
     #TODO: handle islands with estimated sources=0
-    if parinfo is None:
-        logging.info("skipped island {0} due to lack of components".format(isle_num))
+    if params.components <1:
+        logging.warn("skipped island {0} due to lack of components".format(isle_num))
+        logging.warn("This shouldn't really happen")
         return []
 
     logging.debug("Rms is {0}".format(np.shape(rms)))
-    logging.debug("Isle is {0}".format(np.shape(isle.pixels)))
-    logging.debug(" of which {0} are masked".format(sum(np.isnan(isle.pixels).ravel() * 1)))
+    logging.debug("Isle is {0}".format(np.shape(idata)))
+    logging.debug(" of which {0} are masked".format(sum(np.isnan(idata).ravel() * 1)))
 
     # # there are 6 params per summit
     # num_summits = len(parinfo) / 6  # there are 6 params per Guassian
@@ -1826,36 +1846,43 @@ def fit_island(island_data):
     # if (max_summits is not None) and (num_summits > max_summits):
     #     logging.info("Island has too many summits ({0}), not fitting everything".format(num_summits))
 
+    # Check that there is enough data to do the fit
+    free_vars = len( [ 1 for a in params.keys() if params[a].vary])
+    if len(idata)<free_vars:
+        logging.debug("Island {0} doesn't have enough pixels to fit the given model".format(isle_num))
+        result = DummyLM()
+        model = params
+        is_flag |= flags.NOTFIT
+        residual = result.residual
+    else:
+        # Model is the fitted parameters
+        result, model = do_lmfit(idata, params)
+        residual = np.array(result.residual).ravel()
+        residual = residual[np.isfinite(residual)]
+        residual = [ np.median(residual),np.std(residual)]
 
-    result, model = do_lmfit(isle.pixels, parinfo)
-
-    #TODO: Figure out how to dummy results or to not fit anything.
-    if result is None:
-        logging.info("skipped island {0} due to fit failure".format(isle_num))
-        return []
     logging.debug(result)
 
-    residual = result.residual
+
     # report the source parameters
     sources = []
 
-    if model.is_composite:
-        clist = model.components
-    else:
-        clist = [model]
-
-    for j,comp in enumerate(clist):
-        src_flags = 0
+    for j in range(model.components):
+        src_flags = is_flag
         source = OutputSource()
         source.island = isle_num
         source.source = j
-        logging.debug(" component {0}".format(comp))
-        xo, xo_err = result.params['c{0}_xo'.format(j)].value, result.params['c{0}_xo'.format(j)].stderr
-        yo, yo_err = result.params['c{0}_yo'.format(j)].value, result.params['c{0}_yo'.format(j)].stderr
-        major, major_err = result.params['c{0}_major'.format(j)].value, result.params['c{0}_major'.format(j)].stderr
-        minor, minor_err = result.params['c{0}_minor'.format(j)].value, result.params['c{0}_minor'.format(j)].stderr
-        theta, theta_err = result.params['c{0}_pa'.format(j)].value, result.params['c{0}_pa'.format(j)].stderr
-        amp, amp_err = result.params['c{0}_amp'.format(j)].value, result.params['c{0}_amp'.format(j)].stderr
+        logging.debug(" component {0}".format(j))
+        prefix = "c{0}_".format(j)
+        xo = model[prefix+'xo'].value
+        yo = model[prefix+'yo'].value
+        major = model[prefix+'major'].value
+        minor = model[prefix+'minor'].value
+        theta = model[prefix+'pa'].value
+        amp = model[prefix+'amp'].value
+        # These flags are only meaningful if we actually do a fit.
+        if not(is_flag & flags.NOTFIT):
+            src_flags |= model[prefix+'flags'].value
 
 
         #pixel pos within island +
@@ -1903,7 +1930,7 @@ def fit_island(island_data):
         # ------ calculate errors for each parameter ------
         calc_errors(source)
 
-        # these are goodness of fit statistics
+        # these are goodness of fit statistics for the entire island.
         source.residual_mean = residual[0]
         source.residual_std = residual[1]
         # set the flags
