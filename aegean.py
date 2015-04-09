@@ -930,7 +930,7 @@ def ntwodgaussian_mpfit(inpars):
     """
     try:
         params = np.array(inpars).reshape(len(inpars) / 6, 6)
-    except ValueError, e:
+    except ValueError as e:
         if 'size' in e.message:
             logging.error("inpars requires a multiple of 6 parameters")
             logging.error("only {0} parameters supplied".format(len(inpars)))
@@ -964,7 +964,6 @@ def ntwodgaussian_lmfit(params):
             sx = params[prefix+'sx'].value
             sy = params[prefix+'sy'].value
             theta = params[prefix+'theta'].value
-            params[prefix+'theta'].value = theta_limit(theta)
             if model is None:
                 model = elliptical_gaussian(y,x,amp,yo,xo,sx,sy,theta)
             else:
@@ -994,7 +993,7 @@ def do_mpfit(data, rmsimg, parinfo):
 
     def erfunc(p, fjac=None):
         """The difference between the model and the data"""
-        ans = [0, np.ravel((model(p) - data[mask] ) / rmsimg[mask])]
+        ans = [0, model(p) - data[mask]]
         return ans
 
     mp = mpfit(erfunc, parinfo=parinfo, quiet=True)
@@ -2117,7 +2116,7 @@ def fit_island_mpfit(island_data):
         source.source = j
 
         print "MP ({0},{1})".format(isle_num,j)
-        print "amp, xo, yo,major, minor,theta",amp, xo, yo, major, minor, theta
+        print "amp, xo, yo,major, minor,theta",amp, xo, yo, major, minor, pa_limit(theta)
         #take general flags from the island
         src_flags = is_flag
         #and specific flags from the source
