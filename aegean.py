@@ -431,7 +431,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
     :param domask: look for a region mask in globals, and only return islands that are within the mask
     :return:
     """
-    # TODO: rewrite other functions so that data is just 2d array, instead of an island.
+
     if outerclip is None:
         outerclip = innerclip
 
