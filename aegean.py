@@ -17,12 +17,17 @@ import os
 import re
 import numpy as np
 import math
+import copy
 
 # scipy things
 import scipy
 from scipy import ndimage as ndi
 from scipy.special import erf
 from scipy.ndimage import label, find_objects
+
+# fitting
+import lmfit
+from AegeanTools.mpfit import mpfit
 
 # the glory of astropy
 import astropy
@@ -58,7 +63,6 @@ from optparse import OptionParser
 # external and support programs
 from AegeanTools.fits_image import FitsImage, Beam
 from AegeanTools.msq2 import MarchingSquares
-from AegeanTools.mpfit import mpfit
 from AegeanTools.convert import dec2hms, dec2dms, gcd, bear, translate
 import AegeanTools.flags as flags
 
@@ -468,7 +472,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
 
 
 ##parameter estimates
-def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offsets=(0, 0), max_summits=None):
+def estimate_mpfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offsets=(0, 0), max_summits=None):
     """Estimates the number of sources in an island and returns initial parameters for the fit as well as
     limits on those parameters.
 
@@ -685,7 +689,205 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
     return parinfo
 
 
-# Modelling functions
+def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offsets=(0, 0), max_summits=None):
+    """Estimates the number of sources in an island and returns initial parameters for the fit as well as
+    limits on those parameters.
+
+    input:
+    data   - np.ndarray of flux values
+    rmsimg - np.ndarray of 1sigma values
+    curve  - np.ndarray of curvature values
+    beam   - beam object
+    innerclip - the inner clipping level for flux data, in sigmas
+    offsets - the (x,y) offset of data within it's parent image
+              this is required for proper WCS conversions
+
+    returns: an instance of lmfit.Parameters()
+    """
+    debug_on = logging.getLogger().isEnabledFor(logging.DEBUG)
+    is_flag = 0
+
+    #is this a negative island?
+    isnegative = max(data[np.where(np.isfinite(data))]) < 0
+    if isnegative and debug_on:
+        logging.debug("[is a negative island]")
+
+    #TODO: remove this later.
+    if outerclip is None:
+        outerclip = innerclip
+
+    pixbeam = global_data.pixbeam
+    if pixbeam is None:
+        if debug_on:
+            logging.debug("WCSERR")
+        is_flag = flags.WCSERR
+        pixbeam = Beam(1, 1, 0)
+
+    #set a circular limit based on the size of the pixbeam
+    xo_lim = 0.5*np.hypot(pixbeam.a, pixbeam.b)
+    yo_lim = xo_lim
+
+    if debug_on:
+        logging.debug(" - shape {0}".format(data.shape))
+        logging.debug(" - xo_lim,yo_lim {0}, {1}".format(xo_lim, yo_lim))
+
+    if not data.shape == curve.shape:
+        logging.error("data and curvature are mismatched")
+        logging.error("data:{0} curve:{1}".format(data.shape, curve.shape))
+        raise AssertionError()
+
+    #For small islands we can't do a 6 param fit
+    #Don't count the NaN values as part of the island
+    non_nan_pix = len(data[np.where(np.isfinite(data))].ravel())
+    if 4 <= non_nan_pix <= 6:
+        logging.debug("FIXED2PSF")
+        is_flag |= flags.FIXED2PSF
+    elif non_nan_pix < 4:
+        logging.debug("FITERRSMALL!")
+        is_flag |= flags.FITERRSMALL
+    else:
+        is_flag = 0
+    if debug_on:
+        logging.debug(" - size {0}".format(len(data.ravel())))
+
+    if min(data.shape) <= 2 or (is_flag & flags.FITERRSMALL) or (is_flag & flags.FIXED2PSF):
+        #1d islands or small islands only get one source
+        if debug_on:
+            logging.debug("Tiny summit detected")
+            logging.debug("{0}".format(data))
+        summits = [[data, 0, data.shape[0], 0, data.shape[1]]]
+        #and are constrained to be point sources
+        is_flag |= flags.FIXED2PSF
+    else:
+        if isnegative:
+            #the summit should be able to include all pixels within the island not just those above innerclip
+            kappa_sigma = np.where(curve > 0.5, np.where(data + outerclip * rmsimg < 0, data, np.nan), np.nan)
+        else:
+            kappa_sigma = np.where(-1 * curve > 0.5, np.where(data - outerclip * rmsimg > 0, data, np.nan), np.nan)
+        summits = gen_flood_wrap(kappa_sigma, np.ones(kappa_sigma.shape), 0, domask=False)
+
+    params = lmfit.Parameters()
+    i = 0
+    # add summits in reverse order of peak SNR
+    for summit, ymin, ymax, xmin, xmax in sorted(summits, key=lambda x: np.nanmax(-1.*abs(x[0]))):
+        summit_flag = is_flag
+        if debug_on:
+            logging.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape, ymin, ymax, xmin, xmax, i))
+        if isnegative:
+            amp = summit[np.isfinite(summit)].min()
+        else:
+            amp = summit[np.isfinite(summit)].max()  #stupid NaNs break all my things
+
+        (xpeak, ypeak) = np.where(summit == amp)
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.debug(" - max is {0:f}".format(amp))
+            logging.debug(" - peak at {0},{1}".format(xpeak, ypeak))
+        yo = ypeak[0] + ymin
+        xo = xpeak[0] + xmin
+
+        # Summits are allowed to include pixels that are between the outer and inner clip
+        # This means that sometimes we get a summit that has all it's pixels below the inner clip
+        # So we test for that here.
+        snr = np.nanmax(abs(data[ymin:ymax+1,xmin:xmax+1] / rmsimg[ymin:ymax+1,xmin:xmax+1]))
+        if snr < innerclip:
+            logging.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
+            continue
+
+
+        # allow amp to be 5% or (innerclip) sigma higher
+        # TODO: the 5% should depend on the beam sampling
+        # when innerclip is 400 this becomes rather stupid
+        if amp > 0:
+            amp_min, amp_max = 0.95 * min(outerclip * rmsimg[yo, xo], amp), amp * 1.05 + innerclip * rmsimg[yo, xo]
+        else:
+            amp_max, amp_min = 0.95 * max(-outerclip * rmsimg[yo, xo], amp), amp * 1.05 - innerclip * rmsimg[yo, xo]
+
+        if debug_on:
+            logging.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
+
+        yo_min, yo_max = max(ymin, yo - xo_lim), min(ymax, yo + yo_lim)
+        if yo_min == yo_max:  #if we have a 1d summit then allow the position to vary by +/-0.5pix
+            yo_min, yo_max = yo_min - 0.5, yo_max + 0.5
+
+        xo_min, xo_max = max(xmin, xo - yo_lim), min(xmax, xo + yo_lim)
+        if xo_min == xo_max:  #if we have a 1d summit then allow the position to vary by +/-0.5pix
+            xo_min, xo_max = xo_min - 0.5, xo_max + 0.5
+
+        #TODO: The limits on sx,sy work well for circular beams or unresolved sources
+        #for elliptical beams *and* resolved sources this isn't good and should be redone
+
+        xsize = ymax - ymin + 1
+        ysize = xmax - xmin + 1
+
+        #initial shape is the pix beam
+        sx = pixbeam.a * fwhm2cc
+        sy = pixbeam.b * fwhm2cc
+
+        # TODO: this assumes that sx is aligned with the major axis, which it need not be
+        # A proper fix will include the re-calculation of the pixel beam at the given sky location
+        # this will make the beam slightly bigger as we move away from zenith
+        if global_data.telescope_lat is not None:
+            _, dec = pix2sky([yo+offsets[0],xo+offsets[1]]) #double check x/y here
+            sx /= np.cos(np.radians(dec-global_data.telescope_lat))
+
+        #constraints are based on the shape of the island
+        sx_min, sx_max = sx * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * fwhm2cc, sx * 1.1)
+        sy_min, sy_max = sy * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * fwhm2cc, sx * 1.1)
+
+        #TODO: update this to fit a psf for things that are "close" to a psf.
+        #if the min/max of either sx,sy are equal then use a PSF fit
+        if sy_min == sy_max or sx_min == sx_max: # this will never happen
+            summit_flag |= flags.FIXED2PSF
+
+        theta = theta_limit(pixbeam.pa)
+        flag = summit_flag
+
+        #check to see if we are going to fit this source
+        if max_summits is not None:
+            maxxed = i >= max_summits
+        else:
+            maxxed = False
+
+        if maxxed:
+            summit_flag |= flags.NOTFIT
+            summit_flag |= flags.FIXED2PSF
+
+        if debug_on:
+            logging.debug(" - var val min max | min max")
+            logging.debug(" - amp {0} {1} {2} ".format(amp, amp_min, amp_max))
+            logging.debug(" - xo {0} {1} {2} ".format(yo, yo_min, yo_max))
+            logging.debug(" - yo {0} {1} {2} ".format(xo, xo_min, xo_max))
+            logging.debug(" - sx {0} {1} {2} | {3} {4}".format(sx, sx_min, sx_max, sx_min * cc2fwhm,
+                                                                  sx_max * cc2fwhm))
+            logging.debug(" - sy {0} {1} {2} | {3} {4}".format(sy, sy_min, sy_max, sy_min * cc2fwhm,
+                                                                  sy_max * cc2fwhm))
+            logging.debug(" - theta {0} {1} {2}".format(theta, -1*np.pi, np.pi))
+            logging.debug(" - flags {0}".format(flag))
+            logging.debug(" - fit?  {0}".format(not maxxed))
+
+        # TODO: incorporate the circular constraint
+        prefix = "c{0}_".format(i)
+        params.add(prefix+'amp',value=amp, min=amp_min, max=amp_max, vary= not maxxed)
+        params.add(prefix+'yo',value=yo, min=yo_min, max=yo_max, vary= not maxxed)
+        params.add(prefix+'xo',value=xo, min=xo_min, max=xo_max, vary= not maxxed)
+        if summit_flag & flags.FIXED2PSF > 0:
+            psf_vary = False
+        else:
+            psf_vary = not maxxed
+        params.add(prefix+'sx', value=sx, min=sx_min, max=sx_max, vary=psf_vary)
+        params.add(prefix+'sy', value=sy, min=sy_min, max=sy_max, vary=psf_vary)
+        params.add(prefix+'theta', value=theta, min=-2.*np.pi, max=2*np.pi , vary=psf_vary)
+        params.add(prefix+'flags',value=summit_flag, vary=False)
+
+        i += 1
+    if debug_on:
+        logging.debug("Estimated sources: {0}".format(i))
+    # remember how many components are fit.
+    params.components=i
+    return params
+
+
+# Modelling and fitting functions
 def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     """
     Generate a model 2d Gaussian with the given parameters.
@@ -707,7 +909,7 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     return amp*np.exp(exp)
 
 
-def ntwodgaussian(inpars):
+def ntwodgaussian_mpfit(inpars):
     """
     Return an array of values represented by multiple Gaussians as parametrized
     by params = [amp,x0,y0,major,minor,pa]{n}
@@ -736,6 +938,30 @@ def ntwodgaussian(inpars):
     return rfunc
 
 
+def ntwodgaussian_lmfit(params):
+    """
+    :param params: model parameters (can be multiple)
+    :return: a functiont that maps (x,y) -> model
+    """
+    def rfunc(x, y):
+        model=None
+        for i in range(params.components):
+            prefix = "c{0}_".format(i)
+            amp = params[prefix+'amp'].value
+            xo = params[prefix+'xo'].value
+            yo = params[prefix+'yo'].value
+            sx = params[prefix+'sx'].value
+            sy = params[prefix+'sy'].value
+            theta = params[prefix+'theta'].value
+            params[prefix+'theta'].value = theta_limit(theta)
+            if model is None:
+                model = elliptical_gaussian(y,x,amp,yo,xo,sx,sy,theta)
+            else:
+
+                model +=elliptical_gaussian(y,x,amp,yo,xo,sx,sy,theta)
+    return rfunc
+
+
 def do_mpfit(data, rmsimg, parinfo):
     """
     Fit multiple gaussian components to data using the information provided by parinfo.
@@ -751,7 +977,7 @@ def do_mpfit(data, rmsimg, parinfo):
 
     def model(p):
         """Return a map with a number of Gaussians determined by the input parameters."""
-        f = ntwodgaussian(p)
+        f = ntwodgaussian_mpfit(p)
         ans = f(*mask)
         return ans
 
@@ -766,7 +992,34 @@ def do_mpfit(data, rmsimg, parinfo):
     return mp, parinfo, (np.median(residual),np.std(residual))
 
 
-#load and save external files
+def do_lmfit(data, params):
+    """
+    Fit the model to the data
+    data may contain 'flagged' or 'masked' data with the value of np.NaN
+    input: data - pixel information
+           params - and lmfit.Model instance
+    return: fit results, modified model
+    """
+    # copy the params so as not to change the initial conditions
+    # in case we want to use them elsewhere
+    params = copy.deepcopy(params)
+
+    data = np.array(data)
+    mask = np.where(np.isfinite(data))
+
+    def residual(params,x,y,data=None):
+        f = ntwodgaussian_lmfit(params)
+        model = f(*mask)
+        if data is None:
+            return model
+        resid = (model-data[mask])
+        return resid
+
+    result = lmfit.minimize(residual,params, args=(y_mask,x_mask,data))#,Dfun=jacobian2d)
+    return result, params
+
+
+# load and save external files
 def load_aux_image(image, auxfile):
     """
     Load a fits file (bkg/rms/curve) and make sure that
@@ -919,7 +1172,6 @@ def load_catalog(filename):
 
 
 #writing table formats
-
 def check_table_formats(files):
     cont = True
     formats = get_table_formats()
@@ -1515,6 +1767,16 @@ def pa_limit(pa):
         pa -= 180
     return pa
 
+def theta_limit(theta):
+    """
+    Position angle is periodic with period 180\deg
+    Constrain pa such that -pi/2<theta<=pi/2
+    """
+    while theta <= -1*np.pi/2:
+        theta += np.pi
+    while theta > np.pi/2:
+        theta -= np.pi
+    return theta
 
 def gmean(indata):
     """
@@ -1775,7 +2037,7 @@ def fit_island(island_data):
     logging.debug("=====")
     logging.debug("Island ({0})".format(isle_num))
 
-    parinfo = estimate_parinfo(isle.pixels, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
+    parinfo = estimate_mpfit_parinfo(isle.pixels, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
                                max_summits=max_summits)
 
     logging.debug("Rms is {0}".format(np.shape(rms)))
@@ -2223,7 +2485,7 @@ def force_measure_flux(radec):
         xo = source_x - xmin
         yo = source_y - ymin
         params = [amp, xo, yo, pixbeam.a * fwhm2cc, pixbeam.b * fwhm2cc, pixbeam.pa]
-        gaussian_data = ntwodgaussian(params)(*np.indices(data.shape))
+        gaussian_data = ntwodgaussian_mpfit(params)(*np.indices(data.shape))
 
         # Calculate the "best fit" amplitude as the average of the implied amplitude
         # for each pixel. Error is stddev.
