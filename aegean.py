@@ -436,7 +436,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
         outerclip = innerclip
 
     # compute SNR image
-    snr = abs(data.pixels)/rmsimg
+    snr = abs(data)/rmsimg
     # mask of pixles that are above the outerclip
     a =  snr >= outerclip
     # segmentation a la scipy
@@ -452,7 +452,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
         xmin,xmax = f[i][0].start, f[i][0].stop
         ymin,ymax = f[i][1].start, f[i][1].stop
         if np.any(snr[xmin:xmax+1,ymin:ymax+1]>innerclip): # obey inner clip constraint
-            data_box = data.pixels[xmin:xmax+1,ymin:ymax+1]
+            data_box = data[xmin:xmax+1,ymin:ymax+1]
             data_box[np.where(snr[xmin:xmax+1,ymin:ymax+1] < outerclip)] = np.nan
             if domask and global_data.region is not None:
                 y,x = np.where(snr[xmin:xmax+1,ymin:ymax+1] >= outerclip)
@@ -611,11 +611,10 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
     else:
         if isnegative:
             #the summit should be able to include all pixels within the island not just those above innerclip
-            kappa_sigma = Island(np.where(curve > 0.5, np.where(data + outerclip * rmsimg < 0, data, np.nan), np.nan))
+            kappa_sigma = np.where(curve > 0.5, np.where(data + outerclip * rmsimg < 0, data, np.nan), np.nan)
         else:
-            kappa_sigma = Island(
-                np.where(-1 * curve > 0.5, np.where(data - outerclip * rmsimg > 0, data, np.nan), np.nan))
-        summits = gen_flood_wrap(kappa_sigma, np.ones(kappa_sigma.pixels.shape), 0, domask=False)
+            kappa_sigma = np.where(-1 * curve > 0.5, np.where(data - outerclip * rmsimg > 0, data, np.nan), np.nan)
+        summits = gen_flood_wrap(kappa_sigma, np.ones(kappa_sigma.shape), 0, domask=False)
 
     i = 0
     for summit, xmin, xmax, ymin, ymax in summits:
@@ -2108,7 +2107,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
 
     #we now work with the updated versions of the three images
     rmsimg = global_data.rmsimg
-    data = Island(global_data.data_pix)  #not a FitsImage
+    data = global_data.data_pix
     beam = global_data.beam
 
     logging.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a * 3600, beam.b * 3600, beam.pa))
