@@ -466,67 +466,6 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
                 logging.debug("Mask {0}".format(mask))
             yield data_box, xmin, xmax, ymin, ymax
 
-def gen_flood_wrap_dep(data, rmsimg, innerclip, outerclip=None, domask=False):
-    """
-    <a generator function>
-    Find all the sub islands in data.
-    Detect islands with innerclip.
-    Report islands with outerclip
-
-    type(data) = Island
-    return = [(pixels,xmin,ymin)[,(pixels,xmin,ymin)] ]
-    where xmin,ymin is the offset of the sub-island
-    """
-    if outerclip is None:
-        outerclip = innerclip
-    #somehow this avoids problems with multiple cores not working properly!?!?
-    #TODO figure out why this is so.
-    abspix = abs(data.pixels)
-
-    status = np.zeros(data.pixels.shape, dtype=np.uint8)
-    # Selecting PEAKED pixels
-    logging.debug("InnerClip: {0}".format(innerclip))
-
-    status[np.where(abspix / rmsimg > innerclip)] = flags.PEAKED
-    #logging.debug("status: {0}".format(status[1:5,1:5]))
-    logging.debug("Peaked pixels: {0}/{1}".format(np.sum(status), len(data.pixels.ravel())))
-    # making pixel list
-    ax, ay = np.where(abspix / rmsimg > innerclip)
-
-    #TODO: change this so that I can sort without having to decorate/undecorate
-    peaks = [(data.pixels[ax[i], ay[i]], ax[i], ay[i]) for i in range(len(ax))]
-
-    #ignore pixels outside the masking region
-    if global_data.region is not None and domask:
-        logging.debug("masking pixels")
-        yx = [[p[2], p[1]] for p in peaks]
-        ra, dec = global_data.wcs.wcs_pix2world(yx, 1).transpose()
-        mask = global_data.region.sky_within(ra, dec, degin=True)
-        peaks = [peaks[i] for i in xrange(len(mask)) if mask[i]]
-
-    if len(peaks) == 0:
-        logging.debug("There are no pixels above the clipping limit")
-        return
-    # sorting pixel list - strongest peak should be found first
-    peaks.sort(reverse=True)
-    if peaks[0][0] < 0:
-        peaks.reverse()
-    peaks = map(lambda x: x[1:], peaks)  #strip the flux data so we are left with just the positions
-    logging.debug("Most positive peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[0]], rmsimg[peaks[0]]))
-    logging.debug("Most negative peak {0}, SNR= {0}/{1}".format(data.pixels[peaks[-1]], rmsimg[peaks[-1]]))
-    bounds = (data.pixels.shape[0] - 1, data.pixels.shape[1] - 1)
-
-    snr = abspix / rmsimg >= outerclip
-    # starting image segmentation
-    for peak in peaks:
-        blob = flood(snr, status, bounds, peak)
-        #blob=flood(abspix,rmsimg,status,bounds,peak,cutoffratio=outerclip)
-        npix = len(blob)
-        if npix >= 1:  #islands with no pixels have length 1
-            new_isle, xmin, xmax, ymin, ymax = data.list2map(blob)
-            if new_isle is not None:
-                yield new_isle, xmin, xmax, ymin, ymax
-
 
 ##parameter estimates
 def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offsets=(0, 0), max_summits=None):
@@ -767,6 +706,7 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     exp *=-1./2
     return amp*np.exp(exp)
 
+
 def ntwodgaussian(inpars):
     """
     Return an array of values represented by multiple Gaussians as parametrized
@@ -796,26 +736,7 @@ def ntwodgaussian(inpars):
     return rfunc
 
 
-def twodgaussian(params, shape):
-    """
-    Build a (single) 2D Gaussian ellipse as parametrized by "params" for a region with "shape"
-        params - [amp, xo, yo, cx, cy, pa] where:
-                amp - amplitude
-                xo  - centre of Gaussian in X
-                yo  - centre of Gaussian in Y
-                cx  - width of Gaussian in X (sigma or c, not FWHM)
-                cy  - width of Gaussian in Y (sigma or c, not FWHM)
-                pa  - position angle of Gaussian, aka theta (radians clockwise)
-        shape - (y, x) dimensions of region
-    Returns a 2D numpy array with shape="shape"
-
-    Actually just calls ntwodgaussian!!
-    """
-    assert (len(shape) == 2)
-    return ntwodgaussian(params)(*np.indices(shape))
-
-
-def multi_gauss(data, rmsimg, parinfo):
+def do_mpfit(data, rmsimg, parinfo):
     """
     Fit multiple gaussian components to data using the information provided by parinfo.
     data may contain 'flagged' or 'masked' data with the value of np.NaN
@@ -1889,7 +1810,7 @@ def fit_island(island_data):
         residual = (None, None)
     else:
         #do the fitting
-        mp, info, residual = multi_gauss(isle.pixels, rms, parinfo)
+        mp, info, residual = do_mpfit(isle.pixels, rms, parinfo)
 
     logging.debug("Source 0 pa={0} [pixel coords]".format(mp.params[5]))
 
