@@ -746,6 +746,27 @@ def estimate_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offse
     return parinfo
 
 
+# Modelling functions
+def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
+    """
+    Generate a model 2d Gaussian with the given parameters.
+    Evaluate this model at the given locations x,y.
+
+    :param x,y: locations at which to calculate values
+    :param amp: amplitude of Gaussian
+    :param xo,yo: position of Gaussian
+    :param major,minor: axes (sigmas)
+    :param theta: position angle (radians) CCW from x-axis
+    :return: Gaussian function evaluated at x,y locations
+    """
+    sint, cost = math.sin(theta), math.cos(theta)
+    xxo = x-xo
+    yyo = y-yo
+    exp = (xxo*cost + yyo*sint)**2 / sx**2 \
+        + (xxo*sint - yyo*cost)**2 / sy**2
+    exp *=-1./2
+    return amp*np.exp(exp)
+
 def ntwodgaussian(inpars):
     """
     Return an array of values represented by multiple Gaussians as parametrized
@@ -754,24 +775,23 @@ def ntwodgaussian(inpars):
     major/minor are interpreted as being sigmas not FWHMs
     pa is in degrees
     """
-    if not len(inpars) % 6 == 0:
-        logging.error("inpars requires a multiple of 6 parameters")
-        logging.error("only {0} parameters supplied".format(len(inpars)))
-        sys.exit()
-    amp, xo, yo, major, minor, pa = zip(*np.array(inpars).reshape(len(inpars) / 6, 6))
-    #transform pa->-pa so that our angles are CW instead of CCW
-    rads = [np.radians(-p) for p in pa]
-    st = np.sin(rads) ** 2
-    ct = np.cos(rads) ** 2
-    s2t = np.sin([2 * r for r in rads])
-    a = [(ct[i] / major[i] ** 2 + st[i] / minor[i] ** 2) / 2 for i in xrange(len(amp))]
-    bb = [s2t[i] / 4 * (1 / minor[i] ** 2 - 1 / major[i] ** 2) for i in xrange(len(amp))]
-    c = [(st[i] / major[i] ** 2 + ct[i] / minor[i] ** 2) / 2 for i in xrange(len(amp))]
+    try:
+        params = np.array(inpars).reshape(len(inpars) / 6, 6)
+    except ValueError, e:
+        if 'size' in e.message:
+            logging.error("inpars requires a multiple of 6 parameters")
+            logging.error("only {0} parameters supplied".format(len(inpars)))
+        raise e
 
     def rfunc(x, y):
-        return sum(amp[i] * np.exp(
-            -1 * (a[i] * (x - xo[i]) ** 2 + 2 * bb[i] * (x - xo[i]) * (y - yo[i]) + c[i] * (y - yo[i]) ** 2)) for i in
-                   xrange(len(amp)))
+        result = None
+        for p in params:
+            amp, xo, yo, sx, sy, theta = p
+            if result is not None:
+                result += elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(theta))
+            else:
+                result = elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(theta))
+        return result
 
     return rfunc
 
