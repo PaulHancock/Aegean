@@ -939,11 +939,11 @@ def ntwodgaussian_mpfit(inpars):
     def rfunc(x, y):
         result = None
         for p in params:
-            amp, xo, yo, sx, sy, theta = p
+            amp, xo, yo, sx, sy, pa = p
             if result is not None:
-                result += elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(theta))
+                result += elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(pa))
             else:
-                result = elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(theta))
+                result =  elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(pa))
         return result
 
     return rfunc
@@ -955,7 +955,7 @@ def ntwodgaussian_lmfit(params):
     :return: a functiont that maps (x,y) -> model
     """
     def rfunc(x, y):
-        model=None
+        result=None
         for i in range(params.components):
             prefix = "c{0}_".format(i)
             amp = params[prefix+'amp'].value
@@ -964,11 +964,11 @@ def ntwodgaussian_lmfit(params):
             sx = params[prefix+'sx'].value
             sy = params[prefix+'sy'].value
             theta = params[prefix+'theta'].value
-            if model is None:
-                model = elliptical_gaussian(y,x,amp,yo,xo,sx,sy,theta)
+            if result is not None:
+                result += elliptical_gaussian(x,y,amp,xo,yo,sx,sy,theta)
             else:
-                model +=elliptical_gaussian(y,x,amp,yo,xo,sx,sy,theta)
-        return model
+                result =  elliptical_gaussian(x,y,amp,xo,yo,sx,sy,theta)
+        return result
     return rfunc
 
 
@@ -1022,7 +1022,7 @@ def do_lmfit(data, params):
         model = f(*mask)
         if data is None:
             return model
-        resid = (model-data[mask])
+        resid = model-data[mask]
         return resid
 
     result = lmfit.minimize(residual, params, args=(data,))#,Dfun=jacobian2d)
@@ -2115,8 +2115,9 @@ def fit_island_mpfit(island_data):
         source.island = isle_num
         source.source = j
 
-        print "MP ({0},{1})".format(isle_num,j)
-        print "amp, xo, yo,major, minor,theta",amp, xo, yo, major, minor, pa_limit(theta)
+        # print "MP ({0},{1})".format(isle_num,j)
+        # print "amp, xo, yo,major, minor,theta",amp, xo, yo, major, minor, pa_limit(theta)
+        #
         #take general flags from the island
         src_flags = is_flag
         #and specific flags from the source
@@ -2344,9 +2345,10 @@ def fit_island_lmfit(island_data):
         amp = model[prefix+'amp'].value
         src_flags |= model[prefix+'flags'].value
 
-        print "LM ({0},{1})".format(isle_num,j)
-        print "amp, xo, yo,major, minor,theta",amp, xo, yo, sx, sy, theta
-        #pixel pos within island +
+        # print "LM ({0},{1})".format(isle_num,j)
+        # print "amp, xo, yo,major, minor,theta",amp, xo, yo, sx, sy, pa_limit(np.degrees(theta))
+
+        # #pixel pos within island +
         # island offset within region +
         # region offset within image +
         # 1 for luck
@@ -2366,18 +2368,19 @@ def fit_island_lmfit(island_data):
         source.peak_flux = amp
 
         # position and shape
-        if sx > sy:
+        if sx >= sy:
             major = sx
             axial_ratio = sx/sy #abs(sx*global_data.img.pixscale[0] / (sy * global_data.img.pixscale[1]))
         else:
             major = sy
             axial_ratio = sy/sx #abs(sy*global_data.img.pixscale[1] / (sx * global_data.img.pixscale[0]))
-            theta = theta + np.pi/2
+            theta = theta - np.pi/2
 
-        (source.ra, source.dec, source.a, source.pa) = pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
+        # source.pa is returned in degrees
+        (source.ra, source.dec, source.a, source.pa) = pix2sky_vec((x_pix, y_pix), major * cc2fwhm, np.degrees(theta))
         source.a *= 3600  # arcseconds
-        source.b = source.a  / axial_ratio #pix2sky_vec((x_pix, y_pix), sy * cc2fwhm, theta+np.pi/2)[2]*3600
-        source.pa = pa_limit(np.degrees(source.pa))
+        source.b = source.a  / axial_ratio
+        source.pa = pa_limit(source.pa)
         #fix_shape(source)
 
         # if one of these values are nan then there has been some problem with the WCS handling
