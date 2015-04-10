@@ -521,14 +521,8 @@ def estimate_mpfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         is_flag = flags.WCSERR
         pixbeam = Beam(1, 1, 0)
 
-    #The position cannot be more than a pixel beam from the initial location
-    #Use abs so that these distances are always positive
-    # xo_lim=max( abs(pixbeam.a*np.cos(np.radians(pixbeam.pa))), abs(pixbeam.b*np.sin(np.radians(pixbeam.pa))))
-    # yo_lim=max( abs(pixbeam.a*np.sin(np.radians(pixbeam.pa))), abs(pixbeam.b*np.cos(np.radians(pixbeam.pa))))
-
     #set a circular limit based on the size of the pixbeam
-    xo_lim = int(
-        round(0.5 * np.hypot(pixbeam.a * np.cos(np.radians(pixbeam.pa)), pixbeam.b * np.sin(np.radians(pixbeam.pa)))))
+    xo_lim = 0.5*np.hypot(pixbeam.a, pixbeam.b)
     yo_lim = xo_lim
 
     if debug_on:
@@ -571,7 +565,7 @@ def estimate_mpfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         summits = gen_flood_wrap(kappa_sigma, np.ones(kappa_sigma.shape), 0, domask=False)
 
     i = 0
-    for summit, xmin, xmax, ymin, ymax in summits:
+    for summit, xmin, xmax, ymin, ymax in sorted(summits, key=lambda x: np.nanmax(-1.*abs(x[0]))):
         summit_flag = is_flag
         if debug_on:
             logging.debug(
@@ -589,7 +583,7 @@ def estimate_mpfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         yo = ypeak[0] + ymin
 
         #check to ensure that this summit is brighter than innerclip
-        snr = abs(data[xo, yo] / rmsimg[xo, yo])
+        snr = np.nanmax(abs(data[xmin:xmax+1,ymin:ymax+1] / rmsimg[xmin:xmax+1,ymin:ymax+1]))
         if snr < innerclip:
             logging.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
             continue
@@ -780,7 +774,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
     params = lmfit.Parameters()
     i = 0
     # add summits in reverse order of peak SNR
-    for summit, ymin, ymax, xmin, xmax in sorted(summits, key=lambda x: np.nanmax(-1.*abs(x[0]))):
+    for summit, xmin, xmax, ymin, ymax in sorted(summits, key=lambda x: np.nanmax(-1.*abs(x[0]))):
         summit_flag = is_flag
         if debug_on:
             logging.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape, ymin, ymax, xmin, xmax, i))
@@ -799,7 +793,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         # Summits are allowed to include pixels that are between the outer and inner clip
         # This means that sometimes we get a summit that has all it's pixels below the inner clip
         # So we test for that here.
-        snr = np.nanmax(abs(data[ymin:ymax+1,xmin:xmax+1] / rmsimg[ymin:ymax+1,xmin:xmax+1]))
+        snr = np.nanmax(abs(data[xmin:xmax+1,ymin:ymax+1] / rmsimg[xmin:xmax+1,ymin:ymax+1]))
         if snr < innerclip:
             logging.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
             continue
@@ -809,26 +803,26 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         # TODO: the 5% should depend on the beam sampling
         # when innerclip is 400 this becomes rather stupid
         if amp > 0:
-            amp_min, amp_max = 0.95 * min(outerclip * rmsimg[yo, xo], amp), amp * 1.05 + innerclip * rmsimg[yo, xo]
+            amp_min, amp_max = 0.95 * min(outerclip * rmsimg[xo, yo], amp), amp * 1.05 + innerclip * rmsimg[xo, yo]
         else:
-            amp_max, amp_min = 0.95 * max(-outerclip * rmsimg[yo, xo], amp), amp * 1.05 - innerclip * rmsimg[yo, xo]
+            amp_max, amp_min = 0.95 * max(-outerclip * rmsimg[xo, yo], amp), amp * 1.05 - innerclip * rmsimg[xo, yo]
 
         if debug_on:
             logging.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
 
-        yo_min, yo_max = max(ymin, yo - xo_lim), min(ymax, yo + yo_lim)
+        yo_min, yo_max = max(ymin, yo - yo_lim), min(ymax, yo + yo_lim)
         if yo_min == yo_max:  #if we have a 1d summit then allow the position to vary by +/-0.5pix
             yo_min, yo_max = yo_min - 0.5, yo_max + 0.5
 
-        xo_min, xo_max = max(xmin, xo - yo_lim), min(xmax, xo + yo_lim)
+        xo_min, xo_max = max(xmin, xo - xo_lim), min(xmax, xo + xo_lim)
         if xo_min == xo_max:  #if we have a 1d summit then allow the position to vary by +/-0.5pix
             xo_min, xo_max = xo_min - 0.5, xo_max + 0.5
 
         #TODO: The limits on sx,sy work well for circular beams or unresolved sources
         #for elliptical beams *and* resolved sources this isn't good and should be redone
 
-        xsize = ymax - ymin + 1
-        ysize = xmax - xmin + 1
+        xsize = xmax - xmin + 1
+        ysize = ymax - ymin + 1
 
         #initial shape is the pix beam
         sx = pixbeam.a * fwhm2cc
@@ -850,7 +844,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         if sy_min == sy_max or sx_min == sx_max: # this will never happen
             summit_flag |= flags.FIXED2PSF
 
-        theta = theta_limit(pixbeam.pa)
+        theta = theta_limit(np.radians(pixbeam.pa))
         flag = summit_flag
 
         #check to see if we are going to fit this source
@@ -866,8 +860,8 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         if debug_on:
             logging.debug(" - var val min max | min max")
             logging.debug(" - amp {0} {1} {2} ".format(amp, amp_min, amp_max))
-            logging.debug(" - xo {0} {1} {2} ".format(yo, yo_min, yo_max))
-            logging.debug(" - yo {0} {1} {2} ".format(xo, xo_min, xo_max))
+            logging.debug(" - xo {0} {1} {2} ".format(xo, xo_min, xo_max))
+            logging.debug(" - yo {0} {1} {2} ".format(yo, yo_min, yo_max))
             logging.debug(" - sx {0} {1} {2} | {3} {4}".format(sx, sx_min, sx_max, sx_min * cc2fwhm,
                                                                   sx_max * cc2fwhm))
             logging.debug(" - sy {0} {1} {2} | {3} {4}".format(sy, sy_min, sy_max, sy_min * cc2fwhm,
@@ -879,15 +873,15 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         # TODO: incorporate the circular constraint
         prefix = "c{0}_".format(i)
         params.add(prefix+'amp',value=amp, min=amp_min, max=amp_max, vary= not maxxed)
-        params.add(prefix+'yo',value=yo, min=yo_min, max=yo_max, vary= not maxxed)
         params.add(prefix+'xo',value=xo, min=xo_min, max=xo_max, vary= not maxxed)
+        params.add(prefix+'yo',value=yo, min=yo_min, max=yo_max, vary= not maxxed)
         if summit_flag & flags.FIXED2PSF > 0:
             psf_vary = False
         else:
             psf_vary = not maxxed
         params.add(prefix+'sx', value=sx, min=sx_min, max=sx_max, vary=psf_vary)
         params.add(prefix+'sy', value=sy, min=sy_min, max=sy_max, vary=psf_vary)
-        params.add(prefix+'theta', value=theta, min=-2.*np.pi, max=2*np.pi , vary=psf_vary)
+        params.add(prefix+'theta', value=theta, min=-1.*np.pi, max=np.pi , vary=psf_vary)
         params.add(prefix+'flags',value=summit_flag, vary=False)
 
         i += 1
@@ -939,11 +933,11 @@ def ntwodgaussian_mpfit(inpars):
     def rfunc(x, y):
         result = None
         for p in params:
-            amp, xo, yo, sx, sy, pa = p
+            amp, xo, yo, major, minor, pa = p
             if result is not None:
-                result += elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(pa))
+                result += elliptical_gaussian(x,y,amp,xo,yo,major,minor,np.radians(pa))
             else:
-                result =  elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(pa))
+                result =  elliptical_gaussian(x,y,amp,xo,yo,major,minor,np.radians(pa))
         return result
 
     return rfunc
