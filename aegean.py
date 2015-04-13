@@ -26,7 +26,12 @@ from scipy.special import erf
 from scipy.ndimage import label, find_objects
 
 # fitting
-import lmfit
+try:
+    import lmfit
+except ImportError:
+    lmfit_available = False
+    lmfit = None
+
 from AegeanTools.mpfit import mpfit
 
 # the glory of astropy
@@ -2599,9 +2604,9 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
         # and submit to queue for subprocesses. Passing a group of islands is more
         # efficient than passing single islands to the subprocesses.
         if cores == 1:
-            res = fit_island_lmfit(island_data)
+            #res = fit_island_lmfit(island_data)
             res2 = fit_island_mpfit(island_data)
-            queue.append(res)
+            #queue.append(res)
             queue.append(res2)
         else:
             island_group.append(island_data)
