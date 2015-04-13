@@ -88,7 +88,7 @@ import multiprocessing
 __author__ = 'Paul Hancock'
 
 # Aegean version [Updated via script]
-__version__ = 'v1.9rc1-156-g1efb0ab'
+__version__ = 'v1.9rc1-157-g563a7b9'
 __date__ = '2015-04-13'
 
 header = """#Aegean version {0}
@@ -1206,11 +1206,36 @@ def check_table_formats(files):
     return
 
 
+def show_formats():
+    """
+    Print a list of table formats that are supported and the extensions that they are assumed to have
+    :return:
+    """
+    fmts={
+        "ann":"Kvis annotation",
+        "reg":"DS9 regions file",
+        "fits":"FITS Binary Table",
+        "hdf5":"HDF-5 format",
+        "csv":"Comma separated values",
+        "tab":"tabe separated values",
+        "tex":"LaTeX table format",
+        "html":"HTML table",
+        "vot":"VO-Table",
+        "xml":"VO-Table",
+        "db":"Sqlite3 database",
+        "sqlite":"Sqlite3 database"}
+    supported = get_table_formats()
+    print "Extension |     Description       | Supported?"
+    for k in sorted(fmts.keys()):
+        print "{0:10s} {1:24s} {2}".format(k, fmts[k], k in supported)
+    return
+
+
 def get_table_formats():
     """
     Return a list of file extensions that are supported (mapped to an output)
     """
-    fmts = ['ann', 'reg','fits']
+    fmts = ['ann', 'reg', 'fits']
     if votables_supported:
         fmts.extend(['vo', 'vot', 'xml'])
     else:
@@ -1301,6 +1326,7 @@ def write_table(filename, catalog, fmt=None):
         writer(new_name, simples, fmt)
         logging.info("wrote {0}".format(new_name))
     return
+
 
 def writeFITSTable(filename,table):
     """
@@ -2941,6 +2967,8 @@ if __name__ == "__main__":
                       help="Destination of Aegean catalog output. [default: stdout]")
     parser.add_option("--table", dest='tables', default=None,
                       help="Additional table outputs, format inferred from extension. [default: none]")
+    parser.add_option("--tformats",dest='table_formats', action="store_true",default=False,
+                      help='Show a list of table formats supported in this install, and their extensions')
     parser.add_option("--forcerms", dest='rms', type='float', default=None,
                       help="Assume a single image noise of rms, and a background of zero. [default: false]")
     parser.add_option("--noise", dest='noiseimg', default=None,
@@ -2993,6 +3021,10 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is Aegean {0}-({1})".format(__version__,__date__))
 
+    if options.table_formats:
+        show_formats()
+        sys.exit(0)
+
     if options.file_versions:
         logging.info("Numpy {0} from {1} ".format(np.__version__, np.__file__))
         logging.info("Scipy {0} from {1}".format(scipy.__version__, scipy.__file__))
@@ -3002,7 +3034,7 @@ if __name__ == "__main__":
     #print help if the user enters no options or filename
     if len(args) == 0:
         parser.print_help()
-        sys.exit()
+        sys.exit(0)
 
     #check that a valid filename was entered
     filename = args[0]
