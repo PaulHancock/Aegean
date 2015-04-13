@@ -36,8 +36,11 @@ from AegeanTools.mpfit import mpfit
 
 # the glory of astropy
 import astropy
+
+# output table formats
 from astropy.table.table import Table
 from astropy.io import ascii
+from astropy.io import fits
 
 try:
     # the availability of these will depend on the version of astropy
@@ -47,6 +50,13 @@ try:
     votables_supported = True
 except ImportError:
     votables_supported = False
+
+try:
+    import h5py
+    hdf5_supported = True
+except ImportError:
+    hdf5_supported = False
+
 import sqlite3
 
 # need Region in the name space in order to be able to unpickle it
@@ -78,7 +88,7 @@ import multiprocessing
 __author__ = 'Paul Hancock'
 
 # Aegean version [Updated via script]
-__version__ = 'v1.9rc1-155-gf3408b0'
+__version__ = 'v1.9rc1-156-g1efb0ab'
 __date__ = '2015-04-13'
 
 header = """#Aegean version {0}
@@ -1200,7 +1210,7 @@ def get_table_formats():
     """
     Return a list of file extensions that are supported (mapped to an output)
     """
-    fmts = ['ann', 'reg']
+    fmts = ['ann', 'reg','fits']
     if votables_supported:
         fmts.extend(['vo', 'vot', 'xml'])
     else:
@@ -1209,6 +1219,10 @@ def get_table_formats():
         logging.info("Ascii tables are not supported with this version of Astropy ({0})".format(astropy.__version__))
     else:
         fmts.extend(['csv', 'tab', 'tex', 'html'])
+    if hdf5_supported:
+        fmts.append('hdf5')
+    else:
+        logging.info("HDF5 is not supported, by your environment")
     #assume this is always possible -> though it may not be on some systems
     fmts.extend(['db', 'sqlite'])
     return fmts
@@ -1231,6 +1245,8 @@ def save_catalog(filename, catalog):
         writeVOTable(filename, catalog)
     elif extension in ['db', 'sqlite']:
         writeDB(filename, catalog)
+    elif extension in ['hdf5','fits']:
+        write_table(filename,catalog,extension)
     elif extension in ascii_table_formats.keys():
         write_table(filename, catalog, fmt=ascii_table_formats[extension])
     else:
@@ -1247,18 +1263,23 @@ def write_table(filename, catalog, fmt=None):
     def writer(filename, catalog, fmt=None):
         # construct a dict of the data
         # this method preserves the data types in the VOTable
+        meta = {'AegeanVersion':"{0}-({1})".format(__version__,__date__)}
         tab_dict = {}
         for name in catalog[0].names:
             tab_dict[name] = [getattr(c, name, None) for c in catalog]
-        t = Table(tab_dict)
+        t = Table(tab_dict,meta=meta)
         # re-order the columns
         t = t[[n for n in catalog[0].names]]
         if fmt is not None:
-            if fmt.lower() in ["vot", "vo", "xml"]:
+            if fmt in ["vot", "vo", "xml"]:
                 vot = from_table(t)
                 # description of this votable
                 vot.description = "Aegean version {0}-({1})".format(__version__,__date__)
                 writetoVO(vot, filename)
+            elif fmt in ['hdf5']:
+                t.write(filename,path='data',overwrite=True)
+            elif fmt in ['fits']:
+                writeFITSTable(filename,t)
             else:
                 ascii.write(t, filename, fmt)
         else:
@@ -1280,6 +1301,39 @@ def write_table(filename, catalog, fmt=None):
         writer(new_name, simples, fmt)
         logging.info("wrote {0}".format(new_name))
     return
+
+def writeFITSTable(filename,table):
+    """
+
+    :param filename:
+    :param table:
+    :return:
+    """
+    def FITSTableType(val):
+        """
+        Return the FITSTable type corresponding to each named parameter in obj
+        """
+        if isinstance(val, bool):
+            types = "L"
+        elif isinstance(val, int):
+            types = "J"
+        elif isinstance(val, (float, np.float32)):  # float32 is bugged and claims not to be a float
+            types = "E"
+        elif isinstance(val, (str, unicode)):
+            types = "{0}A".format(len(val))
+        else:
+            logging.warn("Column {0} is of unknown type {1}".format(val, type(val)))
+            logging.warn("Using 5A")
+            types = "5A"
+        return types
+
+    cols = []
+    for name in table.colnames:
+        cols.append(fits.Column(name=name, format=FITSTableType(table[name][0]), array=table[name]))
+    cols = fits.ColDefs(cols)
+    tbhdu = fits.BinTableHDU.from_columns(cols)
+    tbhdu.header['HISTORY'] = "Aegean {0}".format(__version__)
+    tbhdu.writeto(filename, clobber=True)
 
 
 def writeVOTable(filename, catalog):
