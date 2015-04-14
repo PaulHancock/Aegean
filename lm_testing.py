@@ -292,13 +292,13 @@ def test1d():
 
     smoothing = 1.5
     # setup the fitting
-    params = lmfit.Parameters()
-    params.add('amp',value=1, min=0.5, max=2)
-    params.add('cen',value=1.*nx/2+0.2, min= nx/4., max = 3.*nx/4)
-    params.add('sigma', value=1*smoothing, min=0.5*smoothing, max=2*smoothing)
-
-    signal = gaussian(x,params['amp'].value,params['cen'].value,params['sigma'].value)
-    snr = 1
+    # params = lmfit.Parameters()
+    # params.add('amp',value=1, min=0.5, max=2)
+    # params.add('cen',value=1.*nx/2+0.2, min= nx/4., max = 3.*nx/4)
+    # params.add('sigma', value=1*smoothing, min=0.5*smoothing, max=2*smoothing)
+    #
+    # signal = gaussian(x,params['amp'].value,params['cen'].value,params['sigma'].value)
+    snr = 10
 
     diffs_nocorr = []
     errs_nocorr = []
@@ -306,12 +306,21 @@ def test1d():
     errs_corr = []
     crb_corr = []
 
-    for i in xrange(100):
-        np.random.seed(1234567+i)
+    for j in xrange(3):
+
+        params = lmfit.Parameters()
+        params.add('amp',value=1, min=0.5, max=2)
+        params.add('cen',value=1.*nx/2)
+        params.add('sigma', value=1.*smoothing)
+
+        signal = gaussian(x,params['amp'].value,params['cen'].value,params['sigma'].value)
+        np.random.seed(1234567+j)
         noise = np.random.random(nx)
         noise = gaussian_filter1d(noise, sigma=smoothing)
         noise -= np.mean(noise)
         noise /= np.std(noise)*snr
+
+
 
         data = signal+noise
         result,fit_params = do_lmfit(data, params, D=1)
@@ -336,23 +345,29 @@ def test1d():
     errs_corr = np.array(errs_corr)
     crb_corr = np.array(crb_corr)
 
-    many = i>10
+    many = j>10
 
     if not many:
         model = gaussian(x, fit_params['amp'].value, fit_params['cen'].value, fit_params['sigma'].value)
+        corr_model = gaussian(x,corr_fit_params['amp'].value, corr_fit_params['cen'].value, corr_fit_params['sigma'].value)
         print "init ",
         print_par(params)
-        print "final",
+        print "model",
         print_par(fit_params)
+        print "corr_model",
+        print_par(corr_fit_params)
+
 
         from matplotlib import pyplot
         fig=pyplot.figure(1)
-        ax = fig.add_subplot(111)
-        ax.plot(x,signal,'bo',label='Signal')
-        ax.plot(x,noise,'k--',label='Noise')
-        ax.plot(x,data,'r-',label="Data")
-        ax.plot(x,model,'g-',label="Model")
-        ax.legend()
+        for k, m in enumerate([model,corr_model]):
+            ax = fig.add_subplot(1,2,k+1)
+            ax.plot(x,signal,'bo',label='Signal')
+            ax.plot(x,noise,'k--',label='Noise')
+            ax.plot(x,data,'r-',label="Data")
+            ax.plot(x,m,'g-',label="Model")
+            ax.plot(x,data-m,'go',label="Data-Model")
+            ax.legend()
         pyplot.show()
     else:
         from matplotlib import pyplot
@@ -388,61 +403,143 @@ def test1d():
 
 
 def test2d():
-    dxy = 20
-    dim = np.linspace(0,5,dxy)
-    x,y = np.meshgrid(dim,dim)
-    ztrue = two_d_gaussian(x,y, 1, 2.5, 2.5, 3, 1, 0)
-    z = ztrue + 0.4*(0.5-np.random.random((dxy,dxy)))
-    z[:10,13:14]=np.nan
-    
-    # convert 2d data into 1d lists, masking out nans in the process
-    data, mask, shape = ravel_nans(z)
-    x = np.ravel(x[mask])
-    y = np.ravel(y[mask])
-    # z = np.ravel(z)
-    # x = np.ravel(x)
-    # y = np.ravel(y)
+    nx = 10
+    ny = 12
+    x = np.arange(nx)
+    y = np.arange(ny)
 
-    # setup the fitting
-    g1 = lmfit.Model(two_d_gaussian,independent_vars=['x','y']) 
-    g1.set_param_hint('amp',value=1)
-    g1.set_param_hint('xo',value=1) 
-    g1.set_param_hint('yo',value=1)
-    g1.set_param_hint('major', value=2, min=1, max=4)
-    g1.set_param_hint('minor', value=1, min=0.5, max=3)
-    g1.set_param_hint('pa', value = 0 , min=-math.pi, max=math.pi)
+    smoothing = 1.5
 
-    #do the fit
-    gmod = g1 + None
-    params = gmod.make_params()
-    result = gmod.fit(data,x=x,y=y,params=params)
+    snr = 10
 
-    print result.fit_report()
+    diffs_nocorr = []
+    errs_nocorr = []
+    diffs_corr = []
+    errs_corr = []
+    crb_corr = []
 
-    # convert the 1d arrays back into 2d arrays, preserving nans
-    z = unravel_nans(data,mask,shape)
-    ff = result.best_fit.copy()
-    ff = unravel_nans(ff,mask,shape)
-    # z = z.reshape((dxy,dxy))
-    # ff = ff.reshape((dxy,dxy))
+    for j in xrange(3):
 
-    # plot the three data sets
-    from matplotlib import pyplot
-    fig=pyplot.figure()
-    kwargs = {'interpolation':'nearest','cmap':pyplot.cm.cubehelix}
-    ax = fig.add_subplot(2,2,1)
-    ax.imshow(ztrue,**kwargs)
-    ax.set_title('True')
+        params = lmfit.Parameters()
+        params.add('amp', value=1, min=0.5, max=2)
+        params.add('xo', value=1.*nx/2)
+        params.add('yo', value=1.*ny/2)
+        params.add('sx', value=smoothing)
+        params.add('sy', value=smoothing)
+        params.add('theta',value=0)
 
-    ax = fig.add_subplot(2,2,2)
-    ax.imshow(z,**kwargs)
-    ax.set_title('Data')
+        signal = elliptical_gaussian(x, y,
+                                     params['amp'].value,
+                                     params['xo'].value,
+                                     params['yo'].value,
+                                     params['sx'].value,
+                                     params['sy'].value,
+                                     params['theta'].value)
+        np.random.seed(1234567+j)
+        noise = np.random.random(nx,ny)
+        noise = gaussian_filter(noise, sigma=smoothing)
+        noise -= np.mean(noise)
+        noise /= np.std(noise)*snr
 
-    ax = fig.add_subplot(2,2,3)
-    ax.imshow(ff,**kwargs)
-    ax.set_title('Fit')
+        data = signal + noise
+        result, fit_params = do_lmfit(data,params,D=2)
+        C = Cmatrix2d(x,y,smoothing,smoothing,0)
+        B = Bmatrix(C)
+        result,corr_fit_params = do_lmfit(data, params, D=2, B=B)
 
-    pyplot.show()
+        if np.all( [fit_params[i].stderr >0 for i in fit_params.valuesdict().keys()]):
+            diffs_nocorr.append([ params[i].value -fit_params[i].value for i in fit_params.valuesdict().keys()])
+            errs_nocorr.append( [fit_params[i].stderr for i in fit_params.valuesdict().keys()])
+
+        # print_par(corr_fit_params)
+        if np.all( [corr_fit_params[i].stderr >0 for i in corr_fit_params.valuesdict().keys()]):
+            diffs_corr.append([ params[i].value -corr_fit_params[i].value for i in corr_fit_params.valuesdict().keys()])
+            errs_corr.append( [corr_fit_params[i].stderr for i in corr_fit_params.valuesdict().keys()])
+
+    diffs_nocorr = np.array(diffs_nocorr)
+    errs_nocorr = np.array(errs_nocorr)
+    diffs_corr = np.array(diffs_corr)
+    errs_corr = np.array(errs_corr)
+    crb_corr = np.array(crb_corr)
+
+    many = j>10
+
+    if not many:
+        model =  elliptical_gaussian(x, y,
+                                     fit_params['amp'].value,
+                                     fit_params['xo'].value,
+                                     fit_params['yo'].value,
+                                     fit_params['sx'].value,
+                                     fit_params['sy'].value,
+                                     fit_params['theta'].value)
+        corr_model = elliptical_gaussian(x, y,
+                                     corr_fit_params['amp'].value,
+                                     corr_fit_params['xo'].value,
+                                     corr_fit_params['yo'].value,
+                                     corr_fit_params['sx'].value,
+                                     corr_fit_params['sy'].value,
+                                     corr_fit_params['theta'].value)
+        print "init ",
+        print_par(params)
+        print "model",
+        print_par(fit_params)
+        print "corr_model",
+        print_par(corr_fit_params)
+
+
+        from matplotlib import pyplot
+        fig=pyplot.figure(1)
+        kwargs = {'interpolation':'nearest','cmap':pyplot.cm.cubehelix,'vmin':-0.1,'vmax':1}
+
+        ax = fig.add_subplot(2,2,1)
+        ax.imshow(signal,**kwargs)
+        ax.set_title('True')
+
+        ax = fig.add_subplot(2,2,2)
+        ax.imshow(data,**kwargs)
+        ax.set_title('Data')
+
+        ax = fig.add_subplot(2,2,3)
+        ax.imshow(model,**kwargs)
+        ax.set_title('Model')
+
+        ax = fig.add_subplot(2,2,4)
+        ax.imshow(corr_model,**kwargs)
+        ax.set_title('Corr_Model')
+
+        pyplot.show()
+    else:
+        from matplotlib import pyplot
+        fig = pyplot.figure(2)
+        ax = fig.add_subplot(121)
+        ax.plot(diffs_nocorr[:,0], label='amp')
+        ax.plot(diffs_nocorr[:,1], label='cen')
+        ax.plot(diffs_nocorr[:,2], label='sigma')
+        ax.set_xlabel("No Corr")
+        ax.legend()
+
+        ax = fig.add_subplot(122)
+        ax.plot(diffs_corr[:,0], label='amp')
+        ax.plot(diffs_corr[:,1], label='cen')
+        ax.plot(diffs_corr[:,2], label='sigma')
+        ax.set_xlabel("Corr")
+        ax.legend()
+
+        print "-- no corr --"
+        for i,val in enumerate(fit_params.valuesdict().keys()):
+            print "{0}: diff {1:6.4f}+/-{2:6.4f}, mean(err) {3}".format(val,np.mean(diffs_nocorr[:,i]), np.std(diffs_nocorr[:,i]), np.mean(errs_nocorr[:,i]))
+
+        print "--  corr --"
+        for i,val in enumerate(corr_fit_params.valuesdict().keys()):
+            print "{0}: diff {1:6.4f}+/-{2:6.4f}, mean(err) {3}, mean(crb_err) {4}".format(val,np.mean(diffs_corr[:,i]),np.std(diffs_corr[:,i]), np.mean(errs_corr[:,i]),np.mean(crb_corr[:,i]))
+        # jac = jacobian(corr_fit_params,x)
+        # print_mat(jac)
+        # print_mat(C)
+        # print_mat(B)
+        # print CRB_errs(jac,C)
+        # print CRB_errs(jac,C,B)
+        pyplot.show()
+
 
 def test2d2():
     dxy = 20
@@ -1456,4 +1553,5 @@ def make_data():
 
 
 if __name__ == '__main__':
-    test1d()
+    # test1d()
+    test2d()
