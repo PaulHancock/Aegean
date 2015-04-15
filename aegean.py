@@ -19,6 +19,10 @@ import numpy as np
 import math
 import copy
 
+# TODO: Not all of these modules are needed for every instance of Aegean.
+# see if there is a way to only import the things that I need.
+# this should increase load speed, and reduce complaints from modules that are not being used.
+
 # scipy things
 import scipy
 from scipy import ndimage as ndi
@@ -43,10 +47,8 @@ from astropy.io import ascii
 from astropy.io import fits
 
 try:
-    # the availability of these will depend on the version of astropy
     from astropy.io.votable import from_table, parse_single_table
     from astropy.io.votable import writeto as writetoVO
-
     votables_supported = True
 except ImportError:
     votables_supported = False
@@ -1247,7 +1249,7 @@ def get_table_formats():
     if hdf5_supported:
         fmts.append('hdf5')
     else:
-        logging.info("HDF5 is not supported, by your environment")
+        logging.info("HDF5 is not supported by your environment")
     #assume this is always possible -> though it may not be on some systems
     fmts.extend(['db', 'sqlite'])
     return fmts
