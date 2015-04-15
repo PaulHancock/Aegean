@@ -80,9 +80,9 @@ def ntwodgaussian_lmfit(params):
             sy = params[prefix+'sy'].value
             theta = params[prefix+'theta'].value
             if result is not None:
-                result += elliptical_gaussian(x,y,amp,xo,yo,sx,sy,theta)
+                result += elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(theta))
             else:
-                result =  elliptical_gaussian(x,y,amp,xo,yo,sx,sy,theta)
+                result =  elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(theta))
         return result
     return rfunc
 
@@ -417,17 +417,16 @@ def test2d():
     errs_corr = []
     crb_corr = []
 
-
     nj = 6
     for j in xrange(nj):
 
         params = lmfit.Parameters()
         params.add('amp', value=1, min=0.5, max=2)
-        params.add('xo', value=1.*nx/2)
+        params.add('xo', value=1.*nx/2+j/6.)
         params.add('yo', value=1.*ny/2)
         params.add('sx', value=2*smoothing)
         params.add('sy', value=smoothing)
-        params.add('theta',value=j*np.pi/4.,min=-2*np.pi,max=2*np.pi)
+        params.add('theta',value=np.pi/4.,min=-2*np.pi,max=2*np.pi)
         params.components=1
 
         signal = elliptical_gaussian(x, y,
@@ -560,75 +559,25 @@ def test2d():
         pyplot.show()
 
 
-def test2d2():
-    dxy = 20
-    dim = np.linspace(0,5,dxy)
-    x,y = np.meshgrid(dim,dim)
-    ztrue = two_d_gaussian(x,y, 1, 1, 1, 3, 1, 0) + two_d_gaussian(x,y, 1,3,3,1,1,0)
-    z = ztrue + 0.4*(0.5-np.random.random((dxy,dxy)))
-    z[:10,13:14]=np.nan
-    
-    # convert 2d data into 1d lists, masking out nans in the process
-    data, mask, shape = ravel_nans(z)
-    x = np.ravel(x[mask])
-    y = np.ravel(y[mask])
+def test2d_load():
+    from astropy.io import fits
+    from aegean import do_lmfit
+    data = fits.open('../lm_dev/test.fits')[0].data
+    params = lmfit.Parameters()
+    params.add('c0_amp', value=8)
+    params.add('c0_xo', value=3)
+    params.add('c0_yo', value=3)
+    params.add('c0_sx', value=2.01)
+    params.add('c0_sy', value=2)
+    params.add('c0_theta',value=0)
+    params.components=1
 
-    # setup the fitting
-    g1 = lmfit.Model(two_d_gaussian,independent_vars=['x','y'],prefix="c1_") 
-    g1.set_param_hint('amp',value=1)
-    g1.set_param_hint('xo',value=1.2) 
-    g1.set_param_hint('yo',value=1)
-    g1.set_param_hint('major', value=2, min=1, max=4)
-    g1.set_param_hint('minor', value=1, min=0.5, max=3)
-    g1.set_param_hint('pa', value = 0 , min=-math.pi, max=math.pi)
+    result, fit_params = do_lmfit(data,params)
+    print result.residual
+    print np.mean(result.residual), np.std(result.residual)
+    print_par(fit_params)
 
-    g2 = lmfit.Model(two_d_gaussian,independent_vars=['x','y'],prefix="c2_") 
-    g2.set_param_hint('amp',value=1)
-    g2.set_param_hint('xo',value=3) 
-    g2.set_param_hint('yo',value=3.1)
-    g2.set_param_hint('major', value=2, min=0.5, max=2)
-    g2.set_param_hint('minor', value=1, min=0.5, max=2)
-    g2.set_param_hint('pa', value = 0 , min=-math.pi, max=math.pi)
 
-    #do the fit
-    gmod = reduce(lambda x,y: x+y,[g1+g2])
-    params = gmod.make_params()
-    result = gmod.fit(data,x=x,y=y,params=params)
-
-    print result.fit_report()
-    print params.valuesdict().keys()
-    print result.values.keys()
-
-    sys.exit()
-
-    # convert the 1d arrays back into 2d arrays, preserving nans
-    z = unravel_nans(data,mask,shape)
-    ff = result.best_fit.copy()
-    ff = unravel_nans(ff,mask,shape)
-    # z = z.reshape((dxy,dxy))
-    # ff = ff.reshape((dxy,dxy))
-
-    # plot the three data sets
-    from matplotlib import pyplot
-    fig=pyplot.figure()
-    kwargs = {'interpolation':'nearest','cmap':pyplot.cm.cubehelix,'vmin':-0.1,'vmax':1}
-    ax = fig.add_subplot(2,2,1)
-    ax.imshow(ztrue,**kwargs)
-    ax.set_title('True')
-
-    ax = fig.add_subplot(2,2,2)
-    ax.imshow(z,**kwargs)
-    ax.set_title('Data')
-
-    ax = fig.add_subplot(2,2,3)
-    ax.imshow(ff,**kwargs)
-    ax.set_title('Fit')
-
-    ax = fig.add_subplot(2,2,4)
-    ax.imshow(ff-ztrue,**kwargs)
-    ax.set_title('Fit - True')
-
-    pyplot.show()
 
 # @profile
 def test_lm(data):
@@ -1573,4 +1522,4 @@ def make_data():
 
 if __name__ == '__main__':
     # test1d()
-    test2d()
+    test2d_load()
