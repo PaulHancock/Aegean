@@ -72,7 +72,7 @@ def ntwodgaussian_lmfit(params):
     def rfunc(x, y):
         result=None
         for i in range(params.components):
-            prefix = "c{0}_".format(i)
+            prefix = ""#"c{0}_".format(i)
             amp = params[prefix+'amp'].value
             xo = params[prefix+'xo'].value
             yo = params[prefix+'yo'].value
@@ -405,12 +405,11 @@ def test1d():
 def test2d():
     nx = 10
     ny = 12
-    x = np.arange(nx)
-    y = np.arange(ny)
+    x,y = np.where(np.ones((nx,ny))==1)
 
     smoothing = 1.5
 
-    snr = 10
+    snr = 1000
 
     diffs_nocorr = []
     errs_nocorr = []
@@ -418,15 +417,18 @@ def test2d():
     errs_corr = []
     crb_corr = []
 
-    for j in xrange(3):
+
+    nj = 6
+    for j in xrange(nj):
 
         params = lmfit.Parameters()
         params.add('amp', value=1, min=0.5, max=2)
         params.add('xo', value=1.*nx/2)
         params.add('yo', value=1.*ny/2)
-        params.add('sx', value=smoothing)
+        params.add('sx', value=2*smoothing)
         params.add('sy', value=smoothing)
-        params.add('theta',value=0)
+        params.add('theta',value=j*np.pi/4.,min=-2*np.pi,max=2*np.pi)
+        params.components=1
 
         signal = elliptical_gaussian(x, y,
                                      params['amp'].value,
@@ -434,9 +436,9 @@ def test2d():
                                      params['yo'].value,
                                      params['sx'].value,
                                      params['sy'].value,
-                                     params['theta'].value)
+                                     params['theta'].value).reshape(nx,ny)
         np.random.seed(1234567+j)
-        noise = np.random.random(nx,ny)
+        noise = np.random.random((nx,ny))
         noise = gaussian_filter(noise, sigma=smoothing)
         noise -= np.mean(noise)
         noise /= np.std(noise)*snr
@@ -444,6 +446,7 @@ def test2d():
         data = signal + noise
         result, fit_params = do_lmfit(data,params,D=2)
         C = Cmatrix2d(x,y,smoothing,smoothing,0)
+        print C.shape
         B = Bmatrix(C)
         result,corr_fit_params = do_lmfit(data, params, D=2, B=B)
 
@@ -455,6 +458,14 @@ def test2d():
         if np.all( [corr_fit_params[i].stderr >0 for i in corr_fit_params.valuesdict().keys()]):
             diffs_corr.append([ params[i].value -corr_fit_params[i].value for i in corr_fit_params.valuesdict().keys()])
             errs_corr.append( [corr_fit_params[i].stderr for i in corr_fit_params.valuesdict().keys()])
+
+        if nj<10:
+            print "init ",
+            print_par(params)
+            print "model",
+            print_par(fit_params)
+            print "corr_model",
+            print_par(corr_fit_params)
 
     diffs_nocorr = np.array(diffs_nocorr)
     errs_nocorr = np.array(errs_nocorr)
@@ -471,14 +482,14 @@ def test2d():
                                      fit_params['yo'].value,
                                      fit_params['sx'].value,
                                      fit_params['sy'].value,
-                                     fit_params['theta'].value)
+                                     fit_params['theta'].value).reshape(nx,ny)
         corr_model = elliptical_gaussian(x, y,
                                      corr_fit_params['amp'].value,
                                      corr_fit_params['xo'].value,
                                      corr_fit_params['yo'].value,
                                      corr_fit_params['sx'].value,
                                      corr_fit_params['sy'].value,
-                                     corr_fit_params['theta'].value)
+                                     corr_fit_params['theta'].value).reshape(nx,ny)
         print "init ",
         print_par(params)
         print "model",
@@ -488,24 +499,32 @@ def test2d():
 
 
         from matplotlib import pyplot
-        fig=pyplot.figure(1)
-        kwargs = {'interpolation':'nearest','cmap':pyplot.cm.cubehelix,'vmin':-0.1,'vmax':1}
+        fig=pyplot.figure(1, figsize=(8,12))
+        kwargs = {'interpolation':'nearest','cmap':pyplot.cm.cubehelix,'vmin':-0.1,'vmax':1, 'origin':'lower'}
 
-        ax = fig.add_subplot(2,2,1)
+        ax = fig.add_subplot(3,2,1)
         ax.imshow(signal,**kwargs)
         ax.set_title('True')
 
-        ax = fig.add_subplot(2,2,2)
+        ax = fig.add_subplot(3,2,2)
         ax.imshow(data,**kwargs)
         ax.set_title('Data')
 
-        ax = fig.add_subplot(2,2,3)
+        ax = fig.add_subplot(3,2,3)
         ax.imshow(model,**kwargs)
         ax.set_title('Model')
 
-        ax = fig.add_subplot(2,2,4)
+        ax = fig.add_subplot(3,2,4)
         ax.imshow(corr_model,**kwargs)
         ax.set_title('Corr_Model')
+
+        ax = fig.add_subplot(3,2,5)
+        ax.imshow(data - model, **kwargs)
+        ax.set_title('Data - Model')
+
+        ax = fig.add_subplot(3,2,6)
+        ax.imshow(data - corr_model, **kwargs)
+        ax.set_title('Data - Corr_model')
 
         pyplot.show()
     else:
