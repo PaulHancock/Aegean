@@ -32,6 +32,7 @@ from scipy.ndimage import label, find_objects
 # fitting
 try:
     import lmfit
+    lmfit_available = True
 except ImportError:
     lmfit_available = False
     lmfit = None
@@ -845,6 +846,10 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         sx = pixbeam.a * fwhm2cc
         sy = pixbeam.b * fwhm2cc
 
+        # lmfit does silly things if we start with these two parameters being equal
+        if sx == sy:
+            sx = sy*1.01
+
         # TODO: this assumes that sx is aligned with the major axis, which it need not be
         # A proper fix will include the re-calculation of the pixel beam at the given sky location
         # this will make the beam slightly bigger as we move away from zenith
@@ -861,7 +866,8 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         if sy_min == sy_max or sx_min == sx_max: # this will never happen
             summit_flag |= flags.FIXED2PSF
 
-        theta = theta_limit(np.radians(pixbeam.pa))
+        #theta = np.radians(pixbeam.pa)
+        theta = pixbeam.pa
         flag = summit_flag
 
         #check to see if we are going to fit this source
@@ -883,7 +889,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
                                                                   sx_max * cc2fwhm))
             logging.debug(" - sy {0} {1} {2} | {3} {4}".format(sy, sy_min, sy_max, sy_min * cc2fwhm,
                                                                   sy_max * cc2fwhm))
-            logging.debug(" - theta {0} {1} {2}".format(theta, -1*np.pi, np.pi))
+            logging.debug(" - theta {0} {1} {2}".format(theta, -180, 180)) # -1*np.pi, np.pi))
             logging.debug(" - flags {0}".format(flag))
             logging.debug(" - fit?  {0}".format(not maxxed))
 
@@ -898,7 +904,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             psf_vary = not maxxed
         params.add(prefix+'sx', value=sx, min=sx_min, max=sx_max, vary=psf_vary)
         params.add(prefix+'sy', value=sy, min=sy_min, max=sy_max, vary=psf_vary)
-        params.add(prefix+'theta', value=theta, min=-1.*np.pi, max=np.pi , vary=psf_vary)
+        params.add(prefix+'theta', value=theta, min=-180, max=180 , vary=psf_vary)
         params.add(prefix+'flags',value=summit_flag, vary=False)
 
         i += 1
@@ -976,9 +982,9 @@ def ntwodgaussian_lmfit(params):
             sy = params[prefix+'sy'].value
             theta = params[prefix+'theta'].value
             if result is not None:
-                result += elliptical_gaussian(x,y,amp,xo,yo,sx,sy,theta)
+                result += elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(theta))
             else:
-                result =  elliptical_gaussian(x,y,amp,xo,yo,sx,sy,theta)
+                result =  elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(theta))
         return result
     return rfunc
 
@@ -995,7 +1001,6 @@ def do_mpfit(data, rmsimg, parinfo):
 
     data = np.array(data)
     mask = np.where(np.isfinite(data))  #the indices of the *non* NaN values in data
-
     def model(p):
         """Return a map with a number of Gaussians determined by the input parameters."""
         f = ntwodgaussian_mpfit(p)
@@ -1024,19 +1029,16 @@ def do_lmfit(data, params):
     # copy the params so as not to change the initial conditions
     # in case we want to use them elsewhere
     params = copy.deepcopy(params)
-
     data = np.array(data)
     mask = np.where(np.isfinite(data))
 
-    def residual(params,data=None):
+    def residual(params):
         f = ntwodgaussian_lmfit(params)
         model = f(*mask)
-        if data is None:
-            return model
         resid = model-data[mask]
         return resid
 
-    result = lmfit.minimize(residual, params, args=(data,))#,Dfun=jacobian2d)
+    result = lmfit.minimize(residual, params)#,Dfun=jacobian2d)
     return result, params
 
 
@@ -2455,10 +2457,10 @@ def fit_island_lmfit(island_data):
         else:
             major = sy
             axial_ratio = sy/sx #abs(sy*global_data.img.pixscale[1] / (sx * global_data.img.pixscale[0]))
-            theta = theta - np.pi/2
+            theta = theta -90
 
         # source.pa is returned in degrees
-        (source.ra, source.dec, source.a, source.pa) = pix2sky_vec((x_pix, y_pix), major * cc2fwhm, np.degrees(theta))
+        (source.ra, source.dec, source.a, source.pa) = pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
         source.a *= 3600  # arcseconds
         source.b = source.a  / axial_ratio
         source.pa = pa_limit(source.pa)
@@ -2581,7 +2583,10 @@ def fit_islands(islands):
     logging.debug("Fitting group of {0} islands".format(len(islands)))
     sources = []
     for island in islands:
-        res = fit_island_mpfit(island)
+        if lmfit_available:
+            res = fit_island_lmfit(island)
+        else:
+            res = fit_island_mpfit(island)
         sources.extend(res)
     return sources
 
@@ -2686,10 +2691,11 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
         # and submit to queue for subprocesses. Passing a group of islands is more
         # efficient than passing single islands to the subprocesses.
         if cores == 1:
-            #res = fit_island_lmfit(island_data)
-            res2 = fit_island_mpfit(island_data)
-            #queue.append(res)
-            queue.append(res2)
+            if lmfit_available:
+                res = fit_island_lmfit(island_data)
+            else:
+                res = fit_island_mpfit(island_data)
+            queue.append(res)
         else:
             island_group.append(island_data)
             # If the island group is full queue it for the subprocesses to fit
