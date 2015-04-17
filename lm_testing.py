@@ -113,7 +113,7 @@ def do_mpfit(data, parinfo, B=None):
     return mp, parinfo
 
 
-def do_lmfit(data, params, B=None, D=2):
+def do_lmfit(data, params, B=None, D=2, dojac=False):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
@@ -144,11 +144,14 @@ def do_lmfit(data, params, B=None, D=2):
             return model-data[mask]
         else:
             return (model - data[mask]).dot(B)
-    if D==1:
-        jfn = jacobian
+    if dojac:
+        if D==1:
+            jfn = jacobian
+        else:
+            jfn = jacobian2d
+        result = lmfit.minimize(residual, params, args=(mask,data,),Dfun=jfn)
     else:
-        jfn = jacobian2d
-    result = lmfit.minimize(residual, params, args=(mask,data,),Dfun=jfn)
+        result = lmfit.minimize(residual, params, args=(mask,data,))
     return result, params
 
 
@@ -428,12 +431,12 @@ def test2d():
     errs_corr = []
     crb_corr = []
 
-    nj = 1
+    nj = 50
     for j in xrange(nj):
 
         params = lmfit.Parameters()
         params.add('amp', value=1, min=0.5, max=2)
-        params.add('xo', value=1.*nx/2+j/6.)
+        params.add('xo', value=1.*nx/2)
         params.add('yo', value=1.*ny/2)
         params.add('sx', value=2*smoothing)
         params.add('sy', value=smoothing)
@@ -454,10 +457,10 @@ def test2d():
         noise /= np.std(noise)*snr
 
         data = signal + noise
-        result, fit_params = do_lmfit(data,params,D=2)
+        result, fit_params = do_lmfit(data,params,D=2,dojac=False)
         C = Cmatrix2d(x,y,smoothing,smoothing,0)
         B = Bmatrix(C)
-        corr_result,corr_fit_params = do_lmfit(data, params, D=2, B=B)
+        corr_result,corr_fit_params = do_lmfit(data, params, D=2, B=B,dojac=False)
 
         if np.all( [fit_params[i].stderr >0 for i in fit_params.valuesdict().keys()]):
             diffs_nocorr.append([ params[i].value -fit_params[i].value for i in fit_params.valuesdict().keys()])
@@ -590,7 +593,7 @@ def test2d_load():
     params.add('theta',value=np.pi/4)
     params.components=1
 
-    result, fit_params = do_lmfit(data,params)
+    result, fit_params = do_lmfit(data,params,dojac=True)
     #print result.residual
     print np.mean(result.residual), np.std(result.residual)
     print_par(fit_params)
