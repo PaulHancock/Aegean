@@ -80,9 +80,9 @@ def ntwodgaussian_lmfit(params):
             sy = params[prefix+'sy'].value
             theta = params[prefix+'theta'].value
             if result is not None:
-                result += elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(theta))
+                result += elliptical_gaussian(x,y,amp,xo,yo,sx,sy,theta)
             else:
-                result =  elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(theta))
+                result =  elliptical_gaussian(x,y,amp,xo,yo,sx,sy,theta)
         return result
     return rfunc
 
@@ -131,11 +131,11 @@ def do_lmfit(data, params, B=None, D=2):
     if D==1:
         mask = mask[0]
 
-    def residual(params,data=None):
+    def residual(params,mask,data=None):
         if D==2:
             f = ntwodgaussian_lmfit(params)
             model = f(*mask)
-        elif D==1:
+        else:
             model = gaussian(mask,params['amp'].value,params['cen'].value,params['sigma'].value)
 
         if data is None:
@@ -144,8 +144,11 @@ def do_lmfit(data, params, B=None, D=2):
             return model-data[mask]
         else:
             return (model - data[mask]).dot(B)
-
-    result = lmfit.minimize(residual, params, args=(data,))#,Dfun=jacobian2d)
+    if D==1:
+        jfn = jacobian
+    else:
+        jfn = jacobian2d
+    result = lmfit.minimize(residual, params, args=(mask,data,),Dfun=jfn)
     return result, params
 
 
@@ -165,19 +168,9 @@ def Cmatrix2d(x,y,sigmax,sigmay,theta):
     """
 
     # 1.*sigma avoid stupid integer problems within two_d_gaussian
-    f = lambda i,j: np.ravel(elliptical_gaussian(x,y,1,i,j,1.*sigmax,1.*sigmay,theta))
+    f = lambda i,j: elliptical_gaussian(x,y,1,i,j,1.*sigmax,1.*sigmay,theta)
     C = np.vstack( [ f(i,j) for i,j in zip(x,y)] )
     return C
-
-
-def test_Cmatrix2d():
-    nx = 4
-    ny = 6
-    smoothing = 1.4
-    x, y = np.meshgrid(range(nx),range(nx))
-    #print [ (x[i,j],y[i,j]) for i in range(len(x)) for j in range(len(y))]
-    C = Cmatrix2d(x,y,smoothing,smoothing,0)
-    print C
 
 
 def Bmatrix(C):
@@ -209,38 +202,56 @@ def jacobian(pars,x,data=None):
     return matrix
 
 
-def jacobian2d(pars,x,y,data=None):
-    # print [ k for k in pars.valuesdict().keys()]
+def jacobian2d(pars,xy,data=None,emp=True):
     amp = pars['amp'].value
     xo = pars['xo'].value
     yo = pars['yo'].value
     sx = pars['sx'].value
     sy = pars['sy'].value
     theta  = pars['theta'].value
-    sint = np.sin(theta)
-    cost = np.cos(theta)
 
-    model = two_d_gaussian(x,y, amp,xo, yo, sx, sy, theta)
-    model = np.ravel(model)
+
+    x,y = xy
+    # all derivatives are proportional to the model so calculate it first
+    model = elliptical_gaussian(x,y, amp,xo, yo, sx, sy, theta)
+
+    if emp:
+        # empirical derivatives
+        eps = 1e-5
+        dmds = elliptical_gaussian(x,y, amp+eps,xo, yo, sx, sy, theta) - model
+        dmdxo = elliptical_gaussian(x,y, amp,xo+eps, yo, sx, sy, theta) - model
+        dmdyo = elliptical_gaussian(x,y, amp,xo, yo+eps, sx, sy, theta) - model
+        dmdsx = elliptical_gaussian(x,y, amp,xo, yo, sx+eps, sy, theta) - model
+        dmdsy = elliptical_gaussian(x,y, amp,xo, yo, sx, sy+eps, theta) - model
+        dmdtheta = elliptical_gaussian(x,y, amp,xo, yo, sx, sy, theta+eps) - model
+        matrix = np.array([dmds,dmdxo,dmdyo,dmdsx,dmdsy,dmdtheta])/eps
+        matrix = np.transpose(matrix)
+        return matrix
+
+    # precompute for speed
+    sint = np.sin(theta)
+    sin2t = np.sin(2*theta)
+    cost = np.cos(theta)
+    x,y = xy
+    xxo = x-xo
+    yyo = x-yo
+    xcos, ycos, xsin, ysin = cost*xxo, cost*yyo, sint*xxo, sint*yyo
 
     dmds = model/amp
 
-    dmdxo = cost * (( x - xo) * cost + (y - yo) * sint) /sy**2
-    dmdxo += sint* (( x - xo) * sint - (y - yo) * cost) /sx**2
+    dmdxo = cost * (xcos + ysin) /sx**2 + sint* (xsin - ycos) /sy**2
     dmdxo *= model
 
-    dmdyo = sint * (( x - xo) * cost + (y - yo) * sint) /sy**2
-    dmdyo -= cost* (( x - xo) * sint - (y - yo) * cost) /sx**2
+    dmdyo = sint * (xcos + ysin) /sx**2 - cost * (xsin - ycos) /sy**2
     dmdyo *= model
 
-    dmdsy = model / sy**3 * ((x - xo) * cost + (y - yo) * sint)**2
-    dmdsx = model / sx**3 * ((x - xo) * sint - (y - yo) * cost)**2
+    dmdsx = model / sx**3 * (xcos + ysin)**2
+    dmdsy = model / sy**3 * (xsin - ycos)**2
 
-    dmdtheta = -1/sy**2 * ((-1*(x - xo) * sint + (y - yo) * cost) * ((x - xo) * cost + (y - yo) * sint))
-    dmdtheta += -1/sx**2 * (((x - xo) * sint - (y - yo) * cost) * ((x - xo) * cost + (y - yo) * sint))
-    dmdtheta *= model
+    dmdtheta = model * (sx**2 - sy**2) * (xsin + ycos) * (xcos + ysin) / sx**2/sy**2
 
-    matrix = np.transpose(np.vstack((dmds,dmdxo,dmdyo,dmdsx,dmdsy,dmdtheta)))
+    matrix = np.vstack((dmds,dmdxo,dmdyo,dmdsx,dmdsy,dmdtheta))
+    matrix = np.transpose(matrix)
     return matrix
 
 
@@ -256,7 +267,7 @@ def CRB_errs(jac, C, B=None):
         # B is actually only a square root of the inverse covariance matrix
         fim_inv =  inv(np.transpose(jac).dot(B).dot(np.transpose(B)).dot(jac))
     else:
-        #fim = np.transpose(jac).dot(inv(C)).dot(jac)
+        fim = np.transpose(jac).dot(inv(C)).dot(jac)
         # print_mat(jac)
         # print 'C='
         # print_mat(C)
@@ -264,8 +275,8 @@ def CRB_errs(jac, C, B=None):
         # print_mat(inv(C))
         # print "fim ="
         # print_mat(fim)
-        #fim_inv = inv(fim)
-        fim_inv = pinv(jac).dot(C).dot(pinv(np.transpose(jac)))
+        fim_inv = inv(fim)
+        #fim_inv = pinv(jac).dot(C).dot(pinv(np.transpose(jac)))
         # print inv(jac).shape, C.shape, inv(np.transpose(jac)).shape
         # fim_inv = np.linalg.pinv(jac).dot(C).dot(np.linalg.pinv(np.transpose(jac)))
 
@@ -417,7 +428,7 @@ def test2d():
     errs_corr = []
     crb_corr = []
 
-    nj = 6
+    nj = 1
     for j in xrange(nj):
 
         params = lmfit.Parameters()
@@ -445,9 +456,8 @@ def test2d():
         data = signal + noise
         result, fit_params = do_lmfit(data,params,D=2)
         C = Cmatrix2d(x,y,smoothing,smoothing,0)
-        print C.shape
         B = Bmatrix(C)
-        result,corr_fit_params = do_lmfit(data, params, D=2, B=B)
+        corr_result,corr_fit_params = do_lmfit(data, params, D=2, B=B)
 
         if np.all( [fit_params[i].stderr >0 for i in fit_params.valuesdict().keys()]):
             diffs_nocorr.append([ params[i].value -fit_params[i].value for i in fit_params.valuesdict().keys()])
@@ -457,13 +467,14 @@ def test2d():
         if np.all( [corr_fit_params[i].stderr >0 for i in corr_fit_params.valuesdict().keys()]):
             diffs_corr.append([ params[i].value -corr_fit_params[i].value for i in corr_fit_params.valuesdict().keys()])
             errs_corr.append( [corr_fit_params[i].stderr for i in corr_fit_params.valuesdict().keys()])
+            crb_corr.append( CRB_errs(jacobian2d(corr_fit_params,(x,y),emp=True), C, B=B) )
 
         if nj<10:
             print "init ",
             print_par(params)
-            print "model",
+            print "model",np.std(result.residual),
             print_par(fit_params)
-            print "corr_model",
+            print "corr_model", np.std(corr_result.residual),
             print_par(corr_fit_params)
 
     diffs_nocorr = np.array(diffs_nocorr)
@@ -527,19 +538,26 @@ def test2d():
 
         pyplot.show()
     else:
+        print diffs_nocorr.shape
         from matplotlib import pyplot
         fig = pyplot.figure(2)
         ax = fig.add_subplot(121)
         ax.plot(diffs_nocorr[:,0], label='amp')
-        ax.plot(diffs_nocorr[:,1], label='cen')
-        ax.plot(diffs_nocorr[:,2], label='sigma')
+        ax.plot(diffs_nocorr[:,1], label='xo')
+        ax.plot(diffs_nocorr[:,2], label='yo')
+        ax.plot(diffs_nocorr[:,3], label='sx')
+        ax.plot(diffs_nocorr[:,4], label='sy')
+        ax.plot(diffs_nocorr[:,5], label='theta')
         ax.set_xlabel("No Corr")
         ax.legend()
 
         ax = fig.add_subplot(122)
         ax.plot(diffs_corr[:,0], label='amp')
-        ax.plot(diffs_corr[:,1], label='cen')
-        ax.plot(diffs_corr[:,2], label='sigma')
+        ax.plot(diffs_corr[:,1], label='xo')
+        ax.plot(diffs_corr[:,2], label='yo')
+        ax.plot(diffs_corr[:,3], label='sx')
+        ax.plot(diffs_corr[:,4], label='sy')
+        ax.plot(diffs_corr[:,5], label='theta')
         ax.set_xlabel("Corr")
         ax.legend()
 
@@ -561,22 +579,60 @@ def test2d():
 
 def test2d_load():
     from astropy.io import fits
-    from aegean import do_lmfit
+    #from aegean import do_lmfit
     data = fits.open('../lm_dev/test.fits')[0].data
     params = lmfit.Parameters()
-    params.add('c0_amp', value=8)
-    params.add('c0_xo', value=3)
-    params.add('c0_yo', value=3)
-    params.add('c0_sx', value=2.01)
-    params.add('c0_sy', value=2)
-    params.add('c0_theta',value=0)
+    params.add('amp', value=10.)
+    params.add('xo', value=4.01)
+    params.add('yo', value=7.)
+    params.add('sx', value=4.01,min=1)
+    params.add('sy', value=2,min=1)
+    params.add('theta',value=np.pi/4)
     params.components=1
 
     result, fit_params = do_lmfit(data,params)
-    print result.residual
+    #print result.residual
     print np.mean(result.residual), np.std(result.residual)
     print_par(fit_params)
 
+    from matplotlib import pyplot
+    fig=pyplot.figure(1, figsize=(8,12))
+    kwargs = {'interpolation':'nearest','cmap':pyplot.cm.cubehelix,'vmin':-2,'vmax':10, 'origin':'lower'}
+
+    ax = fig.add_subplot(5,3,1)
+    ax.imshow(data,**kwargs)
+    ax.set_title('Data')
+
+
+    ax = fig.add_subplot(5,3,2)
+    ax.imshow(data + result.residual.reshape(data.shape),**kwargs)
+    ax.set_title('model')
+
+    ax = fig.add_subplot(5,3,3)
+    ax.imshow(result.residual.reshape(data.shape),**kwargs)
+    ax.set_title('residual')
+
+
+    xy = np.where(np.isfinite(data))
+    jac = jacobian2d(fit_params,xy,emp=False)
+    shape = data.shape
+
+    print jac.shape
+    for i,name in enumerate(['dmds','dmdxo','dmdyo','dmdsx','dmdsy','dmdtheta']):
+        print i,name
+        ax = fig.add_subplot(5,3,i+4)
+        ax.imshow(jac[:,i].reshape(shape),**kwargs)
+        ax.set_title(name)
+
+    jac = jacobian2d(fit_params,xy,emp=True)
+
+    for i,name in enumerate(['dmds','dmdxo','dmdyo','dmdsx','dmdsy','dmdtheta']):
+        ax = fig.add_subplot(5,3,i+10)
+        ax.imshow(jac[:,i].reshape(shape),**kwargs)
+        ax.set_title(name)
+
+
+    pyplot.show()
 
 
 # @profile
@@ -980,6 +1036,7 @@ def test_lm1d_errs():
 
     pyplot.show()
 
+
 def test_lm_corr_noise_2d():
     """
     :return:
@@ -1055,6 +1112,7 @@ def test_lm_corr_noise_2d():
     print "resid rms: {0}".format(np.std(model-data))
 
     pyplot.show()
+
 
 def test_lm2d_errs():
     """
@@ -1485,6 +1543,7 @@ def test_lm2d_errs_xyswap():
             print "{0}: diff {1:6.4f}+/-{2:6.4f}, mean(err) {3}".format(val,np.mean(diffs_nocorr[:,i]), np.std(diffs_nocorr[:,i]), np.mean(errs_nocorr[:,i]))
     pyplot.show()
 
+
 def make_data():
     nhoriz = 14
     nvert = 10
@@ -1519,7 +1578,7 @@ def make_data():
     template.writeto('test_rms.fits', clobber=True)
 
 
-
 if __name__ == '__main__':
     # test1d()
-    test2d_load()
+    test2d()
+    # test2d_load()
