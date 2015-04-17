@@ -271,17 +271,8 @@ def CRB_errs(jac, C, B=None):
         fim_inv =  inv(np.transpose(jac).dot(B).dot(np.transpose(B)).dot(jac))
     else:
         fim = np.transpose(jac).dot(inv(C)).dot(jac)
-        # print_mat(jac)
-        # print 'C='
-        # print_mat(C)
-        # print "inv(C)="
-        # print_mat(inv(C))
-        # print "fim ="
-        # print_mat(fim)
         fim_inv = inv(fim)
         #fim_inv = pinv(jac).dot(C).dot(pinv(np.transpose(jac)))
-        # print inv(jac).shape, C.shape, inv(np.transpose(jac)).shape
-        # fim_inv = np.linalg.pinv(jac).dot(C).dot(np.linalg.pinv(np.transpose(jac)))
 
     errs = np.sqrt(np.diag(fim_inv))
     return errs
@@ -423,7 +414,7 @@ def test2d():
 
     smoothing = 1.5
 
-    snr = 1000
+    snr = 5
 
     diffs_nocorr = []
     errs_nocorr = []
@@ -457,10 +448,10 @@ def test2d():
         noise /= np.std(noise)*snr
 
         data = signal + noise
-        result, fit_params = do_lmfit(data,params,D=2,dojac=False)
+        result, fit_params = do_lmfit(data,params,D=2,dojac=True)
         C = Cmatrix2d(x,y,smoothing,smoothing,0)
         B = Bmatrix(C)
-        corr_result,corr_fit_params = do_lmfit(data, params, D=2, B=B,dojac=False)
+        corr_result,corr_fit_params = do_lmfit(data, params, D=2, B=B,dojac=True)
 
         if np.all( [fit_params[i].stderr >0 for i in fit_params.valuesdict().keys()]):
             diffs_nocorr.append([ params[i].value -fit_params[i].value for i in fit_params.valuesdict().keys()])
@@ -470,7 +461,7 @@ def test2d():
         if np.all( [corr_fit_params[i].stderr >0 for i in corr_fit_params.valuesdict().keys()]):
             diffs_corr.append([ params[i].value -corr_fit_params[i].value for i in corr_fit_params.valuesdict().keys()])
             errs_corr.append( [corr_fit_params[i].stderr for i in corr_fit_params.valuesdict().keys()])
-            crb_corr.append( CRB_errs(jacobian2d(corr_fit_params,(x,y),emp=True), C, B=B) )
+            crb_corr.append( CRB_errs(jacobian2d(corr_fit_params,(x,y),emp=True), C) )
 
         if nj<10:
             print "init ",
@@ -571,12 +562,12 @@ def test2d():
         print "--  corr --"
         for i,val in enumerate(corr_fit_params.valuesdict().keys()):
             print "{0}: diff {1:6.4f}+/-{2:6.4f}, mean(err) {3}, mean(crb_err) {4}".format(val,np.mean(diffs_corr[:,i]),np.std(diffs_corr[:,i]), np.mean(errs_corr[:,i]),np.mean(crb_corr[:,i]))
-        # jac = jacobian(corr_fit_params,x)
-        # print_mat(jac)
-        # print_mat(C)
-        # print_mat(B)
-        # print CRB_errs(jac,C)
-        # print CRB_errs(jac,C,B)
+        jac = jacobian2d(corr_fit_params,(x,y),emp=True)
+        print_mat(jac[:10,:10])
+        print_mat(C[:10,:10])
+        print_mat(B[:10,:10])
+        print CRB_errs(jac,C)
+        print CRB_errs(jac,C,B)
         pyplot.show()
 
 
