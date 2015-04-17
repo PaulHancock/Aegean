@@ -205,7 +205,7 @@ def jacobian(pars,x,data=None):
     return matrix
 
 
-def jacobian2d(pars,xy,data=None,emp=True):
+def jacobian2d(pars,xy,data=None,emp=True,errs=None):
     amp = pars['amp'].value
     xo = pars['xo'].value
     yo = pars['yo'].value
@@ -228,6 +228,8 @@ def jacobian2d(pars,xy,data=None,emp=True):
         dmdsy = elliptical_gaussian(x,y, amp,xo, yo, sx, sy+eps, theta) - model
         dmdtheta = elliptical_gaussian(x,y, amp,xo, yo, sx, sy, theta+eps) - model
         matrix = np.array([dmds,dmdxo,dmdyo,dmdsx,dmdsy,dmdtheta])/eps
+        if errs is not None:
+            matrix /=errs**2
         matrix = np.transpose(matrix)
         return matrix
 
@@ -418,11 +420,12 @@ def test2d():
 
     diffs_nocorr = []
     errs_nocorr = []
+    crb_nocorr = []
     diffs_corr = []
     errs_corr = []
     crb_corr = []
 
-    nj = 50
+    nj = 100
     for j in xrange(nj):
 
         params = lmfit.Parameters()
@@ -448,20 +451,34 @@ def test2d():
         noise /= np.std(noise)*snr
 
         data = signal + noise
+        mask = np.where(signal/noise < 4)
+        #data[mask] = np.nan
+        mx,my = np.where(np.isfinite(data))
+        if len(mx)<7:
+            continue
         result, fit_params = do_lmfit(data,params,D=2,dojac=True)
-        C = Cmatrix2d(x,y,smoothing,smoothing,0)
+
+        C = Cmatrix2d(mx,my,smoothing,smoothing,0)
         B = Bmatrix(C)
         corr_result,corr_fit_params = do_lmfit(data, params, D=2, B=B,dojac=True)
+        errs = np.ones(C.shape[0],dtype=np.float32)/snr
 
         if np.all( [fit_params[i].stderr >0 for i in fit_params.valuesdict().keys()]):
+            if fit_params['sy'].value>fit_params['sx'].value:
+                fit_params['sx'],fit_params['sy'] = fit_params['sy'],fit_params['sx']
+                fit_params['theta'].value += np.pi/2
             diffs_nocorr.append([ params[i].value -fit_params[i].value for i in fit_params.valuesdict().keys()])
             errs_nocorr.append( [fit_params[i].stderr for i in fit_params.valuesdict().keys()])
+            crb_nocorr.append( CRB_errs(jacobian2d(fit_params,(mx,my),emp=True,errs=errs),C) )
 
         # print_par(corr_fit_params)
         if np.all( [corr_fit_params[i].stderr >0 for i in corr_fit_params.valuesdict().keys()]):
+            if corr_fit_params['sy'].value>corr_fit_params['sx'].value:
+                corr_fit_params['sx'],corr_fit_params['sy'] = corr_fit_params['sy'],corr_fit_params['sx']
+                corr_fit_params['theta'].value += np.pi/2
             diffs_corr.append([ params[i].value -corr_fit_params[i].value for i in corr_fit_params.valuesdict().keys()])
             errs_corr.append( [corr_fit_params[i].stderr for i in corr_fit_params.valuesdict().keys()])
-            crb_corr.append( CRB_errs(jacobian2d(corr_fit_params,(x,y),emp=True), C) )
+            crb_corr.append( CRB_errs(jacobian2d(corr_fit_params,(mx,my),emp=True,errs=errs), C) )
 
         if nj<10:
             print "init ",
@@ -473,6 +490,7 @@ def test2d():
 
     diffs_nocorr = np.array(diffs_nocorr)
     errs_nocorr = np.array(errs_nocorr)
+    crb_nocorr = np.array(crb_nocorr)
     diffs_corr = np.array(diffs_corr)
     errs_corr = np.array(errs_corr)
     crb_corr = np.array(crb_corr)
@@ -555,19 +573,42 @@ def test2d():
         ax.set_xlabel("Corr")
         ax.legend()
 
+        hkwargs = {'histtype':'step','bins':51,'range':(-1,1)}
+        fig = pyplot.figure(3)
+        ax = fig.add_subplot(121)
+        ax.hist(diffs_nocorr[:,0], label='amp',**hkwargs)
+        ax.hist(diffs_nocorr[:,1], label='xo',**hkwargs)
+        ax.hist(diffs_nocorr[:,2], label='yo',**hkwargs)
+        ax.hist(diffs_nocorr[:,3], label='sx',**hkwargs)
+        ax.hist(diffs_nocorr[:,4], label='sy',**hkwargs)
+        ax.hist(diffs_nocorr[:,5], label='theta',**hkwargs)
+        ax.set_xlabel("No Corr")
+        ax.legend()
+
+        ax = fig.add_subplot(122)
+        ax.hist(diffs_corr[:,0], label='amp',**hkwargs)
+        ax.hist(diffs_corr[:,1], label='xo',**hkwargs)
+        ax.hist(diffs_corr[:,2], label='yo',**hkwargs)
+        ax.hist(diffs_corr[:,3], label='sx',**hkwargs)
+        ax.hist(diffs_corr[:,4], label='sy',**hkwargs)
+        ax.hist(diffs_corr[:,5], label='theta',**hkwargs)
+        ax.set_xlabel("Corr")
+        ax.legend()
+
         print "-- no corr --"
         for i,val in enumerate(fit_params.valuesdict().keys()):
-            print "{0}: diff {1:6.4f}+/-{2:6.4f}, mean(err) {3}".format(val,np.mean(diffs_nocorr[:,i]), np.std(diffs_nocorr[:,i]), np.mean(errs_nocorr[:,i]))
+            print "{0}: diff {1:6.4f}+/-{2:6.4f}, mean(err) {3}, mean(crb_err) {4}".format(val,np.mean(diffs_nocorr[:,i]), np.std(diffs_nocorr[:,i]), np.mean(errs_nocorr[:,i]),np.mean(crb_nocorr[:,i]))
 
         print "--  corr --"
         for i,val in enumerate(corr_fit_params.valuesdict().keys()):
             print "{0}: diff {1:6.4f}+/-{2:6.4f}, mean(err) {3}, mean(crb_err) {4}".format(val,np.mean(diffs_corr[:,i]),np.std(diffs_corr[:,i]), np.mean(errs_corr[:,i]),np.mean(crb_corr[:,i]))
-        jac = jacobian2d(corr_fit_params,(x,y),emp=True)
-        print_mat(jac[:10,:10])
-        print_mat(C[:10,:10])
-        print_mat(B[:10,:10])
-        print CRB_errs(jac,C)
-        print CRB_errs(jac,C,B)
+        print 1./snr
+        # jac = jacobian2d(corr_fit_params,(x,y),emp=True,errs=errs)
+        # print_mat(jac[:10,:10])
+        # print_mat(C[:10,:10])
+        # print_mat(B[:10,:10])
+        # print CRB_errs(jac,C)
+        # print CRB_errs(jac,C,B)
         pyplot.show()
 
 
@@ -627,6 +668,28 @@ def test2d_load():
 
 
     pyplot.show()
+
+
+def test_CRB():
+
+    def model(x,a,b):
+        return a*x+b
+
+    def jac(x,a,b):
+        m = model(x,a,b)
+        eps = 1e-6
+        dmda = model(x,a+eps,b) - m
+        dmdb = model(x,a,b+eps) - m
+        return np.transpose(np.array( [dmda,dmdb])/eps / errs**2)
+
+    x = np.array([0,10])
+    errs = np.array([0.1,0.1])
+    C = np.identity(len(x))
+    p0=[1,0]
+    print model(x,*p0)
+    print jac(x,*p0)
+    print CRB_errs(jac(x,*p0),C)
+
 
 
 # @profile
@@ -1576,3 +1639,4 @@ if __name__ == '__main__':
     # test1d()
     test2d()
     # test2d_load()
+    # test_CRB()
