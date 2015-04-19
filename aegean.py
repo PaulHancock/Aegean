@@ -28,6 +28,7 @@ import scipy
 from scipy import ndimage as ndi
 from scipy.special import erf
 from scipy.ndimage import label, find_objects
+from scipy.linalg import eigh, inv
 
 # fitting
 try:
@@ -957,7 +958,7 @@ def Bmatrix(C):
     """
     Calculate a matrix which is effectively the square root of the correlation matrix C
     :param C:
-    :return: A matrix B such the B.dot(B) = C
+    :return: A matrix B such the B.dot(B') = inv(C)
     """
     # this version of finding the square root of the inverse matrix
     # suggested by Cath,
@@ -996,6 +997,22 @@ def emp_jacobian(pars, x, y, errs=None):
     matrix = np.transpose(matrix)
     return matrix
 
+
+def CRB_errs(jac, C, B=None):
+    """
+    Calculate minimum errors given by the Cramer-Rao bound
+    :param jac: the jacobian
+    :param C: the correlation matrix
+    :param B: B.dot(B') should = inv(C), ie B ~ sqrt(inv(C))
+    :return: array of errors for the model parameters
+    """
+    if B is not None:
+        fim_inv =  inv(np.transpose(jac).dot(B).dot(np.transpose(B)).dot(jac))
+    else:
+        fim = np.transpose(jac).dot(inv(C)).dot(jac)
+        fim_inv = inv(fim)
+    errs = np.sqrt(np.diag(fim_inv))
+    return errs
 
 
 def ntwodgaussian_mpfit(inpars):
@@ -1079,7 +1096,7 @@ def do_mpfit(data, rmsimg, parinfo):
     return mp, parinfo, (np.median(residual),np.std(residual))
 
 
-def do_lmfit(data, params, B=None):
+def do_lmfit(data, params):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
@@ -1093,15 +1110,20 @@ def do_lmfit(data, params, B=None):
     data = np.array(data)
     mask = np.where(np.isfinite(data))
 
+    B = None
+    # pixbeam = get_pixbeam()
+    # C = Cmatrix(mask[0],mask[1],pixbeam.a*fwhm2cc,pixbeam.b*fwhm2cc,pixbeam.pa)
+    # B = Bmatrix(C)
+
     def residual(params):
-        f = ntwodgaussian_lmfit(params) # A function describing the model
-        model = f(*mask) # The actual model
+        f = ntwodgaussian_lmfit(params)  # A function describing the model
+        model = f(*mask)  # The actual model
         if B is None:
             return model-data[mask]
         else:
             return (model - data[mask]).dot(B)
 
-    result = lmfit.minimize(residual, params)#,Dfun=jacobian2d)
+    result = lmfit.minimize(residual, params)  #,Dfun=jacobian2d)
     return result, params
 
 
@@ -2042,6 +2064,7 @@ def get_pixbeam():
     # TODO: update this to incorporate elevation scaling when needed
     major = beam.a/(pixscale[0]*math.sin(math.radians(beam.pa)) +pixscale[1]*math.cos(math.radians(beam.pa)) )
     minor = beam.b/(pixscale[1]*math.sin(math.radians(beam.pa)) +pixscale[0]*math.cos(math.radians(beam.pa)) )
+    # TODO: calculate the pa of the pixbeam
     return Beam(abs(major),abs(minor),0)
 
 
