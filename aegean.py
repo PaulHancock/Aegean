@@ -937,6 +937,67 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     return amp*np.exp(exp)
 
 
+def Cmatrix(x,y,sx,sy,theta):
+    """
+    Construct a correlation matrix corresponding to the data.
+    :param x:
+    :param y:
+    :param sx:
+    :param sy:
+    :param theta:
+    :return:
+    """
+    # 1.*sigma avoid stupid integer problems within two_d_gaussian
+    f = lambda i,j: elliptical_gaussian(x,y,1,i,j,1.*sx,1.*sy,theta)
+    C = np.vstack( [ f(i,j) for i,j in zip(x,y)] )
+    return C
+
+
+def Bmatrix(C):
+    """
+    Calculate a matrix which is effectively the square root of the correlation matrix C
+    :param C:
+    :return: A matrix B such the B.dot(B) = C
+    """
+    # this version of finding the square root of the inverse matrix
+    # suggested by Cath,
+    L,Q = eigh(C)
+    if not all(L>0):
+        logging.error("at least one eigenvalue is negative, this will cause problems!")
+        sys.exit(1)
+    S = np.diag(1/np.sqrt(L))
+    B = Q.dot(S)
+    return B
+
+
+def emp_jacobian(pars, x, y, errs=None):
+    """
+    An empirical calculation of the jacobian
+    :param pars:
+    :param x:
+    :param y:
+    :return:
+    """
+    eps=1e-5
+    matrix = []
+    model = ntwodgaussian_lmfit(pars)
+    for i in xrange(pars.components):
+        prefix = "c{0}_".format(i)
+        # Note: all derivatives are calculated, even if the parameter is fixed
+        for p in ['amp','xo','yo','sx','sy','theta']:
+            pars[prefix+p].value += eps
+            dmdp = ntwodgaussian_lmfit(pars) - model
+            matrix.append(dmdp)
+            pars[prefix+p].value -= eps
+
+    matrix = np.array(matrix)/eps
+    if errs is not None:
+        matrix /=errs**2
+    matrix = np.transpose(matrix)
+    return matrix
+
+
+
 def ntwodgaussian_mpfit(inpars):
     """
     Return an array of values represented by multiple Gaussians as parametrized
@@ -1018,7 +1079,7 @@ def do_mpfit(data, rmsimg, parinfo):
     return mp, parinfo, (np.median(residual),np.std(residual))
 
 
-def do_lmfit(data, params):
+def do_lmfit(data, params, B=None):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
@@ -1033,10 +1094,12 @@ def do_lmfit(data, params):
     mask = np.where(np.isfinite(data))
 
     def residual(params):
-        f = ntwodgaussian_lmfit(params)
-        model = f(*mask)
-        resid = model-data[mask]
-        return resid
+        f = ntwodgaussian_lmfit(params) # A function describing the model
+        model = f(*mask) # The actual model
+        if B is None:
+            return model-data[mask]
+        else:
+            return (model - data[mask]).dot(B)
 
     result = lmfit.minimize(residual, params)#,Dfun=jacobian2d)
     return result, params
