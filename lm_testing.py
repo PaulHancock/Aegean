@@ -171,7 +171,7 @@ def Cmatrix2d(x,y,sigmax,sigmay,theta):
     """
 
     # 1.*sigma avoid stupid integer problems within two_d_gaussian
-    f = lambda i,j: elliptical_gaussian(x,y,1,i,j,1.*sigmax,1.*sigmay,theta)
+    f = lambda i,j: elliptical_gaussian(x,y,1,i,j,sigmax,sigmay,theta)
     C = np.vstack( [ f(i,j) for i,j in zip(x,y)] )
     return C
 
@@ -410,13 +410,13 @@ def test1d():
 
 
 def test2d():
-    nx = 10
+    nx = 20
     ny = 12
     x,y = np.where(np.ones((nx,ny))==1)
 
     smoothing = 1.5
 
-    snr = 5
+    snr = 10
 
     diffs_nocorr = []
     errs_nocorr = []
@@ -425,16 +425,16 @@ def test2d():
     errs_corr = []
     crb_corr = []
 
-    nj = 100
+    nj = 5
     for j in xrange(nj):
 
         params = lmfit.Parameters()
         params.add('amp', value=1, min=0.5, max=2)
         params.add('xo', value=1.*nx/2)
         params.add('yo', value=1.*ny/2)
-        params.add('sx', value=2*smoothing)
+        params.add('sx', value=smoothing*(1+3*np.random.random()))
         params.add('sy', value=smoothing)
-        params.add('theta',value=np.pi/4.,min=-2*np.pi,max=2*np.pi)
+        params.add('theta',value=np.pi*np.random.random(),min=-2*np.pi,max=2*np.pi)
         params.components=1
 
         signal = elliptical_gaussian(x, y,
@@ -452,7 +452,7 @@ def test2d():
 
         data = signal + noise
         mask = np.where(signal/noise < 4)
-        #data[mask] = np.nan
+        data[mask] = np.nan
         mx,my = np.where(np.isfinite(data))
         if len(mx)<7:
             continue

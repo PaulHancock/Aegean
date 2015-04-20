@@ -847,16 +847,15 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         sx = pixbeam.a * fwhm2cc
         sy = pixbeam.b * fwhm2cc
 
-        # lmfit does silly things if we start with these two parameters being equal
-        if sx == sy:
-            sx = sy*1.01
-
         # TODO: this assumes that sx is aligned with the major axis, which it need not be
         # A proper fix will include the re-calculation of the pixel beam at the given sky location
         # this will make the beam slightly bigger as we move away from zenith
         if global_data.telescope_lat is not None:
             _, dec = pix2sky([yo+offsets[0],xo+offsets[1]]) #double check x/y here
             sx /= np.cos(np.radians(dec-global_data.telescope_lat))
+
+        # lmfit does silly things if we start with these two parameters being equal
+        sx = max(sx,sy*1.01)
 
         #constraints are based on the shape of the island
         sx_min, sx_max = sx * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * fwhm2cc, sx * 1.1)
@@ -948,8 +947,7 @@ def Cmatrix(x,y,sx,sy,theta):
     :param theta:
     :return:
     """
-    # 1.*sigma avoid stupid integer problems within two_d_gaussian
-    f = lambda i,j: elliptical_gaussian(x,y,1,i,j,1.*sx,1.*sy,theta)
+    f = lambda i,j: elliptical_gaussian(x,y,1,i,j,sx,sy,theta)
     C = np.vstack( [ f(i,j) for i,j in zip(x,y)] )
     return C
 
@@ -1096,7 +1094,7 @@ def do_mpfit(data, rmsimg, parinfo):
     return mp, parinfo, (np.median(residual),np.std(residual))
 
 
-def do_lmfit(data, params):
+def do_lmfit_old(data, params):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
@@ -1110,10 +1108,11 @@ def do_lmfit(data, params):
     data = np.array(data)
     mask = np.where(np.isfinite(data))
 
-    B = None
-    # pixbeam = get_pixbeam()
-    # C = Cmatrix(mask[0],mask[1],pixbeam.a*fwhm2cc,pixbeam.b*fwhm2cc,pixbeam.pa)
-    # B = Bmatrix(C)
+    # B = None
+    mx, my = mask
+    pixbeam = get_pixbeam()
+    C = Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa)
+    B = Bmatrix(C)
 
     def residual(params):
         f = ntwodgaussian_lmfit(params)  # A function describing the model
@@ -1124,6 +1123,48 @@ def do_lmfit(data, params):
             return (model - data[mask]).dot(B)
 
     result = lmfit.minimize(residual, params)  #,Dfun=jacobian2d)
+    return result, params
+
+
+def do_lmfit(data, params, B=None, D=2, dojac=False):
+    """
+    Fit the model to the data
+    data may contain 'flagged' or 'masked' data with the value of np.NaN
+    input: data - pixel information
+           params - and lmfit.Model instance
+    return: fit results, modified model
+    """
+    # copy the params so as not to change the initial conditions
+    # in case we want to use them elsewhere
+    params = copy.deepcopy(params)
+
+    data = np.array(data)
+    mask = np.where(np.isfinite(data))
+
+    if D==1:
+        mask = mask[0]
+
+    def residual(params,mask,data=None):
+        if D==2:
+            f = ntwodgaussian_lmfit(params)
+            model = f(*mask)
+        else:
+            model = gaussian(mask,params['amp'].value,params['cen'].value,params['sigma'].value)
+
+        if data is None:
+            return model
+        if B is None:
+            return model-data[mask]
+        else:
+            return (model - data[mask]).dot(B)
+    if dojac:
+        if D==1:
+            jfn = jacobian
+        else:
+            jfn = jacobian2d
+        result = lmfit.minimize(residual, params, args=(mask,data,),Dfun=jfn)
+    else:
+        result = lmfit.minimize(residual, params, args=(mask,data,))
     return result, params
 
 
@@ -2476,7 +2517,8 @@ def fit_island_lmfit(island_data):
 
     # TODO: Allow for some of the components to be fit if there are multiple components in the island
     # Check that there is enough data to do the fit
-    non_blank_pix = len(idata[np.isfinite(idata)].ravel())
+    mx,my = np.where(np.isfinite(idata))
+    non_blank_pix = len(mx)
     free_vars = len( [ 1 for a in params.keys() if params[a].vary])
     if non_blank_pix < free_vars:
         logging.debug("Island {0} doesn't have enough pixels to fit the given model".format(isle_num))
@@ -2487,7 +2529,11 @@ def fit_island_lmfit(island_data):
         residual = result.residual
     else:
         # Model is the fitted parameters
-        result, model = do_lmfit(idata, params)
+        C = Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa)
+        # C = np.identity(len(mx))
+        # Cmatrix(mx, my, 1.5, 1.5, 0)
+        B = Bmatrix(C)
+        result, model = do_lmfit(idata, params, D=2, B=B, dojac=False)
         residual = np.array(result.residual).ravel()
         residual = residual[np.isfinite(residual)]
         residual = [ np.median(residual),np.std(residual)]
@@ -2513,9 +2559,6 @@ def fit_island_lmfit(island_data):
         theta = model[prefix+'theta'].value
         amp = model[prefix+'amp'].value
         src_flags |= model[prefix+'flags'].value
-
-        # print "LM ({0},{1})".format(isle_num,j)
-        # print "amp, xo, yo,major, minor,theta",amp, xo, yo, sx, sy, pa_limit(np.degrees(theta))
 
         # #pixel pos within island +
         # island offset within region +
