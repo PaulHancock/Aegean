@@ -410,13 +410,15 @@ def test1d():
 
 
 def test2d():
-    nx = 20
+    nx = 10
     ny = 12
     x,y = np.where(np.ones((nx,ny))==1)
 
-    smoothing = 1.5
+    smoothing = 1.27 # 3pix/beam
+    smoothing = 2.12 # 5pix/beam
+    smoothing = 1.5 # ~4.2pix/beam
 
-    snr = 10
+    snr = 5
 
     diffs_nocorr = []
     errs_nocorr = []
@@ -429,22 +431,24 @@ def test2d():
     for j in xrange(nj):
         np.random.seed(1234567+j)
 
+        # The model parameters
         params = lmfit.Parameters()
         params.add('amp', value=1, min=0.5, max=2)
         params.add('xo', value=1.*nx/2)
         params.add('yo', value=1.*ny/2)
-        params.add('sx', value=smoothing*(1+3*np.random.random()))
-        params.add('sy', value=smoothing)
+        params.add('sx', value=2*smoothing, min=1)
+        params.add('sy', value=smoothing, min=1)
         params.add('theta',value=np.pi*np.random.random(),min=-2*np.pi,max=2*np.pi)
         params.components=1
 
+        # The initial guess at the parameters
         init_params = copy.deepcopy(params)
-        init_params['amp'].value +=0.05* 2*(np.random.random()-0.5)
-        init_params['xo'].value +=2*(np.random.random()-0.5)
-        init_params['yo'].value +=2*(np.random.random()-0.5)
-        init_params['sx'].value +=np.random.random()
-        init_params['sy'].value +=np.random.random()
-        init_params['theta'].value += 0
+        init_params['amp'].value += 0.05* 2*(np.random.random()-0.5)
+        init_params['xo'].value += 2*(np.random.random()-0.5)
+        init_params['yo'].value += 2*(np.random.random()-0.5)
+        init_params['sx'].value *= 1+np.random.random()*0.1
+        init_params['sy'].value *= 1+np.random.random()*0.1
+        init_params['theta'].value = 0
 
         signal = elliptical_gaussian(x, y,
                                      params['amp'].value,
@@ -465,13 +469,11 @@ def test2d():
         if len(mx)<7:
             continue
 
-        p = copy.deepcopy(init_params)
-        result, fit_params = do_lmfit(data,p,D=2,dojac=True)
+        result, fit_params = do_lmfit(data,init_params,D=2,dojac=False)
 
         C = Cmatrix2d(mx,my,smoothing,smoothing,0)
         B = Bmatrix(C)
-        p = copy.deepcopy(init_params)
-        corr_result,corr_fit_params = do_lmfit(data, p, D=2, B=B,dojac=True)
+        corr_result,corr_fit_params = do_lmfit(data, init_params, D=2, B=B,dojac=False)
         errs = np.ones(C.shape[0],dtype=np.float32)/snr
 
         if np.all( [fit_params[i].stderr >0 for i in fit_params.valuesdict().keys()]):
@@ -482,7 +484,6 @@ def test2d():
             errs_nocorr.append( [fit_params[i].stderr for i in fit_params.valuesdict().keys()])
             crb_nocorr.append( CRB_errs(jacobian2d(fit_params,(mx,my),emp=True,errs=errs),C) )
 
-        # print_par(corr_fit_params)
         if np.all( [corr_fit_params[i].stderr >0 for i in corr_fit_params.valuesdict().keys()]):
             if corr_fit_params['sy'].value>corr_fit_params['sx'].value:
                 corr_fit_params['sx'],corr_fit_params['sy'] = corr_fit_params['sy'],corr_fit_params['sx']
@@ -532,15 +533,19 @@ def test2d():
 
 
         from matplotlib import pyplot
-        fig=pyplot.figure(1, figsize=(8,12))
-        kwargs = {'interpolation':'nearest','cmap':pyplot.cm.cubehelix,'vmin':-0.1,'vmax':1, 'origin':'lower'}
+        fig=pyplot.figure(1)#, figsize=(8,12))
+        # This sets all nan pixels to be a nasty yellow colour
+        cmap = pyplot.cm.cubehelix
+        cmap.set_bad('y',1.)
+        kwargs = {'interpolation':'nearest','cmap':cmap,'vmin':-0.1,'vmax':1, 'origin':'lower'}
 
         ax = fig.add_subplot(3,2,1)
         ax.imshow(signal,**kwargs)
         ax.set_title('True')
 
         ax = fig.add_subplot(3,2,2)
-        ax.imshow(data,**kwargs)
+        ax.imshow(signal+noise,**kwargs)
+        #ax.imshow(data*0, alpha=0.5, **kwargs)
         ax.set_title('Data')
 
         ax = fig.add_subplot(3,2,3)
@@ -608,11 +613,11 @@ def test2d():
 
         print "-- no corr --"
         for i,val in enumerate(fit_params.valuesdict().keys()):
-            print "{0}: diff {1:6.4f}+/-{2:6.4f}, mean(err) {3}, mean(crb_err) {4}".format(val,np.mean(diffs_nocorr[:,i]), np.std(diffs_nocorr[:,i]), np.mean(errs_nocorr[:,i]),np.mean(crb_nocorr[:,i]))
+            print "{0}: diff {1:6.4f}+/-{2:6.4f}, median(err) {3}, median(crb_err) {4}".format(val,np.median(diffs_nocorr[:,i]), np.std(diffs_nocorr[:,i]), np.median(errs_nocorr[:,i]),np.median(crb_nocorr[:,i]))
 
         print "--  corr --"
         for i,val in enumerate(corr_fit_params.valuesdict().keys()):
-            print "{0}: diff {1:6.4f}+/-{2:6.4f}, mean(err) {3}, mean(crb_err) {4}".format(val,np.mean(diffs_corr[:,i]),np.std(diffs_corr[:,i]), np.mean(errs_corr[:,i]),np.mean(crb_corr[:,i]))
+            print "{0}: diff {1:6.4f}+/-{2:6.4f}, median(err) {3}, median(crb_err) {4}".format(val,np.median(diffs_corr[:,i]),np.std(diffs_corr[:,i]), np.median(errs_corr[:,i]),np.median(crb_corr[:,i]))
         print 1./snr
         # jac = jacobian2d(corr_fit_params,(x,y),emp=True,errs=errs)
         # print_mat(jac[:10,:10])
