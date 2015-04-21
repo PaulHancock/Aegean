@@ -215,7 +215,7 @@ class SimpleSource():
         Convert various numpy types to np.float64 so that they will print properly
         """
         for k in self.__dict__:
-            if type(self.__dict__[k]) in [np.float32, np.int16, np.int32, np.int64]:
+            if type(self.__dict__[k]) in [np.float32]:  # np.float32 has a broken __str__ method
                 self.__dict__[k] = np.float64(self.__dict__[k])
 
     def __str__(self):
@@ -372,6 +372,7 @@ class OutputSource(SimpleSource):
                 return -1
             else:
                 return 0
+
 
 class GlobalFittingData:
     """
@@ -1238,46 +1239,6 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
     return
 
 
-def load_catalog(filename):
-    """
-    load a catalog and extract the source positions
-    acceptable formats are:
-    csv,tab,tex - from astropy.io.ascii
-    vo,vot,xml - votable format
-    cat - format created by Aegean
-    returns [(ra,dec),...]
-    """
-    supported = get_table_formats()
-
-    fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
-
-    if fmt in ['csv', 'tab', 'tex'] and fmt in supported:
-        logging.info("Reading file {0}".format(filename))
-        t = ascii.read(filename)
-        catalog = zip(t.columns['ra'], t.columns['dec'])
-
-    elif fmt in ['vo', 'vot', 'xml'] and fmt in supported:
-        logging.info("Reading file {0}".format(filename))
-        t = parse_single_table(filename)
-        catalog = zip(t.array['ra'].tolist(), t.array['dec'].tolist())
-
-    elif fmt == 'cat':
-        logging.info("Reading ra/dec columns of Aegean catalog")
-        lines = [a.strip().split() for a in open(filename, 'r').readlines() if not a.startswith('#')]
-        catalog = [(float(a[5]), float(a[7])) for a in lines]
-    else:
-        logging.info("Assuming ascii format, reading first two columns")
-        lines = [a.strip().split() for a in open(filename, 'r').readlines() if not a.startswith('#')]
-        try:
-            catalog = [(float(a[0]), float(a[1])) for a in lines]
-        except:
-            logging.error("Expecting two columns of floats but failed to parse")
-            logging.error("Catalog file {0} not loaded".format(filename))
-            sys.exit()
-
-    return catalog
-
-
 #writing table formats
 def check_table_formats(files):
     cont = True
@@ -1367,6 +1328,94 @@ def save_catalog(filename, catalog):
         logging.warning("You get tab format")
         write_table(filename, catalog, fmt='tab')
     return
+
+
+def load_catalog(filename):
+    """
+    load a catalog and extract the source positions
+    acceptable formats are:
+    csv,tab,tex - from astropy.io.ascii
+    vo,vot,xml - votable format
+    cat - format created by Aegean
+    returns [(ra,dec),...]
+    """
+    supported = get_table_formats()
+
+    fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
+
+    if fmt in ['csv', 'tab', 'tex'] and fmt in supported:
+        logging.info("Reading file {0}".format(filename))
+        t = ascii.read(filename)
+        catalog = zip(t.columns['ra'], t.columns['dec'])
+
+    elif fmt in ['vo', 'vot', 'xml'] and fmt in supported:
+        logging.info("Reading file {0}".format(filename))
+        t = parse_single_table(filename)
+        catalog = zip(t.array['ra'].tolist(), t.array['dec'].tolist())
+
+    elif fmt == 'cat':
+        logging.info("Reading ra/dec columns of Aegean catalog")
+        lines = [a.strip().split() for a in open(filename, 'r').readlines() if not a.startswith('#')]
+        catalog = [(float(a[5]), float(a[7])) for a in lines]
+    else:
+        logging.info("Assuming ascii format, reading first two columns")
+        lines = [a.strip().split() for a in open(filename, 'r').readlines() if not a.startswith('#')]
+        try:
+            catalog = [(float(a[0]), float(a[1])) for a in lines]
+        except:
+            logging.error("Expecting two columns of floats but failed to parse")
+            logging.error("Catalog file {0} not loaded".format(filename))
+            sys.exit()
+
+    return catalog
+
+
+def load_table(filename):
+    """
+
+    :param filename:
+    :return:
+    """
+    supported = get_table_formats()
+
+    fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
+
+    if fmt in ['csv', 'tab', 'tex'] and fmt in supported:
+        logging.info("Reading file {0}".format(filename))
+        t = ascii.read(filename)
+
+    elif fmt in ['vo', 'vot', 'xml'] and fmt in supported:
+        logging.info("Reading file {0}".format(filename))
+        t = parse_single_table(filename)
+    else:
+        logging.error("Table format not recognized or supported")
+        logging.error("{0} [{1}]".format(filename,fmt))
+        t= None
+    return t
+
+
+def table_to_source_list(table, src_type=OutputSource):
+    """
+    Wrangle a table into a list of sources given by src_type
+    :param table: astropy table instance
+    :param src_type: an object type for this source, something that derives from SimpleSource is best
+    :return:
+    """
+    source_list = []
+    if table is None:
+        return source_list
+
+    for row in table:
+        # Initialise our object
+        src = src_type()
+        # look for the columns required by our source object
+        for param in src_type.names:
+            if param in table.colnames:
+                # copy the value to our object
+                setattr(src,param,row[param])
+        # save this object to our list of sources
+        source_list.append(src)
+    return source_list
 
 
 def write_table(filename, catalog, fmt=None):
@@ -2822,6 +2871,79 @@ def VASTP_find_sources_in_image():
     pass
 
 
+def priorized_fit_stage1(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
+                           beam=None, lat=None):
+    """
+    Take an input catalog, and image, and optional background/noise images
+    :return: a list of source objects
+    """
+    load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
+                 do_curve=False, beam=beam, lat=lat)
+
+    # load the table and convert to an input source list
+    input_table = load_table(catfile)
+    input_sources = table_to_source_list(input_table)
+
+    sources = []
+
+    # setup some things
+    data = global_data.img.pixels
+    rmsimg = global_data.rmsimg
+    shape = data.shape
+    pixbeam = global_data.pixbeam
+
+    for src in input_sources:
+        new_src = src
+        #find the right pixels from the ra/dec
+        source_x, source_y = sky2pix([src.ra, src.dec])
+        x = int(round(source_x))
+        y = int(round(source_y))
+
+        #reject sources that are outside the image bounds, or which have nan data/rms values
+        if not 0 <= x < shape[0] or not 0 <= y < shape[1] or \
+                not np.isfinite(data[x, y]) or \
+                not np.isfinite(rmsimg[x, y]):
+            logging.info("Source {0} not within usable region: skipping".format(src))
+            continue
+
+        flag = 0
+
+        #determine the x and y extent of the beam
+        xwidth = 2 * pixbeam.a * pixbeam.b
+        xwidth /= np.hypot(pixbeam.b * np.sin(np.radians(pixbeam.pa)), pixbeam.a * np.cos(np.radians(pixbeam.pa)))
+        ywidth = 2 * pixbeam.a * pixbeam.b
+        ywidth /= np.hypot(pixbeam.b * np.cos(np.radians(pixbeam.pa)), pixbeam.a * np.sin(np.radians(pixbeam.pa)))
+        #round to an int and add 1
+        ywidth = int(round(ywidth)) + 1
+        xwidth = int(round(xwidth)) + 1
+
+        #cut out an image of this size
+        xmin = max(0, x - xwidth / 2)
+        ymin = max(0, y - ywidth / 2)
+        xmax = min(shape[0], x + xwidth / 2 + 1)
+        ymax = min(shape[1], y + ywidth / 2 + 1)
+        idata = data[xmin:xmax, ymin:ymax]
+
+        # Select the region of the map that is to be used
+
+        pass
+        # Set up the parameters for the fit, including constraints
+        pass
+        # Do the fit
+        pass
+        # Create a new source by copying most parameters
+        # Don't copy errors on input parameters (use, -1 for all not fit errors)
+        # Residual is still useful so recreate that
+        sources.append(new_src)
+
+
+    # Write the output to the output file (note that None -> stdout)
+    print >> outfile, header.format("{0}-({1})".format(__version__,__date__), filename)
+    print >> outfile, OutputSource.header
+    for source in sources:
+        print >> outfile, str(source)
+    return sources
+
 def classify_catalog(catalog):
     """
     look at a catalog of sources and split them according to their class
@@ -3106,6 +3228,8 @@ if __name__ == "__main__":
 
     parser.add_option('--measure', dest='measure', action='store_true', default=False,
                       help='Enable forced measurement mode. Requires an input source list via --input. Sets --find to false. [default: false]')
+    parser.add_option('--priorized', dest='priorized', default=0,
+                      help="Enable priorized fitting, with stage = n [default=0]")
     parser.add_option('--input', dest='input', default=None,
                       help='If --measure is true, this gives the filename for a catalog of locations at which fluxes will be measured. [default: none]')
 
@@ -3148,7 +3272,7 @@ if __name__ == "__main__":
         sys.exit()
 
     #if measure/save are enabled we turn off "find" unless it was specifically
-    if (options.measure or options.save) and not options.find:
+    if (options.measure or options.save or options.priorized) and not options.find:
         options.find = False
     else:
         options.find = True
@@ -3252,13 +3376,13 @@ if __name__ == "__main__":
 
     #do forced measurements using catfile
     sources = []
-    if options.measure:
+    if options.measure and options.priorized==0:
         if options.input is None:
             logging.error("Must specify input catalog when --measure is selected")
-            sys.exit()
+            sys.exit(1)
         if not os.path.exists(options.input):
             logging.error("{0} not found".format(options.input))
-            sys.exit()
+            sys.exit(1)
         logging.info("Measuring fluxes of input catalog.")
         measurements = measure_catalog_fluxes(filename, catfile=options.input, hdu_index=options.hdu_index,
                                               outfile=options.outfile, bkgin=options.backgroundimg,
@@ -3266,6 +3390,21 @@ if __name__ == "__main__":
         if len(measurements) == 0:
             logging.info("No measurements made")
         sources.extend(measurements)
+
+    if options.priorized>0:
+        print options
+        if options.input is None:
+            logging.error("Must specify input catalog when --priorized is selected")
+            sys.exit(1)
+        if not os.path.exists(options.input):
+            logging.error("{0} not found".format(options.input))
+            sys.exit(1)
+        logging.info("Priorized fitting of sources in input catalog.")
+        logging.info("Stage = 1")
+        measurements = priorized_fit_stage1(filename, catfile=options.input, hdu_index=options.hdu_index,
+                                              outfile=options.outfile, bkgin=options.backgroundimg,
+                                              rmsin=options.noiseimg, beam=options.beam, lat=lat)
+
 
     if options.find:
         logging.info("Finding sources.")
