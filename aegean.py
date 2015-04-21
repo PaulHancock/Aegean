@@ -896,8 +896,8 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         # TODO: incorporate the circular constraint
         prefix = "c{0}_".format(i)
         params.add(prefix+'amp',value=amp, min=amp_min, max=amp_max, vary= not maxxed)
-        params.add(prefix+'xo',value=xo, min=xo_min, max=xo_max, vary= not maxxed)
-        params.add(prefix+'yo',value=yo, min=yo_min, max=yo_max, vary= not maxxed)
+        params.add(prefix+'xo',value=xo, min=float(xo_min), max=float(xo_max), vary= not maxxed)
+        params.add(prefix+'yo',value=yo, min=float(yo_min), max=float(yo_max), vary= not maxxed)
         if summit_flag & flags.FIXED2PSF > 0:
             psf_vary = False
         else:
@@ -2533,6 +2533,7 @@ def fit_island_lmfit(island_data):
         # C = np.identity(len(mx))
         # Cmatrix(mx, my, 1.5, 1.5, 0)
         B = Bmatrix(C)
+        logging.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa))
         result, model = do_lmfit(idata, params, D=2, B=B, dojac=False)
         residual = np.array(result.residual).ravel()
         residual = residual[np.isfinite(residual)]
