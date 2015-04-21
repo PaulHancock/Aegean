@@ -1094,7 +1094,7 @@ def do_mpfit(data, rmsimg, parinfo):
     return mp, parinfo, (np.median(residual),np.std(residual))
 
 
-def do_lmfit_old(data, params):
+def do_lmfit(data, params):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
@@ -1108,11 +1108,11 @@ def do_lmfit_old(data, params):
     data = np.array(data)
     mask = np.where(np.isfinite(data))
 
-    # B = None
-    mx, my = mask
-    pixbeam = get_pixbeam()
-    C = Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa)
-    B = Bmatrix(C)
+    B = None
+    #mx, my = mask
+    #pixbeam = get_pixbeam()
+    #C = Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa)
+    #B = Bmatrix(C)
 
     def residual(params):
         f = ntwodgaussian_lmfit(params)  # A function describing the model
@@ -1122,49 +1122,7 @@ def do_lmfit_old(data, params):
         else:
             return (model - data[mask]).dot(B)
 
-    result = lmfit.minimize(residual, params)  #,Dfun=jacobian2d)
-    return result, params
-
-
-def do_lmfit(data, params, B=None, D=2, dojac=False):
-    """
-    Fit the model to the data
-    data may contain 'flagged' or 'masked' data with the value of np.NaN
-    input: data - pixel information
-           params - and lmfit.Model instance
-    return: fit results, modified model
-    """
-    # copy the params so as not to change the initial conditions
-    # in case we want to use them elsewhere
-    params = copy.deepcopy(params)
-
-    data = np.array(data)
-    mask = np.where(np.isfinite(data))
-
-    if D==1:
-        mask = mask[0]
-
-    def residual(params,mask,data=None):
-        if D==2:
-            f = ntwodgaussian_lmfit(params)
-            model = f(*mask)
-        else:
-            model = gaussian(mask,params['amp'].value,params['cen'].value,params['sigma'].value)
-
-        if data is None:
-            return model
-        if B is None:
-            return model-data[mask]
-        else:
-            return (model - data[mask]).dot(B)
-    if dojac:
-        if D==1:
-            jfn = jacobian
-        else:
-            jfn = jacobian2d
-        result = lmfit.minimize(residual, params, args=(mask,data,),Dfun=jfn)
-    else:
-        result = lmfit.minimize(residual, params, args=(mask,data,))
+    result = lmfit.minimize(residual, params)
     return result, params
 
 
@@ -1986,6 +1944,7 @@ def pa_limit(pa):
         pa -= 180
     return pa
 
+
 def theta_limit(theta):
     """
     Position angle is periodic with period 180\deg
@@ -1996,6 +1955,7 @@ def theta_limit(theta):
     while theta > np.pi/2:
         theta -= np.pi
     return theta
+
 
 def gmean(indata):
     """
@@ -2529,15 +2489,13 @@ def fit_island_lmfit(island_data):
         residual = result.residual
     else:
         # Model is the fitted parameters
-        C = Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa)
+        # C = Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa)
         # C = np.identity(len(mx))
         # Cmatrix(mx, my, 1.5, 1.5, 0)
-        B = Bmatrix(C)
+        # B = Bmatrix(C)
         logging.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa))
-        result, model = do_lmfit(idata, params, D=2, B=B, dojac=False)
-        residual = np.array(result.residual).ravel()
-        residual = residual[np.isfinite(residual)]
-        residual = [ np.median(residual),np.std(residual)]
+        result, model = do_lmfit(idata, params)
+        residual = [ np.median(result.residual),np.std(result.residual)]
         if not result.success:
             is_flag = flags.FITERR
 
