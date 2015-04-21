@@ -425,8 +425,9 @@ def test2d():
     errs_corr = []
     crb_corr = []
 
-    nj = 5
+    nj = 50
     for j in xrange(nj):
+        np.random.seed(1234567+j)
 
         params = lmfit.Parameters()
         params.add('amp', value=1, min=0.5, max=2)
@@ -437,6 +438,14 @@ def test2d():
         params.add('theta',value=np.pi*np.random.random(),min=-2*np.pi,max=2*np.pi)
         params.components=1
 
+        init_params = copy.deepcopy(params)
+        init_params['amp'].value +=0.05* 2*(np.random.random()-0.5)
+        init_params['xo'].value +=2*(np.random.random()-0.5)
+        init_params['yo'].value +=2*(np.random.random()-0.5)
+        init_params['sx'].value +=np.random.random()
+        init_params['sy'].value +=np.random.random()
+        init_params['theta'].value += 0
+
         signal = elliptical_gaussian(x, y,
                                      params['amp'].value,
                                      params['xo'].value,
@@ -444,7 +453,6 @@ def test2d():
                                      params['sx'].value,
                                      params['sy'].value,
                                      params['theta'].value).reshape(nx,ny)
-        np.random.seed(1234567+j)
         noise = np.random.random((nx,ny))
         noise = gaussian_filter(noise, sigma=smoothing)
         noise -= np.mean(noise)
@@ -456,11 +464,14 @@ def test2d():
         mx,my = np.where(np.isfinite(data))
         if len(mx)<7:
             continue
-        result, fit_params = do_lmfit(data,params,D=2,dojac=True)
+
+        p = copy.deepcopy(init_params)
+        result, fit_params = do_lmfit(data,p,D=2,dojac=True)
 
         C = Cmatrix2d(mx,my,smoothing,smoothing,0)
         B = Bmatrix(C)
-        corr_result,corr_fit_params = do_lmfit(data, params, D=2, B=B,dojac=True)
+        p = copy.deepcopy(init_params)
+        corr_result,corr_fit_params = do_lmfit(data, p, D=2, B=B,dojac=True)
         errs = np.ones(C.shape[0],dtype=np.float32)/snr
 
         if np.all( [fit_params[i].stderr >0 for i in fit_params.valuesdict().keys()]):
