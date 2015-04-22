@@ -2887,13 +2887,143 @@ def priorized_fit_stage1(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
     sources = []
 
     # setup some things
-    data = global_data.img.pixels
+    data = global_data.data_pix
     rmsimg = global_data.rmsimg
+    bkgimg = global_data.bkgimg
+
+    shape = data.shape
+
+    for src in input_sources:
+        new_src = copy.deepcopy(src)
+        new_src.flags = 0
+        #find the right pixels from the ra/dec
+        source_x, source_y = sky2pix([src.ra, src.dec])
+        source_x -=1
+        source_y -=1
+        x = int(round(source_x))
+        y = int(round(source_y))
+
+        #reject sources that are outside the image bounds, or which have nan data/rms values
+        if not 0 <= x < shape[0] or not 0 <= y < shape[1] or \
+                not np.isfinite(data[x, y]) or \
+                not np.isfinite(rmsimg[x, y]):
+            logging.info("Source {0} not within usable region: skipping".format(src))
+            continue
+
+        # determine the shape parameters in pixel values
+        (_,_, sx, theta) = sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)
+        (_, _, sy, _ ) = sky2pix_vec([src.ra,src.dec], src.b/3600., src.pa+90)
+
+        if sy>sx:
+            sx,sy = sy,sx
+            theta +=90
+        sx *=fwhm2cc
+        sy *=fwhm2cc
+
+        #print src.island,src.source, sx,sy,theta
+        # choose a region that is 2x the major axis of the source, 4x semimajor axis a
+        width = 2 * sx
+
+        ywidth = int(round(width)) + 1
+        xwidth = int(round(width)) + 1
+
+        #cut out an image of this size
+        xmin = max(0, x - xwidth / 2)
+        ymin = max(0, y - ywidth / 2)
+        xmax = min(shape[0], x + xwidth / 2 + 1)
+        ymax = min(shape[1], y + ywidth / 2 + 1)
+        idata = data[xmin:xmax, ymin:ymax]
+
+        # print x,y,sx,sy,xwidth,ywidth, xmin,xmax,ymin,ymax
+
+        #offset of source location within island
+        xo = source_x - xmin
+        yo = source_y - ymin
+
+        # Set up the parameters for the fit, including constraints
+
+        params = lmfit.Parameters()
+        params.components=1
+        prefix = "c{0}_".format(params.components-1)
+        params.add(prefix + 'amp', value=src.peak_flux*2)
+        params.add(prefix + 'xo', value=xo, vary=False)
+        params.add(prefix + 'yo', value=yo, vary=False)
+        params.add(prefix + 'sx', value=sx, vary=False)
+        params.add(prefix + 'sy', value=sy, vary=False)
+        params.add(prefix + 'theta', value=theta, vary=False)
+
+
+        # do the fit
+        result, params = do_lmfit(idata,params)
+
+        # now copy across the fit parameters
+        new_src.peak_flux = params[prefix + 'amp'].value
+        new_src.err_peak_flux = params[prefix + 'amp'].stderr
+
+        print src.island,src.source,src.peak_flux, new_src.peak_flux, data[x,y]+bkgimg[x,y], idata.shape
+
+        xo = params[prefix + 'xo'].value
+        yo = params[prefix + 'yo'].value
+
+        x_pix = xo + xmin + 1
+        y_pix = yo + ymin + 1
+        y = max(min(int(round(y_pix - ymin)), bkgimg.shape[1] - 1), 0)
+        x = max(min(int(round(x_pix - xmin)), bkgimg.shape[0] - 1), 0)
+        # Create a new source by copying most parameters
+        new_src.background = bkgimg[x, y]
+        new_src.local_rms = rmsimg[x, y]
+
+        # calculate integrated flux
+        new_src.int_flux = new_src.peak_flux * sx * sy * cc2fwhm ** 2 * np.pi
+        new_src.int_flux /= get_beamarea_pix(new_src.ra,new_src.dec) # scale Jy/beam -> Jy
+
+        new_src.residual_mean = np.median(result.residual)
+        new_src.residual_std = np.std(result.residual)
+
+        # set errors to -1 for things that were not fit
+        new_src.err_a = -1
+        new_src.err_b = -1
+        new_src.err_pa = -1
+        new_src.err_ra = -1
+        new_src.err_dec = -1
+
+        sources.append(new_src)
+
+    sources = sorted(sources)
+    # Write the output to the output file (note that None -> stdout)
+    print >> outfile, header.format("{0}-({1})".format(__version__,__date__), filename)
+    print >> outfile, OutputSource.header
+    for source in sources:
+        print >> outfile, str(source)
+    return sources
+
+
+def priorized_fit_stage2(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
+                           beam=None, lat=None):
+    """
+    Take an input catalog, and image, and optional background/noise images
+    :return: a list of source objects
+    """
+    load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
+                 do_curve=False, beam=beam, lat=lat)
+
+    # load the table and convert to an input source list
+    input_table = load_table(catfile)
+    input_sources = table_to_source_list(input_table)
+
+    sources = []
+
+    # setup some things
+    data = global_data.img.pixels
+    rms = global_data.rmsimg
+    bkg = global_data.bkgimg
+
     shape = data.shape
     pixbeam = global_data.pixbeam
 
     for src in input_sources:
         new_src = src
+        new_src.flags = 0
         #find the right pixels from the ra/dec
         source_x, source_y = sky2pix([src.ra, src.dec])
         x = int(round(source_x))
@@ -2906,16 +3036,22 @@ def priorized_fit_stage1(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             logging.info("Source {0} not within usable region: skipping".format(src))
             continue
 
-        flag = 0
+        # determine the shape parameters in pixel values
+        offset = sky2pix_vec([src.ra,src.dec], src.a/3600, src.pa)
+        sx = np.hypot(offset[0]-source_x, offset[1]-source_y) * fwhm2cc
+        theta = np.atan2(offset[0]-source_x, offset[1]-source_y)
+        offset = sky2pix_vec([src.ra,src.dec], src.a/3600, src.pa+90)
+        sy = np.hypot(offset[0]-source_x, offset[1]-source_y) * fwhm2cc
 
-        #determine the x and y extent of the beam
-        xwidth = 2 * pixbeam.a * pixbeam.b
-        xwidth /= np.hypot(pixbeam.b * np.sin(np.radians(pixbeam.pa)), pixbeam.a * np.cos(np.radians(pixbeam.pa)))
-        ywidth = 2 * pixbeam.a * pixbeam.b
-        ywidth /= np.hypot(pixbeam.b * np.cos(np.radians(pixbeam.pa)), pixbeam.a * np.sin(np.radians(pixbeam.pa)))
-        #round to an int and add 1
-        ywidth = int(round(ywidth)) + 1
-        xwidth = int(round(xwidth)) + 1
+        if sy>sx:
+            sx,sy = sy,sx
+            theta +=90
+
+        # choose a region that is 2x the major axis of the source, 4x semimajor axis a
+        width = 4 * sx
+
+        ywidth = int(round(width)) + 1
+        xwidth = int(round(width)) + 1
 
         #cut out an image of this size
         xmin = max(0, x - xwidth / 2)
@@ -2924,16 +3060,60 @@ def priorized_fit_stage1(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
         ymax = min(shape[1], y + ywidth / 2 + 1)
         idata = data[xmin:xmax, ymin:ymax]
 
-        # Select the region of the map that is to be used
+        #offset of source location within island
+        xo = x - xmin
+        yo = y - ymin
 
-        pass
         # Set up the parameters for the fit, including constraints
-        pass
-        # Do the fit
-        pass
+
+        params = lmfit.Parameters()
+        params.add('amp', value=src.peak_flux)
+        params.add('xo', value=xo, min=0, max=xwidth)
+        params.add('yo', value=yo, min=0, max=ywidth)
+        params.add('sx', value=sx, vary=False)
+        params.add('sy', value=sy, vary=False)
+        params.add('theta', value=theta, vary=False)
+
+        # do the fit
+        result, params = do_lmfit(idata,params)
+
+        # now copy across the fit parameters
+        new_src.peak_flux = params['amp'].value
+        new_src.err_peak_flux = params['amp'].std
+
+        xo = params['xo'].value
+        yo = params['yo'].value
+
+        x_pix = xo + xmin + 1
+        y_pix = yo + ymin + 1
+        y = max(min(int(round(y_pix - ymin)), bkg.shape[1] - 1), 0)
+        x = max(min(int(round(x_pix - xmin)), bkg.shape[0] - 1), 0)
         # Create a new source by copying most parameters
-        # Don't copy errors on input parameters (use, -1 for all not fit errors)
-        # Residual is still useful so recreate that
+        new_src.background = bkg[x, y]
+        new_src.local_rms = rms[x, y]
+
+        (new_src.ra, new_src.dec, _) = pix2sky_vec((x_pix, y_pix), sx * cc2fwhm, theta)
+
+        # if one of these values are nan then there has been some problem with the WCS handling
+        if not all(np.isfinite([new_src.ra, new_src.dec])):
+            new_src.flags |= flags.WCSERR
+        # negative degrees is valid for RA, but I don't want them.
+        if new_src.ra < 0:
+            new_src.ra += 360
+        new_src.ra_str = dec2hms(new_src.ra)
+        new_src.dec_str = dec2dms(new_src.dec)
+
+        # calculate integrated flux
+        new_src.int_flux = new_src.peak_flux * sx * sy * cc2fwhm ** 2 * np.pi
+        new_src.int_flux /= get_beamarea_pix(new_src.ra,new_src.dec) # scale Jy/beam -> Jy
+
+        new_src.residual_mean = np.median(result.residual)
+        new_src.residual_std = np.std(result.residual)
+
+        # set errors to -1 for things that were not fit
+        new_src.err_a = -1
+        new_src.err_b = -1
+        new_src.err_pa = -1
         sources.append(new_src)
 
 
@@ -2943,6 +3123,7 @@ def priorized_fit_stage1(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
     for source in sources:
         print >> outfile, str(source)
     return sources
+
 
 def classify_catalog(catalog):
     """
@@ -3392,7 +3573,6 @@ if __name__ == "__main__":
         sources.extend(measurements)
 
     if options.priorized>0:
-        print options
         if options.input is None:
             logging.error("Must specify input catalog when --priorized is selected")
             sys.exit(1)
@@ -3402,8 +3582,10 @@ if __name__ == "__main__":
         logging.info("Priorized fitting of sources in input catalog.")
         logging.info("Stage = 1")
         measurements = priorized_fit_stage1(filename, catfile=options.input, hdu_index=options.hdu_index,
-                                              outfile=options.outfile, bkgin=options.backgroundimg,
-                                              rmsin=options.noiseimg, beam=options.beam, lat=lat)
+                                            rms=options.rms,
+                                            outfile=options.outfile, bkgin=options.backgroundimg,
+                                            rmsin=options.noiseimg, beam=options.beam, lat=lat)
+        sources.extend(measurements)
 
 
     if options.find:
