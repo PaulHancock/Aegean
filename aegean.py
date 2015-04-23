@@ -1214,8 +1214,27 @@ def result_to_components(result, model, island_data, flags):
         source.int_flux = source.peak_flux * sx * sy * cc2fwhm ** 2 * np.pi
         source.int_flux /= get_beamarea_pix(source.ra,source.dec) # scale Jy/beam -> Jy
 
-        # ------ calculate errors for each parameter ------
+        # We currently assume Condon'97 errors for all params.
         calc_errors(source)
+
+        # if we didn't fit xo/yo then there are no ra/dec errors
+        if not model[prefix + 'xo'].vary or not model[prefix + 'yo'].vary:
+            source.err_ra = -1
+            source.err_dec = -1
+
+        # if we did't fit sx,xy then there is no major/minor errors
+        if not model[prefix + 'sx'].vary or not model[prefix + 'sy'].vary:
+            source.err_a = -1
+            source.err_b = -1
+
+        # if we didn't fit theta then pa has no error
+        if not model[prefix + 'theta'].vary:
+            source.err_pa = -1
+
+        # to be consistent we also check for amp
+        if not model[prefix + 'amp'].vary:
+            source.err_peak_flux = -1
+            source.err_int_flux = -1
 
         # these are goodness of fit statistics for the entire island.
         source.residual_mean = residual[0]
