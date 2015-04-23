@@ -407,12 +407,8 @@ class IslandFittingData(object):
     scalars=(innerclip,outerclip,max_summits)
     offsets=(xmin,xmax,ymin,ymax)
     """
-    isle_num = 0
-    i = None
-    scalars = []
-    offsets = []
 
-    def __init__(self, isle_num, i, scalars, offsets, doislandflux):
+    def __init__(self, isle_num=0, i=None, scalars=None, offsets=(0,0,1,1), doislandflux=False):
         self.isle_num = isle_num
         self.i = i
         self.scalars = scalars
@@ -1138,7 +1134,8 @@ def result_to_components(result, model, island_data, flags):
     # island data
     isle_num = island_data.isle_num
     idata = island_data.i
-    innerclip, outerclip, max_summits = island_data.scalars
+    if island_data.scalars is not None:
+        innerclip, outerclip, max_summits = island_data.scalars
     xmin, xmax, ymin, ymax = island_data.offsets
 
 
@@ -3232,8 +3229,8 @@ def priorized_fit_stage3(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
     for src in input_sources:
         logging.debug("-=-")
         logging.debug("input source: ({0},{1})".format(src.island,src.source))
-        new_src = copy.deepcopy(src)
-        new_src.flags = 0
+        # new_src = copy.deepcopy(src)
+        # new_src.flags = 0
         #find the right pixels from the ra/dec
         source_x, source_y = sky2pix([src.ra, src.dec])
         source_x -=1
@@ -3295,58 +3292,65 @@ def priorized_fit_stage3(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
         params.add(prefix + 'sx', value=sx, min=1, max=xwidth)
         params.add(prefix + 'sy', value=sy, min=1, max=ywidth)
         params.add(prefix + 'theta', value=theta)
-
+        params.add(prefix + 'flags', value=0, vary=False)
 
         # do the fit
-        result, params = do_lmfit(idata,params)
+        result, model = do_lmfit(idata,params)
 
+        # convert the results to a source object
+        offsets = (xmin, xmax, ymin, ymax)
+        island_data = IslandFittingData(src.island, src.source, offsets=offsets)
+        new_src = result_to_components(result, model, island_data, src.flags)[0]
+        # preserve the component numbers
+        new_src.source = src.source
         #
-        # now copy across the fit parameters
+        # #
+        # # now copy across the fit parameters
+        # #
         #
-
-        # flux
-        new_src.peak_flux = params[prefix + 'amp'].value
-        new_src.err_peak_flux = params[prefix + 'amp'].stderr
-        logging.debug("Input params:")
-        logging.debug(" amp: {0:5.2e}+/-{1:5.2e}".format(src.peak_flux,src.err_peak_flux))
-        logging.debug(" sky pos {0}, {1}".format(src.ra_str, src.dec_str))
-        logging.debug("Fitted params:")
-        logging.debug(" amp: {0:5.2e}+/-{1:5.2e}".format(new_src.peak_flux,new_src.err_peak_flux))
-
-        # position
-        xo = params[prefix + 'xo'].value
-        yo = params[prefix + 'yo'].value
-
-        x_pix = xo + xmin + 1
-        y_pix = yo + ymin + 1
-        new_src.ra, new_src.dec = pix2sky([x_pix,y_pix])
-        # TODO calculate these errors.
-        new_src.err_ra = -1
-        new_src.err_dec = -1
-        new_src.ra_str = dec2hms(new_src.ra)
-        new_src.dec_str = dec2dms(new_src.dec)
-        logging.debug(" sky pos {0}, {1}".format(new_src.ra_str,new_src.dec_str))
-
-        # background/rms
-
-        y = max(min(int(round(y_pix - ymin)), bkgimg.shape[1] - 1), 0)
-        x = max(min(int(round(x_pix - xmin)), bkgimg.shape[0] - 1), 0)
-        new_src.background = bkgimg[x, y]
-        new_src.local_rms = rmsimg[x, y]
-        logging.debug(" background {0}".format(bkgimg[x,y]))
-        logging.debug(" local_rms {0}".format(rmsimg[x,y]))
-
-        # calculate integrated flux
-        new_src.int_flux = new_src.peak_flux * sx * sy * cc2fwhm ** 2 * np.pi
-        new_src.int_flux /= get_beamarea_pix(new_src.ra,new_src.dec) # scale Jy/beam -> Jy
-
-        new_src.residual_mean = np.median(result.residual)
-        new_src.residual_std = np.std(result.residual)
-
-        # set errors to -1 for things that were not fit
-        new_src.err_a = -1
-        new_src.err_b = -1
-        new_src.err_pa = -1
+        # # flux
+        # new_src.peak_flux = params[prefix + 'amp'].value
+        # new_src.err_peak_flux = params[prefix + 'amp'].stderr
+        # logging.debug("Input params:")
+        # logging.debug(" amp: {0:5.2e}+/-{1:5.2e}".format(src.peak_flux,src.err_peak_flux))
+        # logging.debug(" sky pos {0}, {1}".format(src.ra_str, src.dec_str))
+        # logging.debug("Fitted params:")
+        # logging.debug(" amp: {0:5.2e}+/-{1:5.2e}".format(new_src.peak_flux,new_src.err_peak_flux))
+        #
+        # # position
+        # xo = params[prefix + 'xo'].value
+        # yo = params[prefix + 'yo'].value
+        #
+        # x_pix = xo + xmin + 1
+        # y_pix = yo + ymin + 1
+        # new_src.ra, new_src.dec = pix2sky([x_pix,y_pix])
+        # # TODO calculate these errors.
+        # new_src.err_ra = -1
+        # new_src.err_dec = -1
+        # new_src.ra_str = dec2hms(new_src.ra)
+        # new_src.dec_str = dec2dms(new_src.dec)
+        # logging.debug(" sky pos {0}, {1}".format(new_src.ra_str,new_src.dec_str))
+        #
+        # # background/rms
+        #
+        # y = max(min(int(round(y_pix - ymin)), bkgimg.shape[1] - 1), 0)
+        # x = max(min(int(round(x_pix - xmin)), bkgimg.shape[0] - 1), 0)
+        # new_src.background = bkgimg[x, y]
+        # new_src.local_rms = rmsimg[x, y]
+        # logging.debug(" background {0}".format(bkgimg[x,y]))
+        # logging.debug(" local_rms {0}".format(rmsimg[x,y]))
+        #
+        # # calculate integrated flux
+        # new_src.int_flux = new_src.peak_flux * sx * sy * cc2fwhm ** 2 * np.pi
+        # new_src.int_flux /= get_beamarea_pix(new_src.ra,new_src.dec) # scale Jy/beam -> Jy
+        #
+        # new_src.residual_mean = np.median(result.residual)
+        # new_src.residual_std = np.std(result.residual)
+        #
+        # # set errors to -1 for things that were not fit
+        # new_src.err_a = -1
+        # new_src.err_b = -1
+        # new_src.err_pa = -1
 
         sources.append(new_src)
 
@@ -3815,7 +3819,11 @@ if __name__ == "__main__":
             logging.error("{0} not found".format(options.input))
             sys.exit(1)
         logging.info("Priorized fitting of sources in input catalog.")
-        if options.priorized==2:
+
+        if options.priorized==3:
+            fn = priorized_fit_stage3
+            logging.info("Stage = 3")
+        elif options.priorized==2:
             fn = priorized_fit_stage2
             logging.info("Stage = 2")
         else:
