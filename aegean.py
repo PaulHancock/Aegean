@@ -3126,7 +3126,7 @@ def priorized_fit_stage2(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
 
         x_pix = xo + xmin + 1
         y_pix = yo + ymin + 1
-        new_src.ra, new_src.dec, _ , _ = pix2sky_vec([x_pix,y_pix],sx*cc2fwhm, theta)
+        new_src.ra, new_src.dec = pix2sky([x_pix,y_pix])
         # TODO calculate these errors.
         new_src.err_ra = -1
         new_src.err_dec = -1
