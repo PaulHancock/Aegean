@@ -2190,6 +2190,7 @@ def calc_errors(source):
     :param source:
     :return:
     """
+
     alphas = {'amp':(3./2, 3./2),
     'major':(5./2, 1./2), 'xo':(5./2, 1./2),
     'minor':(1./2, 5./2), 'yo':(1./2, 5./2), 'pa':(1./2, 5./2)}
@@ -2945,6 +2946,7 @@ def priorized_fit_stage1(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
         yo = source_y - ymin
         logging.debug("island extracted:")
         logging.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
+        logging.debug(" flux at src position [{0},{1}]={2}".format(x,y,data[x,y]))
         logging.debug(" max = {0}".format(np.nanmax(idata)))
         logging.debug("{0}".format(idata))
         # Set up the parameters for the fit, including constraints
@@ -3015,6 +3017,7 @@ def priorized_fit_stage2(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
                            beam=None, lat=None):
     """
     Take an input catalog, and image, and optional background/noise images
+    fit the flux and ra/dec for each of the given sources, keeping the morpholoy fixed
     :return: a list of source objects
     """
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
@@ -3022,26 +3025,30 @@ def priorized_fit_stage2(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
 
     # load the table and convert to an input source list
     input_table = load_table(catfile)
-    input_sources = table_to_source_list(input_table)
+    input_sources = sorted(table_to_source_list(input_table))
 
     sources = []
 
     # setup some things
-    data = global_data.img.pixels
-    rms = global_data.rmsimg
-    bkg = global_data.bkgimg
+    data = global_data.data_pix
+    rmsimg = global_data.rmsimg
+    bkgimg = global_data.bkgimg
 
     shape = data.shape
-    pixbeam = global_data.pixbeam
 
     for src in input_sources:
-        new_src = src
+        logging.debug("-=-")
+        logging.debug("input source: ({0},{1})".format(src.island,src.source))
+        new_src = copy.deepcopy(src)
         new_src.flags = 0
         #find the right pixels from the ra/dec
         source_x, source_y = sky2pix([src.ra, src.dec])
+        source_x -=1
+        source_y -=1
         x = int(round(source_x))
         y = int(round(source_y))
 
+        logging.debug("pixel location ({0:5.2f},{1:5.2f})".format(source_x,source_y))
         #reject sources that are outside the image bounds, or which have nan data/rms values
         if not 0 <= x < shape[0] or not 0 <= y < shape[1] or \
                 not np.isfinite(data[x, y]) or \
@@ -3050,18 +3057,19 @@ def priorized_fit_stage2(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             continue
 
         # determine the shape parameters in pixel values
-        offset = sky2pix_vec([src.ra,src.dec], src.a/3600, src.pa)
-        sx = np.hypot(offset[0]-source_x, offset[1]-source_y) * fwhm2cc
-        theta = np.atan2(offset[0]-source_x, offset[1]-source_y)
-        offset = sky2pix_vec([src.ra,src.dec], src.a/3600, src.pa+90)
-        sy = np.hypot(offset[0]-source_x, offset[1]-source_y) * fwhm2cc
-
+        (_,_, sx, theta) = sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)
+        (_, _, sy, _ ) = sky2pix_vec([src.ra,src.dec], src.b/3600., src.pa+90)
         if sy>sx:
             sx,sy = sy,sx
             theta +=90
+        sx *=fwhm2cc
+        sy *=fwhm2cc
+        logging.debug("Source shape [sky coords ]  {0:5.2f}x{1:5.2f}@{2:05.2f}".format(src.a,src.b,src.pa))
+        logging.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
 
+        #print src.island,src.source, sx,sy,theta
         # choose a region that is 2x the major axis of the source, 4x semimajor axis a
-        width = 4 * sx
+        width = 2 * sx
 
         ywidth = int(round(width)) + 1
         xwidth = int(round(width)) + 1
@@ -3073,48 +3081,67 @@ def priorized_fit_stage2(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
         ymax = min(shape[1], y + ywidth / 2 + 1)
         idata = data[xmin:xmax, ymin:ymax]
 
-        #offset of source location within island
-        xo = x - xmin
-        yo = y - ymin
+        # print x,y,sx,sy,xwidth,ywidth, xmin,xmax,ymin,ymax
 
+        #offset of source location within island
+        xo = source_x - xmin
+        yo = source_y - ymin
+        logging.debug("island extracted:")
+        logging.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
+        logging.debug(" flux at src position [{0},{1}]={2}".format(x,y,data[x,y]))
+        logging.debug(" max = {0}".format(np.nanmax(idata)))
+        logging.debug("{0}".format(idata))
         # Set up the parameters for the fit, including constraints
 
         params = lmfit.Parameters()
-        params.add('amp', value=src.peak_flux)
-        params.add('xo', value=xo, min=0, max=xwidth)
-        params.add('yo', value=yo, min=0, max=ywidth)
-        params.add('sx', value=sx, vary=False)
-        params.add('sy', value=sy, vary=False)
-        params.add('theta', value=theta, vary=False)
+        params.components=1
+        prefix = "c{0}_".format(params.components-1)
+        params.add(prefix + 'amp', value=src.peak_flux*2)
+        params.add(prefix + 'xo', value=xo, min=0, max=xwidth)
+        params.add(prefix + 'yo', value=yo, min=0, max=ywidth)
+        params.add(prefix + 'sx', value=sx, vary=False)
+        params.add(prefix + 'sy', value=sy, vary=False)
+        params.add(prefix + 'theta', value=theta, vary=False)
+
 
         # do the fit
         result, params = do_lmfit(idata,params)
 
+        #
         # now copy across the fit parameters
-        new_src.peak_flux = params['amp'].value
-        new_src.err_peak_flux = params['amp'].std
+        #
 
-        xo = params['xo'].value
-        yo = params['yo'].value
+        # flux
+        new_src.peak_flux = params[prefix + 'amp'].value
+        new_src.err_peak_flux = params[prefix + 'amp'].stderr
+        logging.debug("Input params:")
+        logging.debug(" amp: {0:5.2e}+/-{1:5.2e}".format(src.peak_flux,src.err_peak_flux))
+        logging.debug(" sky pos {0}, {1}".format(src.ra_str, src.dec_str))
+        logging.debug("Fitted params:")
+        logging.debug(" amp: {0:5.2e}+/-{1:5.2e}".format(new_src.peak_flux,new_src.err_peak_flux))
+
+        # position
+        xo = params[prefix + 'xo'].value
+        yo = params[prefix + 'yo'].value
 
         x_pix = xo + xmin + 1
         y_pix = yo + ymin + 1
-        y = max(min(int(round(y_pix - ymin)), bkg.shape[1] - 1), 0)
-        x = max(min(int(round(x_pix - xmin)), bkg.shape[0] - 1), 0)
-        # Create a new source by copying most parameters
-        new_src.background = bkg[x, y]
-        new_src.local_rms = rms[x, y]
-
-        (new_src.ra, new_src.dec, _) = pix2sky_vec((x_pix, y_pix), sx * cc2fwhm, theta)
-
-        # if one of these values are nan then there has been some problem with the WCS handling
-        if not all(np.isfinite([new_src.ra, new_src.dec])):
-            new_src.flags |= flags.WCSERR
-        # negative degrees is valid for RA, but I don't want them.
-        if new_src.ra < 0:
-            new_src.ra += 360
+        new_src.ra, new_src.dec, _ , _ = pix2sky_vec([x_pix,y_pix],sx*cc2fwhm, theta)
+        # TODO calculate these errors.
+        new_src.err_ra = -1
+        new_src.err_dec = -1
         new_src.ra_str = dec2hms(new_src.ra)
         new_src.dec_str = dec2dms(new_src.dec)
+        logging.debug(" sky pos {0}, {1}".format(new_src.ra_str,new_src.dec_str))
+
+        # background/rms
+
+        y = max(min(int(round(y_pix - ymin)), bkgimg.shape[1] - 1), 0)
+        x = max(min(int(round(x_pix - xmin)), bkgimg.shape[0] - 1), 0)
+        new_src.background = bkgimg[x, y]
+        new_src.local_rms = rmsimg[x, y]
+        logging.debug(" background {0}".format(bkgimg[x,y]))
+        logging.debug(" local_rms {0}".format(rmsimg[x,y]))
 
         # calculate integrated flux
         new_src.int_flux = new_src.peak_flux * sx * sy * cc2fwhm ** 2 * np.pi
@@ -3127,9 +3154,10 @@ def priorized_fit_stage2(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
         new_src.err_a = -1
         new_src.err_b = -1
         new_src.err_pa = -1
+
         sources.append(new_src)
 
-
+    sources = sorted(sources)
     # Write the output to the output file (note that None -> stdout)
     print >> outfile, header.format("{0}-({1})".format(__version__,__date__), filename)
     print >> outfile, OutputSource.header
@@ -3422,7 +3450,7 @@ if __name__ == "__main__":
 
     parser.add_option('--measure', dest='measure', action='store_true', default=False,
                       help='Enable forced measurement mode. Requires an input source list via --input. Sets --find to false. [default: false]')
-    parser.add_option('--priorized', dest='priorized', default=0,
+    parser.add_option('--priorized', dest='priorized', default=0, type=int,
                       help="Enable priorized fitting, with stage = n [default=0]")
     parser.add_option('--input', dest='input', default=None,
                       help='If --measure is true, this gives the filename for a catalog of locations at which fluxes will be measured. [default: none]')
@@ -3593,8 +3621,14 @@ if __name__ == "__main__":
             logging.error("{0} not found".format(options.input))
             sys.exit(1)
         logging.info("Priorized fitting of sources in input catalog.")
-        logging.info("Stage = 1")
-        measurements = priorized_fit_stage1(filename, catfile=options.input, hdu_index=options.hdu_index,
+        if options.priorized==2:
+            fn = priorized_fit_stage2
+            logging.info("Stage = 2")
+        else:
+            fn = priorized_fit_stage1
+            logging.info("Stage = 1")
+
+        measurements = fn(filename, catfile=options.input, hdu_index=options.hdu_index,
                                             rms=options.rms,
                                             outfile=options.outfile, bkgin=options.backgroundimg,
                                             rmsin=options.noiseimg, beam=options.beam, lat=lat)
