@@ -3441,8 +3441,6 @@ if __name__ == "__main__":
                       help="Automatically look for background, noise, and region files using the input filename as a hint. [default: False]")
     parser.add_option("--maxsummits", dest='max_summits', type='float', default=None,
                       help="If more than *maxsummits* summits are detected in an island, no fitting is done, only estimation. [default: no limit]")
-    parser.add_option("--csigma", dest='csigma', type='float', default=None,
-                      help="[DEPRECATION IMMINENT] The cliping value applied to the curvature map, when deciding which peaks/summits are significant. [default: 1sigma]")
     parser.add_option('--seedclip', dest='innerclip', type='float', default=5,
                       help='The clipping value (in sigmas) for seeding islands. [default: 5]')
     parser.add_option('--floodclip', dest='outerclip', type='float', default=4,
@@ -3660,7 +3658,7 @@ if __name__ == "__main__":
         logging.info("Finding sources.")
         detections = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,
                                            rms=options.rms,
-                                           max_summits=options.max_summits, csigma=options.csigma,
+                                           max_summits=options.max_summits,
                                            innerclip=options.innerclip,
                                            outerclip=options.outerclip, cores=options.cores, rmsin=options.noiseimg,
                                            bkgin=options.backgroundimg, beam=options.beam,
