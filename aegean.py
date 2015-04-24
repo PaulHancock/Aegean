@@ -1580,11 +1580,7 @@ def load_table(filename):
         logging.info("Reading file {0}".format(filename))
         t = ascii.read(filename)
 
-    elif fmt in ['vo', 'vot', 'xml'] and fmt in supported:
-        logging.info("Reading file {0}".format(filename))
-        t = Table.read(filename)
-        # t = parse_single_table(filename)
-    elif fmt in ['fits']:
+    elif fmt in ['vo', 'vot', 'xml', 'fits','hdf5'] and fmt in supported:
         logging.info("Reading file {0}".format(filename))
         t = Table.read(filename)
     else:
