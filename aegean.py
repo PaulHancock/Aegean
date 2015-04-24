@@ -1584,6 +1584,9 @@ def load_table(filename):
         logging.info("Reading file {0}".format(filename))
         t = Table.read(filename)
         # t = parse_single_table(filename)
+    elif fmt in ['fits']:
+        logging.info("Reading file {0}".format(filename))
+        t = Table.read(filename)
     else:
         logging.error("Table format not recognized or supported")
         logging.error("{0} [{1}]".format(filename,fmt))
