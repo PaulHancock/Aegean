@@ -3050,9 +3050,12 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
         # set up the parameters for each of the sources within the island
         i = 0
         params = lmfit.Parameters()
+        xmin, ymin = shape
+        xmax = ymax = 0
         for src in isle:
             # find the right pixels from the ra/dec
             source_x, source_y = sky2pix([src.ra, src.dec])
+            print source_x, source_y, src.ra, src.dec
             source_x -=1
             source_y -=1
             x = int(round(source_x))
@@ -3082,45 +3085,58 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             ywidth = int(round(width)) + 1
             xwidth = int(round(width)) + 1
 
-            # cut out an image of this size
-            xmin = max(0, x - xwidth / 2)
-            ymin = max(0, y - ywidth / 2)
-            xmax = min(shape[0], x + xwidth / 2 + 1)
-            ymax = min(shape[1], y + ywidth / 2 + 1)
-            idata = data[xmin:xmax, ymin:ymax]
+            # adjust the size of the island to include this source
+            xmin = min(xmin, max(0, x - xwidth / 2))
+            ymin = min(ymin, max(0, y - ywidth / 2))
+            xmax = max(xmax, min(shape[0], x + xwidth / 2 + 1))
+            ymax = max(ymax, min(shape[1], y + ywidth / 2 + 1))
 
             # offset of source location within island
-            xo = source_x - xmin
-            yo = source_y - ymin
-            logging.debug("island extracted:")
-            logging.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
-            logging.debug(" flux at src position [{0},{1}]={2}".format(x,y,data[x,y]))
-            logging.debug(" max = {0}".format(np.nanmax(idata)))
-            logging.debug("{0}".format(idata))
+            #xo = source_x - xmin
+            #yo = source_y - ymin
 
             # Set up the parameters for the fit, including constraints
             prefix = "c{0}_".format(i)
             params.add(prefix + 'amp', value=src.peak_flux*2) # always vary
-            params.add(prefix + 'xo', value=xo, min=0, max=xwidth, vary= stage>=2)
-            params.add(prefix + 'yo', value=yo, min=0, max=ywidth, vary= stage>=2)
-            params.add(prefix + 'sx', value=sx, min=1, max=xwidth, vary= stage>=3)
-            params.add(prefix + 'sy', value=sy, min=1, max=ywidth, vary= stage>=3)
+            print source_x, source_y
+            # for now the xo/yo are locations within the main image, we correct this later
+            params.add(prefix + 'xo', value=source_x, min=source_x-xwidth/2., max=source_x+xwidth/2., vary= stage>=2)
+            params.add(prefix + 'yo', value=source_y, min=source_y-ywidth/2., max=source_y+ywidth/2., vary= stage>=2)
+            params.add(prefix + 'sx', value=sx, min=1, max=xwidth/2., vary= stage>=3)
+            params.add(prefix + 'sy', value=sy, min=1, max=ywidth/2., vary= stage>=3)
             params.add(prefix + 'theta', value=theta, vary= stage>=3)
             params.add(prefix + 'flags', value=0, vary=False)
             i += 1
 
         params.components = i
-
+        logging.debug(" {0} components being fit".format(i))
+        # now we correct the xo/yo positions to be relative to the sub-image
+        logging.debug("xmxxymyx {0} {1} {2} {3}".format(xmin,xmax,ymin,ymax))
+        for i in range(components):
+            prefix = "c{0}_".format(i)
+            params[prefix + 'xo'].value -=xmin
+            params[prefix + 'xo'].min -=xmin
+            params[prefix + 'xo'].max -=xmin
+            params[prefix + 'yo'].value -=ymin
+            params[prefix + 'yo'].min -=ymin
+            params[prefix + 'yo'].max -=ymin
+        logging.debug(params)
         # don't fit if there are no sources
-        if i<1:
+        if params.components<1:
+            logging.info("Island {0} has no sources".format(src.island))
             continue
+
+        idata = data[xmin:xmax, ymin:ymax]
+        logging.debug("island extracted:")
+        logging.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
+        logging.debug(" max = {0}".format(np.nanmax(idata)))
 
         # do the fit
         result, model = do_lmfit(idata,params)
 
         # convert the results to a source object
         offsets = (xmin, xmax, ymin, ymax)
-        island_data = IslandFittingData(src.island, src.source, offsets=offsets)
+        island_data = IslandFittingData(src.island, offsets=offsets)
         new_src = result_to_components(result, model, island_data, src.flags)
 
         sources.extend(new_src)
@@ -3629,10 +3645,14 @@ if __name__ == "__main__":
         logging.info("Priorized fitting of sources in input catalog.")
 
         logging.info("Stage = {0}".format(options.priorized))
-        measurements = priorized_fit_stage3(filename, catfile=options.input, hdu_index=options.hdu_index,
-                                            rms=options.rms,
-                                            outfile=options.outfile, bkgin=options.backgroundimg,
-                                            rmsin=options.noiseimg, beam=options.beam, lat=lat, stage=options.priorized)
+        if options.priorized <=3:
+            fn = priorized_fit_stage3
+        else:
+            fn = priorized_fit_island
+        measurements = fn(filename, catfile=options.input, hdu_index=options.hdu_index,
+                                    rms=options.rms,
+                                    outfile=options.outfile, bkgin=options.backgroundimg,
+                                    rmsin=options.noiseimg, beam=options.beam, lat=lat, stage=options.priorized)
         sources.extend(measurements)
 
 
