@@ -43,7 +43,7 @@ from AegeanTools.mpfit import mpfit
 # the glory of astropy
 import astropy
 
-# output table formats
+# input/output table formats
 from astropy.table.table import Table
 from astropy.io import ascii
 from astropy.io import fits
@@ -1582,7 +1582,8 @@ def load_table(filename):
 
     elif fmt in ['vo', 'vot', 'xml'] and fmt in supported:
         logging.info("Reading file {0}".format(filename))
-        t = parse_single_table(filename)
+        t = Table.read(filename)
+        # t = parse_single_table(filename)
     else:
         logging.error("Table format not recognized or supported")
         logging.error("{0} [{1}]".format(filename,fmt))
