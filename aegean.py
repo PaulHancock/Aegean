@@ -3049,6 +3049,7 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
 
         # set up the parameters for each of the sources within the island
         i = 0
+        params = lmfit.Parameters()
         for src in isle:
             # find the right pixels from the ra/dec
             source_x, source_y = sky2pix([src.ra, src.dec])
@@ -3098,7 +3099,6 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             logging.debug("{0}".format(idata))
 
             # Set up the parameters for the fit, including constraints
-            params = lmfit.Parameters()
             prefix = "c{0}_".format(i)
             params.add(prefix + 'amp', value=src.peak_flux*2) # always vary
             params.add(prefix + 'xo', value=xo, min=0, max=xwidth, vary= stage>=2)
@@ -3110,6 +3110,11 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             i += 1
 
         params.components = i
+
+        # don't fit if there are no sources
+        if i<1:
+            continue
+
         # do the fit
         result, model = do_lmfit(idata,params)
 
