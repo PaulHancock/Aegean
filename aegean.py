@@ -3019,6 +3019,118 @@ def priorized_fit_stage3(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
     return sources
 
 
+def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
+                           beam=None, lat=None,stage=3):
+    """
+    Take an input catalog, and image, and optional background/noise images
+    fit the flux and ra/dec for each of the given sources, keeping the morpholoy fixed
+    :return: a list of source objects
+    """
+    if stage>3:
+        logging.info("I don't understand stage={0}".format(stage))
+        logging.info("Behaving as if stage=3 instead")
+    load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
+                 do_curve=False, beam=beam, lat=lat)
+
+    # load the table and convert to an input source list
+    input_table = load_table(catfile)
+    input_sources = sorted(table_to_source_list(input_table))
+    sources = []
+
+    # setup some things
+    data = global_data.data_pix
+    rmsimg = global_data.rmsimg
+    shape = data.shape
+
+    for isle in island_itergen(input_sources):
+        components = len(isle)
+        logging.debug("-=-")
+        logging.debug("input island = {0}, {1} components".format(isle[0].island, components))
+
+        # set up the parameters for each of the sources within the island
+        i = 0
+        for src in isle:
+            # find the right pixels from the ra/dec
+            source_x, source_y = sky2pix([src.ra, src.dec])
+            source_x -=1
+            source_y -=1
+            x = int(round(source_x))
+            y = int(round(source_y))
+
+            logging.debug("pixel location ({0:5.2f},{1:5.2f})".format(source_x,source_y))
+            # reject sources that are outside the image bounds, or which have nan data/rms values
+            if not 0 <= x < shape[0] or not 0 <= y < shape[1] or \
+                    not np.isfinite(data[x, y]) or \
+                    not np.isfinite(rmsimg[x, y]):
+                logging.info("Source {0} not within usable region: skipping".format(src))
+                continue
+            # determine the shape parameters in pixel values
+            (_, _, sx, theta) = sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)
+            (_, _, sy, _ ) = sky2pix_vec([src.ra,src.dec], src.b/3600., src.pa+90)
+            if sy>sx:
+                sx,sy = sy,sx
+                theta +=90
+            sx *=fwhm2cc
+            sy *=fwhm2cc
+
+            logging.debug("Source shape [sky coords]  {0:5.2f}x{1:5.2f}@{2:05.2f}".format(src.a,src.b,src.pa))
+            logging.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
+
+            # choose a region that is 2x the major axis of the source, 4x semimajor axis a
+            width = 2 * sx
+            ywidth = int(round(width)) + 1
+            xwidth = int(round(width)) + 1
+
+            # cut out an image of this size
+            xmin = max(0, x - xwidth / 2)
+            ymin = max(0, y - ywidth / 2)
+            xmax = min(shape[0], x + xwidth / 2 + 1)
+            ymax = min(shape[1], y + ywidth / 2 + 1)
+            idata = data[xmin:xmax, ymin:ymax]
+
+            # offset of source location within island
+            xo = source_x - xmin
+            yo = source_y - ymin
+            logging.debug("island extracted:")
+            logging.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
+            logging.debug(" flux at src position [{0},{1}]={2}".format(x,y,data[x,y]))
+            logging.debug(" max = {0}".format(np.nanmax(idata)))
+            logging.debug("{0}".format(idata))
+
+            # Set up the parameters for the fit, including constraints
+            params = lmfit.Parameters()
+            prefix = "c{0}_".format(i)
+            params.add(prefix + 'amp', value=src.peak_flux*2) # always vary
+            params.add(prefix + 'xo', value=xo, min=0, max=xwidth, vary= stage>=2)
+            params.add(prefix + 'yo', value=yo, min=0, max=ywidth, vary= stage>=2)
+            params.add(prefix + 'sx', value=sx, min=1, max=xwidth, vary= stage>=3)
+            params.add(prefix + 'sy', value=sy, min=1, max=ywidth, vary= stage>=3)
+            params.add(prefix + 'theta', value=theta, vary= stage>=3)
+            params.add(prefix + 'flags', value=0, vary=False)
+            i += 1
+
+        params.components = i
+        # do the fit
+        result, model = do_lmfit(idata,params)
+
+        # convert the results to a source object
+        offsets = (xmin, xmax, ymin, ymax)
+        island_data = IslandFittingData(src.island, src.source, offsets=offsets)
+        new_src = result_to_components(result, model, island_data, src.flags)
+
+        sources.extend(new_src)
+    sources = sorted(sources)
+
+    # Write the output to the output file (note that None -> stdout)
+    print >> outfile, header.format("{0}-({1})".format(__version__,__date__), filename)
+    print >> outfile, OutputSource.header
+    for source in sources:
+        print >> outfile, str(source)
+
+    return sources
+
+
+
 def classify_catalog(catalog):
     """
     look at a catalog of sources and split them according to their class
