@@ -2910,7 +2910,7 @@ def VASTP_find_sources_in_image():
 
 
 
-def priorized_fit_stage3(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
+def priorized_fit_source(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
                            beam=None, lat=None,stage=3):
     """
     Take an input catalog, and image, and optional background/noise images
@@ -3646,7 +3646,7 @@ if __name__ == "__main__":
 
         logging.info("Stage = {0}".format(options.priorized))
         if options.priorized <=3:
-            fn = priorized_fit_stage3
+            fn = priorized_fit_source
         else:
             fn = priorized_fit_island
         measurements = fn(filename, catfile=options.input, hdu_index=options.hdu_index,
