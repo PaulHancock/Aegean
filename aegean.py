@@ -63,6 +63,8 @@ except ImportError:
 
 import sqlite3
 
+import uuid # for keeping track of source id's
+
 # need Region in the name space in order to be able to unpickle it
 try:
     from AegeanTools.regions import Region
@@ -195,7 +197,7 @@ class SimpleSource(object):
 
     formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.a:5.2f} {0.b:5.2f} {0.pa:6.1f} {0.flags:06b}"
     names = ['background', 'local_rms', 'ra', 'dec', 'peak_flux', 'err_peak_flux', 'flags', 'peak_pixel', 'a', 'b',
-             'pa']
+             'pa','uuid']
 
     def __init__(self):
         self.background = 0.0
@@ -209,6 +211,7 @@ class SimpleSource(object):
         self.a = 0.0
         self.b = 0.0
         self.pa = 0.0
+        self.uuid = str(uuid.uuid4())
 
     def sanitise(self):
         """
@@ -250,7 +253,7 @@ class IslandSource(SimpleSource):
     """
     names = ['island', 'components', 'background', 'local_rms', 'ra_str', 'dec_str', 'ra', 'dec',
              'peak_flux', 'int_flux', 'err_int_flux', 'eta', 'x_width', 'y_width', 'max_angular_size', 'pa',
-             'pixels', 'area', 'beam_area', 'flags']
+             'pixels', 'area', 'beam_area', 'flags','uuid']
 
     def __init__(self):
         SimpleSource.__init__(self)
@@ -313,7 +316,7 @@ class OutputSource(SimpleSource):
                 "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:06b}"
     names = ['island', 'source', 'background', 'local_rms', 'ra_str', 'dec_str', 'ra', 'err_ra', 'dec', 'err_dec',
              'peak_flux', 'err_peak_flux', 'int_flux', 'err_int_flux', 'a', 'err_a', 'b', 'err_b', 'pa', 'err_pa',
-             'flags','residual_mean','residual_std']
+             'flags','residual_mean','residual_std','uuid']
 
     def __init__(self):
         SimpleSource.__init__(self)
