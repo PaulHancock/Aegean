@@ -3008,8 +3008,9 @@ def priorized_fit_source(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
         island_data = IslandFittingData(src.island, src.source, offsets=offsets)
         new_src = result_to_components(result, model, island_data, src.flags)[0]
 
-        # preserve the component numbers
+        # preserve the following fields for easy xmatching
         new_src.source = src.source
+        new_src.uuid = src.uuid
         sources.append(new_src)
     sources = sorted(sources)
 
