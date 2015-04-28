@@ -3059,7 +3059,6 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
         for src in isle:
             # find the right pixels from the ra/dec
             source_x, source_y = sky2pix([src.ra, src.dec])
-            print source_x, source_y, src.ra, src.dec
             source_x -=1
             source_y -=1
             x = int(round(source_x))
@@ -3142,6 +3141,10 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
         offsets = (xmin, xmax, ymin, ymax)
         island_data = IslandFittingData(src.island, offsets=offsets)
         new_src = result_to_components(result, model, island_data, src.flags)
+
+        # preserve the uuids
+        for ns, s in zip(new_src,isle):
+            ns.uuid = s.uuid
 
         sources.extend(new_src)
     sources = sorted(sources)
