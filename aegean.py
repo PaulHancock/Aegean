@@ -3045,7 +3045,7 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
     data = global_data.data_pix
     rmsimg = global_data.rmsimg
     shape = data.shape
-
+    pixbeam = get_pixbeam()
     for isle in island_itergen(input_sources):
         components = len(isle)
         logging.debug("-=-")
@@ -3098,15 +3098,16 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             #xo = source_x - xmin
             #yo = source_y - ymin
 
+            s_lims = [0.8 * pixbeam.b * fwhm2cc, 2 * sy * math.sqrt(2)]
+
             # Set up the parameters for the fit, including constraints
             prefix = "c{0}_".format(i)
             params.add(prefix + 'amp', value=src.peak_flux*2) # always vary
-            print source_x, source_y
             # for now the xo/yo are locations within the main image, we correct this later
             params.add(prefix + 'xo', value=source_x, min=source_x-xwidth/2., max=source_x+xwidth/2., vary= stage>=2)
             params.add(prefix + 'yo', value=source_y, min=source_y-ywidth/2., max=source_y+ywidth/2., vary= stage>=2)
-            params.add(prefix + 'sx', value=sx, min=1, max=xwidth/2., vary= stage>=3)
-            params.add(prefix + 'sy', value=sy, min=1, max=ywidth/2., vary= stage>=3)
+            params.add(prefix + 'sx', value=sx, min=s_lims[0], max=s_lims[1], vary= stage>=3)
+            params.add(prefix + 'sy', value=sy, min=s_lims[0], max=s_lims[1], vary= stage>=3)
             params.add(prefix + 'theta', value=theta, vary= stage>=3)
             params.add(prefix + 'flags', value=0, vary=False)
             i += 1
@@ -3478,7 +3479,9 @@ if __name__ == "__main__":
     parser.add_option('--measure', dest='measure', action='store_true', default=False,
                       help='Enable forced measurement mode. Requires an input source list via --input. Sets --find to false. [default: false]')
     parser.add_option('--priorized', dest='priorized', default=0, type=int,
-                      help="Enable priorized fitting, with stage = n [default=0]")
+                      help="IN TESTING: Enable priorized fitting, with stage = n [default=0]")
+    parser.add_option('--ratio', dest='ratio', default=1, type=float,
+                      help="IN TESTING: the ratio of synthesized beam sizes (image psf / input catalog psf). For use with priorized.")
     parser.add_option('--input', dest='input', default=None,
                       help='If --measure is true, this gives the filename for a catalog of locations at which fluxes will be measured. [default: none]')
 
@@ -3641,6 +3644,11 @@ if __name__ == "__main__":
         sources.extend(measurements)
 
     if options.priorized>0:
+        if options.ratio<=0:
+            logging.error("ratio must be positive definite")
+            sys.exit(1)
+        if options.ratio<1:
+            logging.error("ratio <1 is not advised. Have fun!")
         if options.input is None:
             logging.error("Must specify input catalog when --priorized is selected")
             sys.exit(1)
