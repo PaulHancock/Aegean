@@ -2912,15 +2912,12 @@ def VASTP_find_sources_in_image():
 
 
 def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
-                           beam=None, lat=None,stage=3):
+                           beam=None, lat=None,stage=3, ratio=1.0):
     """
     Take an input catalog, and image, and optional background/noise images
     fit the flux and ra/dec for each of the given sources, keeping the morpholoy fixed
     :return: a list of source objects
     """
-    if stage>3:
-        logging.info("I don't understand stage={0}".format(stage))
-        logging.info("Behaving as if stage=3 instead")
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
                  do_curve=False, beam=beam, lat=lat)
 
@@ -2970,6 +2967,13 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
 
             logging.debug("Source shape [sky coords]  {0:5.2f}x{1:5.2f}@{2:05.2f}".format(src.a,src.b,src.pa))
             logging.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
+
+            # resize the source based on the ratio of catalog/image resolutions
+            if ratio is not None:
+                sx *= ratio
+                sy *= ratio
+                logging.debug(" ratio is {0}".format(ratio))
+                logging.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
 
             # choose a region that is 2x the major axis of the source, 4x semimajor axis a
             width = 2 * sx
@@ -3367,7 +3371,7 @@ if __name__ == "__main__":
                       help='Enable forced measurement mode. Requires an input source list via --input. Sets --find to false. [default: false]')
     parser.add_option('--priorized', dest='priorized', default=0, type=int,
                       help="IN TESTING: Enable priorized fitting, with stage = n [default=0]")
-    parser.add_option('--ratio', dest='ratio', default=1, type=float,
+    parser.add_option('--ratio', dest='ratio', default=None, type=float,
                       help="IN TESTING: the ratio of synthesized beam sizes (image psf / input catalog psf). For use with priorized.")
     parser.add_option('--input', dest='input', default=None,
                       help='If --measure is true, this gives the filename for a catalog of locations at which fluxes will be measured. [default: none]')
@@ -3531,11 +3535,12 @@ if __name__ == "__main__":
         sources.extend(measurements)
 
     if options.priorized>0:
-        if options.ratio<=0:
-            logging.error("ratio must be positive definite")
-            sys.exit(1)
-        if options.ratio<1:
-            logging.error("ratio <1 is not advised. Have fun!")
+        if options.ratio is not None:
+            if options.ratio<=0:
+                logging.error("ratio must be positive definite")
+                sys.exit(1)
+            if options.ratio<1:
+                logging.error("ratio <1 is not advised. Have fun!")
         if options.input is None:
             logging.error("Must specify input catalog when --priorized is selected")
             sys.exit(1)
@@ -3548,7 +3553,8 @@ if __name__ == "__main__":
         measurements = priorized_fit_island(filename, catfile=options.input, hdu_index=options.hdu_index,
                                             rms=options.rms,
                                             outfile=options.outfile, bkgin=options.backgroundimg,
-                                            rmsin=options.noiseimg, beam=options.beam, lat=lat, stage=options.priorized)
+                                            rmsin=options.noiseimg, beam=options.beam, lat=lat,
+                                            stage=options.priorized, ratio=options.ratio)
         sources.extend(measurements)
 
 
