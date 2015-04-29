@@ -384,19 +384,19 @@ class GlobalFittingData(object):
     Used by island fitting subprocesses.
     wcs parameter used by most functions.
     """
-    img = None
-    dcurve = None
-    rmsimg = None
-    bkgimg = None
-    hdu_header = None
-    beam = None
-    wcs = None
-    data_pix = None
-    dtype = None
-    region = None
-    telescope_lat = None
 
     def __init__(self):
+        self.img = None
+        self.dcurve = None
+        self.rmsimg = None
+        self.bkgimg = None
+        self.hdu_header = None
+        self.beam = None
+        self.wcs = None
+        self.data_pix = None
+        self.dtype = None
+        self.region = None
+        self.telescope_lat = None
         return
 
 
@@ -1582,7 +1582,6 @@ def load_table(filename):
     if fmt in ['csv', 'tab', 'tex'] and fmt in supported:
         logging.info("Reading file {0}".format(filename))
         t = ascii.read(filename)
-
     elif fmt in ['vo', 'vot', 'xml', 'fits','hdf5'] and fmt in supported:
         logging.info("Reading file {0}".format(filename))
         t = Table.read(filename)
