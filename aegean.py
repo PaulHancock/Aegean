@@ -2409,9 +2409,10 @@ def calc_errors(source):
     source.err_a = major * np.sqrt(2/rho2('major')) *3600 # arcsec
     source.err_b = minor * np.sqrt(2/rho2('minor')) *3600 # arcsec
 
+    # TODO: proper conversion of x/y errors in ra/dec errors
     err_xo2 = 2./rho2('xo')*major**2/(8*np.log(2))
     err_yo2 = 2./rho2('yo')*minor**2/(8*np.log(2))
-    source.err_ra = np.sqrt( err_xo2*np.sin(phi)**2 + err_yo2*np.cos(phi)**2)
+    source.err_ra  = np.sqrt( err_xo2*np.sin(phi)**2 + err_yo2*np.cos(phi)**2)
     source.err_dec = np.sqrt( err_xo2*np.cos(phi)**2 + err_yo2*np.sin(phi)**2)
 
     # if major/minor are very similar then we should not be able to figure out what pa is.
