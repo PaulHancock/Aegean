@@ -155,6 +155,18 @@ def do_lmfit(data, params, B=None, D=2, dojac=False):
     return result, params
 
 
+def theta_limit(theta):
+    """
+    Position angle is periodic with period 180\deg
+    Constrain pa such that -pi/2<theta<=pi/2
+    """
+    while theta <= -1*np.pi/2:
+        theta += np.pi
+    while theta > np.pi/2:
+        theta -= np.pi
+    return theta
+
+
 def Cmatrix(x,sigma):
     return np.vstack( [ gaussian(x,1., i, 1.*sigma) for i in x ])
 
@@ -229,13 +241,12 @@ def jacobian2d(pars,xy,data=None,emp=True,errs=None):
         dmdtheta = elliptical_gaussian(x,y, amp,xo, yo, sx, sy, theta+eps) - model
         matrix = np.array([dmds,dmdxo,dmdyo,dmdsx,dmdsy,dmdtheta])/eps
         if errs is not None:
-            matrix /=errs**2
+            matrix /=errs#**2
         matrix = np.transpose(matrix)
         return matrix
 
     # precompute for speed
     sint = np.sin(theta)
-    sin2t = np.sin(2*theta)
     cost = np.cos(theta)
     x,y = xy
     xxo = x-xo
@@ -410,13 +421,13 @@ def test1d():
 
 
 def test2d():
-    nx = 10
+    nx = 15
     ny = 12
     x,y = np.where(np.ones((nx,ny))==1)
 
     smoothing = 1.27 # 3pix/beam
-    smoothing = 2.12 # 5pix/beam
-    smoothing = 1.5 # ~4.2pix/beam
+    #smoothing = 2.12 # 5pix/beam
+    #smoothing = 1.5 # ~4.2pix/beam
 
     snr = 5
 
@@ -427,27 +438,27 @@ def test2d():
     errs_corr = []
     crb_corr = []
 
-    nj = 50
+    nj = 40
+    # The model parameters
+    params = lmfit.Parameters()
+    params.add('amp', value=1, min=0.5, max=2)
+    params.add('xo', value=1.*nx/2)
+    params.add('yo', value=1.*ny/2)
+    params.add('sx', value=2*smoothing, min=0.8*smoothing)
+    params.add('sy', value=smoothing, min=0.8*smoothing)
+    params.add('theta',value=0, min=-2*np.pi, max=2*np.pi)
+    params.components=1
+
     for j in xrange(nj):
         np.random.seed(1234567+j)
-
-        # The model parameters
-        params = lmfit.Parameters()
-        params.add('amp', value=1, min=0.5, max=2)
-        params.add('xo', value=1.*nx/2)
-        params.add('yo', value=1.*ny/2)
-        params.add('sx', value=2*smoothing, min=1)
-        params.add('sy', value=smoothing, min=1)
-        params.add('theta',value=np.pi*np.random.random(),min=-2*np.pi,max=2*np.pi)
-        params.components=1
 
         # The initial guess at the parameters
         init_params = copy.deepcopy(params)
         init_params['amp'].value += 0.05* 2*(np.random.random()-0.5)
-        init_params['xo'].value += 2*(np.random.random()-0.5)
-        init_params['yo'].value += 2*(np.random.random()-0.5)
-        init_params['sx'].value *= 1+np.random.random()*0.1
-        init_params['sy'].value *= 1+np.random.random()*0.1
+        init_params['xo'].value += 1*(np.random.random()-0.5)
+        init_params['yo'].value += 1*(np.random.random()-0.5)
+        init_params['sx'].value = smoothing*1.01
+        init_params['sy'].value = smoothing
         init_params['theta'].value = 0
 
         signal = elliptical_gaussian(x, y,
@@ -463,8 +474,8 @@ def test2d():
         noise /= np.std(noise)*snr
 
         data = signal + noise
-        mask = np.where(signal/noise < 4)
-        data[mask] = np.nan
+        mask = np.where(data < 4/snr)
+        #data[mask] = np.nan
         mx,my = np.where(np.isfinite(data))
         if len(mx)<7:
             continue
@@ -480,6 +491,7 @@ def test2d():
             if fit_params['sy'].value>fit_params['sx'].value:
                 fit_params['sx'],fit_params['sy'] = fit_params['sy'],fit_params['sx']
                 fit_params['theta'].value += np.pi/2
+            fit_params['theta'].value = theta_limit(fit_params['theta'].value)
             diffs_nocorr.append([ params[i].value -fit_params[i].value for i in fit_params.valuesdict().keys()])
             errs_nocorr.append( [fit_params[i].stderr for i in fit_params.valuesdict().keys()])
             crb_nocorr.append( CRB_errs(jacobian2d(fit_params,(mx,my),emp=True,errs=errs),C) )
@@ -488,6 +500,7 @@ def test2d():
             if corr_fit_params['sy'].value>corr_fit_params['sx'].value:
                 corr_fit_params['sx'],corr_fit_params['sy'] = corr_fit_params['sy'],corr_fit_params['sx']
                 corr_fit_params['theta'].value += np.pi/2
+            corr_fit_params['theta'].value = theta_limit(corr_fit_params['theta'].value)
             diffs_corr.append([ params[i].value -corr_fit_params[i].value for i in corr_fit_params.valuesdict().keys()])
             errs_corr.append( [corr_fit_params[i].stderr for i in corr_fit_params.valuesdict().keys()])
             crb_corr.append( CRB_errs(jacobian2d(corr_fit_params,(mx,my),emp=True,errs=errs), C) )
@@ -509,7 +522,7 @@ def test2d():
 
     many = j>10
 
-    if not many:
+    if True:
         model =  elliptical_gaussian(x, y,
                                      fit_params['amp'].value,
                                      fit_params['xo'].value,
@@ -539,35 +552,44 @@ def test2d():
         cmap.set_bad('y',1.)
         kwargs = {'interpolation':'nearest','cmap':cmap,'vmin':-0.1,'vmax':1, 'origin':'lower'}
 
-        ax = fig.add_subplot(3,2,1)
+        ax = fig.add_subplot(3,3,1)
         ax.imshow(signal,**kwargs)
         ax.set_title('True')
+        rmlabels(ax)
 
-        ax = fig.add_subplot(3,2,2)
+        ax = fig.add_subplot(3,3,2)
         ax.imshow(signal+noise,**kwargs)
-        #ax.imshow(data*0, alpha=0.5, **kwargs)
         ax.set_title('Data')
+        rmlabels(ax)
+
+        ax = fig.add_subplot(3,3,3)
+        ax.imshow(noise,**kwargs)
+        ax.set_title("Noise")
+        rmlabels(ax)
 
         ax = fig.add_subplot(3,2,3)
         ax.imshow(model,**kwargs)
         ax.set_title('Model')
+        rmlabels(ax)
 
         ax = fig.add_subplot(3,2,4)
         ax.imshow(corr_model,**kwargs)
         ax.set_title('Corr_Model')
+        rmlabels(ax)
 
         ax = fig.add_subplot(3,2,5)
         ax.imshow(data - model, **kwargs)
         ax.set_title('Data - Model')
+        rmlabels(ax)
 
         ax = fig.add_subplot(3,2,6)
-        ax.imshow(data - corr_model, **kwargs)
+        mappable = ax.imshow(data - corr_model, **kwargs)
         ax.set_title('Data - Corr_model')
+        rmlabels(ax)
 
-        pyplot.show()
-    else:
-        print diffs_nocorr.shape
-        from matplotlib import pyplot
+        cax = fig.add_axes([0.9, 0.1, 0.03, 0.8])
+        fig.colorbar(mappable, cax=cax)
+
         fig = pyplot.figure(2)
         ax = fig.add_subplot(121)
         ax.plot(diffs_nocorr[:,0], label='amp')
