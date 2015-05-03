@@ -84,7 +84,7 @@ from optparse import OptionParser
 # external and support programs
 from AegeanTools.fits_image import FitsImage, Beam
 from AegeanTools.msq2 import MarchingSquares
-from AegeanTools.convert import dec2hms, dec2dms, gcd, bear, translate
+from AegeanTools.angle_tools import dec2hms, dec2dms, gcd, bear, translate
 import AegeanTools.flags as flags
 
 #multiple cores support
