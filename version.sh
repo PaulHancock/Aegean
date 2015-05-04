@@ -8,7 +8,7 @@ files="aegean.py BANE.py MIMAS.py SR6.py"
 for f in ${files}
 do
 date=`git log -n 1 --pretty="%cd" ${f}`
-shortdate=`python d2v.py ${date}`
+shortdate=`python AegeanTools/d2v.py ${date}`
 sed -i.bak "0,/__date__/{s/__date__ = '.*'/__date__ = '${shortdate}'/}" ${f}
 echo git add ${f}
 done
