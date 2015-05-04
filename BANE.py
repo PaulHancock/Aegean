@@ -6,6 +6,7 @@ import sys, os
 from optparse import OptionParser
 from time import gmtime, strftime
 import logging
+import copy
 
 #image manipulation 
 from scipy.interpolate import griddata
@@ -14,11 +15,13 @@ from astropy.io import fits as pyfits
 #Aegean tools
 from AegeanTools.running_percentile import RunningPercentiles as RP
 import AegeanTools.pprocess as pprocess
+from AegeanTools.fits_interp import compress
 
 import multiprocessing
 #from blist import *
 
-version='v1.0'
+__version__ = 'v1.0'
+__date__ = '2015-03-03'
 
 ###
 #
@@ -128,6 +131,10 @@ def running_filter(xmn,xmx,ymn,ymx):
         if (p75 is not None) and (p25 is not None):
             rms_points.append((x,y))
             rms_values.append((p75-p25)/1.34896)
+            # if rms_values[-1]<0 and logging.getLogger().isEnabledFor(logging.DEBUG):
+            #     logging.debug("RMS: {0}".format(rms_values[-1]))
+            #     logging.debug("percentiles: {0}".format([p0,p25,p50,p75,p100]))
+            #     logging.debug("rp {0}".format(rp.slist))
     #return our lists, the interpolation will be done on the master node
     #also tell the master node where the data came from
     logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
@@ -170,6 +177,16 @@ def optimum_sections(cores,data_shape):
             min_overlap=overlap
     logging.debug("Sectioning chosen to be {0[0]}x{0[1]} for a score of {1}".format(best,min_overlap))
     return best
+
+def mask_img(data,mask_data):
+    """
+
+    :param data:
+    :param mask_data:
+    :return:
+    """
+    mask = np.where(np.isnan(mask_data))
+    data[mask]=np.NaN
 
 def filter_mc(data,step_size,box_size,cores):
     """
@@ -252,17 +269,23 @@ def filter_mc(data,step_size,box_size,cores):
         interpolated_rms = griddata(rms_points,rms_values,(gx,gy),method='linear')
     else:
         interpolated_rms=gx*np.nan
-    #mask the output image as per the input image
-    mask = np.where(np.isnan(data))
-    interpolated_bkg[mask]=np.NaN
-    interpolated_rms[mask]=np.NaN
+
     if cores>1:
         del queue, parfilt
     return interpolated_bkg,interpolated_rms
 
-def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False,cores=None):
+def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False):
     """
 
+    :param im_name:
+    :param out_base:
+    :param step_size:
+    :param box_size:
+    :param twopass:
+    :param cores:
+    :param mask:
+    :param compress:
+    :return:
     """
     fits,data = load_image(im_name)
     #remove spurious dimensions of this array
@@ -295,7 +318,12 @@ def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False,cor
         #default to 5x the step size
         box_size = (step_size[0]*5,step_size[1]*5)
 
-    logging.info("using step_size {0}, box_size {1}".format(step_size,box_size))
+    if compressed:
+        if not step_size[0] == step_size[1]:
+            step_size = (min(step_size),min(step_size))
+            logging.info("Changing grid to be {0} so we can compress the output".format(step_size))
+
+    logging.info("using grid_size {0}, box_size {1}".format(step_size,box_size))
     logging.info("on data shape {0}".format(data.shape))
     bkg,rms = filter_mc(data,step_size=step_size,box_size=box_size,cores=cores)
     logging.info("done")
@@ -306,8 +334,25 @@ def filter_image(im_name,out_base,step_size=None,box_size=None,twopass=False,cor
 
     bkg_out = '_'.join([os.path.expanduser(out_base),'bkg.fits'])
     rms_out = '_'.join([os.path.expanduser(out_base),'rms.fits'])
-    save_image(fits,np.array(bkg,dtype=np.float32),bkg_out)
-    save_image(fits,np.array(rms,dtype=np.float32),rms_out)
+
+    # force float 32s to avoid bloat
+    bkg = np.array(bkg, dtype=np.float32)
+    rms = np.array(rms, dtype=np.float32)
+
+    if compressed:
+        #need to copy since compress will mess with the header
+        old_header= copy.deepcopy(fits[0].header)
+        fits[0].data = bkg
+        compress(fits, step_size[0], bkg_out)
+        fits[0].header = old_header
+        fits[0].data = rms
+        compress(fits, step_size[0], rms_out)
+        return
+    if mask:
+        mask_img(bkg, data)
+        mask_img(rms, data)
+    save_image(fits, bkg, bkg_out)
+    save_image(fits, rms, rms_out)
 
 ###
 # Alternate Filters
@@ -387,6 +432,7 @@ def save_image(fits,data,im_name):
     This function modifies the fits object!
     """
     fits[0].data = data
+    fits[0].header['HISTORY']='BANE {0}-({1})'.format(__version__,__date__)
     try:
         fits.writeto(im_name,clobber=True)
     except pyfits.verify.VerifyError,e:
@@ -402,7 +448,7 @@ if __name__=="__main__":
     usage="usage: %prog [options] FileName.fits"
     parser = OptionParser(usage=usage)
     parser.add_option("--out",dest='out_base',
-                      help="Basename for output images default = 'out'. eg out_rms.fits, out_bkg.fits")
+                      help="Basename for output images default: FileName_{bkg,rms}.fits")
     parser.add_option('--grid',dest='step_size',type='int',nargs=2,
                       help='The [x,y] size of the grid to use. Default = ~4* beam size square.')
     parser.add_option('--box',dest='box_size',type='int',nargs=2,
@@ -412,15 +458,21 @@ if __name__=="__main__":
     parser.add_option('--onepass',dest='twopass',action='store_false', help='the opposite of twopass. default=False')
     parser.add_option('--twopass',dest='twopass',action='store_true',
                       help='Calculate the bkg and rms in a two passes instead of one. (when the bkg changes rapidly)')
+    parser.add_option('--nomask', dest='mask', action='store_false', default=True,
+                      help="Don't mask the output array [default = mask]")
+    parser.add_option('--noclobber', dest='clobber',action='store_false', default=True,
+                      help="Don't run if output files already exist. Default is to run+overwrite.")
     parser.add_option('--scipy',dest='usescipy',action='store_true',
                       help='Use scipy generic filter instead of the running percentile filter. (for testing/timing)')
     parser.add_option('--debug',dest='debug',action='store_true',help='debug mode, default=False')
-    parser.set_defaults(out_base='out',step_size=None,box_size=None,twopass=True,cores=None,usescipy=False,debug=False)
+    parser.add_option('--compress', dest='compress', action='store_true',default=False,
+                      help='Produce a compressed output file.')
+    parser.set_defaults(out_base=None,step_size=None,box_size=None,twopass=True,cores=None,usescipy=False,debug=False)
     (options, args) = parser.parse_args()
 
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
-    logging.info("This is BANE {0}".format(version))
+    logging.info("This is BANE {0}-({1})".format(__version__,__date__))
     if len(args)<1:
         parser.print_help()
         sys.exit()
@@ -428,9 +480,23 @@ if __name__=="__main__":
         filename = args[0]
     if not os.path.exists(filename):
         logging.error("{0} does not exist".format(filename))
-        sys.exit()
+        sys.exit(1)
+
+    if options.out_base is None:
+        options.out_base = os.path.splitext(filename)[0]
+
+    if not options.clobber:
+        bkgout, rmsout = options.out_base+'_bkg.fits', options.out_base+'_rms.fits'
+        if os.path.exists(bkgout) and os.path.exists(rmsout):
+            logging.error("{0} and {1} exist and you said noclobber".format(bkgout,rmsout))
+            logging.error("Not running")
+            sys.exit(1)
+
+
     if options.usescipy:
         scipy_filter(im_name=filename,out_base=options.out_base,step_size=options.step_size,box_size=options.box_size,cores=options.cores)
     else:
-        filter_image(im_name=filename,out_base=options.out_base,step_size=options.step_size,box_size=options.box_size,twopass=options.twopass,cores=options.cores)
+        filter_image(im_name=filename, out_base=options.out_base, step_size=options.step_size,
+                     box_size=options.box_size, twopass=options.twopass, cores=options.cores,
+                     mask=options.mask, compressed=options.compress)
 

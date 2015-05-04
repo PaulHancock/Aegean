@@ -39,7 +39,7 @@ class RunningPercentiles():
         if len(to_add) == 0:
             return
         if len(self.slist) == 0:
-            self.slist = blist(to_add)
+            self.slist = blist(sorted(to_add))
             return
 
         #cheap version (works better for large length arrays)
@@ -108,11 +108,17 @@ def test_running_percentiles():
     correct_answers = [0, 2.5, 5.0, 7.5, 10]
     rp = RunningPercentiles()
     rp.add(a)
+    print rp.slist
     answer = rp.score()
     if answer == correct_answers:
         print "RunningPercentiles: TEST 1 PASS"
-    rp.add(np.arange(11, 26))
-    rp.sub(np.arange(15))
+    to_add = np.arange(11, 26)
+    np.random.shuffle(to_add)
+    rp.add(to_add)
+    to_sub = np.arange(15)
+    np.random.shuffle(to_sub)
+    rp.sub(to_sub)
+    print rp.slist
     answer = rp.score()
     correct_answers = [15, 17.5, 20, 22.5, 25]
     if answer == correct_answers:

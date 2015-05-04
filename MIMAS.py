@@ -18,7 +18,8 @@ from astropy.io import fits as pyfits
 from astropy.wcs import wcs as pywcs
 from AegeanTools.regions import Region
 
-version='v1.0'
+__version__ = 'v1.0'
+__date__ = '2015-03-03'
 
 #seems like this fails sometimes
 try:
@@ -235,7 +236,7 @@ def combine_regions(container):
     if len(container.exclude_polygons) > 0:
         for p in container.include_polygons:
             poly = np.array(np.radians(p))
-            r2 = Regions(container.maxdepth)
+            r2 = Region(container.maxdepth)
             r2.add_poly(poly)
             region.without(r2)
 
@@ -277,10 +278,10 @@ if __name__=="__main__":
                         help='exclude the given circles from a region')
 
     #add/remove polygons
-    group1.add_argument('+p', dest='include_polygons', action='store',
+    group1.add_argument('+p', dest='include_polygons', action='append',
                         default=[], type=float, metavar=('ra','dec'), nargs='*',
                         help='add a polygon to this region ( decimal degrees)')
-    group1.add_argument('-p', dest='exclude_polygons', action='store',
+    group1.add_argument('-p', dest='exclude_polygons', action='append',
                         default=[], type=float, metavar=('ra','dec'), nargs='*',
                         help='remove a polygon from this region ( decimal degrees)')
 
@@ -298,7 +299,7 @@ if __name__=="__main__":
     group3 = parser.add_argument_group('Extra options')
     #extras
     group3.add_argument('--debug', dest='debug', action='store_true', help='debug mode [default=False]', default=False)
-    group3.add_argument('--version', action='version', version='%(prog)s '+version)
+    group3.add_argument('--version', action='version', version='%(prog)s '+__version__+"-({0})".format(__date__))
     results = parser.parse_args()
 
     #TODO: see if there is an 'argparse' way of detecting no input
@@ -308,7 +309,7 @@ if __name__=="__main__":
 
     logging_level = logging.DEBUG if results.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
-    logging.info("This is MIMAS {0}".format(version))
+    logging.info("This is MIMAS {0}-({1})".format(__version__,__date__))
 
     if len(results.mim2reg)>0:
         for i,o in results.mim2reg:
