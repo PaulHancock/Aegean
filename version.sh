@@ -1,3 +1,4 @@
+#!/bin/sh
 # use the following format to change the major version number
 # git tag -a v2.5 -m 'Version 2.5'
 # git push --tags
