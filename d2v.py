@@ -21,7 +21,7 @@ if sys.argv[-1] == __file__:
 
 tinfo = sys.argv[-5:]
 
-months=['','Jan','Feb','Mar','Apr','Jun',"Jul",'Aug','Sep','Oct','Nov','Dec']
+months=['','Jan','Feb','Mar','Apr','May','Jun',"Jul",'Aug','Sep','Oct','Nov','Dec']
 
 month = months.index(tinfo[0])
 
