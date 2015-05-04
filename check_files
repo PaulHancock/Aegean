@@ -1,1 +1,0 @@
-find . -iname '*.py' -exec grep "^@profile" {} +
