@@ -2913,7 +2913,7 @@ def VASTP_find_sources_in_image():
 
 
 def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
-                           beam=None, lat=None,stage=3, ratio=1.0):
+                           beam=None, lat=None, stage=3, ratio=1.0):
     """
     Take an input catalog, and image, and optional background/noise images
     fit the flux and ra/dec for each of the given sources, keeping the morpholoy fixed
@@ -2942,6 +2942,8 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
         params = lmfit.Parameters()
         xmin, ymin = shape
         xmax = ymax = 0
+
+        island_mask = []
         for src in isle:
             # find the right pixels from the ra/dec
             source_x, source_y = sky2pix([src.ra, src.dec])
@@ -3005,6 +3007,21 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             params.add(prefix + 'flags', value=0, vary=False)
             i += 1
 
+            # calculate which pixels are within the FWHM of this component
+            xpix,ypix = np.mgrid[xmin:xmax,ymin:ymax]
+            vals = elliptical_gaussian(xpix,ypix, 1,
+                                       params[prefix+'xo'].value,
+                                       params[prefix+'yo'].value,
+                                       params[prefix+'sx'].value,
+                                       params[prefix+'sy'].value,
+                                       params[prefix+'theta'].value)
+            mask = np.where(vals>0.25)
+            # convert the pixel indices to be pixels within the parent data set
+            xmask =mask[0] + xmin
+            ymask =mask[1] + ymin
+            island_mask.extend(zip(xmask,ymask))
+
+
         params.components = i
         logging.debug(" {0} components being fit".format(i))
         # now we correct the xo/yo positions to be relative to the sub-image
@@ -3023,11 +3040,24 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             logging.info("Island {0} has no sources".format(src.island))
             continue
 
-        idata = data[xmin:xmax, ymin:ymax]
+        # this .copy() will stop us from modifying the parent region when we later apply our mask.
+        idata = data[xmin:xmax, ymin:ymax].copy()
+        # now convert these back to indices within the idata region
+        island_mask = [(x-xmin,y-ymin) for x,y in island_mask]
+        # the mask is for good pixels so we need to reverse it
+        all_pixels = zip(*np.where(idata))
+        mask = zip(*set(all_pixels).difference(set(island_mask)))
+        idata[mask] = np.nan # this is the mask mentioned above
+
+        non_nan_pix = len(np.where(np.isfinite(idata))[0])
+
         logging.debug("island extracted:")
         logging.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
         logging.debug(" max = {0}".format(np.nanmax(idata)))
-
+        logging.debug(" total {0}, masked {1}, not masked {2}".format(len(all_pixels),non_nan_pix,len(all_pixels)-non_nan_pix))
+        if non_nan_pix< params.components*6:
+            logging.info(" too many masked pixels, skipping")
+            continue
         # do the fit
         result, model = do_lmfit(idata,params)
 
@@ -3036,11 +3066,20 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
         island_data = IslandFittingData(src.island, offsets=offsets)
         new_src = result_to_components(result, model, island_data, src.flags)
 
-        # preserve the uuids
         for ns, s in zip(new_src,isle):
             ns.uuid = s.uuid
-
         sources.extend(new_src)
+        new_isle = IslandSource()
+        new_isle.flags = 0
+        new_isle.island = src.island
+        new_isle.components = params.components
+        new_isle.extent = [xmin,xmax,ymin,ymax]
+        msq = MarchingSquares(idata)
+        new_isle.contour = [(a[0] + xmin, a[1] + ymin) for a in msq.perimeter]
+        anchors = [pix2sky([xmin,ymin]), pix2sky([xmax,ymax])]
+        new_isle.max_angular_size_anchors = np.ravel(anchors)
+        sources.append(new_isle)
+
     sources = sorted(sources)
 
     # Write the output to the output file (note that None -> stdout)
