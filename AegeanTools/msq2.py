@@ -121,6 +121,8 @@ class MarchingSquares():
                 y += 1
             elif self.next == self.RIGHT:
                 x += 1
+            elif self.next == self.NOWHERE:
+                break
             else:
                 #not sure what to do here
                 logging.warn("Failed to determine next step")
@@ -138,8 +140,19 @@ class MarchingSquares():
         """
         March about and trace the outline of our object
         """
-        x, y = self.findStartPoint()
-        return self.walkPerimeter(x, y)
+
+        perimeter = []
+        p = self.findStartPoint()
+        while p is not None:
+            x, y = self.findStartPoint()
+            perim = self.walkPerimeter(x, y)
+            perimeter.extend(perim)
+            p = None
+            # For fragmented islands [Doesn't work]
+            # x,y = zip(*[p for p in perim if p[0]<self.xsize and p[1] < self.ysize])
+            # self.data[x,y] = 0
+            # p = self.findStartPoint()
+        return perimeter
 
 
 if __name__ == '__main__':
