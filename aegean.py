@@ -2913,14 +2913,14 @@ def VASTP_find_sources_in_image():
 
 
 def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
-                           beam=None, lat=None, stage=3, ratio=1.0):
+                           beam=None, lat=None, stage=3, ratio=1.0, outerclip=3):
     """
     Take an input catalog, and image, and optional background/noise images
     fit the flux and ra/dec for each of the given sources, keeping the morpholoy fixed
     :return: a list of source objects
     """
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
-                 do_curve=False, beam=beam, lat=lat)
+                 do_curve=True, beam=beam, lat=lat)
 
     # load the table and convert to an input source list
     input_table = load_table(catfile)
@@ -2930,6 +2930,7 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
     # setup some things
     data = global_data.data_pix
     rmsimg = global_data.rmsimg
+    curvature = global_data.dcurve
     shape = data.shape
     pixbeam = get_pixbeam()
     for isle in island_itergen(input_sources):
@@ -2989,18 +2990,14 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             xmax = max(xmax, min(shape[0], x + xwidth / 2 + 1))
             ymax = max(ymax, min(shape[1], y + ywidth / 2 + 1))
 
-            # offset of source location within island
-            #xo = source_x - xmin
-            #yo = source_y - ymin
-
             s_lims = [0.8 * pixbeam.b * fwhm2cc, 2 * sy * math.sqrt(2)]
 
             # Set up the parameters for the fit, including constraints
             prefix = "c{0}_".format(i)
             params.add(prefix + 'amp', value=src.peak_flux*2) # always vary
             # for now the xo/yo are locations within the main image, we correct this later
-            params.add(prefix + 'xo', value=source_x, min=source_x-xwidth/2., max=source_x+xwidth/2., vary= stage>=2)
-            params.add(prefix + 'yo', value=source_y, min=source_y-ywidth/2., max=source_y+ywidth/2., vary= stage>=2)
+            params.add(prefix + 'xo', value=source_x, min=source_x-sx/2., max=source_x+sx/2., vary= stage>=2)
+            params.add(prefix + 'yo', value=source_y, min=source_y-sy/2., max=source_y+sy/2., vary= stage>=2)
             params.add(prefix + 'sx', value=sx, min=s_lims[0], max=s_lims[1], vary= stage>=3)
             params.add(prefix + 'sy', value=sy, min=s_lims[0], max=s_lims[1], vary= stage>=3)
             params.add(prefix + 'theta', value=theta, vary= stage>=3)
@@ -3008,20 +3005,33 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             i += 1
 
             # calculate which pixels are within the FWHM of this component
-            xpix,ypix = np.mgrid[xmin:xmax,ymin:ymax]
-            vals = elliptical_gaussian(xpix,ypix, 1,
-                                       params[prefix+'xo'].value,
-                                       params[prefix+'yo'].value,
-                                       params[prefix+'sx'].value,
-                                       params[prefix+'sy'].value,
-                                       params[prefix+'theta'].value)
-            mask = np.where(vals>0.25)
+            # # use pixels within the FWHM of the source
+            # xpix,ypix = np.mgrid[xmin:xmax,ymin:ymax]
+            # vals = elliptical_gaussian(xpix,ypix, 1,
+            #                            params[prefix+'xo'].value,
+            #                            params[prefix+'yo'].value,
+            #                            params[prefix+'sx'].value,
+            #                            params[prefix+'sy'].value,
+            #                            -1*params[prefix+'theta'].value) # I cannot figure out why this needs to be negative
+            # mask = np.where(vals>0.5)
+            # Use pixels above outerclip sigmas..
+            mask = np.where(data[xmin:xmax,ymin:ymax]-outerclip*rmsimg[xmin:xmax,ymin:ymax]>0)
+
+            # # Use negative curvature
+            # mask = np.where(curvature[xmin:xmax,ymin:ymax]<0)
+
+            # # Use both
+            # mask = np.where(curvature[xmin:xmax,ymin:ymax]<0 , data[xmin:xmax,ymin:ymax]-3*rmsimg[xmin:xmax,ymin:ymax]>0,False)
+            # mask = np.where(mask)
+
             # convert the pixel indices to be pixels within the parent data set
-            xmask =mask[0] + xmin
-            ymask =mask[1] + ymin
+            xmask = mask[0] + xmin
+            ymask = mask[1] + ymin
             island_mask.extend(zip(xmask,ymask))
 
-
+        if i==0:
+            logging.info("No sources found in island {0}".format(src.island))
+            continue
         params.components = i
         logging.debug(" {0} components being fit".format(i))
         # now we correct the xo/yo positions to be relative to the sub-image
@@ -3594,7 +3604,7 @@ if __name__ == "__main__":
                                             rms=options.rms,
                                             outfile=options.outfile, bkgin=options.backgroundimg,
                                             rmsin=options.noiseimg, beam=options.beam, lat=lat,
-                                            stage=options.priorized, ratio=options.ratio)
+                                            stage=options.priorized, ratio=options.ratio, outerclip=options.outerclip)
         sources.extend(measurements)
 
 
