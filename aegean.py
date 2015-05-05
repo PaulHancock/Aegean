@@ -2958,7 +2958,7 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             if not 0 <= x < shape[0] or not 0 <= y < shape[1] or \
                     not np.isfinite(data[x, y]) or \
                     not np.isfinite(rmsimg[x, y]):
-                logging.info("Source {0} not within usable region: skipping".format(src))
+                logging.info("Source ({0},{1}) not within usable region: skipping".format(src.island,src.source))
                 continue
             # determine the shape parameters in pixel values
             (_, _, sx, theta) = sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)
@@ -3065,8 +3065,19 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
         logging.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
         logging.debug(" max = {0}".format(np.nanmax(idata)))
         logging.debug(" total {0}, masked {1}, not masked {2}".format(len(all_pixels),non_nan_pix,len(all_pixels)-non_nan_pix))
-        if non_nan_pix< params.components*6:
-            logging.info(" too many masked pixels, skipping")
+
+        # determine the number of free parameters
+        nfree = np.count_nonzero([params[p].vary for p in params.keys()])
+        if non_nan_pix < nfree:
+            logging.debug("More free parameters {0} than available pixels {1}".format(nfree,non_nan_pix))
+            if non_nan_pix >= params.components:
+                logging.debug("Fixing all parameters except amplitudes")
+                for i in range(components):
+                    for p in params.keys():
+                        if 'amp' not in p:
+                            params[p].vary = False
+            else:
+                logging.debug(" no not-masked pixels, skipping".format(src.island,src.source))
             continue
         # do the fit
         result, model = do_lmfit(idata,params)
