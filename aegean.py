@@ -2925,7 +2925,7 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
     :return: a list of source objects
     """
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
-                 do_curve=True, beam=beam, lat=lat)
+                 do_curve=False, beam=beam, lat=lat)
 
     # load the table and convert to an input source list
     input_table = load_table(catfile)
@@ -2935,7 +2935,6 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
     # setup some things
     data = global_data.data_pix
     rmsimg = global_data.rmsimg
-    curvature = global_data.dcurve
     shape = data.shape
     pixbeam = get_pixbeam()
     for isle in island_itergen(input_sources):
@@ -2979,8 +2978,9 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
 
             # resize the source based on the ratio of catalog/image resolutions
             if ratio is not None:
-                sx *= ratio
-                sy *= ratio
+                sx = np.sqrt( sx**2 + (pixbeam.a*fwhm2cc)**2*(1-1/r**2))
+                sy = np.sqrt( sy**2 + (pixbeam.b*fwhm2cc)**2*(1-1/r**2))
+                pass # we don't do anything with the PA since we assume they are aligned or we have a circular beam.
                 logging.debug(" ratio is {0}".format(ratio))
                 logging.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
 
@@ -3009,25 +3009,8 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             params.add(prefix + 'flags', value=0, vary=False)
             i += 1
 
-            # calculate which pixels are within the FWHM of this component
-            # # use pixels within the FWHM of the source
-            # xpix,ypix = np.mgrid[xmin:xmax,ymin:ymax]
-            # vals = elliptical_gaussian(xpix,ypix, 1,
-            #                            params[prefix+'xo'].value,
-            #                            params[prefix+'yo'].value,
-            #                            params[prefix+'sx'].value,
-            #                            params[prefix+'sy'].value,
-            #                            -1*params[prefix+'theta'].value) # I cannot figure out why this needs to be negative
-            # mask = np.where(vals>0.5)
             # Use pixels above outerclip sigmas..
             mask = np.where(data[xmin:xmax,ymin:ymax]-outerclip*rmsimg[xmin:xmax,ymin:ymax]>0)
-
-            # # Use negative curvature
-            # mask = np.where(curvature[xmin:xmax,ymin:ymax]<0)
-
-            # # Use both
-            # mask = np.where(curvature[xmin:xmax,ymin:ymax]<0 , data[xmin:xmax,ymin:ymax]-3*rmsimg[xmin:xmax,ymin:ymax]>0,False)
-            # mask = np.where(mask)
 
             # convert the pixel indices to be pixels within the parent data set
             xmask = mask[0] + xmin
@@ -3071,7 +3054,7 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
         logging.debug(" max = {0}".format(np.nanmax(idata)))
         logging.debug(" total {0}, masked {1}, not masked {2}".format(len(all_pixels),non_nan_pix,len(all_pixels)-non_nan_pix))
 
-        # determine the number of free parameters
+        # determine the number of free parameters and if we have enough data for a fit
         nfree = np.count_nonzero([params[p].vary for p in params.keys()])
         if non_nan_pix < nfree:
             logging.debug("More free parameters {0} than available pixels {1}".format(nfree,non_nan_pix))
