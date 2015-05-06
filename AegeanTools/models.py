@@ -240,3 +240,23 @@ class IslandFittingData(object):
         self.scalars = scalars
         self.offsets = offsets
         self.doislandflux = doislandflux
+
+
+def classify_catalog(catalog):
+    """
+    look at a catalog of sources and split them according to their class
+    returns:
+    components - sources of type OutputSource
+    islands - sources of type IslandSource
+    """
+    components = []
+    islands = []
+    simples = []
+    for source in catalog:
+        if isinstance(source, OutputSource):
+            components.append(source)
+        elif isinstance(source, IslandSource):
+            islands.append(source)
+        elif isinstance(source, SimpleSource):
+            simples.append(source)
+    return components, islands, simples
