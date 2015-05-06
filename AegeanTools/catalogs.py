@@ -19,6 +19,7 @@ import re
 from models import OutputSource, IslandSource, SimpleSource, classify_catalog
 
 # input/output table formats
+import astropy
 from astropy.table.table import Table
 from astropy.io import ascii
 from astropy.io import fits
