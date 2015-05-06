@@ -2978,8 +2978,8 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
 
             # resize the source based on the ratio of catalog/image resolutions
             if ratio is not None:
-                sx = np.sqrt( sx**2 + (pixbeam.a*fwhm2cc)**2*(1-1/r**2))
-                sy = np.sqrt( sy**2 + (pixbeam.b*fwhm2cc)**2*(1-1/r**2))
+                sx = np.sqrt( sx**2 + (pixbeam.a*fwhm2cc)**2*(1-1/ratio**2))
+                sy = np.sqrt( sy**2 + (pixbeam.b*fwhm2cc)**2*(1-1/ratio**2))
                 pass # we don't do anything with the PA since we assume they are aligned or we have a circular beam.
                 logging.debug(" ratio is {0}".format(ratio))
                 logging.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
