@@ -9,7 +9,6 @@ DBSCAN clustering
 __author__= "Paul Hancock"
 
 import numpy as np
-import logging
 import sys
 
 from angle_tools import gcd
@@ -17,6 +16,10 @@ import sklearn
 import sklearn.cluster
 
 from catalogs import load_table, table_to_source_list
+
+# join the Aegean logger
+import logging
+log = logging.getLogger('Aegean')
 
 def pairwise_distance(positions):
     """
@@ -78,7 +81,9 @@ def group_iter(catalog, eps, min_members=1):
         logging.error("I don't know what catalog is")
         sys.exit(1)
 
+    log.debug("Calculating distances")
     X = pairwise_distance(positions)
+    log.debug("Clustering")
     samples, labels = sklearn.cluster.dbscan(X,eps=eps, min_samples=min_members, metric='precomputed')
     # remove repeats and the noise flag of -1
     unique_labels = set(labels).difference(set([-1]))
