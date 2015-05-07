@@ -326,21 +326,26 @@ def writeIslandContours(filename, catalog, fmt):
         line_fmt = 'image;line({0},{1},{2},{3})'
         text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
         mas_fmt = 'image; line({1},{0},{3},{2}) #color = yellow'
+        x_fmt = 'image; point({1},{0}) # point=x'
     if fmt == 'ann':
         log.warn("Kvis not yet supported")
         log.warn("not writing anything")
         return
     for c in catalog:
         contour = c.contour
-        for p1, p2 in zip(contour[:-1], contour[1:]):
-            print >> out, line_fmt.format(p1[1] + 0.5, p1[0] + 0.5, p2[1] + 0.5, p2[0] + 0.5)
-        print >> out, line_fmt.format(contour[-1][1] + 0.5, contour[-1][0] + 0.5, contour[0][1] + 0.5,
-                                      contour[0][0] + 0.5)
+        if len(contour) > 1:
+            for p1, p2 in zip(contour[:-1], contour[1:]):
+                print >> out, line_fmt.format(p1[1] + 0.5, p1[0] + 0.5, p2[1] + 0.5, p2[0] + 0.5)
+            print >> out, line_fmt.format(contour[-1][1] + 0.5, contour[-1][0] + 0.5, contour[0][1] + 0.5,
+                                          contour[0][0] + 0.5)
         #comment out lines that have invalid ra/dec (WCS problems)
         if np.nan in [c.ra, c.dec]:
             print >> out, '#',
         print >> out, text_fmt.format(c.ra, c.dec, c.island)
         print >> out, mas_fmt.format(*[a + 0.5 for a in c.max_angular_size_anchors])
+        for p1, p2 in c.pix_mask:
+            # DS9 uses 1-based instead of 0-based indexing
+            print >> out, x_fmt.format(p1+1,p2+1)
 
     out.close()
     return
