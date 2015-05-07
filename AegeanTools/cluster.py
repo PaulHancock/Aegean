@@ -20,9 +20,10 @@ from catalogs import load_table, table_to_source_list
 
 def pairwise_distance(positions):
     """
-
-    :param positions:
-    :return:
+    Calculate the distance between each pair of positions.
+    Form this into a matrix.
+    :param positions: A list of (ra,dec) positions in degrees
+    :return: a matrix of distances between each pair of points.
     """
     distances = np.empty((len(positions), len(positions)), dtype=np.float32)
     for i,p1 in enumerate(positions):
@@ -32,6 +33,27 @@ def pairwise_distance(positions):
             distances[i, j] = gcd(*np.ravel([p1,p2]))
             distances[j, i] = distances[i, j]
     return distances
+
+
+def pairwise_probability(sources):
+    """
+    Calculate the probability of an association between each pair of sources.
+    0<= probability <=1
+    Form this into a matrix.
+    :param sources: A list of sources
+    :return: a matrix of probabilities.
+    """
+    logging.error("Not yet implemented")
+    sys.exit(1)
+    probabilities = np.empty((len(sources), len(sources)), dtype=np.float32)
+    for i,p1 in enumerate(sources):
+        for j,p2 in enumerate(sources):
+            if j<i: #distances are symmetric so only calculate 1/2 of them
+                continue
+            probabilities[i, j] = gcd(*np.ravel([p1,p2]))
+            probabilities[j, i] = probabilities[i, j]
+    return probabilities
+
 
 def group_iter(catalog, eps, min_members=1):
     """
