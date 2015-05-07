@@ -43,28 +43,6 @@ from AegeanTools.mpfit import mpfit
 # the glory of astropy
 import astropy
 
-# input/output table formats
-from astropy.table.table import Table
-from astropy.io import ascii
-from astropy.io import fits
-
-try:
-    from astropy.io.votable import from_table, parse_single_table
-    from astropy.io.votable import writeto as writetoVO
-    votables_supported = True
-except ImportError:
-    votables_supported = False
-
-try:
-    import h5py
-    hdf5_supported = True
-except ImportError:
-    hdf5_supported = False
-
-import sqlite3
-
-import uuid # for keeping track of source id's
-
 # need Region in the name space in order to be able to unpickle it
 try:
     from AegeanTools.regions import Region
@@ -79,6 +57,7 @@ except ImportError:
 
 # logging and nice options
 import logging
+import logging.config
 from optparse import OptionParser
 
 # external and support programs
@@ -86,6 +65,11 @@ from AegeanTools.fits_image import FitsImage, Beam
 from AegeanTools.msq2 import MarchingSquares
 from AegeanTools.angle_tools import dec2hms, dec2dms, gcd, bear, translate
 import AegeanTools.flags as flags
+import AegeanTools.catalogs as catalogs
+# TODO: find a better solution than import *
+from AegeanTools.catalogs import *
+
+from AegeanTools.models import OutputSource, IslandSource, SimpleSource, classify_catalog
 
 #multiple cores support
 import AegeanTools.pprocess as pprocess
@@ -185,196 +169,6 @@ class Island(object):
 
     def get_pixels(self):
         return self.pixels
-
-
-class SimpleSource(object):
-    """
-    A (forced) measurement of flux at a given location
-    """
-    header = "#RA           DEC          Flux      err     a     b         pa  flags\n" + \
-             "#                        Jy/beam   Jy/beam   ''    ''        deg WNCPES\n" + \
-             "#======================================================================="
-
-    formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.a:5.2f} {0.b:5.2f} {0.pa:6.1f} {0.flags:06b}"
-    names = ['background', 'local_rms', 'ra', 'dec', 'peak_flux', 'err_peak_flux', 'flags', 'peak_pixel', 'a', 'b',
-             'pa','uuid']
-
-    def __init__(self):
-        self.background = 0.0
-        self.local_rms = 0.0
-        self.ra = 0.0
-        self.dec = 0.0
-        self.peak_flux = 0.0
-        self.err_peak_flux = 0.0
-        self.flags = 0
-        self.peak_pixel = 0.0
-        self.a = 0.0
-        self.b = 0.0
-        self.pa = 0.0
-        self.uuid = str(uuid.uuid4())
-
-    def sanitise(self):
-        """
-        Convert various numpy types to np.float64 so that they will print properly
-        """
-        for k in self.__dict__:
-            if type(self.__dict__[k]) in [np.float32]:  # np.float32 has a broken __str__ method
-                self.__dict__[k] = np.float64(self.__dict__[k])
-
-    def __str__(self):
-        """
-        convert to string
-        """
-        self.sanitise()
-        return self.formatter.format(self)
-
-    def __repr__(self):
-        """
-        A string representation of the name of this source
-        which is always just an empty string
-        """
-        return self.__str__()
-
-    def as_list(self):
-        """
-        return an ordered list of the source attributes
-        """
-        self.sanitise()
-        l = []
-        for name in self.names:
-            l.append(getattr(self, name))
-        return l
-
-
-class IslandSource(SimpleSource):
-    """
-    Each island of pixels can be characterised in a basic manner.
-    This class contains info relevant to such objects.
-    """
-    names = ['island', 'components', 'background', 'local_rms', 'ra_str', 'dec_str', 'ra', 'dec',
-             'peak_flux', 'int_flux', 'err_int_flux', 'eta', 'x_width', 'y_width', 'max_angular_size', 'pa',
-             'pixels', 'area', 'beam_area', 'flags','uuid']
-
-    def __init__(self):
-        SimpleSource.__init__(self)
-        self.island = 0  # island number
-        #background = None # local background zero point
-        #local_rms= None #local image rms
-        self.ra_str = ''  # str
-        self.dec_str = ''  # str
-        #ra = None # degrees
-        #dec = None # degrees
-        #peak_flux = None # Jy/beam
-        self.int_flux = 0.0  # Jy
-        self.err_int_flux = 0.0  # Jy
-        self.x_width = 0
-        self.y_width = 0
-        self.max_angular_size = 0
-        self.pa = 0
-        self.pixels = 0
-        self.area = 0
-        self.beam_area = 0  # at the brightest pixel
-        self.components = 0
-        self.eta = 0.0
-        # not included in 'names' and thus not included by default in most output
-        self.extent = 0
-        self.contours = []
-        self.max_angular_size_anchors = []
-
-    def __repr__(self):
-        return "({0:d})".format(self.island)
-
-    def __cmp__(self, other):
-        """
-        sort order is firstly by island then by source
-        both in ascending order
-        """
-        if self.island > other.island:
-            return 1
-        elif self.island < other.island:
-            return -1
-        else:
-            return 0
-
-
-class OutputSource(SimpleSource):
-    """
-    Each source that is fit by Aegean is cast to this type.
-    The parameters of the source are stored, along with a string
-    formatter that makes printing easy. (as does OutputSource.__str__)
-    """
-    #header for the output
-    header = "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags\n" + \
-             "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   WNCPES\n" + \
-             "#==========================================================================================================================================================================================="
-
-    #formatting strings for making nice output
-    formatter = "({0.island:04d},{0.source:02d}) {0.background: 8.6f} {0.local_rms: 8.6f} " + \
-                "{0.ra_str:12s} {0.dec_str:12s} {0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} {0.err_dec: 9.7f} " + \
-                "{0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} {0.err_int_flux: 8.6f} " + \
-                "{0.a:5.2f} {0.err_a:5.2f} {0.b:5.2f} {0.err_b:5.2f} " + \
-                "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:06b}"
-    names = ['island', 'source', 'background', 'local_rms', 'ra_str', 'dec_str', 'ra', 'err_ra', 'dec', 'err_dec',
-             'peak_flux', 'err_peak_flux', 'int_flux', 'err_int_flux', 'a', 'err_a', 'b', 'err_b', 'pa', 'err_pa',
-             'flags','residual_mean','residual_std','uuid']
-
-    def __init__(self):
-        SimpleSource.__init__(self)
-        self.island = 0  # island number
-        self.source = 0  # source number
-        #background = None # local background zero point
-        #local_rms= None #local image rms
-        self.ra_str = ''  #str
-        self.dec_str = ''  #str
-        #ra = None # degrees
-        self.err_ra = 0.0  # degrees
-        #dec = None # degrees
-        self.err_dec = 0.0
-        #peak_flux = None # Jy/beam
-        #err_peak_flux = None # Jy/beam
-        self.int_flux = 0.0  #Jy
-        self.err_int_flux = 0.0  #Jy
-        #self.a = 0.0 # major axis (arcsecs)
-        self.err_a = 0.0  # arcsecs
-        #self.b = 0.0 # minor axis (arcsecs)
-        self.err_b = 0.0  # arcsecs
-        #self.pa = 0.0 # position angle (degrees - WHAT??)
-        self.err_pa = 0.0  # degrees
-        self.flags = 0x0
-        self.residual_mean = 0
-        self.residual_std = 0
-
-    def __str__(self):
-        self.sanitise()
-        return self.formatter.format(self)
-
-    def as_list_dep(self):
-        """Return a list of all the parameters that are stored in this Source"""
-        return [self.island, self.source, self.background, self.local_rms,
-                self.ra_str, self.dec_str, self.ra, self.err_ra, self.dec, self.err_dec,
-                self.peak_flux, self.err_peak_flux, self.int_flux, self.err_int_flux,
-                self.a, self.err_a, self.b, self.err_b,
-                self.pa, self.err_pa, self.flags]
-
-    def __repr__(self):
-        return "({0:d},{1:d})".format(self.island, self.source)
-
-    def __cmp__(self, other):
-        """
-        sort order is firstly by island then by source
-        both in ascending order
-        """
-        if self.island > other.island:
-            return 1
-        elif self.island < other.island:
-            return -1
-        else:
-            if self.source > other.source:
-                return 1
-            elif self.source < other.source:
-                return -1
-            else:
-                return 0
 
 
 class GlobalFittingData(object):
@@ -478,7 +272,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
     f = find_objects(l)
 
     if n == 0:
-        logging.debug("There are no pixels above the clipping limit")
+        log.debug("There are no pixels above the clipping limit")
         return
 
     # Yield values as before, though they are not sorted by flux
@@ -497,7 +291,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
                 # if there are no un-masked pixels within the region then we skip this island.
                 if not np.any(mask):
                     continue
-                logging.debug("Mask {0}".format(mask))
+                log.debug("Mask {0}".format(mask))
             yield data_box, xmin, xmax, ymin, ymax
 
 
@@ -519,13 +313,13 @@ def estimate_mpfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
     parinfo object for mpfit
     with all parameters in pixel coords
     """
-    debug_on = logging.getLogger().isEnabledFor(logging.DEBUG)
+    debug_on = logging.getLogger('Aegean').isEnabledFor(logging.DEBUG)
     is_flag = 0
 
     #is this a negative island?
     isnegative = max(data[np.where(np.isfinite(data))]) < 0
     if isnegative and debug_on:
-        logging.debug("[is a negative island]")
+        log.debug("[is a negative island]")
 
     parinfo = []
 
@@ -536,7 +330,7 @@ def estimate_mpfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
     pixbeam = global_data.pixbeam
     if pixbeam is None:
         if debug_on:
-            logging.debug("WCSERR")
+            log.debug("WCSERR")
         is_flag = flags.WCSERR
         pixbeam = Beam(1, 1, 0)
 
@@ -545,33 +339,33 @@ def estimate_mpfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
     yo_lim = xo_lim
 
     if debug_on:
-        logging.debug(" - shape {0}".format(data.shape))
-        logging.debug(" - xo_lim,yo_lim {0}, {1}".format(xo_lim, yo_lim))
+        log.debug(" - shape {0}".format(data.shape))
+        log.debug(" - xo_lim,yo_lim {0}, {1}".format(xo_lim, yo_lim))
 
     if not data.shape == curve.shape:
-        logging.error("data and curvature are mismatched")
-        logging.error("data:{0} curve:{1}".format(data.shape, curve.shape))
+        log.error("data and curvature are mismatched")
+        log.error("data:{0} curve:{1}".format(data.shape, curve.shape))
         sys.exit()
 
     #For small islands we can't do a 6 param fit
     #Don't count the NaN values as part of the island
     non_nan_pix = len(data[np.where(np.isfinite(data))].ravel())
     if 4 <= non_nan_pix <= 6:
-        logging.debug("FIXED2PSF")
+        log.debug("FIXED2PSF")
         is_flag |= flags.FIXED2PSF
     elif non_nan_pix < 4:
-        logging.debug("FITERRSMALL!")
+        log.debug("FITERRSMALL!")
         is_flag |= flags.FITERRSMALL
     else:
         is_flag = 0
     if debug_on:
-        logging.debug(" - size {0}".format(len(data.ravel())))
+        log.debug(" - size {0}".format(len(data.ravel())))
 
     if min(data.shape) <= 2 or (is_flag & flags.FITERRSMALL):
         #1d islands or small islands only get one source
         if debug_on:
-            logging.debug("Tiny summit detected")
-            logging.debug("{0}".format(data))
+            log.debug("Tiny summit detected")
+            log.debug("{0}".format(data))
         summits = [[data, 0, data.shape[0], 0, data.shape[1]]]
         #and are constrained to be point sources
         is_flag |= flags.FIXED2PSF
@@ -587,7 +381,7 @@ def estimate_mpfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
     for summit, xmin, xmax, ymin, ymax in sorted(summits, key=lambda x: np.nanmax(-1.*abs(x[0]))):
         summit_flag = is_flag
         if debug_on:
-            logging.debug(
+            log.debug(
                 "Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape, xmin, xmax, ymin, ymax, i))
         if isnegative:
             amp = summit[np.isfinite(summit)].min()
@@ -595,16 +389,16 @@ def estimate_mpfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             amp = summit[np.isfinite(summit)].max()  #stupid NaNs break all my things
 
         (xpeak, ypeak) = np.where(summit == amp)
-        if logging.getLogger().isEnabledFor(logging.DEBUG):
-            logging.debug(" - max is {0:f}".format(amp))
-            logging.debug(" - peak at {0},{1}".format(xpeak, ypeak))
+        if log.getLogger().isEnabledFor(log.DEBUG):
+            log.debug(" - max is {0:f}".format(amp))
+            log.debug(" - peak at {0},{1}".format(xpeak, ypeak))
         xo = xpeak[0] + xmin
         yo = ypeak[0] + ymin
 
         #check to ensure that this summit is brighter than innerclip
         snr = np.nanmax(abs(data[xmin:xmax+1,ymin:ymax+1] / rmsimg[xmin:xmax+1,ymin:ymax+1]))
         if snr < innerclip:
-            logging.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
+            log.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
             continue
 
 
@@ -617,7 +411,7 @@ def estimate_mpfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             amp_max, amp_min = 0.95 * max(-outerclip * rmsimg[xo, yo], amp), amp * 1.05 - innerclip * rmsimg[xo, yo]
 
         if debug_on:
-            logging.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
+            log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
 
         xo_min, xo_max = max(xmin, xo - xo_lim), min(xmax, xo + xo_lim)
         if xo_min == xo_max:  #if we have a 1d summit then allow the position to vary by +/-0.5pix
@@ -662,17 +456,17 @@ def estimate_mpfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         # if maxxed:
         #     break
         if debug_on:
-            logging.debug(" - var val min max | min max")
-            logging.debug(" - amp {0} {1} {2} ".format(amp, amp_min, amp_max))
-            logging.debug(" - xo {0} {1} {2} ".format(xo, xo_min, xo_max))
-            logging.debug(" - yo {0} {1} {2} ".format(yo, yo_min, yo_max))
-            logging.debug(" - major {0} {1} {2} | {3} {4}".format(major, major_min, major_max, major_min / fwhm2cc,
+            log.debug(" - var val min max | min max")
+            log.debug(" - amp {0} {1} {2} ".format(amp, amp_min, amp_max))
+            log.debug(" - xo {0} {1} {2} ".format(xo, xo_min, xo_max))
+            log.debug(" - yo {0} {1} {2} ".format(yo, yo_min, yo_max))
+            log.debug(" - major {0} {1} {2} | {3} {4}".format(major, major_min, major_max, major_min / fwhm2cc,
                                                                   major_max / fwhm2cc))
-            logging.debug(" - minor {0} {1} {2} | {3} {4}".format(minor, minor_min, minor_max, minor_min / fwhm2cc,
+            log.debug(" - minor {0} {1} {2} | {3} {4}".format(minor, minor_min, minor_max, minor_min / fwhm2cc,
                                                                   minor_max / fwhm2cc))
-            logging.debug(" - pa {0} {1} {2}".format(pa, -180, 180))
-            logging.debug(" - flags {0}".format(flag))
-            logging.debug(" - fit?  {0}".format(not maxxed))
+            log.debug(" - pa {0} {1} {2}".format(pa, -180, 180))
+            log.debug(" - flags {0}".format(flag))
+            log.debug(" - fit?  {0}".format(not maxxed))
 
         parinfo.append({'value': amp,
                         'fixed': False or maxxed,
@@ -709,7 +503,7 @@ def estimate_mpfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
                         'flags': flag})
         i += 1
     if debug_on:
-        logging.debug("Estimated sources: {0}".format(i))
+        log.debug("Estimated sources: {0}".format(i))
     return parinfo
 
 
@@ -728,13 +522,13 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
 
     returns: an instance of lmfit.Parameters()
     """
-    debug_on = logging.getLogger().isEnabledFor(logging.DEBUG)
+    debug_on = log.getLogger().isEnabledFor(log.DEBUG)
     is_flag = 0
 
     #is this a negative island?
     isnegative = max(data[np.where(np.isfinite(data))]) < 0
     if isnegative and debug_on:
-        logging.debug("[is a negative island]")
+        log.debug("[is a negative island]")
 
     #TODO: remove this later.
     if outerclip is None:
@@ -743,7 +537,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
     pixbeam = global_data.pixbeam
     if pixbeam is None:
         if debug_on:
-            logging.debug("WCSERR")
+            log.debug("WCSERR")
         is_flag = flags.WCSERR
         pixbeam = Beam(1, 1, 0)
 
@@ -752,33 +546,33 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
     yo_lim = xo_lim
 
     if debug_on:
-        logging.debug(" - shape {0}".format(data.shape))
-        logging.debug(" - xo_lim,yo_lim {0}, {1}".format(xo_lim, yo_lim))
+        log.debug(" - shape {0}".format(data.shape))
+        log.debug(" - xo_lim,yo_lim {0}, {1}".format(xo_lim, yo_lim))
 
     if not data.shape == curve.shape:
-        logging.error("data and curvature are mismatched")
-        logging.error("data:{0} curve:{1}".format(data.shape, curve.shape))
+        log.error("data and curvature are mismatched")
+        log.error("data:{0} curve:{1}".format(data.shape, curve.shape))
         raise AssertionError()
 
     #For small islands we can't do a 6 param fit
     #Don't count the NaN values as part of the island
     non_nan_pix = len(data[np.where(np.isfinite(data))].ravel())
     if 4 <= non_nan_pix <= 6:
-        logging.debug("FIXED2PSF")
+        log.debug("FIXED2PSF")
         is_flag |= flags.FIXED2PSF
     elif non_nan_pix < 4:
-        logging.debug("FITERRSMALL!")
+        log.debug("FITERRSMALL!")
         is_flag |= flags.FITERRSMALL
     else:
         is_flag = 0
     if debug_on:
-        logging.debug(" - size {0}".format(len(data.ravel())))
+        log.debug(" - size {0}".format(len(data.ravel())))
 
     if min(data.shape) <= 2 or (is_flag & flags.FITERRSMALL) or (is_flag & flags.FIXED2PSF):
         #1d islands or small islands only get one source
         if debug_on:
-            logging.debug("Tiny summit detected")
-            logging.debug("{0}".format(data))
+            log.debug("Tiny summit detected")
+            log.debug("{0}".format(data))
         summits = [[data, 0, data.shape[0], 0, data.shape[1]]]
         #and are constrained to be point sources
         is_flag |= flags.FIXED2PSF
@@ -796,16 +590,16 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
     for summit, xmin, xmax, ymin, ymax in sorted(summits, key=lambda x: np.nanmax(-1.*abs(x[0]))):
         summit_flag = is_flag
         if debug_on:
-            logging.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape, ymin, ymax, xmin, xmax, i))
+            log.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape, ymin, ymax, xmin, xmax, i))
         if isnegative:
             amp = summit[np.isfinite(summit)].min()
         else:
             amp = summit[np.isfinite(summit)].max()  #stupid NaNs break all my things
 
         (xpeak, ypeak) = np.where(summit == amp)
-        if logging.getLogger().isEnabledFor(logging.DEBUG):
-            logging.debug(" - max is {0:f}".format(amp))
-            logging.debug(" - peak at {0},{1}".format(xpeak, ypeak))
+        if log.getLogger().isEnabledFor(log.DEBUG):
+            log.debug(" - max is {0:f}".format(amp))
+            log.debug(" - peak at {0},{1}".format(xpeak, ypeak))
         yo = ypeak[0] + ymin
         xo = xpeak[0] + xmin
 
@@ -814,7 +608,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         # So we test for that here.
         snr = np.nanmax(abs(data[xmin:xmax+1,ymin:ymax+1] / rmsimg[xmin:xmax+1,ymin:ymax+1]))
         if snr < innerclip:
-            logging.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
+            log.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
             continue
 
 
@@ -827,7 +621,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             amp_max, amp_min = 0.95 * max(-outerclip * rmsimg[xo, yo], amp), amp * 1.05 - innerclip * rmsimg[xo, yo]
 
         if debug_on:
-            logging.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
+            log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
 
         yo_min, yo_max = max(ymin, yo - yo_lim), min(ymax, yo + yo_lim)
         if yo_min == yo_max:  #if we have a 1d summit then allow the position to vary by +/-0.5pix
@@ -881,17 +675,17 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             summit_flag |= flags.FIXED2PSF
 
         if debug_on:
-            logging.debug(" - var val min max | min max")
-            logging.debug(" - amp {0} {1} {2} ".format(amp, amp_min, amp_max))
-            logging.debug(" - xo {0} {1} {2} ".format(xo, xo_min, xo_max))
-            logging.debug(" - yo {0} {1} {2} ".format(yo, yo_min, yo_max))
-            logging.debug(" - sx {0} {1} {2} | {3} {4}".format(sx, sx_min, sx_max, sx_min * cc2fwhm,
+            log.debug(" - var val min max | min max")
+            log.debug(" - amp {0} {1} {2} ".format(amp, amp_min, amp_max))
+            log.debug(" - xo {0} {1} {2} ".format(xo, xo_min, xo_max))
+            log.debug(" - yo {0} {1} {2} ".format(yo, yo_min, yo_max))
+            log.debug(" - sx {0} {1} {2} | {3} {4}".format(sx, sx_min, sx_max, sx_min * cc2fwhm,
                                                                   sx_max * cc2fwhm))
-            logging.debug(" - sy {0} {1} {2} | {3} {4}".format(sy, sy_min, sy_max, sy_min * cc2fwhm,
+            log.debug(" - sy {0} {1} {2} | {3} {4}".format(sy, sy_min, sy_max, sy_min * cc2fwhm,
                                                                   sy_max * cc2fwhm))
-            logging.debug(" - theta {0} {1} {2}".format(theta, -180, 180)) # -1*np.pi, np.pi))
-            logging.debug(" - flags {0}".format(flag))
-            logging.debug(" - fit?  {0}".format(not maxxed))
+            log.debug(" - theta {0} {1} {2}".format(theta, -180, 180)) # -1*np.pi, np.pi))
+            log.debug(" - flags {0}".format(flag))
+            log.debug(" - fit?  {0}".format(not maxxed))
 
         # TODO: incorporate the circular constraint
         prefix = "c{0}_".format(i)
@@ -909,7 +703,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
 
         i += 1
     if debug_on:
-        logging.debug("Estimated sources: {0}".format(i))
+        log.debug("Estimated sources: {0}".format(i))
     # remember how many components are fit.
     params.components=i
     return params
@@ -962,7 +756,7 @@ def Bmatrix(C):
     # suggested by Cath,
     L,Q = eigh(C)
     if not all(L>0):
-        logging.error("at least one eigenvalue is negative, this will cause problems!")
+        log.error("at least one eigenvalue is negative, this will cause problems!")
         sys.exit(1)
     S = np.diag(1/np.sqrt(L))
     B = Q.dot(S)
@@ -1025,8 +819,8 @@ def ntwodgaussian_mpfit(inpars):
         params = np.array(inpars).reshape(len(inpars) / 6, 6)
     except ValueError as e:
         if 'size' in e.message:
-            logging.error("inpars requires a multiple of 6 parameters")
-            logging.error("only {0} parameters supplied".format(len(inpars)))
+            log.error("inpars requires a multiple of 6 parameters")
+            log.error("only {0} parameters supplied".format(len(inpars)))
         raise e
 
     def rfunc(x, y):
@@ -1154,7 +948,7 @@ def result_to_components(result, model, island_data, flags):
         source = OutputSource()
         source.island = isle_num
         source.source = j
-        logging.debug(" component {0}".format(j))
+        log.debug(" component {0}".format(j))
         prefix = "c{0}_".format(j)
         xo = model[prefix+'xo'].value
         yo = model[prefix+'yo'].value
@@ -1243,13 +1037,13 @@ def result_to_components(result, model, island_data, flags):
         source.flags = src_flags
 
         sources.append(source)
-        logging.debug(source)
+        log.debug(source)
 
     # calculate the integrated island flux if required
     if island_data.doislandflux:
-        logging.debug("Integrated flux for island {0}".format(isle_num))
+        log.debug("Integrated flux for island {0}".format(isle_num))
         kappa_sigma = np.where(abs(idata) - outerclip * rms > 0, idata, np.NaN)
-        logging.debug("- island shape is {0}".format(kappa_sigma.shape))
+        log.debug("- island shape is {0}".format(kappa_sigma.shape))
 
         source = IslandSource()
         source.flags = 0
@@ -1259,7 +1053,7 @@ def result_to_components(result, model, island_data, flags):
         # check for negative islands
         if source.peak_flux < 0:
             source.peak_flux = np.nanmin(kappa_sigma)
-        logging.debug("- peak flux {0}".format(source.peak_flux))
+        log.debug("- peak flux {0}".format(source.peak_flux))
 
         # positions and background
         positions = np.where(kappa_sigma == source.peak_flux)
@@ -1304,19 +1098,19 @@ def result_to_components(result, model, island_data, flags):
                     source.pa = bear(radec1[0], radec1[1], radec2[0], radec2[1])
                     source.max_angular_size_anchors = [pos1[0], pos1[1], pos2[0], pos2[1]]
 
-        logging.debug("- peak position {0}, {1} [{2},{3}]".format(source.ra_str, source.dec_str, positions[0][0],
+        log.debug("- peak position {0}, {1} [{2},{3}]".format(source.ra_str, source.dec_str, positions[0][0],
                                                                   positions[1][0]))
 
         # integrated flux
         beam_area = get_beamarea_pix(source.ra,source.dec)
         isize = source.pixels  #number of non zero pixels
-        logging.debug("- pixels used {0}".format(isize))
+        log.debug("- pixels used {0}".format(isize))
         source.int_flux = np.nansum(kappa_sigma)  #total flux Jy/beam
-        logging.debug("- sum of pixles {0}".format(source.int_flux))
+        log.debug("- sum of pixles {0}".format(source.int_flux))
         source.int_flux /= beam_area
-        logging.debug("- integrated flux {0}".format(source.int_flux))
+        log.debug("- integrated flux {0}".format(source.int_flux))
         eta = erf(np.sqrt(-1 * np.log(abs(source.local_rms * outerclip / source.peak_flux)))) ** 2
-        logging.debug("- eta {0}".format(eta))
+        log.debug("- eta {0}".format(eta))
         source.eta = eta
         source.beam_area = beam_area
 
@@ -1336,8 +1130,8 @@ def load_aux_image(image, auxfile):
     """
     auximg = FitsImage(auxfile, beam=global_data.beam).get_pixels()
     if auximg.shape != image.get_pixels().shape:
-        logging.error("file {0} is not the same size as the image map".format(auxfile))
-        logging.error("{0}= {1}, image = {2}".format(auxfile, auximg.shape, image.get_pixels().shape))
+        log.error("file {0} is not the same size as the image map".format(auxfile))
+        log.error("{0}= {1}, image = {2}".format(auxfile, auximg.shape, image.get_pixels().shape))
         sys.exit()
     return auximg
 
@@ -1366,6 +1160,8 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
     # Save global data for use by fitting sub-processes
     global_data = GlobalFittingData()
 
+    debug = logging.getLogger('Aegean').isEnabledFor(logging.DEBUG)
+
     if mask is not None and region_available:
         # allow users to supply and object instead of a filename
         if isinstance(mask,Region):
@@ -1373,7 +1169,7 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
         elif os.path.exists(mask):
             global_data.region = pickle.load(open(mask))
         else:
-            logging.error("File {0} not found for loading".format(mask))
+            log.error("File {0} not found for loading".format(mask))
     else:
         global_data.region = None
 
@@ -1393,7 +1189,7 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
         #calculate curvature but store it as -1,0,+1
         cimg = curvature(global_data.data_pix)
         if csigma is None:
-            logging.info("Calculating curvature csigma")
+            log.info("Calculating curvature csigma")
             _, csigma = estimate_bkg_rms(cimg)
         dcurve = np.zeros(global_data.data_pix.shape, dtype=np.int8)
         dcurve[np.where(cimg <= -abs(csigma))] = -1
@@ -1404,12 +1200,12 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
 
     #calculate the pixel beam
     global_data.pixbeam = get_pixbeam()
-    logging.debug("pixbeam is : {0}".format(global_data.pixbeam))
+    log.debug("pixbeam is : {0}".format(global_data.pixbeam))
 
     #if either of rms or bkg images are not supplied then calculate them both
     if not (rmsin and bkgin):
         if verb:
-            logging.info("Calculating background and rms data")
+            log.info("Calculating background and rms data")
         make_bkg_rms_from_global(mesh_size=20, forced_rms=rms, cores=cores)
 
     #if a forced rms was supplied use that instead
@@ -1419,488 +1215,23 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
     #replace the calculated images with input versions, if the user has supplied them.
     if bkgin:
         if verb:
-            logging.info("loading background data from file {0}".format(bkgin))
+            log.info("loading background data from file {0}".format(bkgin))
         global_data.bkgimg = load_aux_image(img, bkgin)
     if rmsin:
         if verb:
-            logging.info("Loading rms data from file {0}".format(rmsin))
+            log.info("Loading rms data from file {0}".format(rmsin))
         global_data.rmsimg = load_aux_image(img, rmsin)
 
     #subtract the background image from the data image and save
-    if verb and logging.getLogger().isEnabledFor(logging.DEBUG):
-        logging.debug("Data max is {0}".format(img.get_pixels()[np.isfinite(img.get_pixels())].max()))
-        logging.debug("Doing background subtraction")
+    if verb and debug:
+        log.debug("Data max is {0}".format(img.get_pixels()[np.isfinite(img.get_pixels())].max()))
+        log.debug("Doing background subtraction")
     img.set_pixels(img.get_pixels() - global_data.bkgimg)
     global_data.data_pix = img.get_pixels()
-    if verb and logging.getLogger().isEnabledFor(logging.DEBUG):
-        logging.debug("Data max is {0}".format(img.get_pixels()[np.isfinite(img.get_pixels())].max()))
+    if verb and debug:
+        log.debug("Data max is {0}".format(img.get_pixels()[np.isfinite(img.get_pixels())].max()))
 
     return
-
-
-#writing table formats
-def check_table_formats(files):
-    cont = True
-    formats = get_table_formats()
-    for t in files.split(','):
-        name, ext = os.path.splitext(t)
-        ext = ext[1:].lower()
-        if not ext in formats:
-            cont = False
-            logging.warn("Format not supported for {0} ({1})".format(t, ext))
-    if not cont:
-        logging.error("Invalid table format specified.")
-        sys.exit()
-    return
-
-
-def show_formats():
-    """
-    Print a list of table formats that are supported and the extensions that they are assumed to have
-    :return:
-    """
-    fmts={
-        "ann":"Kvis annotation",
-        "reg":"DS9 regions file",
-        "fits":"FITS Binary Table",
-        "hdf5":"HDF-5 format",
-        "csv":"Comma separated values",
-        "tab":"tabe separated values",
-        "tex":"LaTeX table format",
-        "html":"HTML table",
-        "vot":"VO-Table",
-        "xml":"VO-Table",
-        "db":"Sqlite3 database",
-        "sqlite":"Sqlite3 database"}
-    supported = get_table_formats()
-    print "Extension |     Description       | Supported?"
-    for k in sorted(fmts.keys()):
-        print "{0:10s} {1:24s} {2}".format(k, fmts[k], k in supported)
-    return
-
-
-def get_table_formats():
-    """
-    Return a list of file extensions that are supported (mapped to an output)
-    """
-    fmts = ['ann', 'reg', 'fits']
-    if votables_supported:
-        fmts.extend(['vo', 'vot', 'xml'])
-    else:
-        logging.info("VOTables are not supported from this version of Astropy ({0})".format(astropy.__version__))
-    if astropy.__version__.startswith('0.2') or astropy.__version__.startswith('0.3'):
-        logging.info("Ascii tables are not supported with this version of Astropy ({0})".format(astropy.__version__))
-    else:
-        fmts.extend(['csv', 'tab', 'tex', 'html'])
-    if hdf5_supported:
-        fmts.append('hdf5')
-    else:
-        logging.info("HDF5 is not supported by your environment")
-    #assume this is always possible -> though it may not be on some systems
-    fmts.extend(['db', 'sqlite'])
-    return fmts
-
-
-def save_catalog(filename, catalog):
-    """
-    input:
-        filename - name of file to write, format determined by extension
-        catalog - a list of sources (OutputSources, SimpleSources, or IslandSource)
-    returns:
-        nothing
-    """
-    ascii_table_formats = {'csv': 'csv', 'tab': 'tab', 'tex': 'latex', 'html': 'html'}
-    #.ann and .reg are handled by me
-    extension = os.path.splitext(filename)[1][1:].lower()
-    if extension in ['ann', 'reg']:
-        writeAnn(filename, catalog, extension)
-    elif extension in ['vo', 'vot', 'xml']:
-        writeVOTable(filename, catalog)
-    elif extension in ['db', 'sqlite']:
-        writeDB(filename, catalog)
-    elif extension in ['hdf5','fits']:
-        write_table(filename,catalog,extension)
-    elif extension in ascii_table_formats.keys():
-        write_table(filename, catalog, fmt=ascii_table_formats[extension])
-    else:
-        logging.warning("extension not recognised {0}".format(extension))
-        logging.warning("You get tab format")
-        write_table(filename, catalog, fmt='tab')
-    return
-
-
-def load_catalog(filename):
-    """
-    load a catalog and extract the source positions
-    acceptable formats are:
-    csv,tab,tex - from astropy.io.ascii
-    vo,vot,xml - votable format
-    cat - format created by Aegean
-    returns [(ra,dec),...]
-    """
-    supported = get_table_formats()
-
-    fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
-
-    if fmt in ['csv', 'tab', 'tex'] and fmt in supported:
-        logging.info("Reading file {0}".format(filename))
-        t = ascii.read(filename)
-        catalog = zip(t.columns['ra'], t.columns['dec'])
-
-    elif fmt in ['vo', 'vot', 'xml'] and fmt in supported:
-        logging.info("Reading file {0}".format(filename))
-        t = parse_single_table(filename)
-        catalog = zip(t.array['ra'].tolist(), t.array['dec'].tolist())
-
-    elif fmt == 'cat':
-        logging.info("Reading ra/dec columns of Aegean catalog")
-        lines = [a.strip().split() for a in open(filename, 'r').readlines() if not a.startswith('#')]
-        catalog = [(float(a[5]), float(a[7])) for a in lines]
-    else:
-        logging.info("Assuming ascii format, reading first two columns")
-        lines = [a.strip().split() for a in open(filename, 'r').readlines() if not a.startswith('#')]
-        try:
-            catalog = [(float(a[0]), float(a[1])) for a in lines]
-        except:
-            logging.error("Expecting two columns of floats but failed to parse")
-            logging.error("Catalog file {0} not loaded".format(filename))
-            sys.exit()
-
-    return catalog
-
-
-def load_table(filename):
-    """
-
-    :param filename:
-    :return:
-    """
-    supported = get_table_formats()
-
-    fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
-
-    if fmt in ['csv', 'tab', 'tex'] and fmt in supported:
-        logging.info("Reading file {0}".format(filename))
-        t = ascii.read(filename)
-    elif fmt in ['vo', 'vot', 'xml', 'fits','hdf5'] and fmt in supported:
-        logging.info("Reading file {0}".format(filename))
-        t = Table.read(filename)
-    else:
-        logging.error("Table format not recognized or supported")
-        logging.error("{0} [{1}]".format(filename,fmt))
-        t= None
-    return t
-
-
-def table_to_source_list(table, src_type=OutputSource):
-    """
-    Wrangle a table into a list of sources given by src_type
-    :param table: astropy table instance
-    :param src_type: an object type for this source, something that derives from SimpleSource is best
-    :return:
-    """
-    source_list = []
-    if table is None:
-        return source_list
-
-    for row in table:
-        # Initialise our object
-        src = src_type()
-        # look for the columns required by our source object
-        for param in src_type.names:
-            if param in table.colnames:
-                # copy the value to our object
-                setattr(src,param,row[param])
-        # save this object to our list of sources
-        source_list.append(src)
-    return source_list
-
-
-def write_table(filename, catalog, fmt=None):
-    """
-    """
-
-    def writer(filename, catalog, fmt=None):
-        # construct a dict of the data
-        # this method preserves the data types in the VOTable
-        meta = {'AegeanVersion':"{0}-({1})".format(__version__,__date__)}
-        tab_dict = {}
-        for name in catalog[0].names:
-            tab_dict[name] = [getattr(c, name, None) for c in catalog]
-        t = Table(tab_dict,meta=meta)
-        # re-order the columns
-        t = t[[n for n in catalog[0].names]]
-        if fmt is not None:
-            if fmt in ["vot", "vo", "xml"]:
-                vot = from_table(t)
-                # description of this votable
-                vot.description = "Aegean version {0}-({1})".format(__version__,__date__)
-                writetoVO(vot, filename)
-            elif fmt in ['hdf5']:
-                t.write(filename,path='data',overwrite=True)
-            elif fmt in ['fits']:
-                writeFITSTable(filename,t)
-            else:
-                ascii.write(t, filename, fmt)
-        else:
-            ascii.write(t, filename)
-        return
-
-    components, islands, simples = classify_catalog(catalog)
-
-    if len(components) > 0:
-        new_name = "{1}{0}{2}".format('_comp', *os.path.splitext(filename))
-        writer(new_name, components, fmt)
-        logging.info("wrote {0}".format(new_name))
-    if len(islands) > 0:
-        new_name = "{1}{0}{2}".format('_isle', *os.path.splitext(filename))
-        writer(new_name, islands, fmt)
-        logging.info("wrote {0}".format(new_name))
-    if len(simples) > 0:
-        new_name = "{1}{0}{2}".format('_simp', *os.path.splitext(filename))
-        writer(new_name, simples, fmt)
-        logging.info("wrote {0}".format(new_name))
-    return
-
-
-def writeFITSTable(filename,table):
-    """
-
-    :param filename:
-    :param table:
-    :return:
-    """
-    def FITSTableType(val):
-        """
-        Return the FITSTable type corresponding to each named parameter in obj
-        """
-        if isinstance(val, bool):
-            types = "L"
-        elif isinstance(val, int):
-            types = "J"
-        elif isinstance(val, (float, np.float32)):  # float32 is bugged and claims not to be a float
-            types = "E"
-        elif isinstance(val, (str, unicode)):
-            types = "{0}A".format(len(val))
-        else:
-            logging.warn("Column {0} is of unknown type {1}".format(val, type(val)))
-            logging.warn("Using 5A")
-            types = "5A"
-        return types
-
-    cols = []
-    for name in table.colnames:
-        cols.append(fits.Column(name=name, format=FITSTableType(table[name][0]), array=table[name]))
-    cols = fits.ColDefs(cols)
-    tbhdu = fits.BinTableHDU.from_columns(cols)
-    tbhdu.header['HISTORY'] = "Aegean {0}".format(__version__)
-    tbhdu.writeto(filename, clobber=True)
-
-
-def writeVOTable(filename, catalog):
-    """
-    write VOTables for each of the source types that are in the catalog
-    append an appropriate prefix to the file name for each type of source
-    """
-    write_table(filename, catalog, fmt="vo")
-
-
-def writeIslandContours(filename, catalog, fmt):
-    """
-    Draw a contour around the pixels of each island
-    Input:
-    filename = file to write
-    catalog = [IslandSource, ...]
-    """
-    out = open(filename, 'w')
-    print >> out, "#Aegean island contours"
-    print >> out, "#Aegean version {0}-({1})".format(__version__,__date__)
-    if fmt == 'reg':
-        line_fmt = 'image;line({0},{1},{2},{3})'
-        text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
-        mas_fmt = 'image; line({1},{0},{3},{2}) #color = yellow'
-    if fmt == 'ann':
-        logging.warn("Kvis not yet supported")
-        logging.warn("not writing anything")
-        return
-    for c in catalog:
-        contour = c.contour
-        for p1, p2 in zip(contour[:-1], contour[1:]):
-            print >> out, line_fmt.format(p1[1] + 0.5, p1[0] + 0.5, p2[1] + 0.5, p2[0] + 0.5)
-        print >> out, line_fmt.format(contour[-1][1] + 0.5, contour[-1][0] + 0.5, contour[0][1] + 0.5,
-                                      contour[0][0] + 0.5)
-        #comment out lines that have invalid ra/dec (WCS problems)
-        if np.nan in [c.ra, c.dec]:
-            print >> out, '#',
-        print >> out, text_fmt.format(c.ra, c.dec, c.island)
-        print >> out, mas_fmt.format(*[a + 0.5 for a in c.max_angular_size_anchors])
-
-    out.close()
-    return
-
-
-def writeIslandBoxes(filename, catalog, fmt):
-    """
-    Draw a box around each island in the given catalog.
-    The box simply outlines the pixels used in the fit.
-    Input:
-        filename = file to write
-        catalog = [IslandSource, ...]
-    """
-    out = open(filename, 'w')
-
-    print >> out, "#Aegean Islands"
-    print >> out, "#Aegean version {0}-({1})".format(__version__,__date__)
-    if fmt == 'reg':
-        print >> out, "IMAGE"
-        box_fmt = 'box({0},{1},{2},{3}) #{4}'
-    elif fmt == 'ann':
-        print >> out, "COORD P"
-        box_fmt = 'box P {0} {1} {2} {3} #{4}'
-    else:
-        return  #fmt not supported
-    for c in catalog:
-        #x/y swap for pyfits/numpy translation
-        ymin, ymax, xmin, xmax = c.extent
-        #+1 for array/image offset
-        xcen = (xmin + xmax) / 2.0 + 1
-        #+0.5 in each direction to make lines run 'between' DS9 pixels
-        xwidth = xmax - xmin + 1
-        ycen = (ymin + ymax) / 2.0 + 1
-        ywidth = ymax - ymin + 1
-        print >> out, box_fmt.format(xcen, ycen, xwidth, ywidth, c.island)
-    out.close()
-    return
-
-
-def writeAnn(filename, catalog, fmt):
-    """
-    Write an annotation file that can be read by Kvis (.ann) or DS9 (.reg).
-    Uses ra/dec from catalog.
-    Draws ellipses if bmaj/bmin/pa are in catalog
-    Draws 30" circles otherwise
-    Input:
-        filename - file to write to
-        catalog - a list of OutputSource or SimpleSource
-        fmt - [.ann|.reg] format to use
-    """
-    components, islands, simples = classify_catalog(catalog)
-    if len(components) > 0:
-        catalog = sorted(components)
-        suffix = "comp"
-    elif len(simples) > 0:
-        catalog = simples
-        suffix = "simp"
-    else:
-        catalog = []
-
-    if len(catalog) > 0:
-        ras = [a.ra for a in catalog]
-        decs = [a.dec for a in catalog]
-        if not hasattr(catalog[0], 'a'):  #a being the variable that I used for bmaj.
-            bmajs = [30 / 3600.0 for a in catalog]
-            bmins = bmajs
-            pas = [0 for a in catalog]
-        else:
-            bmajs = [a.a / 3600.0 for a in catalog]
-            bmins = [a.b / 3600.0 for a in catalog]
-            pas = [a.pa for a in catalog]
-
-        names = [a.__repr__() for a in catalog]
-        if fmt == 'ann':
-            new_file = re.sub('.ann$', '_{0}.ann'.format(suffix), filename)
-            out = open(new_file, 'w')
-            print >> out, "#Aegean version {0}-({1})".format(__version__,__date__)
-            print >> out, 'PA SKY'
-            formatter = "ellipse {0} {1} {2} {3} {4:+07.3f} #{5}"
-        elif fmt == 'reg':
-            new_file = re.sub('.reg$', '_{0}.reg'.format(suffix), filename)
-            out = open(new_file, 'w')
-            print >> out, "#Aegean version {0}-({1})".format(__version__,__date__)
-            print >> out, "fk5"
-            formatter = 'ellipse {0} {1} {2}d {3}d {4:+07.3f}d # text="{5}"'
-            #DS9 has some strange ideas about position angle
-            pas = [a - 90 for a in pas]
-
-        for ra, dec, bmaj, bmin, pa, name in zip(ras, decs, bmajs, bmins, pas, names):
-            #comment out lines that have invalid or stupid entries
-            if np.nan in [ra, dec, bmaj, bmin, pa] or bmaj >= 180:
-                print >> out, '#',
-            print >> out, formatter.format(ra, dec, bmaj, bmin, pa, name)
-        out.close()
-        logging.info("wrote {0}".format(new_file))
-    if len(islands) > 0:
-        if fmt == 'reg':
-            new_file = re.sub('.reg$', '_isle.reg', filename)
-        elif fmt == 'ann':
-            logging.warn('kvis islands are currently not working')
-            return
-        else:
-            logging.warn('format {0} not supported for island annotations'.format(fmt))
-            return
-        #writeIslandBoxes(new_file,islands,fmt)
-        writeIslandContours(new_file, islands, fmt)
-        logging.info("wrote {0}".format(new_file))
-
-    return
-
-
-def writeDB(filename, catalog):
-    """
-    Output an sqlite3 database containing one table for each source type
-    inputs:
-    filename - output filename
-    catalog - a catalog of sources to populated the database with
-    """
-
-    def sqlTypes(obj, names):
-        """
-        Return the sql type corresponding to each named parameter in obj
-        """
-        types = []
-        for n in names:
-            val = getattr(obj, n)
-            if isinstance(val, bool):
-                types.append("BOOL")
-            elif isinstance(val, int):
-                types.append("INT")
-            elif isinstance(val, (float, np.float32)):  # float32 is bugged and claims not to be a float
-                types.append("FLOAT")
-            elif isinstance(val, (str, unicode)):
-                types.append("VARCHAR")
-            else:
-                logging.warn("Column {0} is of unknown type {1}".format(n, type(n)))
-                logging.warn("Using VARCHAR")
-                types.append("VARCHAR)")
-        return types
-
-    if os.path.exists(filename):
-        logging.warn("overwriting {0}".format(filename))
-        os.remove(filename)
-    conn = sqlite3.connect(filename)
-    db = conn.cursor()
-    # determine the column names by inspecting the catalog class
-    for t, tn in zip(classify_catalog(catalog), ["components", "islands", "simples"]):
-        if len(t) < 1:
-            continue  #don't write empty tables
-        col_names = t[0].names
-        col_types = sqlTypes(t[0], col_names)
-        stmnt = ','.join(["{0} {1}".format(a, b) for a, b in zip(col_names, col_types)])
-        db.execute('CREATE TABLE {0} ({1})'.format(tn, stmnt))
-        stmnt = 'INSERT INTO {0} ({1}) VALUES ({2})'.format(tn, ','.join(col_names), ','.join(['?' for i in col_names]))
-        # convert values of -1 into None
-        nulls = lambda x: [x, None][x == -1]
-        db.executemany(stmnt, [map(nulls, r.as_list()) for r in t])
-        logging.info("Created table {0}".format(tn))
-    # metadata add some meta data
-    db.execute("CREATE TABLE meta (author VARCHAR, version VARCHAR)")
-    db.execute("INSERT INTO meta (author,version) VALUES (?,?)",('Aegean',"{0}-({1})".format(__version__,__date__)))
-    conn.commit()
-    logging.info(db.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall())
-    conn.close()
-    logging.info("Wrote file {0}".format(filename))
-    return
-
 
 #image manipulation
 def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
@@ -1931,7 +1262,7 @@ def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
     #calculate a local beam from the center of the data
     pixbeam = get_pixbeam()
     if pixbeam is None:
-        logging.error("Cannot calculate the beam shape at the image center")
+        log.error("Cannot calculate the beam shape at the image center")
         sys.exit()
 
     width_x = mesh_size * max(abs(math.cos(np.radians(pixbeam.pa)) * pixbeam.a),
@@ -1943,9 +1274,9 @@ def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
 
     rmsimg = np.zeros(data.shape)
     bkgimg = np.zeros(data.shape)
-    logging.debug("image size x,y:{0},{1}".format(img_x, img_y))
-    logging.debug("beam: {0}".format(beam))
-    logging.debug("mesh width (pix) x,y: {0},{1}".format(width_x, width_y))
+    log.debug("image size x,y:{0},{1}".format(img_x, img_y))
+    log.debug("beam: {0}".format(beam))
+    log.debug("mesh width (pix) x,y: {0},{1}".format(width_x, width_y))
 
     #box centered at image center then tilling outwards
     xstart = (xcen - width_x / 2) % width_x  #the starting point of the first "full" box
@@ -2020,7 +1351,7 @@ def make_bkg_rms_from_global(mesh_size=20, forced_rms=None, cores=None):
     #calculate a local beam from the center of the data
     pixbeam = global_data.pixbeam
     if pixbeam is None:
-        logging.error("Cannot calculate the beam shape at the image center")
+        log.error("Cannot calculate the beam shape at the image center")
         sys.exit()
 
     width_x = mesh_size * max(abs(math.cos(np.radians(pixbeam.pa)) * pixbeam.a),
@@ -2030,9 +1361,9 @@ def make_bkg_rms_from_global(mesh_size=20, forced_rms=None, cores=None):
                               abs(math.cos(np.radians(pixbeam.pa)) * pixbeam.b))
     width_y = int(width_y)
 
-    logging.debug("image size x,y:{0},{1}".format(img_x, img_y))
-    logging.debug("beam: {0}".format(beam))
-    logging.debug("mesh width (pix) x,y: {0},{1}".format(width_x, width_y))
+    log.debug("image size x,y:{0},{1}".format(img_x, img_y))
+    log.debug("beam: {0}".format(beam))
+    log.debug("mesh width (pix) x,y: {0},{1}".format(width_x, width_y))
 
     #box centered at image center then tilling outwards
     xstart = (xcen - width_x / 2) % width_x  #the starting point of the first "full" box
@@ -2137,8 +1468,8 @@ def estimate_bkg_rms(data):
 
 
 def estimate_background(*args,**kwargs):
-    logging.warn("This function has been deprecated and should no longer be used")
-    logging.warn("use estimate_background_global or estimate_bkg_rms instead")
+    log.warn("This function has been deprecated and should no longer be used")
+    log.warn("use estimate_background_global or estimate_bkg_rms instead")
     return None, None
 
 
@@ -2153,7 +1484,7 @@ def curvature(data, aspect=None):
     if not aspect:
         kern = np.array([[1, 1, 1], [1, -8, 1], [1, 1, 1]])
     else:
-        logging.warn("Aspect != has not been tested.")
+        log.warn("Aspect != has not been tested.")
         #TODO: test that this actually works as intended
         a = 1.0 / aspect
         b = 1.0 / math.sqrt(1 + aspect ** 2)
@@ -2361,8 +1692,8 @@ def scope2lat(telescope):
     elif telescope.lower() == 'lofar':
         return 52.9088 # From google
     else:
-        logging.warn("Telescope {0} is unknown".format(telescope))
-        logging.warn("integrated fluxes may be incorrect")
+        log.warn("Telescope {0} is unknown".format(telescope))
+        log.warn("integrated fluxes may be incorrect")
         return None
 
 
@@ -2468,23 +1799,23 @@ def fit_island_mpfit(island_data):
     if pixbeam is None:
         is_flag |= flags.WCSERR
 
-    logging.debug("=====")
-    logging.debug("Island ({0})".format(isle_num))
+    log.debug("=====")
+    log.debug("Island ({0})".format(isle_num))
 
     parinfo = estimate_mpfit_parinfo(isle.pixels, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
                                max_summits=max_summits)
 
-    logging.debug("Rms is {0}".format(np.shape(rms)))
-    logging.debug("Isle is {0}".format(np.shape(isle.pixels)))
-    logging.debug(" of which {0} are masked".format(sum(np.isnan(isle.pixels).ravel() * 1)))
+    log.debug("Rms is {0}".format(np.shape(rms)))
+    log.debug("Isle is {0}".format(np.shape(isle.pixels)))
+    log.debug(" of which {0} are masked".format(sum(np.isnan(isle.pixels).ravel() * 1)))
 
     # there are 6 params per summit
     num_summits = len(parinfo) / 6  # there are 6 params per Guassian
-    logging.debug("max_summits, num_summits={0},{1}".format(max_summits, num_summits))
+    log.debug("max_summits, num_summits={0},{1}".format(max_summits, num_summits))
 
     # Islands may have no summits if the curvature is not steep enough.
     if num_summits < 1:
-        logging.debug("Island {0} has no summits!".format(isle_num))
+        log.debug("Island {0} has no summits!".format(isle_num))
         return []
 
     #determine if the island is big enough to fit
@@ -2492,12 +1823,12 @@ def fit_island_mpfit(island_data):
         if src['parname'].split(":")[-1] in ['minor', 'major', 'pa']:
             if src['flags'] & flags.FITERRSMALL:
                 is_flag |= flags.FITERRSMALL
-                logging.debug("Island is too small for a fit, not fitting anything")
+                log.debug("Island is too small for a fit, not fitting anything")
                 is_flag |= flags.NOTFIT
                 break
     # report that some components may not be fit [ limitations are imposed in estimate_parinfo ]
     if (max_summits is not None) and (num_summits > max_summits):
-        logging.info("Island has too many summits ({0}), not fitting everything".format(num_summits))
+        log.info("Island has too many summits ({0}), not fitting everything".format(num_summits))
 
     #supply dummy info if there is no fitting
     if is_flag & flags.NOTFIT:
@@ -2508,7 +1839,7 @@ def fit_island_mpfit(island_data):
         #do the fitting
         mp, info, residual = do_mpfit(isle.pixels, rms, parinfo)
 
-    logging.debug("Source 0 pa={0} [pixel coords]".format(mp.params[5]))
+    log.debug("Source 0 pa={0} [pixel coords]".format(mp.params[5]))
 
     params = mp.params
     # report the source parameters
@@ -2523,10 +1854,10 @@ def fit_island_mpfit(island_data):
     if mp.perror is None:
         mp.perror = [0 for a in mp.params]
         is_flag |= flags.FIXED2PSF
-        logging.debug("FitError: {0}".format(mp.errmsg))
-        logging.debug("info:")
+        log.debug("FitError: {0}".format(mp.errmsg))
+        log.debug("info:")
         for i in info:
-            logging.debug("{0}".format(i))
+            log.debug("{0}".format(i))
 
     # anything that has an error of zero should be converted to -1
     for k, val in enumerate(mp.perror):
@@ -2578,7 +1909,7 @@ def fit_island_mpfit(island_data):
             source.ra += 360
         source.ra_str = dec2hms(source.ra)
         source.dec_str = dec2dms(source.dec)
-        logging.debug("Source {0} Extracted pa={1}deg [pixel] -> {2}deg [sky]".format(j, theta, source.pa))
+        log.debug("Source {0} Extracted pa={1}deg [pixel] -> {2}deg [sky]".format(j, theta, source.pa))
 
         # calculate minor axis and convert a/b to arcsec
         source.a *= 3600  # arcseconds
@@ -2602,13 +1933,13 @@ def fit_island_mpfit(island_data):
         source.flags = src_flags
 
         sources.append(source)
-        logging.debug(source)
+        log.debug(source)
 
     #calculate the integrated island flux if required
     if island_data.doislandflux:
-        logging.debug("Integrated flux for island {0}".format(isle_num))
+        log.debug("Integrated flux for island {0}".format(isle_num))
         kappa_sigma = np.where(abs(idata) - outerclip * rms > 0, idata, np.NaN)
-        logging.debug("- island shape is {0}".format(kappa_sigma.shape))
+        log.debug("- island shape is {0}".format(kappa_sigma.shape))
 
         source = IslandSource()
         source.flags = 0
@@ -2618,7 +1949,7 @@ def fit_island_mpfit(island_data):
         #check for negative islands
         if source.peak_flux < 0:
             source.peak_flux = np.nanmin(kappa_sigma)
-        logging.debug("- peak flux {0}".format(source.peak_flux))
+        log.debug("- peak flux {0}".format(source.peak_flux))
 
         #positions and background
         positions = np.where(kappa_sigma == source.peak_flux)
@@ -2661,19 +1992,19 @@ def fit_island_mpfit(island_data):
                     source.pa = bear(radec1[0], radec1[1], radec2[0], radec2[1])
                     source.max_angular_size_anchors = [pos1[0], pos1[1], pos2[0], pos2[1]]
 
-        logging.debug("- peak position {0}, {1} [{2},{3}]".format(source.ra_str, source.dec_str, positions[0][0],
+        log.debug("- peak position {0}, {1} [{2},{3}]".format(source.ra_str, source.dec_str, positions[0][0],
                                                                   positions[1][0]))
 
         # integrated flux
         beam_area = get_beamarea_pix(source.ra,source.dec)
         isize = source.pixels  #number of non zero pixels
-        logging.debug("- pixels used {0}".format(isize))
+        log.debug("- pixels used {0}".format(isize))
         source.int_flux = np.nansum(kappa_sigma)  #total flux Jy/beam
-        logging.debug("- sum of pixles {0}".format(source.int_flux))
+        log.debug("- sum of pixles {0}".format(source.int_flux))
         source.int_flux /= beam_area
-        logging.debug("- integrated flux {0}".format(source.int_flux))
+        log.debug("- integrated flux {0}".format(source.int_flux))
         eta = erf(np.sqrt(-1 * np.log(abs(source.local_rms * outerclip / source.peak_flux)))) ** 2
-        logging.debug("- eta {0}".format(eta))
+        log.debug("- eta {0}".format(eta))
         source.eta = eta
         source.beam_area = beam_area
 
@@ -2712,20 +2043,20 @@ def fit_island_lmfit(island_data):
     if pixbeam is None:
         is_flag |= flags.WCSERR
 
-    logging.debug("=====")
-    logging.debug("Island ({0})".format(isle_num))
+    log.debug("=====")
+    log.debug("Island ({0})".format(isle_num))
 
     params = estimate_lmfit_parinfo(idata, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
                                max_summits=max_summits)
     #TODO: handle islands with estimated sources=0
     if params.components <1:
-        logging.warn("skipped island {0} due to lack of components".format(isle_num))
-        logging.warn("This shouldn't really happen")
+        log.warn("skipped island {0} due to lack of components".format(isle_num))
+        log.warn("This shouldn't really happen")
         return []
 
-    logging.debug("Rms is {0}".format(np.shape(rms)))
-    logging.debug("Isle is {0}".format(np.shape(idata)))
-    logging.debug(" of which {0} are masked".format(sum(np.isnan(idata).ravel() * 1)))
+    log.debug("Rms is {0}".format(np.shape(rms)))
+    log.debug("Isle is {0}".format(np.shape(idata)))
+    log.debug(" of which {0} are masked".format(sum(np.isnan(idata).ravel() * 1)))
 
     # TODO: Allow for some of the components to be fit if there are multiple components in the island
     # Check that there is enough data to do the fit
@@ -2733,8 +2064,8 @@ def fit_island_lmfit(island_data):
     non_blank_pix = len(mx)
     free_vars = len( [ 1 for a in params.keys() if params[a].vary])
     if non_blank_pix < free_vars:
-        logging.debug("Island {0} doesn't have enough pixels to fit the given model".format(isle_num))
-        logging.debug("non_blank_pix {0}, free_vars {1}".format(non_blank_pix,free_vars))
+        log.debug("Island {0} doesn't have enough pixels to fit the given model".format(isle_num))
+        log.debug("non_blank_pix {0}, free_vars {1}".format(non_blank_pix,free_vars))
         result = DummyLM()
         model = params
         is_flag |= flags.NOTFIT
@@ -2744,12 +2075,12 @@ def fit_island_lmfit(island_data):
         # C = np.identity(len(mx))
         # Cmatrix(mx, my, 1.5, 1.5, 0)
         # B = Bmatrix(C)
-        logging.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa))
+        log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa))
         result, model = do_lmfit(idata, params)
         if not result.success:
             is_flag = flags.FITERR
 
-    logging.debug(model)
+    log.debug(model)
 
     # convert the fitting results to a list of sources +/0 islands
     sources =result_to_components(result, model, island_data, is_flag)
@@ -2763,7 +2094,7 @@ def fit_islands(islands):
       islands - a list of IslandFittingData objects
     Returns a list of OutputSources
     """
-    logging.debug("Fitting group of {0} islands".format(len(islands)))
+    log.debug("Fitting group of {0} islands".format(len(islands)))
     sources = []
     for island in islands:
         if lmfit_available:
@@ -2827,9 +2158,9 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
     data = global_data.data_pix
     beam = global_data.beam
 
-    logging.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a * 3600, beam.b * 3600, beam.pa))
-    logging.info("seedclip={0}".format(innerclip))
-    logging.info("floodclip={0}".format(outerclip))
+    log.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a * 3600, beam.b * 3600, beam.pa))
+    log.info("seedclip={0}".format(innerclip))
+    log.info("floodclip={0}".format(outerclip))
 
     isle_num = 0
 
@@ -2841,15 +2172,15 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
         #into other codes (eg the VAST pipeline)
         if cores is None:
             cores = multiprocessing.cpu_count()
-            logging.info("Found {0} cores".format(cores))
+            log.info("Found {0} cores".format(cores))
         else:
-            logging.info("Using {0} subprocesses".format(cores))
+            log.info("Using {0} subprocesses".format(cores))
         try:
             queue = pprocess.Queue(limit=cores, reuse=1)
             fit_parallel = queue.manage(pprocess.MakeReusable(fit_islands))
         except AttributeError, e:
             if 'poll' in e.message:
-                logging.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
+                log.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
                 cores = 1
                 queue = []
             else:
@@ -2939,8 +2270,8 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
     pixbeam = get_pixbeam()
     for isle in island_itergen(input_sources):
         components = len(isle)
-        logging.debug("-=-")
-        logging.debug("input island = {0}, {1} components".format(isle[0].island, components))
+        log.debug("-=-")
+        log.debug("input island = {0}, {1} components".format(isle[0].island, components))
 
         # set up the parameters for each of the sources within the island
         i = 0
@@ -2957,12 +2288,12 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             x = int(round(source_x))
             y = int(round(source_y))
 
-            logging.debug("pixel location ({0:5.2f},{1:5.2f})".format(source_x,source_y))
+            log.debug("pixel location ({0:5.2f},{1:5.2f})".format(source_x,source_y))
             # reject sources that are outside the image bounds, or which have nan data/rms values
             if not 0 <= x < shape[0] or not 0 <= y < shape[1] or \
                     not np.isfinite(data[x, y]) or \
                     not np.isfinite(rmsimg[x, y]):
-                logging.info("Source ({0},{1}) not within usable region: skipping".format(src.island,src.source))
+                log.info("Source ({0},{1}) not within usable region: skipping".format(src.island,src.source))
                 continue
             # determine the shape parameters in pixel values
             (_, _, sx, theta) = sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)
@@ -2973,16 +2304,16 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             sx *=fwhm2cc
             sy *=fwhm2cc
 
-            logging.debug("Source shape [sky coords]  {0:5.2f}x{1:5.2f}@{2:05.2f}".format(src.a,src.b,src.pa))
-            logging.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
+            log.debug("Source shape [sky coords]  {0:5.2f}x{1:5.2f}@{2:05.2f}".format(src.a,src.b,src.pa))
+            log.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
 
             # resize the source based on the ratio of catalog/image resolutions
             if ratio is not None:
                 sx = np.sqrt( sx**2 + (pixbeam.a*fwhm2cc)**2*(1-1/ratio**2))
                 sy = np.sqrt( sy**2 + (pixbeam.b*fwhm2cc)**2*(1-1/ratio**2))
                 pass # we don't do anything with the PA since we assume they are aligned or we have a circular beam.
-                logging.debug(" ratio is {0}".format(ratio))
-                logging.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
+                log.debug(" ratio is {0}".format(ratio))
+                log.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
 
             # choose a region that is 2x the major axis of the source, 4x semimajor axis a
             width = 2 * sx
@@ -3018,12 +2349,12 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             island_mask.extend(zip(xmask,ymask))
 
         if i==0:
-            logging.info("No sources found in island {0}".format(src.island))
+            log.info("No sources found in island {0}".format(src.island))
             continue
         params.components = i
-        logging.debug(" {0} components being fit".format(i))
+        log.debug(" {0} components being fit".format(i))
         # now we correct the xo/yo positions to be relative to the sub-image
-        logging.debug("xmxxymyx {0} {1} {2} {3}".format(xmin,xmax,ymin,ymax))
+        log.debug("xmxxymyx {0} {1} {2} {3}".format(xmin,xmax,ymin,ymax))
         for i in range(components):
             prefix = "c{0}_".format(i)
             params[prefix + 'xo'].value -=xmin
@@ -3032,10 +2363,10 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
             params[prefix + 'yo'].value -=ymin
             params[prefix + 'yo'].min -=ymin
             params[prefix + 'yo'].max -=ymin
-        logging.debug(params)
+        log.debug(params)
         # don't fit if there are no sources
         if params.components<1:
-            logging.info("Island {0} has no sources".format(src.island))
+            log.info("Island {0} has no sources".format(src.island))
             continue
 
         # this .copy() will stop us from modifying the parent region when we later apply our mask.
@@ -3049,23 +2380,23 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
 
         non_nan_pix = len(np.where(np.isfinite(idata))[0])
 
-        logging.debug("island extracted:")
-        logging.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
-        logging.debug(" max = {0}".format(np.nanmax(idata)))
-        logging.debug(" total {0}, masked {1}, not masked {2}".format(len(all_pixels),non_nan_pix,len(all_pixels)-non_nan_pix))
+        log.debug("island extracted:")
+        log.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
+        log.debug(" max = {0}".format(np.nanmax(idata)))
+        log.debug(" total {0}, masked {1}, not masked {2}".format(len(all_pixels),non_nan_pix,len(all_pixels)-non_nan_pix))
 
         # determine the number of free parameters and if we have enough data for a fit
         nfree = np.count_nonzero([params[p].vary for p in params.keys()])
         if non_nan_pix < nfree:
-            logging.debug("More free parameters {0} than available pixels {1}".format(nfree,non_nan_pix))
+            log.debug("More free parameters {0} than available pixels {1}".format(nfree,non_nan_pix))
             if non_nan_pix >= params.components:
-                logging.debug("Fixing all parameters except amplitudes")
+                log.debug("Fixing all parameters except amplitudes")
                 for i in range(components):
                     for p in params.keys():
                         if 'amp' not in p:
                             params[p].vary = False
             else:
-                logging.debug(" no not-masked pixels, skipping".format(src.island,src.source))
+                log.debug(" no not-masked pixels, skipping".format(src.island,src.source))
             continue
         # do the fit
         result, model = do_lmfit(idata,params)
@@ -3131,8 +2462,8 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
 
     for inum, isle in enumerate(group_iter(input_sources, eps=radius)):
         components = len(isle)
-        logging.debug("-=-")
-        logging.debug("input island = {0}, {1} components".format(isle[0].island, components))
+        log.debug("-=-")
+        log.debug("input island = {0}, {1} components".format(isle[0].island, components))
 
         # set up the parameters for each of the sources within the island
         i = 0
@@ -3149,12 +2480,12 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
             x = int(round(source_x))
             y = int(round(source_y))
 
-            logging.debug("pixel location ({0:5.2f},{1:5.2f})".format(source_x,source_y))
+            log.debug("pixel location ({0:5.2f},{1:5.2f})".format(source_x,source_y))
             # reject sources that are outside the image bounds, or which have nan data/rms values
             if not 0 <= x < shape[0] or not 0 <= y < shape[1] or \
                     not np.isfinite(data[x, y]) or \
                     not np.isfinite(rmsimg[x, y]):
-                logging.info("Source ({0},{1}) not within usable region: skipping".format(src.island,src.source))
+                log.info("Source ({0},{1}) not within usable region: skipping".format(src.island,src.source))
                 continue
             # determine the shape parameters in pixel values
             (_, _, sx, theta) = sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)
@@ -3165,16 +2496,16 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
             sx *=fwhm2cc
             sy *=fwhm2cc
 
-            logging.debug("Source shape [sky coords]  {0:5.2f}x{1:5.2f}@{2:05.2f}".format(src.a,src.b,src.pa))
-            logging.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
+            log.debug("Source shape [sky coords]  {0:5.2f}x{1:5.2f}@{2:05.2f}".format(src.a,src.b,src.pa))
+            log.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
 
             # resize the source based on the ratio of catalog/image resolutions
             if ratio is not None:
                 sx = np.sqrt( sx**2 + (pixbeam.a*fwhm2cc)**2*(1-1/ratio**2))
                 sy = np.sqrt( sy**2 + (pixbeam.b*fwhm2cc)**2*(1-1/ratio**2))
                 pass # we don't do anything with the PA since we assume they are aligned or we have a circular beam.
-                logging.debug(" ratio is {0}".format(ratio))
-                logging.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
+                log.debug(" ratio is {0}".format(ratio))
+                log.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
 
             # choose a region that is 2x the major axis of the source, 4x semimajor axis a
             width = 2 * sx
@@ -3210,12 +2541,12 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
             island_mask.extend(zip(xmask,ymask))
 
         if i==0:
-            logging.info("No sources found in island {0}".format(src.island))
+            log.info("No sources found in island {0}".format(src.island))
             continue
         params.components = i
-        logging.debug(" {0} components being fit".format(i))
+        log.debug(" {0} components being fit".format(i))
         # now we correct the xo/yo positions to be relative to the sub-image
-        logging.debug("xmxxymyx {0} {1} {2} {3}".format(xmin,xmax,ymin,ymax))
+        log.debug("xmxxymyx {0} {1} {2} {3}".format(xmin,xmax,ymin,ymax))
         for i in range(components):
             prefix = "c{0}_".format(i)
             params[prefix + 'xo'].value -=xmin
@@ -3224,10 +2555,10 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
             params[prefix + 'yo'].value -=ymin
             params[prefix + 'yo'].min -=ymin
             params[prefix + 'yo'].max -=ymin
-        logging.debug(params)
+        log.debug(params)
         # don't fit if there are no sources
         if params.components<1:
-            logging.info("Island {0} has no sources".format(src.island))
+            log.info("Island {0} has no sources".format(src.island))
             continue
 
         # this .copy() will stop us from modifying the parent region when we later apply our mask.
@@ -3241,23 +2572,23 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
 
         non_nan_pix = len(np.where(np.isfinite(idata))[0])
 
-        logging.debug("island extracted:")
-        logging.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
-        logging.debug(" max = {0}".format(np.nanmax(idata)))
-        logging.debug(" total {0}, masked {1}, not masked {2}".format(len(all_pixels),non_nan_pix,len(all_pixels)-non_nan_pix))
+        log.debug("island extracted:")
+        log.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
+        log.debug(" max = {0}".format(np.nanmax(idata)))
+        log.debug(" total {0}, masked {1}, not masked {2}".format(len(all_pixels),non_nan_pix,len(all_pixels)-non_nan_pix))
 
         # determine the number of free parameters and if we have enough data for a fit
         nfree = np.count_nonzero([params[p].vary for p in params.keys()])
         if non_nan_pix < nfree:
-            logging.debug("More free parameters {0} than available pixels {1}".format(nfree,non_nan_pix))
+            log.debug("More free parameters {0} than available pixels {1}".format(nfree,non_nan_pix))
             if non_nan_pix >= params.components:
-                logging.debug("Fixing all parameters except amplitudes")
+                log.debug("Fixing all parameters except amplitudes")
                 for i in range(components):
                     for p in params.keys():
                         if 'amp' not in p:
                             params[p].vary = False
             else:
-                logging.debug(" no not-masked pixels, skipping".format(src.island,src.source))
+                log.debug(" no not-masked pixels, skipping".format(src.island,src.source))
             continue
         # do the fit
         result, model = do_lmfit(idata,params)
@@ -3294,27 +2625,6 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
         print >> outfile, str(source)
 
     return sources
-
-
-
-def classify_catalog(catalog):
-    """
-    look at a catalog of sources and split them according to their class
-    returns:
-    components - sources of type OutputSource
-    islands - sources of type IslandSource
-    """
-    components = []
-    islands = []
-    simples = []
-    for source in catalog:
-        if isinstance(source, OutputSource):
-            components.append(source)
-        elif isinstance(source, IslandSource):
-            islands.append(source)
-        elif isinstance(source, SimpleSource):
-            simples.append(source)
-    return components, islands, simples
 
 
 def island_itergen(catalog):
@@ -3376,7 +2686,7 @@ def force_measure_flux(radec):
     shape = global_data.data_pix.shape
 
     if global_data.telescope_lat is not None:
-        logging.warn("No account is being made for telescope latitude, even though it has been supplied")
+        log.warn("No account is being made for telescope latitude, even though it has been supplied")
     for ra, dec in radec:
         #find the right pixels from the ra/dec
         source_x, source_y = sky2pix([ra, dec])
@@ -3446,14 +2756,14 @@ def force_measure_flux(radec):
         source.pa = global_data.beam.pa
 
         catalog.append(source)
-        if logging.getLogger().isEnabledFor(logging.DEBUG):
-            logging.debug("Measured source {0}".format(source))
-            logging.debug("  used area = [{0}:{1},{2}:{3}]".format(xmin, xmax, ymin, ymax))
-            logging.debug("  xo,yo = {0},{1}".format(xo, yo))
-            logging.debug("  params = {0}".format(params))
-            logging.debug("  flux at [xmin+xo,ymin+yo] = {0} Jy".format(data[int(xo), int(yo)]))
-            logging.debug("  error = {0}".format(error))
-            logging.debug("  rms = {0}".format(source.local_rms))
+        if log.getLogger().isEnabledFor(log.DEBUG):
+            log.debug("Measured source {0}".format(source))
+            log.debug("  used area = [{0}:{1},{2}:{3}]".format(xmin, xmax, ymin, ymax))
+            log.debug("  xo,yo = {0},{1}".format(xo, yo))
+            log.debug("  params = {0}".format(params))
+            log.debug("  flux at [xmin+xo,ymin+yo] = {0} Jy".format(data[int(xo), int(yo)]))
+            log.debug("  error = {0}".format(error))
+            log.debug("  rms = {0}".format(source.local_rms))
     return catalog
 
 
@@ -3508,11 +2818,11 @@ def VASTP_measure_catalog_fluxes(filename, positions, hdu_index=0, bkgin=None, r
                  do_curve=False)
     #measure fluxes
     if debug:
-        level = logging.getLogger().getEffectiveLevel()
-        logging.getLogger().setLevel(logging.DEBUG)
+        level = log.getLogger().getEffectiveLevel()
+        log.getLogger().setLevel(log.DEBUG)
     sources = force_measure_flux(positions)
     if debug:
-        logging.getLogger().setLevel(level)
+        log.getLogger().setLevel(level)
     return sources
 
 
@@ -3525,7 +2835,7 @@ def save_background_files(image_filename, hdu_index=0, bkgin=None, rmsin=None, b
     """
     global global_data
 
-    logging.info("Saving background / RMS maps")
+    log.info("Saving background / RMS maps")
     #load image, and load/create background/rms images
     load_globals(image_filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms,
                  cores=cores)
@@ -3551,11 +2861,11 @@ def save_background_files(image_filename, hdu_index=0, bkgin=None, rmsin=None, b
 
     new_hdu.data = bkgimg
     new_hdu.writeto(background_out, clobber=True)
-    logging.info("Wrote {0}".format(background_out))
+    log.info("Wrote {0}".format(background_out))
 
     new_hdu.data = rmsimg
     new_hdu.writeto(noise_out, clobber=True)
-    logging.info("Wrote {0}".format(noise_out))
+    log.info("Wrote {0}".format(noise_out))
     return
 
 #command line version of this program runs from here.
@@ -3626,18 +2936,23 @@ if __name__ == "__main__":
 
 
     # configure logging
+    global log
     logging_level = logging.DEBUG if options.debug else logging.INFO
-    logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
-    logging.info("This is Aegean {0}-({1})".format(__version__,__date__))
+    config = {"level":logging_level, "format":"%(module)s:%(levelname)s %(message)s"}
+    logging.basicConfig(**config)
+    # set up logging for Aegean which other modules can join
+    log = logging.getLogger("Aegean")
+    log.info("This is Aegean {0}-({1})".format(__version__,__date__))
+
 
     if options.table_formats:
         show_formats()
         sys.exit(0)
 
     if options.file_versions:
-        logging.info("Numpy {0} from {1} ".format(np.__version__, np.__file__))
-        logging.info("Scipy {0} from {1}".format(scipy.__version__, scipy.__file__))
-        logging.info("AstroPy {0} from {1}".format(astropy.__version__, astropy.__file__))
+        log.info("Numpy {0} from {1} ".format(np.__version__, np.__file__))
+        log.info("Scipy {0} from {1}".format(scipy.__version__, scipy.__file__))
+        log.info("AstroPy {0} from {1}".format(astropy.__version__, astropy.__file__))
         sys.exit()
 
     #print help if the user enters no options or filename
@@ -3648,7 +2963,7 @@ if __name__ == "__main__":
     #check that a valid filename was entered
     filename = args[0]
     if not os.path.exists(filename):
-        logging.error("{0} not found".format(filename))
+        log.error("{0} not found".format(filename))
         sys.exit(-1)
 
     # tell numpy to shut up about "invalid values encountered"
@@ -3657,7 +2972,7 @@ if __name__ == "__main__":
 
     #check for nopositive/negative conflict
     if options.nopositive and not options.negative:
-        logging.warning('Requested no positive sources, but no negative sources. Nothing to find.')
+        log.warning('Requested no positive sources, but no negative sources. Nothing to find.')
         sys.exit()
 
     #if measure/save are enabled we turn off "find" unless it was specifically
@@ -3668,34 +2983,34 @@ if __name__ == "__main__":
 
     #debugging in multi core mode is very hard to understand
     if options.debug:
-        logging.info("Setting cores=1 for debugging")
+        log.info("Setting cores=1 for debugging")
         options.cores = 1
 
     #check/set cores to use
     if options.cores is None:
         options.cores = multiprocessing.cpu_count()
-        logging.info("Found {0} cores".format(options.cores))
+        log.info("Found {0} cores".format(options.cores))
     if options.cores > 1:
         try:
             queue = pprocess.Queue(limit=options.cores, reuse=1)
             temp = queue.manage(pprocess.MakeReusable(fit_islands))
         except AttributeError, e:
             if 'poll' in e.message:
-                logging.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
+                log.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
                 cores = 1
                 queue = None
                 temp = None
             else:
-                logging.error("Your system can't seem to make a queue, try using --cores=1")
+                log.error("Your system can't seem to make a queue, try using --cores=1")
                 raise e
         finally:
             del queue, temp
 
-    logging.info("Using {0} cores".format(options.cores))
+    log.info("Using {0} cores".format(options.cores))
 
     hdu_index = options.hdu_index
     if hdu_index > 0:
-        logging.info("Using hdu index {0}".format(hdu_index))
+        log.info("Using hdu index {0}".format(hdu_index))
 
     #create a beam object from user input
     if options.beam is not None:
@@ -3705,8 +3020,8 @@ if __name__ == "__main__":
             print "Beam requires 3 args. You supplied '{0}'".format(beam)
             sys.exit()
         options.beam = Beam(beam[0], beam[1], beam[2])
-        logging.info("Using user supplied beam parameters")
-        logging.info("Beam is {0} deg x {1} deg with pa {2}".format(options.beam.a, options.beam.b, options.beam.pa))
+        log.info("Using user supplied beam parameters")
+        log.info("Beam is {0} deg x {1} deg with pa {2}".format(options.beam.a, options.beam.b, options.beam.pa))
 
     # determine the latitude of the telescope
     if options.telescope is not None:
@@ -3726,21 +3041,21 @@ if __name__ == "__main__":
         basename = os.path.splitext(filename)[0]
         if os.path.exists(basename+'_bkg.fits'):
             options.backgroundimg = basename+'_bkg.fits'
-            logging.info("Found background {0}".format(options.backgroundimg))
+            log.info("Found background {0}".format(options.backgroundimg))
         if os.path.exists(basename+"_rms.fits"):
             options.noiseimg = basename+'_rms.fits'
-            logging.info("Found noise {0}".format(options.noiseimg))
+            log.info("Found noise {0}".format(options.noiseimg))
         if os.path.exists(basename+".mim"):
             options.region = basename+".mim"
-            logging.info("Found region {0}".format(options.region))
+            log.info("Found region {0}".format(options.region))
 
 
     #check that the background and noise files exist
     if options.backgroundimg and not os.path.exists(options.backgroundimg):
-        logging.error("{0} not found".format(options.backgroundimg))
+        log.error("{0} not found".format(options.backgroundimg))
         sys.exit()
     if options.noiseimg and not os.path.exists(options.noiseimg):
-        logging.error("{0} not found".format(options.noise))
+        log.error("{0} not found".format(options.noise))
         sys.exit()
 
     #check that the output table formats are supported (if given)
@@ -3756,46 +3071,46 @@ if __name__ == "__main__":
 
     if options.region is not None:
         if not os.path.exists(options.region):
-            logging.error("Region file {0} not found")
+            log.error("Region file {0} not found")
             sys.exit()
         if not region_available:
-            logging.error("Could not import AegeanTools/Region.py")
-            logging.error("(you probably need to install HealPy)")
+            log.error("Could not import AegeanTools/Region.py")
+            log.error("(you probably need to install HealPy)")
             sys.exit()
 
     #do forced measurements using catfile
     sources = []
     if options.measure and options.priorized==0:
         if options.input is None:
-            logging.error("Must specify input catalog when --measure is selected")
+            log.error("Must specify input catalog when --measure is selected")
             sys.exit(1)
         if not os.path.exists(options.input):
-            logging.error("{0} not found".format(options.input))
+            log.error("{0} not found".format(options.input))
             sys.exit(1)
-        logging.info("Measuring fluxes of input catalog.")
+        log.info("Measuring fluxes of input catalog.")
         measurements = measure_catalog_fluxes(filename, catfile=options.input, hdu_index=options.hdu_index,
                                               outfile=options.outfile, bkgin=options.backgroundimg,
                                               rmsin=options.noiseimg, beam=options.beam, lat=lat)
         if len(measurements) == 0:
-            logging.info("No measurements made")
+            log.info("No measurements made")
         sources.extend(measurements)
 
     if options.priorized>0:
         if options.ratio is not None:
             if options.ratio<=0:
-                logging.error("ratio must be positive definite")
+                log.error("ratio must be positive definite")
                 sys.exit(1)
             if options.ratio<1:
-                logging.error("ratio <1 is not advised. Have fun!")
+                log.error("ratio <1 is not advised. Have fun!")
         if options.input is None:
-            logging.error("Must specify input catalog when --priorized is selected")
+            log.error("Must specify input catalog when --priorized is selected")
             sys.exit(1)
         if not os.path.exists(options.input):
-            logging.error("{0} not found".format(options.input))
+            log.error("{0} not found".format(options.input))
             sys.exit(1)
-        logging.info("Priorized fitting of sources in input catalog.")
+        log.info("Priorized fitting of sources in input catalog.")
 
-        logging.info("Stage = {0}".format(options.priorized))
+        log.info("Stage = {0}".format(options.priorized))
         measurements = priorized_fit_islands(filename, catfile=options.input, hdu_index=options.hdu_index,
                                             rms=options.rms,
                                             outfile=options.outfile, bkgin=options.backgroundimg,
@@ -3805,7 +3120,7 @@ if __name__ == "__main__":
 
 
     if options.find:
-        logging.info("Finding sources.")
+        log.info("Finding sources.")
         detections = find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,
                                            rms=options.rms,
                                            max_summits=options.max_summits,
@@ -3816,7 +3131,7 @@ if __name__ == "__main__":
                                            nonegative=not options.negative, nopositive=options.nopositive,
                                            mask=options.region, lat=lat)
         if len(detections) == 0:
-            logging.info("No sources found in image")
+            log.info("No sources found in image")
         sources.extend(detections)
 
     if len(sources) > 0 and options.tables:
