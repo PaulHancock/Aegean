@@ -5,11 +5,11 @@ Module for reading at writing catalogs
 """
 
 __author__ = "Paul Hancock"
+# TODO: get this info passed from aegean for metadata
 __version__ = "0.1"
 __date__ = "2015-06-05"
 
 # Standard imports
-import logging
 import sys
 import os
 import numpy as np
@@ -40,6 +40,10 @@ except ImportError:
 
 import sqlite3
 
+# join the Aegean logger
+import logging
+log = logging.getLogger('Aegean')
+
 #writing table formats
 def check_table_formats(files):
     cont = True
@@ -49,9 +53,9 @@ def check_table_formats(files):
         ext = ext[1:].lower()
         if not ext in formats:
             cont = False
-            logging.warn("Format not supported for {0} ({1})".format(t, ext))
+            log.warn("Format not supported for {0} ({1})".format(t, ext))
     if not cont:
-        logging.error("Invalid table format specified.")
+        log.error("Invalid table format specified.")
         sys.exit()
     return
 
@@ -89,15 +93,15 @@ def get_table_formats():
     if votables_supported:
         fmts.extend(['vo', 'vot', 'xml'])
     else:
-        logging.info("VOTables are not supported from this version of Astropy ({0})".format(astropy.__version__))
+        log.info("VOTables are not supported from this version of Astropy ({0})".format(astropy.__version__))
     if astropy.__version__.startswith('0.2') or astropy.__version__.startswith('0.3'):
-        logging.info("Ascii tables are not supported with this version of Astropy ({0})".format(astropy.__version__))
+        log.info("Ascii tables are not supported with this version of Astropy ({0})".format(astropy.__version__))
     else:
         fmts.extend(['csv', 'tab', 'tex', 'html'])
     if hdf5_supported:
         fmts.append('hdf5')
     else:
-        logging.info("HDF5 is not supported by your environment")
+        log.info("HDF5 is not supported by your environment")
     #assume this is always possible -> though it may not be on some systems
     fmts.extend(['db', 'sqlite'])
     return fmts
@@ -125,8 +129,8 @@ def save_catalog(filename, catalog):
     elif extension in ascii_table_formats.keys():
         write_table(filename, catalog, fmt=ascii_table_formats[extension])
     else:
-        logging.warning("extension not recognised {0}".format(extension))
-        logging.warning("You get tab format")
+        log.warning("extension not recognised {0}".format(extension))
+        log.warning("You get tab format")
         write_table(filename, catalog, fmt='tab')
     return
 
@@ -145,27 +149,27 @@ def load_catalog(filename):
     fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
 
     if fmt in ['csv', 'tab', 'tex'] and fmt in supported:
-        logging.info("Reading file {0}".format(filename))
+        log.info("Reading file {0}".format(filename))
         t = ascii.read(filename)
         catalog = zip(t.columns['ra'], t.columns['dec'])
 
     elif fmt in ['vo', 'vot', 'xml'] and fmt in supported:
-        logging.info("Reading file {0}".format(filename))
+        log.info("Reading file {0}".format(filename))
         t = parse_single_table(filename)
         catalog = zip(t.array['ra'].tolist(), t.array['dec'].tolist())
 
     elif fmt == 'cat':
-        logging.info("Reading ra/dec columns of Aegean catalog")
+        log.info("Reading ra/dec columns of Aegean catalog")
         lines = [a.strip().split() for a in open(filename, 'r').readlines() if not a.startswith('#')]
         catalog = [(float(a[5]), float(a[7])) for a in lines]
     else:
-        logging.info("Assuming ascii format, reading first two columns")
+        log.info("Assuming ascii format, reading first two columns")
         lines = [a.strip().split() for a in open(filename, 'r').readlines() if not a.startswith('#')]
         try:
             catalog = [(float(a[0]), float(a[1])) for a in lines]
         except:
-            logging.error("Expecting two columns of floats but failed to parse")
-            logging.error("Catalog file {0} not loaded".format(filename))
+            log.error("Expecting two columns of floats but failed to parse")
+            log.error("Catalog file {0} not loaded".format(filename))
             sys.exit()
 
     return catalog
@@ -182,14 +186,14 @@ def load_table(filename):
     fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
 
     if fmt in ['csv', 'tab', 'tex'] and fmt in supported:
-        logging.info("Reading file {0}".format(filename))
+        log.info("Reading file {0}".format(filename))
         t = ascii.read(filename)
     elif fmt in ['vo', 'vot', 'xml', 'fits','hdf5'] and fmt in supported:
-        logging.info("Reading file {0}".format(filename))
+        log.info("Reading file {0}".format(filename))
         t = Table.read(filename)
     else:
-        logging.error("Table format not recognized or supported")
-        logging.error("{0} [{1}]".format(filename,fmt))
+        log.error("Table format not recognized or supported")
+        log.error("{0} [{1}]".format(filename,fmt))
         t= None
     return t
 
@@ -248,20 +252,21 @@ def write_table(filename, catalog, fmt=None):
             ascii.write(t, filename)
         return
 
+    # sort the sources into types and then write them out individually
     components, islands, simples = classify_catalog(catalog)
 
     if len(components) > 0:
         new_name = "{1}{0}{2}".format('_comp', *os.path.splitext(filename))
         writer(new_name, components, fmt)
-        logging.info("wrote {0}".format(new_name))
+        log.info("wrote {0}".format(new_name))
     if len(islands) > 0:
         new_name = "{1}{0}{2}".format('_isle', *os.path.splitext(filename))
         writer(new_name, islands, fmt)
-        logging.info("wrote {0}".format(new_name))
+        log.info("wrote {0}".format(new_name))
     if len(simples) > 0:
         new_name = "{1}{0}{2}".format('_simp', *os.path.splitext(filename))
         writer(new_name, simples, fmt)
-        logging.info("wrote {0}".format(new_name))
+        log.info("wrote {0}".format(new_name))
     return
 
 
@@ -285,8 +290,8 @@ def writeFITSTable(filename,table):
         elif isinstance(val, (str, unicode)):
             types = "{0}A".format(len(val))
         else:
-            logging.warn("Column {0} is of unknown type {1}".format(val, type(val)))
-            logging.warn("Using 5A")
+            log.warn("Column {0} is of unknown type {1}".format(val, type(val)))
+            log.warn("Using 5A")
             types = "5A"
         return types
 
@@ -322,8 +327,8 @@ def writeIslandContours(filename, catalog, fmt):
         text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
         mas_fmt = 'image; line({1},{0},{3},{2}) #color = yellow'
     if fmt == 'ann':
-        logging.warn("Kvis not yet supported")
-        logging.warn("not writing anything")
+        log.warn("Kvis not yet supported")
+        log.warn("not writing anything")
         return
     for c in catalog:
         contour = c.contour
@@ -430,19 +435,19 @@ def writeAnn(filename, catalog, fmt):
                 print >> out, '#',
             print >> out, formatter.format(ra, dec, bmaj, bmin, pa, name)
         out.close()
-        logging.info("wrote {0}".format(new_file))
+        log.info("wrote {0}".format(new_file))
     if len(islands) > 0:
         if fmt == 'reg':
             new_file = re.sub('.reg$', '_isle.reg', filename)
         elif fmt == 'ann':
-            logging.warn('kvis islands are currently not working')
+            log.warn('kvis islands are currently not working')
             return
         else:
-            logging.warn('format {0} not supported for island annotations'.format(fmt))
+            log.warn('format {0} not supported for island annotations'.format(fmt))
             return
         #writeIslandBoxes(new_file,islands,fmt)
         writeIslandContours(new_file, islands, fmt)
-        logging.info("wrote {0}".format(new_file))
+        log.info("wrote {0}".format(new_file))
 
     return
 
@@ -471,13 +476,13 @@ def writeDB(filename, catalog):
             elif isinstance(val, (str, unicode)):
                 types.append("VARCHAR")
             else:
-                logging.warn("Column {0} is of unknown type {1}".format(n, type(n)))
-                logging.warn("Using VARCHAR")
+                log.warn("Column {0} is of unknown type {1}".format(n, type(n)))
+                log.warn("Using VARCHAR")
                 types.append("VARCHAR)")
         return types
 
     if os.path.exists(filename):
-        logging.warn("overwriting {0}".format(filename))
+        log.warn("overwriting {0}".format(filename))
         os.remove(filename)
     conn = sqlite3.connect(filename)
     db = conn.cursor()
@@ -493,13 +498,13 @@ def writeDB(filename, catalog):
         # convert values of -1 into None
         nulls = lambda x: [x, None][x == -1]
         db.executemany(stmnt, [map(nulls, r.as_list()) for r in t])
-        logging.info("Created table {0}".format(tn))
+        log.info("Created table {0}".format(tn))
     # metadata add some meta data
     db.execute("CREATE TABLE meta (author VARCHAR, version VARCHAR)")
     db.execute("INSERT INTO meta (author,version) VALUES (?,?)",('Aegean',"{0}-({1})".format(__version__,__date__)))
     conn.commit()
-    logging.info(db.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall())
+    log.info(db.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall())
     conn.close()
-    logging.info("Wrote file {0}".format(filename))
+    log.info("Wrote file {0}".format(filename))
     return
 
