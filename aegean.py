@@ -65,9 +65,7 @@ from AegeanTools.fits_image import FitsImage, Beam
 from AegeanTools.msq2 import MarchingSquares
 from AegeanTools.angle_tools import dec2hms, dec2dms, gcd, bear, translate
 import AegeanTools.flags as flags
-import AegeanTools.catalogs as catalogs
-# TODO: find a better solution than import *
-from AegeanTools.catalogs import *
+from AegeanTools.catalogs import show_formats, check_table_formats, load_table, load_catalog, table_to_source_list, save_catalog
 
 from AegeanTools.models import OutputSource, IslandSource, SimpleSource, classify_catalog
 
