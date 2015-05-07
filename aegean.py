@@ -2608,8 +2608,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
         new_isle.island = inum
         new_isle.components = params.components
         new_isle.extent = [xmin,xmax,ymin,ymax]
-        msq = MarchingSquares(idata)
-        new_isle.contour = [(a[0] + xmin, a[1] + ymin) for a in msq.perimeter]
+        new_isle.pix_mask = [(a[0] + xmin, a[1] + ymin) for a in zip(*np.where(np.isfinite(idata)))]
         anchors = [pix2sky([xmin,ymin]), pix2sky([xmax,ymax])]
         new_isle.max_angular_size_anchors = np.ravel(anchors)
         sources.append(new_isle)
