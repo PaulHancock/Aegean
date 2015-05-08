@@ -17,7 +17,6 @@ import sklearn
 import sklearn.cluster
 
 from catalogs import load_table, table_to_source_list
-from fitting import elliptical_gaussian
 
 # join the Aegean logger
 import logging
@@ -48,8 +47,9 @@ def norm_dist(src1,src2):
     R = dist / (np.hypot(r1,r2) / 3600)
     return R
 
-
-def pairwise_ellpitical(sources):
+# import line_profiler
+# @profile
+def pairwise_ellpitical(sources, far = 1):
     """
     Calculate the probability of an association between each pair of sources.
     0<= probability <=1
@@ -57,15 +57,21 @@ def pairwise_ellpitical(sources):
     :param sources: A list of sources
     :return: a matrix of probabilities.
     """
-    probabilities = np.empty((len(sources), len(sources)), dtype=np.float32)
+    distances = np.ones((len(sources), len(sources)), dtype=np.float32)*50
     for i,src1 in enumerate(sources):
         for j,src2 in enumerate(sources):
             if j<i:
                 continue
-            # TODO: write an early-out for very distant sources
-            probabilities[i, j] = norm_dist(src1, src2)
-            probabilities[j, i] = probabilities[i, j]
-    return probabilities
+            if i == j:
+                distances[i, j] = 0
+                continue
+            if abs(src2.dec - src1.dec) > far:
+                continue
+            if abs(src2.ra - src1.ra)*np.cos(np.radians(src1.dec)) > far:
+                continue
+            distances[i, j] = norm_dist(src1, src2)
+            distances[j, i] = distances[i, j]
+    return distances
 
 
 def pairwise_distance(positions):
