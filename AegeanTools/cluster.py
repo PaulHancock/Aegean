@@ -47,26 +47,31 @@ def norm_dist(src1,src2):
     R = dist / (np.hypot(r1,r2) / 3600)
     return R
 
-# import line_profiler
-# @profile
-def pairwise_ellpitical(sources, far = 1):
+import line_profiler
+@profile
+def pairwise_ellpitical(sources, far = None):
     """
     Calculate the probability of an association between each pair of sources.
     0<= probability <=1
     Form this into a matrix.
-    :param sources: A list of sources
+    :param sources: A list of sources sorted by declination
     :return: a matrix of probabilities.
     """
-    distances = np.ones((len(sources), len(sources)), dtype=np.float32)*50
-    for i,src1 in enumerate(sources):
-        for j,src2 in enumerate(sources):
+    if far is None:
+        far = max(a.a/3600 for a in sources)
+    l = len(sources)
+    distances = np.full((l, l), fill_value = 50, dtype=np.float32)
+    for i in xrange(l):
+        for j in xrange(i,l):
             if j<i:
                 continue
             if i == j:
                 distances[i, j] = 0
                 continue
-            if abs(src2.dec - src1.dec) > far:
-                continue
+            src1 = sources[i]
+            src2 = sources[j]
+            if src2.dec - src1.dec > far:
+                break
             if abs(src2.ra - src1.ra)*np.cos(np.radians(src1.dec)) > far:
                 continue
             distances[i, j] = norm_dist(src1, src2)
@@ -91,34 +96,33 @@ def pairwise_distance(positions):
     return distances
 
 
-def group_iter(catalog, eps, min_members=1, norm=False):
+def group_iter(catalog, eps, min_members=1):
     """
     :param catalog: List of sources, or filename of a catalog
     :param eps: Clustering radius in *degrees*
     :param min_members: Minimum number of members to form a cluster, default=1
-    :yiled: lists of sources, one list per group. No particular order.
+    :yield: lists of sources, one list per group. No particular order.
     """
 
     if isinstance(catalog,str):
         table = load_table(catalog)
-        positions = np.array(zip(table['ra'],table['dec']))
-        srccat = np.array(table_to_source_list(table))
+        srccat = table_to_source_list(table)
     elif isinstance(catalog,list):
         try:
-            positions = np.array([(s.ra,s.dec) for s in catalog])
-            srccat = np.array(catalog)
+            srccat = catalog
         except AttributeError:
             logging.error("catalog is as list of something that has not ra/dec attributes")
             sys.exit(1)
     else:
         logging.error("I don't know what catalog is")
         sys.exit(1)
+
     log.info("Regrouping islands within catalog")
     log.debug("Calculating distances")
-    if norm:
-        X = pairwise_ellpitical(srccat)
-    else:
-        X = pairwise_distance(positions)
+
+    srccat = np.array(sorted(srccat, key = lambda x: x.dec))
+    X = pairwise_ellpitical(srccat)
+
     log.debug("Clustering")
     off_diag = X[np.where(X>0)]
     if min(off_diag) > eps:
@@ -147,10 +151,6 @@ if __name__ == "__main__":
     positions = np.array(zip(table['ra'],table['dec']))
     srccat = list(table_to_source_list(table))
     X = pairwise_ellpitical(srccat)
-#    print positions[:10]
-    #print X[0]
-    #print gcd(srccat[0].ra,srccat[0].dec, srccat[1].ra, srccat[1].dec)
-    #print norm_dist(srccat[0],srccat[1])
 
-    for g in group_iter(srccat, 2. ,norm=True):
+    for g in group_iter(srccat, np.sqrt(2)):
         print len(g),[(a.island,a.source) for a in g]
