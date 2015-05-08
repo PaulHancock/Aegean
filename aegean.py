@@ -2243,11 +2243,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     shape = data.shape
     pixbeam = get_pixbeam()
 
-    # default to 2x the synthesized beam size
-    if radius is None:
-        radius = 2*abs(global_data.img.beam.a)
-
-    for inum, isle in enumerate(group_iter(input_sources, eps=radius)):
+    for inum, isle in enumerate(group_iter(input_sources, eps=np.sqrt(2), norm=True)):
         components = len(isle)
         log.debug("-=-")
         log.debug("input island = {0}, {1} components".format(isle[0].island, components))
@@ -2411,6 +2407,16 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
         print >> outfile, str(source)
 
     return sources
+
+
+def psf_rescale(srccat, ratio):
+    """
+
+    :param srccat:
+    :return:
+    """
+
+    return srccat
 
 
 def island_itergen(catalog):
