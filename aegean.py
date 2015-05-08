@@ -1887,10 +1887,7 @@ def fit_islands(islands):
     log.debug("Fitting group of {0} islands".format(len(islands)))
     sources = []
     for island in islands:
-        if lmfit_available:
-            res = fit_island_lmfit(island)
-        else:
-            res = fit_island_mpfit(island)
+        res = fit_island_lmfit(island)
         sources.extend(res)
     return sources
 
@@ -2467,6 +2464,7 @@ def force_measure_flux(radec):
     returns:
     [(flux,err),...]
     """
+    log.critical("This ability has been disabled for now")
     catalog = []
 
     #this is what we use to denote sources that are we are not able to measure
