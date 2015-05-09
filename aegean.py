@@ -2306,7 +2306,10 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
             i += 1
 
             # Use pixels above outerclip sigmas..
-            mask = np.where(data[xmin:xmax,ymin:ymax]-outerclip*rmsimg[xmin:xmax,ymin:ymax]>0)
+            if outerclip>=0:
+                mask = np.where(data[xmin:xmax,ymin:ymax]-outerclip*rmsimg[xmin:xmax,ymin:ymax]>0)
+            else: # negative outer clip means not clipping at all
+                mask = np.where(data[xmin:xmax,ymin:ymax])
 
             # convert the pixel indices to be pixels within the parent data set
             xmask = mask[0] + xmin
