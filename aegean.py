@@ -80,88 +80,6 @@ fwhm2cc = 1 / (2 * math.sqrt(2 * math.log(2)))
 cc2fwhm = (2 * math.sqrt(2 * math.log(2)))
 
 ####################################### CLASSES ####################################
-
-
-class Island(object):
-    """
-    A collection of pixels within an image.
-    An island is generally composed of one or more components which are
-    detected a characterised by Aegean
-
-    Island(pixels,pixlist)
-    pixels = an np.array of pixels that make up this island
-    pixlist = a list of [(x,y,flux),... ] pixel values that make up this island
-              This allows for non rectangular islands to be used. Pixels not lis
-              ted
-              are set to np.NaN and are ignored by Aegean.
-    """
-
-    def __init__(self, pixels=None, pixlist=None):
-        if pixels is not None:
-            self.pixels = pixels
-        elif pixlist is not None:
-            self.pixels = self.list2map(pixlist)
-        else:
-            self.pixels = self.gen_island(64, 64)
-
-    def __repr__(self):
-        return "An island of pixels of shape {0},{1}".format(*self.pixels.shape)
-
-    def list2map(self, pixlist):
-        """
-        Turn a list of (x,y) tuples into a 2d array
-        returns: map[x,y]=self.pixels[x,y] and the offset coordinates
-        for the new island with respect to 'self'.
-
-        Input:
-        pixlist - a list of (x,y) coordinates of the pixels of interest
-
-        Return:
-        pixels  - a 2d array with the pixels specified (and filled with NaNs)
-        xmin,xmax,ymin,ymax - the boundaries of this box within self.pixels
-        """
-        xmin, xmax = min([a[0] for a in pixlist]), max([a[0] for a in pixlist])
-        ymin, ymax = min([a[1] for a in pixlist]), max([a[1] for a in pixlist])
-        pixels = np.ones(self.pixels[xmin:xmax + 1, ymin:ymax + 1].shape) * np.NaN
-        for x, y in pixlist:
-            pixels[x - xmin, y - ymin] = self.pixels[x, y]
-        return pixels, xmin, xmax, ymin, ymax
-
-    @staticmethod
-    def map2list(data):
-        """Turn a 2d array into a list of (val,x,y) tuples."""
-        lst = [(data[x, y], x, y) for x in range(data.shape[0]) for y in range(data.shape[1])]
-        return lst
-
-    def get_pixlist(self, clip):
-        # Jay's version
-        indices = np.where(self.pixels > clip)
-        ax, ay = indices
-        pixlist = [(self.pixels[ax[i], ay[i]], ax[i], ay[i]) for i in range(len(ax))]
-        return pixlist
-
-    @staticmethod
-    def gauss(a, x, fwhm):
-        c = fwhm / (2 * math.sqrt(2 * math.log(2)))
-        return a * math.exp(-x ** 2 / (2 * c ** 2))
-
-    def gen_island(self, nx, ny):
-        """
-        Generate an island with a single source in it
-        Good for testing
-        """
-        fwhm_x = (nx / 8)
-        fwhm_y = (ny / 4)
-        midx, midy = math.floor(nx / 2), math.floor(ny / 2)
-        source = np.array([[self.gauss(1, (x - midx), fwhm_x) * self.gauss(1, (y - midy), fwhm_y) for y in range(ny)]
-                           for x in range(nx)])
-        source *= source > 1e-3
-        return source
-
-    def get_pixels(self):
-        return self.pixels
-
-
 class GlobalFittingData(object):
     """
     The global data used for fitting.
@@ -1552,253 +1470,7 @@ def calc_errors(source):
 ######################################### THE MAIN DRIVING FUNCTIONS ###############
 
 #source finding and fitting
-def fit_island_mpfit(island_data):
-    """
-    Take an Island and do all the parameter estimation and fitting.
-    island_data - an IslandFittingData object
-    Return a list of sources that are within the island.
-    None = no sources found in the island.
-    """
-    global global_data
-
-    # global data
-    dcurve = global_data.dcurve
-    rmsimg = global_data.rmsimg
-    bkgimg = global_data.bkgimg
-    beam = global_data.beam
-
-    # island data
-    isle_num = island_data.isle_num
-    idata = island_data.i
-    innerclip, outerclip, max_summits = island_data.scalars
-    xmin, xmax, ymin, ymax = island_data.offsets
-
-    isle = Island(idata)
-    icurve = dcurve[xmin:xmax + 1, ymin:ymax + 1]
-    rms = rmsimg[xmin:xmax + 1, ymin:ymax + 1]
-    bkg = bkgimg[xmin:xmax + 1, ymin:ymax + 1]
-
-    is_flag = 0
-    pixbeam = global_data.pixbeam
-    if pixbeam is None:
-        is_flag |= flags.WCSERR
-
-    log.debug("=====")
-    log.debug("Island ({0})".format(isle_num))
-
-    parinfo = estimate_mpfit_parinfo(isle.pixels, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
-                               max_summits=max_summits)
-
-    log.debug("Rms is {0}".format(np.shape(rms)))
-    log.debug("Isle is {0}".format(np.shape(isle.pixels)))
-    log.debug(" of which {0} are masked".format(sum(np.isnan(isle.pixels).ravel() * 1)))
-
-    # there are 6 params per summit
-    num_summits = len(parinfo) / 6  # there are 6 params per Guassian
-    log.debug("max_summits, num_summits={0},{1}".format(max_summits, num_summits))
-
-    # Islands may have no summits if the curvature is not steep enough.
-    if num_summits < 1:
-        log.debug("Island {0} has no summits!".format(isle_num))
-        return []
-
-    #determine if the island is big enough to fit
-    for src in parinfo:
-        if src['parname'].split(":")[-1] in ['minor', 'major', 'pa']:
-            if src['flags'] & flags.FITERRSMALL:
-                is_flag |= flags.FITERRSMALL
-                log.debug("Island is too small for a fit, not fitting anything")
-                is_flag |= flags.NOTFIT
-                break
-    # report that some components may not be fit [ limitations are imposed in estimate_parinfo ]
-    if (max_summits is not None) and (num_summits > max_summits):
-        log.info("Island has too many summits ({0}), not fitting everything".format(num_summits))
-
-    #supply dummy info if there is no fitting
-    if is_flag & flags.NOTFIT:
-        mp = DummyMP(parinfo=parinfo, perror=None)
-        info = parinfo
-        residual = (None, None)
-    else:
-        #do the fitting
-        mp, info, residual = do_mpfit(isle.pixels, rms, parinfo)
-
-    log.debug("Source 0 pa={0} [pixel coords]".format(mp.params[5]))
-
-    params = mp.params
-    # report the source parameters
-    sources = []
-    components = len(params) / 6
-
-    # fix_shape(mp)
-    par_matrix = np.asarray(params, dtype=np.float64)  #float32's give string conversion errors.
-    par_matrix = par_matrix.reshape(components, 6)
-
-    # if there was a fitting error create an mp.perror matrix full of zeros
-    if mp.perror is None:
-        mp.perror = [0 for a in mp.params]
-        is_flag |= flags.FIXED2PSF
-        log.debug("FitError: {0}".format(mp.errmsg))
-        log.debug("info:")
-        for i in info:
-            log.debug("{0}".format(i))
-
-    # anything that has an error of zero should be converted to -1
-    for k, val in enumerate(mp.perror):
-        if val == 0.0:
-            mp.perror[k] = -1
-
-    # TODO: figure out what to do with the -1 errors. They are still important.
-    for j, (amp, xo, yo, major, minor, theta) in enumerate(par_matrix):
-        source = OutputSource()
-        source.island = isle_num
-        source.source = j
-
-        # print "MP ({0},{1})".format(isle_num,j)
-        # print "amp, xo, yo,major, minor,theta",amp, xo, yo, major, minor, pa_limit(theta)
-        #
-        #take general flags from the island
-        src_flags = is_flag
-        #and specific flags from the source
-        src_flags |= info[j * 6 + 5]['flags']
-
-        #params = [amp,x0,y0,major,minor,pa]{n}
-        #pixel pos within island +
-        # island offset within region +
-        # region offset within image +
-        # 1 for luck
-        # (pyfits->fits conversion = luck)
-        x_pix = xo + xmin + 1
-        y_pix = yo + ymin + 1
-
-        # ------ extract source parameters ------
-
-        # fluxes
-        # the background is taken from background map
-        # Clamp the pixel location to the edge of the background map (see Trac #51)
-        y = max(min(int(round(y_pix - ymin)), bkg.shape[1] - 1), 0)
-        x = max(min(int(round(x_pix - xmin)), bkg.shape[0] - 1), 0)
-        source.background = bkg[x, y]
-        source.local_rms = rms[x, y]
-        source.peak_flux = amp
-        # source.err_peak_flux = amp_err
-
-        # position and shape
-        (source.ra, source.dec, source.a, source.pa) = pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
-        # if one of these values are nan then there has been some problem with the WCS handling
-        if not all(np.isfinite([source.ra, source.dec, source.a, source.pa])):
-            src_flags |= flags.WCSERR
-        # negative degrees is valid for RA, but I don't want them.
-        if source.ra < 0:
-            source.ra += 360
-        source.ra_str = dec2hms(source.ra)
-        source.dec_str = dec2dms(source.dec)
-        log.debug("Source {0} Extracted pa={1}deg [pixel] -> {2}deg [sky]".format(j, theta, source.pa))
-
-        # calculate minor axis and convert a/b to arcsec
-        source.a *= 3600  # arcseconds
-        source.b = pix2sky_vec((x_pix, y_pix), minor * cc2fwhm, theta + 90)[2] * 3600  # arcseconds
-        # ensure a>=b
-        fix_shape(source)
-        # fix the pa to be between -90<pa<=90
-        source.pa = pa_limit(source.pa)
-
-        # calculate integrated flux
-        source.int_flux = source.peak_flux * major * minor * cc2fwhm ** 2 * np.pi
-        source.int_flux /= get_beamarea_pix(source.ra,source.dec) # scale Jy/beam -> Jy
-
-        # ------ calculate errors for each parameter ------
-        calc_errors(source)
-
-        # these are goodness of fit statistics
-        source.residual_mean = residual[0]
-        source.residual_std = residual[1]
-        # set the flags
-        source.flags = src_flags
-
-        sources.append(source)
-        log.debug(source)
-
-    #calculate the integrated island flux if required
-    if island_data.doislandflux:
-        log.debug("Integrated flux for island {0}".format(isle_num))
-        kappa_sigma = np.where(abs(idata) - outerclip * rms > 0, idata, np.NaN)
-        log.debug("- island shape is {0}".format(kappa_sigma.shape))
-
-        source = IslandSource()
-        source.flags = 0
-        source.island = isle_num
-        source.components = j + 1
-        source.peak_flux = np.nanmax(kappa_sigma)
-        #check for negative islands
-        if source.peak_flux < 0:
-            source.peak_flux = np.nanmin(kappa_sigma)
-        log.debug("- peak flux {0}".format(source.peak_flux))
-
-        #positions and background
-        positions = np.where(kappa_sigma == source.peak_flux)
-        xy = positions[0][0] + xmin, positions[1][0] + ymin
-        radec = pix2sky(xy)
-        source.ra = radec[0]
-        #convert negative ra's to positive ones
-        if source.ra < 0:
-            source.ra += 360
-        source.dec = radec[1]
-        source.ra_str = dec2hms(source.ra)
-        source.dec_str = dec2dms(source.dec)
-        source.background = bkg[positions[0][0], positions[1][0]]
-        source.local_rms = rms[positions[0][0], positions[1][0]]
-        source.x_width, source.y_width = isle.pixels.shape
-        source.pixels = int(sum(np.isfinite(kappa_sigma).ravel() * 1.0))
-        source.extent = [xmin, xmax, ymin, ymax]
-        #calculate the area of the island as a fraction of the area of the bounding box
-        #br = pix2sky([xmin,ymin])
-        bl = pix2sky([xmax, ymin])
-        tl = pix2sky([xmax, ymax])
-        tr = pix2sky([xmin, ymax])
-        height = gcd(tl[0], tl[1], bl[0], bl[1])
-        width = gcd(tl[0], tl[1], tr[0], tr[1])
-        area = height * width
-        #print tl,br,height,width, area, source.pixels, source.x_width,source.y_width
-        source.area = area * source.pixels / source.x_width / source.y_width
-        #create contours
-        msq = MarchingSquares(idata)
-        source.contour = [(a[0] + xmin, a[1] + ymin) for a in msq.perimeter]
-        #calculate the maximum angular size of this island, brute force method
-        source.max_angular_size = 0
-        for i, pos1 in enumerate(source.contour):
-            radec1 = pix2sky(pos1)
-            for j, pos2 in enumerate(source.contour[i:]):
-                radec2 = pix2sky(pos2)
-                dist = gcd(radec1[0], radec1[1], radec2[0], radec2[1])
-                if dist > source.max_angular_size:
-                    source.max_angular_size = dist
-                    source.pa = bear(radec1[0], radec1[1], radec2[0], radec2[1])
-                    source.max_angular_size_anchors = [pos1[0], pos1[1], pos2[0], pos2[1]]
-
-        log.debug("- peak position {0}, {1} [{2},{3}]".format(source.ra_str, source.dec_str, positions[0][0],
-                                                                  positions[1][0]))
-
-        # integrated flux
-        beam_area = get_beamarea_pix(source.ra,source.dec)
-        isize = source.pixels  #number of non zero pixels
-        log.debug("- pixels used {0}".format(isize))
-        source.int_flux = np.nansum(kappa_sigma)  #total flux Jy/beam
-        log.debug("- sum of pixles {0}".format(source.int_flux))
-        source.int_flux /= beam_area
-        log.debug("- integrated flux {0}".format(source.int_flux))
-        eta = erf(np.sqrt(-1 * np.log(abs(source.local_rms * outerclip / source.peak_flux)))) ** 2
-        log.debug("- eta {0}".format(eta))
-        source.eta = eta
-        source.beam_area = beam_area
-
-        # I don't know how to calculate this error so we'll set it to nan
-        source.err_int_flux = np.nan
-        sources.append(source)
-    return sources
-
-
-def fit_island_lmfit(island_data):
+def fit_island(island_data):
     """
     Take an Island and do all the parameter estimation and fitting.
     island_data - an IslandFittingData object
@@ -1881,7 +1553,7 @@ def fit_islands(islands):
     log.debug("Fitting group of {0} islands".format(len(islands)))
     sources = []
     for island in islands:
-        res = fit_island_lmfit(island)
+        res = fit_island(island)
         sources.extend(res)
     return sources
 
@@ -1986,7 +1658,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
         # and submit to queue for subprocesses. Passing a group of islands is more
         # efficient than passing single islands to the subprocesses.
         if cores == 1:
-            res = fit_island_lmfit(island_data)
+            res = fit_island(island_data)
             queue.append(res)
         else:
             island_group.append(island_data)
@@ -2210,7 +1882,7 @@ def priorized_fit_island(filename, catfile, hdu_index=0, outfile=None, bkgin=Non
 
 
 def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
-                           beam=None, lat=None, stage=3, ratio=1.0, outerclip=3, radius=None):
+                           beam=None, lat=None, stage=3, ratio=1.0, outerclip=3, radius=None, regroup=True):
     """
     Take an input catalog, and image, and optional background/noise images
     fit the flux and ra/dec for each of the given sources, keeping the morphology fixed
@@ -2226,7 +1898,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     beam = global_data.beam
     # load the table and convert to an input source list
     input_table = load_table(catfile)
-    input_sources = sorted(table_to_source_list(input_table), key = lambda x: x.dec)
+    input_sources = table_to_source_list(input_table)
     # the input sources are the intial conditions for our fits.
     # Expand each source size if needed.
     if ratio is not None:
@@ -2241,7 +1913,14 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     shape = data.shape
     pixbeam = get_pixbeam()
 
-    for inum, isle in enumerate(group_iter(input_sources, eps=np.sqrt(2))):
+    if regroup:
+        input_sources = sorted(input_sources, key = lambda x: x.dec)
+        groups = list(group_iter(input_sources, eps=np.sqrt(2)))
+    else:
+        groups = list(island_itergen(input_sources))
+
+
+    for inum, isle in enumerate(groups):
         components = len(isle)
         log.debug("-=-")
         log.debug("input island = {0}, {1} components".format(isle[0].island, components))
@@ -2711,10 +2390,12 @@ if __name__ == "__main__":
 
     parser.add_option('--measure', dest='measure', action='store_true', default=False,
                       help='Enable forced measurement mode. Requires an input source list via --input. Sets --find to false. [default: false]')
-    parser.add_option('--priorized', dest='priorized', default=0, type=int,
-                      help="IN TESTING: Enable priorized fitting, with stage = n [default=0]")
+    parser.add_option('--priorized', dest='priorized', default=1, type=int,
+                      help="IN TESTING: Enable priorized fitting, with stage = n [default=1]")
     parser.add_option('--ratio', dest='ratio', default=None, type=float,
                       help="IN TESTING: the ratio of synthesized beam sizes (image psf / input catalog psf). For use with priorized.")
+    parser.add_option('--noregroup',dest='regroup', default=True, action='store_false',
+                      help='IN TESTING: Do not regroup islands before priorized fitting.')
     parser.add_option('--input', dest='input', default=None,
                       help='If --measure is true, this gives the filename for a catalog of locations at which fluxes will be measured. [default: none]')
 
@@ -2901,7 +2582,8 @@ if __name__ == "__main__":
                                             rms=options.rms,
                                             outfile=options.outfile, bkgin=options.backgroundimg,
                                             rmsin=options.noiseimg, beam=options.beam, lat=lat,
-                                            stage=options.priorized, ratio=options.ratio, outerclip=options.outerclip)
+                                            stage=options.priorized, ratio=options.ratio, outerclip=options.outerclip,
+                                            regroup=options.regroup)
         sources.extend(measurements)
 
 
