@@ -7,6 +7,7 @@ from optparse import OptionParser
 from time import gmtime, strftime
 import logging
 import copy
+from tempfile import NamedTemporaryFile
 import time
 
 #image manipulation 
@@ -19,7 +20,6 @@ import AegeanTools.pprocess as pprocess
 from AegeanTools.fits_interp import compress
 
 import multiprocessing
-#from blist import *
 
 __version__ = 'v1.0'
 __date__ = '2015-03-03'
@@ -27,15 +27,6 @@ __date__ = '2015-03-03'
 ###
 #
 ###
-
-class dummy:
-    pass
-
-gdata=dummy()
-gdata.data = None
-gdata.step_size=None
-gdata.box_size=None
-
 
 def rf(filename, region, step_size, box_size, shape):
     """
@@ -163,111 +154,6 @@ def rf(filename, region, step_size, box_size, shape):
     return xmin,xmax,ymin,ymax,bkg_points,bkg_values,rms_points,rms_values
 
 
-
-#@profile
-def running_filter(xmn,xmx,ymn,ymx):
-    """
-    A version of running_filter that works on a subset of the data
-    and returns the data without interpolation
-    uses gdata for: data, step_size, and box_size
-    Input:
-    bounds - 
-    """
-    #TODO propagate this change to the remainder of the func
-    xmin,xmax,ymin,ymax=ymn,ymx,xmn,xmx
-    data=gdata.data
-    box_size=gdata.box_size
-    step_size=gdata.step_size
-    #start a new RunningPercentile class
-    rp = RP()
-    logging.debug('{0}x{1},{2}x{3} starting at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-
-    def locations(step_size,xmin,xmax,ymin,ymax):
-        """
-        Generator function to iterate over a grid of x,y coords
-        operates only within the given bounds
-        Returns:
-        x,y,previous_x,previous_y
-        """
-
-        xvals = range(xmin,xmax,step_size[0])
-        if xvals[-1]!=xmax:
-            xvals.append(xmax)
-        yvals = range(ymin,ymax,step_size[1])
-        if yvals[-1]!=ymax:
-            yvals.append(ymax)
-        #initial data
-        px,py=xvals[0],yvals[0]
-        i=1
-        for y in yvals:
-            for x in xvals[::i]:
-                yield x,y,px,py
-                px,py=x,y
-            i*=-1 #change x direction
-
-    def box(x,y):
-        """
-        calculate the boundaries of the box centered at x,y
-        with size = box_size
-        """
-        x_min = max(0,x-box_size[0]/2)
-        x_max = min(data.shape[0]-1,x+box_size[0]/2)
-        y_min = max(0,y-box_size[1]/2)
-        y_max = min(data.shape[1]-1,y+box_size[1]/2)
-        return x_min,x_max,y_min,y_max
-
-    bkg_points = []
-    rms_points = []
-    bkg_values = []
-    rms_values = []
-    #intialise the rp with our first box worth of data
-    x_min,x_max,y_min,y_max = box(xmin,ymin)
-    #print "initial box is",x_min,x_max,y_min,y_max
-    new = data[x_min:x_max,y_min:y_max].ravel()
-    #print "and has",len(new),"pixels"
-    rp.add(new)
-    for x,y,px,py in locations(step_size,xmin,xmax,ymin,ymax):
-        x_min,x_max,y_min,y_max = box(x,y)
-        px_min,px_max,py_min,py_max = box(px,py)
-        old=[]
-        new=[]
-        #we only move in one direction at a time, but don't know which
-        if (x_min>px_min) or (x_max>px_max):
-            #down
-            if x_min != px_min:
-                old = data[min(px_min,x_min):max(px_min,x_min),y_min:y_max].ravel()
-            if x_max != px_max:
-                new = data[min(px_max,x_max):max(px_max,x_max),y_min:y_max].ravel()
-        elif (x_min<px_min) or (x_max<px_max):
-            #up
-            if x_min != px_min:
-                new = data[min(px_min,x_min):max(px_min,x_min),y_min:y_max].ravel()
-            if x_max != px_max:
-                old = data[min(px_max,x_max):max(px_max,x_max),y_min:y_max].ravel()
-        else: # x's have not changed
-            #we are moving right
-            if y_min != py_min:
-                old = data[x_min:x_max,min(py_min,y_min):max(py_min,y_min)].ravel()
-            if y_max != py_max:
-                new = data[x_min:x_max,min(py_max,y_max):max(py_max,y_max)].ravel()
-        rp.add(new)
-        rp.sub(old)
-        p0,p25,p50,p75,p100 = rp.score()
-        if p50 is not None:
-            bkg_points.append((x,y))
-            bkg_values.append(p50)
-        if (p75 is not None) and (p25 is not None):
-            rms_points.append((x,y))
-            rms_values.append((p75-p25)/1.34896)
-            # if rms_values[-1]<0 and logging.getLogger().isEnabledFor(logging.DEBUG):
-            #     logging.debug("RMS: {0}".format(rms_values[-1]))
-            #     logging.debug("percentiles: {0}".format([p0,p25,p50,p75,p100]))
-            #     logging.debug("rp {0}".format(rp.slist))
-    #return our lists, the interpolation will be done on the master node
-    #also tell the master node where the data came from
-    logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-    return xmin,xmax,ymin,ymax,bkg_points,bkg_values,rms_points,rms_values
-
 def gen_factors(m,permute=True):
     """
     Generate a list of integer factors for m
@@ -283,6 +169,7 @@ def gen_factors(m,permute=True):
             #yield the reverse pair if it is unique
             if i != n/i and permute:
                 yield n/i,i
+
 
 def optimum_sections(cores,data_shape):
     """
@@ -306,6 +193,7 @@ def optimum_sections(cores,data_shape):
     logging.debug("Sectioning chosen to be {0[0]}x{0[1]} for a score of {1}".format(best,min_overlap))
     return best
 
+
 def mask_img(data,mask_data):
     """
 
@@ -315,6 +203,7 @@ def mask_img(data,mask_data):
     """
     mask = np.where(np.isnan(mask_data))
     data[mask]=np.NaN
+
 
 def filter_mc(filename, step_size, box_size, cores, shape):
     """
@@ -400,6 +289,7 @@ def filter_mc(filename, step_size, box_size, cores, shape):
         del queue, parfilt
     return interpolated_bkg,interpolated_rms
 
+
 def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False):
     """
 
@@ -452,10 +342,17 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
     logging.info("done")
 
     if twopass:
-        logging.error("twopass is temporarily not in use")
-        # logging.info("running second pass to get a better rms")
-        # _,rms=filter_mc(data-bkg,step_size=step_size,box_size=box_size,cores=cores)
-        # logging.info("done")
+        # TODO: check what this does for our memory usage
+        tempfile = NamedTemporaryFile(delete=False)
+        data = fits.getdata(im_name) - bkg
+        header = fits.getheader(im_name)
+        write_fits(data, header, tempfile)
+        tempfile.close()
+        del data, header
+        logging.info("running second pass to get a better rms")
+        _,rms=filter_mc(tempfile.name,step_size=step_size,box_size=box_size,cores=cores, shape=shape)
+        #logging.info("cleaning up temp file {0}".format(tempfile.name))
+        os.remove(tempfile.name)
 
     bkg_out = '_'.join([os.path.expanduser(out_base),'bkg.fits'])
     rms_out = '_'.join([os.path.expanduser(out_base),'rms.fits'])
@@ -553,22 +450,37 @@ def load_image(im_name):
     logging.info("loaded {0}".format(im_name))
     return fitsfile,data
 
-def save_image(fits,data,im_name):
+
+def write_fits(data, header, file_name):
+    """
+
+    :param hdu:
+    :param data:
+    :param filen_name:
+    :return:
+    """
+    hdu = fits.PrimaryHDU(data)
+    hdu.header = header
+    hdulist = fits.HDUList([hdu])
+    hdulist.writeto(file_name, clobber=True)
+
+def save_image(hdu,data,im_name):
     """
     Generic helper function to save a fits file with a given name/header
     This function modifies the fits object!
     """
-    fits[0].data = data
-    fits[0].header['HISTORY']='BANE {0}-({1})'.format(__version__,__date__)
+    hdu[0].data = data
+    hdu[0].header['HISTORY']='BANE {0}-({1})'.format(__version__,__date__)
     try:
-        fits.writeto(im_name,clobber=True)
-    except fits.verify.VerifyError,e:
+        hdu.writeto(im_name,clobber=True)
+    except hdu.verify.VerifyError,e:
         if "DATAMAX" in e.message or "DATAMIN" in e.message:
             logging.warn(e.message)
             logging.warn("I will fix this but it will cause some programs to break")
-            fits.writeto(im_name,clobber=True,output_verify="silentfix")
+            hdu.writeto(im_name,clobber=True,output_verify="silentfix")
     logging.info("wrote {0}".format(im_name))
     return
+
 
 #command line version of this program runs from here.    
 if __name__=="__main__":
