@@ -701,7 +701,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
 
 
 pass # for code folding purposes only!
-# Modelling and fitting functions (now in AegeanTools.fitting
+# Modelling and fitting functions (now in AegeanTools.fitting)
 # def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
 # def Cmatrix(x,y,sx,sy,theta):
 # def Bmatrix(C):
@@ -1255,12 +1255,6 @@ def estimate_bkg_rms(data):
     p75 = pixels[pixels.size / 4 * 3]
     iqr = p75 - p25
     return p50, iqr / 1.34896
-
-
-def estimate_background(*args,**kwargs):
-    log.warn("This function has been deprecated and should no longer be used")
-    log.warn("use estimate_background_global or estimate_bkg_rms instead")
-    return None, None
 
 
 def curvature(data, aspect=None):
@@ -2229,9 +2223,16 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
                  do_curve=False, beam=beam, lat=lat)
 
+    beam = global_data.beam
     # load the table and convert to an input source list
     input_table = load_table(catfile)
-    input_sources = sorted(table_to_source_list(input_table))
+    input_sources = sorted(table_to_source_list(input_table), key = lambda x: x.dec)
+    # the input sources are the intial conditions for our fits.
+    # Expand each source size if needed.
+    if ratio is not None:
+        for src in input_sources:
+            src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
+            src.b = np.sqrt(src.b**2 + (beam.b*3600)**2*(1-1/ratio**2))
     sources = []
 
     # setup some things
@@ -2240,7 +2241,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     shape = data.shape
     pixbeam = get_pixbeam()
 
-    for inum, isle in enumerate(group_iter(input_sources, eps=np.sqrt(2), norm=True)):
+    for inum, isle in enumerate(group_iter(input_sources, eps=np.sqrt(2))):
         components = len(isle)
         log.debug("-=-")
         log.debug("input island = {0}, {1} components".format(isle[0].island, components))
@@ -2278,14 +2279,6 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
 
             log.debug("Source shape [sky coords]  {0:5.2f}x{1:5.2f}@{2:05.2f}".format(src.a,src.b,src.pa))
             log.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
-
-            # resize the source based on the ratio of catalog/image resolutions
-            if ratio is not None:
-                sx = np.sqrt( sx**2 + (pixbeam.a*fwhm2cc)**2*(1-1/ratio**2))
-                sy = np.sqrt( sy**2 + (pixbeam.b*fwhm2cc)**2*(1-1/ratio**2))
-                pass # we don't do anything with the PA since we assume they are aligned or we have a circular beam.
-                log.debug(" ratio is {0}".format(ratio))
-                log.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
 
             # choose a region that is 2x the major axis of the source, 4x semimajor axis a
             width = 2 * sx
