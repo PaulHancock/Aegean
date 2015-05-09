@@ -111,7 +111,7 @@ def rf(filename, region, step_size, box_size, shape):
     new = data[x_min:x_max,y_min:y_max].ravel()
     #print "and has",len(new),"pixels"
     rp.add(new)
-    for x,y,px,py in locations(step_size,xmin,xmax,ymin,ymax):
+    for x,y,px,py in locations(step_size, xmin, xmax, ymin, ymax):
         x_min,x_max,y_min,y_max = box(x,y)
         px_min,px_max,py_min,py_max = box(px,py)
         old=[]
@@ -139,18 +139,14 @@ def rf(filename, region, step_size, box_size, shape):
         rp.sub(old)
         p0,p25,p50,p75,p100 = rp.score()
         if p50 is not None:
-            bkg_points.append((x+xmin+rmin,y+ymin+cmin)) #the coords need to be indices into the larger array
+            bkg_points.append((x+rmin,y+cmin)) #the coords need to be indices into the larger array
             bkg_values.append(p50)
         if (p75 is not None) and (p25 is not None):
-            rms_points.append((x+xmin+rmin,y+ymin+cmin))
+            rms_points.append((x+rmin,y+cmin))
             rms_values.append((p75-p25)/1.34896)
 
     #return our lists, the interpolation will be done on the master node
     #also tell the master node where the data came from - using the original coords
-    xmin += rmin
-    xmax += rmin
-    ymin += cmin
-    ymax += cmin
     logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     return xmin,xmax,ymin,ymax,bkg_points,bkg_values,rms_points,rms_values
 
@@ -301,7 +297,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
     :param twopass:
     :param cores:
     :param mask:
-    :param compress:
+    :param compressed:
     :return:
     """
     header = fits.getheader(im_name)
