@@ -47,8 +47,8 @@ def norm_dist(src1,src2):
     R = dist / (np.hypot(r1,r2) / 3600)
     return R
 
-import line_profiler
-@profile
+# import line_profiler
+# @profile
 def pairwise_ellpitical(sources, far = None):
     """
     Calculate the probability of an association between each pair of sources.
