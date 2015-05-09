@@ -57,6 +57,7 @@ def rf(filename, region, step_size, box_size, shape):
             sys.exit(1)
     # from here on the notion of x/y is swapped!
     xmin, xmax, ymin, ymax = region
+    logging.debug('{0}x{1},{2}x{3} starting at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     xmin -= rmin
     xmax -= rmin
     ymin -= cmin
@@ -65,7 +66,6 @@ def rf(filename, region, step_size, box_size, shape):
 
     #start a new RunningPercentile class
     rp = RP()
-    logging.debug('{0}x{1},{2}x{3} starting at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
     def locations(step_size,xmin,xmax,ymin,ymax):
         """
@@ -139,17 +139,18 @@ def rf(filename, region, step_size, box_size, shape):
         rp.sub(old)
         p0,p25,p50,p75,p100 = rp.score()
         if p50 is not None:
-            bkg_points.append((x,y))
+            bkg_points.append((x+xmin+rmin,y+ymin+cmin)) #the coords need to be indices into the larger array
             bkg_values.append(p50)
         if (p75 is not None) and (p25 is not None):
-            rms_points.append((x,y))
+            rms_points.append((x+xmin+rmin,y+ymin+cmin))
             rms_values.append((p75-p25)/1.34896)
-            # if rms_values[-1]<0 and logging.getLogger().isEnabledFor(logging.DEBUG):
-            #     logging.debug("RMS: {0}".format(rms_values[-1]))
-            #     logging.debug("percentiles: {0}".format([p0,p25,p50,p75,p100]))
-            #     logging.debug("rp {0}".format(rp.slist))
+
     #return our lists, the interpolation will be done on the master node
-    #also tell the master node where the data came from
+    #also tell the master node where the data came from - using the original coords
+    xmin += rmin
+    xmax += rmin
+    ymin += cmin
+    ymax += cmin
     logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     return xmin,xmax,ymin,ymax,bkg_points,bkg_values,rms_points,rms_values
 
@@ -365,13 +366,11 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
     header = fits.getheader(im_name)
     header['HISTORY'] = 'BANE {0}-({1})'.format(__version__,__date__)
     if compressed:
-        #need to copy since compress will mess with the header
-        old_header= copy.deepcopy(header)
         hdu = fits.PrimaryHDU(bkg)
-        hdu.header = old_header
+        hdu.header = copy.deepcopy(header)
         hdulist = fits.HDUList([hdu])
         compress(hdulist, step_size[0], bkg_out)
-        hdulist[0].header = old_header
+        hdulist[0].header = copy.deepcopy(header)
         hdulist[0].data = rms
         compress(hdulist, step_size[0], rms_out)
         return
@@ -468,6 +467,7 @@ def write_fits(data, header, file_name):
     hdu.header = header
     hdulist = fits.HDUList([hdu])
     hdulist.writeto(file_name, clobber=True)
+
 
 def save_image(hdu,data,im_name):
     """
