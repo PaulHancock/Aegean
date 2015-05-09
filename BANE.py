@@ -362,21 +362,26 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
     rms = np.array(rms, dtype=np.float32)
 
     # load the file since we are now going to fiddle with it
-    fitsfile, header = load_image(im_name)
+    header = fits.getheader(im_name)
+    header['HISTORY'] = 'BANE {0}-({1})'.format(__version__,__date__)
     if compressed:
         #need to copy since compress will mess with the header
         old_header= copy.deepcopy(header)
-        fitsfile[0].data = bkg
-        compress(fits, step_size[0], bkg_out)
-        fitsfile[0].header = old_header
-        fitsfile[0].data = rms
-        compress(fits, step_size[0], rms_out)
+        hdu = fits.PrimaryHDU(bkg)
+        hdu.header = old_header
+        hdulist = fits.HDUList([hdu])
+        compress(hdulist, step_size[0], bkg_out)
+        hdulist[0].header = old_header
+        hdulist[0].data = rms
+        compress(hdulist, step_size[0], rms_out)
         return
     if mask:
-        mask_img(bkg, fitsfile[0].data)
-        mask_img(rms, fitsfile[0].data)
-    save_image(fitsfile, bkg, bkg_out)
-    save_image(fitsfile, rms, rms_out)
+        ref = fits.getdata(im_name)
+        mask_img(bkg, ref)
+        mask_img(rms, ref)
+        del ref
+    write_fits(bkg, header, bkg_out)
+    write_fits(rms, header, rms_out)
 
 ###
 # Alternate Filters
