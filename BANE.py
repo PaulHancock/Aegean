@@ -37,12 +37,15 @@ def rf(filename, region, step_size, box_size, shape):
     :param box_size:
     :return:
     """
+    cmin, cmax, rmin, rmax = region
+    #logging.debug('{0}x{1},{2}x{3} starting at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     hdu = fits.getheader(filename)
-    rmin = max(0,region[0]-box_size[0]/2)
-    rmax = min(shape[0],region[1]+box_size[0]/2)
-    cmin = max(0, region[2]-box_size[1]/2)
-    cmax = min(shape[1], region[3]+box_size[1]/2)
+    cmin = max(0, cmin - box_size[0]/2)
+    cmax = min(shape[1], cmax + box_size[0]/2)
+    rmin = max(0, rmin - box_size[1]/2)
+    rmax = min(shape[0], rmax + box_size[1]/2)
     NAXIS = hdu["NAXIS"]
+
     # It seems that I cannot memmap the same file multiple times without errors
     with fits.open(filename, memmap=False) as a:
         if NAXIS ==2:
@@ -55,15 +58,26 @@ def rf(filename, region, step_size, box_size, shape):
             logging.error("Too many NAXIS for me {0}".format(NAXIS))
             logging.error("fix your file to be more sane")
             sys.exit(1)
-    # from here on the notion of x/y is swapped!
-    xmin, xmax, ymin, ymax = region
-    logging.debug('{0}x{1},{2}x{3} starting at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+
+    ymin, ymax, xmin, xmax = region
     xmin -= rmin
     xmax -= rmin
     ymin -= cmin
     ymax -= cmin
+
+
+
+    logging.debug(" region {0}".format(region))
+    logging.debug(" shape {0}".format(data.shape))
+    logging.debug(" rmin,rmax,cmin,cmax {0}".format([rmin,rmax,cmin,cmax]))
+    logging.debug(" xmin/max, ymin/max {0}".format([xmin,xmax,ymin,ymax]))
     del hdu
 
+    # from here on we use (x,y) instead of (y,x) for the data
+    # it gets confusing but it currently works
+    # many apologies for this!
+    xmin,ymin = ymin,xmin
+    xmax,ymax = ymax,xmax
     #start a new RunningPercentile class
     rp = RP()
 
@@ -95,10 +109,10 @@ def rf(filename, region, step_size, box_size, shape):
         calculate the boundaries of the box centered at x,y
         with size = box_size
         """
-        x_min = max(0,x-box_size[0]/2)
-        x_max = min(data.shape[0]-1,x+box_size[0]/2)
-        y_min = max(0,y-box_size[1]/2)
-        y_max = min(data.shape[1]-1,y+box_size[1]/2)
+        x_min = max(xmin,x-box_size[0]/2)
+        x_max = min(data.shape[1]-1,x+box_size[0]/2)
+        y_min = max(ymin,y-box_size[1]/2)
+        y_max = min(data.shape[0]-1,y+box_size[1]/2)
         return x_min,x_max,y_min,y_max
 
     bkg_points = []
@@ -116,6 +130,8 @@ def rf(filename, region, step_size, box_size, shape):
         px_min,px_max,py_min,py_max = box(px,py)
         old=[]
         new=[]
+        if x_min<xmin or x_max>data.shape[1] or y_min<ymin or y_max>data.shape[0]:
+            logging.info("{0}".format([xmin,data.shape[1],ymin,data.shape[0],x_min,x_max,y_min,y_max]))
         #we only move in one direction at a time, but don't know which
         if (x_min>px_min) or (x_max>px_max):
             #down
@@ -139,10 +155,10 @@ def rf(filename, region, step_size, box_size, shape):
         rp.sub(old)
         p0,p25,p50,p75,p100 = rp.score()
         if p50 is not None:
-            bkg_points.append((x+rmin,y+cmin)) #the coords need to be indices into the larger array
+            bkg_points.append((x+cmin,y+rmin)) #the coords need to be indices into the larger array
             bkg_values.append(p50)
         if (p75 is not None) and (p25 is not None):
-            rms_points.append((x+rmin,y+cmin))
+            rms_points.append((x+cmin,y+rmin))
             rms_values.append((p75-p25)/1.34896)
 
     #return our lists, the interpolation will be done on the master node
@@ -253,7 +269,7 @@ def filter_mc(filename, step_size, box_size, cores, shape):
             for ymin,ymax in zip(ymins,ymaxs):
                 region = [xmin,xmax,ymin,ymax]
                 parfilt(filename, region, step_size, box_size, shape)
-                # time.sleep(5)
+                time.sleep(0.5)
 
         #now unpack the results
         bkg_points=[]
