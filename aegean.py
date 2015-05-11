@@ -1970,7 +1970,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
             xmax = max(xmax, min(shape[0], x + xwidth / 2 + 1))
             ymax = max(ymax, min(shape[1], y + ywidth / 2 + 1))
 
-            s_lims = [0.8 * pixbeam.b * fwhm2cc, 2 * sy * math.sqrt(2)]
+            s_lims = [0.8 * min(sx,pixbeam.b * fwhm2cc), 2 * sy * math.sqrt(2)]
 
             # Set up the parameters for the fit, including constraints
             prefix = "c{0}_".format(i)
