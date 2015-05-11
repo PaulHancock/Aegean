@@ -188,11 +188,11 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
     for i in range(n):
         xmin,xmax = f[i][0].start, f[i][0].stop
         ymin,ymax = f[i][1].start, f[i][1].stop
-        if np.any(snr[xmin:xmax+1,ymin:ymax+1]>innerclip): # obey inner clip constraint
-            data_box = data[xmin:xmax+1,ymin:ymax+1]
-            data_box[np.where(snr[xmin:xmax+1,ymin:ymax+1] < outerclip)] = np.nan
+        if np.any(snr[xmin:xmax,ymin:ymax]>innerclip): # obey inner clip constraint
+            data_box = data[xmin:xmax,ymin:ymax]
+            data_box[np.where(snr[xmin:xmax,ymin:ymax] < outerclip)] = np.nan
             if domask and global_data.region is not None:
-                y,x = np.where(snr[xmin:xmax+1,ymin:ymax+1] >= outerclip)
+                y,x = np.where(snr[xmin:xmax,ymin:ymax] >= outerclip)
                 # convert indices of this sub region to indices in the greater image
                 yx = zip(y+ymin,x+xmin)
                 ra, dec = global_data.wcs.wcs_pix2world(yx, 1).transpose()
@@ -201,7 +201,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
                 if not np.any(mask):
                     continue
                 log.debug("Mask {0}".format(mask))
-            yield data_box, xmin, xmax, ymin, ymax
+            yield data_box, xmin, xmax-1, ymin, ymax-1
 
 
 ##parameter estimates
@@ -450,7 +450,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         is_flag = flags.WCSERR
         pixbeam = Beam(1, 1, 0)
 
-    #set a circular limit based on the size of the pixbeam
+    #set a square limit based on the size of the pixbeam
     xo_lim = 0.5*np.hypot(pixbeam.a, pixbeam.b)
     yo_lim = xo_lim
 
@@ -2207,7 +2207,7 @@ if __name__ == "__main__":
 
     parser.add_option('--measure', dest='measure', action='store_true', default=False,
                       help='Enable forced measurement mode. Requires an input source list via --input. Sets --find to false. [default: false]')
-    parser.add_option('--priorized', dest='priorized', default=1, type=int,
+    parser.add_option('--priorized', dest='priorized', default=None, type=int,
                       help="IN TESTING: Enable priorized fitting, with stage = n [default=1]")
     parser.add_option('--ratio', dest='ratio', default=None, type=float,
                       help="IN TESTING: the ratio of synthesized beam sizes (image psf / input catalog psf). For use with priorized.")
