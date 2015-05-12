@@ -438,7 +438,7 @@ def test2d():
     errs_corr = []
     crb_corr = []
 
-    nj = 40
+    nj = 150
     # The model parameters
     params = lmfit.Parameters()
     params.add('amp', value=1, min=0.5, max=2)
@@ -649,6 +649,133 @@ def test2d():
         # print CRB_errs(jac,C,B)
         pyplot.show()
 
+
+def JC_err_comp():
+    nx = 15
+    ny = 12
+    x,y = np.where(np.ones((nx,ny))==1)
+
+    smoothing = 1.27 # 3pix/beam
+    #smoothing = 2.12 # 5pix/beam
+    #smoothing = 1.5 # ~4.2pix/beam
+
+
+
+    condon_err_list_corr= []
+    condon_err_list_nocorr= []
+    CRB_err_list_corr = []
+    CRB_err_list_nocorr = []
+
+    nj = 50
+    nsnr = 10
+    snr = np.logspace(np.log10(5),np.log10(50),nsnr)
+    print snr
+    # The model parameters
+    params = lmfit.Parameters()
+    params.add('amp', value=1, min=0.5, max=2)
+    params.add('xo', value=1.*nx/2)
+    params.add('yo', value=1.*ny/2)
+    params.add('sx', value=2*smoothing, min=0.8*smoothing)
+    params.add('sy', value=smoothing, min=0.8*smoothing)
+    params.add('theta',value=0, min=-2*np.pi, max=2*np.pi)
+    params.components=1
+
+    for k in xrange(nsnr):
+        diffs_nocorr = []
+        errs_nocorr = []
+        crb_nocorr = []
+        diffs_corr = []
+        errs_corr = []
+        crb_corr = []
+        print k
+        for j in xrange(nj):
+            np.random.seed(1234567+j)
+
+            # The initial guess at the parameters
+            init_params = copy.deepcopy(params)
+            init_params['amp'].value += 0.05* 2*(np.random.random()-0.5)
+            init_params['xo'].value += 1*(np.random.random()-0.5)
+            init_params['yo'].value += 1*(np.random.random()-0.5)
+            init_params['sx'].value = smoothing*1.01
+            init_params['sy'].value = smoothing
+            init_params['theta'].value = 0
+
+            signal = elliptical_gaussian(x, y,
+                                         params['amp'].value,
+                                         params['xo'].value,
+                                         params['yo'].value,
+                                         params['sx'].value,
+                                         params['sy'].value,
+                                         params['theta'].value).reshape(nx,ny)
+
+            noise = np.random.random((nx,ny))
+            noise = gaussian_filter(noise, sigma=smoothing)
+            noise -= np.mean(noise)
+            noise /= np.std(noise)*snr[k]
+
+            data = signal + noise
+            mask = np.where(data < 4/snr[k])
+            data[mask] = np.nan
+            mx,my = np.where(np.isfinite(data))
+            if len(mx)<7:
+                continue
+
+            result, fit_params = do_lmfit(data,init_params,D=2,dojac=False)
+
+            C = Cmatrix2d(mx,my,smoothing,smoothing,0)
+            B = Bmatrix(C)
+            corr_result,corr_fit_params = do_lmfit(data, init_params, D=2, B=B,dojac=False)
+            errs = np.ones(C.shape[0],dtype=np.float32)/snr[k]
+            I = np.identity(C.shape[0])
+
+            if np.all( [fit_params[i].stderr >0 for i in fit_params.valuesdict().keys()]):
+                if fit_params['sy'].value>fit_params['sx'].value:
+                    fit_params['sx'],fit_params['sy'] = fit_params['sy'],fit_params['sx']
+                    fit_params['theta'].value += np.pi/2
+                fit_params['theta'].value = theta_limit(fit_params['theta'].value)
+                diffs_nocorr.append([ params[i].value -fit_params[i].value for i in fit_params.valuesdict().keys()])
+                errs_nocorr.append( [fit_params[i].stderr for i in fit_params.valuesdict().keys()])
+                crb_nocorr.append( CRB_errs(jacobian2d(fit_params,(mx,my),emp=True,errs=errs),I) )
+
+            if np.all( [corr_fit_params[i].stderr >0 for i in corr_fit_params.valuesdict().keys()]):
+                if corr_fit_params['sy'].value>corr_fit_params['sx'].value:
+                    corr_fit_params['sx'],corr_fit_params['sy'] = corr_fit_params['sy'],corr_fit_params['sx']
+                    corr_fit_params['theta'].value += np.pi/2
+                corr_fit_params['theta'].value = theta_limit(corr_fit_params['theta'].value)
+                diffs_corr.append([ params[i].value -corr_fit_params[i].value for i in corr_fit_params.valuesdict().keys()])
+                errs_corr.append( [corr_fit_params[i].stderr for i in corr_fit_params.valuesdict().keys()])
+                crb_corr.append( CRB_errs(jacobian2d(corr_fit_params,(mx,my),emp=True,errs=errs), C) )
+
+            if nj<10:
+                print "init ",
+                print_par(params)
+                print "model",np.std(result.residual),
+                print_par(fit_params)
+                print "corr_model", np.std(corr_result.residual),
+                print_par(corr_fit_params)
+
+        diffs_nocorr = np.array(diffs_nocorr)
+        errs_nocorr = np.array(errs_nocorr)
+        crb_nocorr = np.array(crb_nocorr)
+        diffs_corr = np.array(diffs_corr)
+        errs_corr = np.array(errs_corr)
+        crb_corr = np.array(crb_corr)
+
+        CRB_err_list_corr.append(np.median(crb_corr[:,0]*snr[k]))
+        CRB_err_list_nocorr.append(np.median(crb_nocorr[:,0]*snr[k]))
+
+    from matplotlib import pyplot
+    fig = pyplot.figure(2)
+    ax = fig.add_subplot(111)
+    ax.plot(snr, CRB_err_list_corr, 'ro-', label='$C^{-1}$')
+    ax.plot(snr, CRB_err_list_nocorr, 'bo-', label='$C = I$')
+    ax.set_xlabel("SNR")
+    ax.set_ylabel("Peak Flux Error ($\sigma$)")
+    ax.set_xlim(snr[0],snr[-1])
+    ax.set_ylim((0,1.2))
+    ax.legend()
+
+    pyplot.show()
 
 def test2d_load():
     from astropy.io import fits
@@ -1675,6 +1802,7 @@ def make_data():
 
 if __name__ == '__main__':
     # test1d()
-    test2d()
+    # test2d()
     # test2d_load()
     # test_CRB()
+    JC_err_comp()
