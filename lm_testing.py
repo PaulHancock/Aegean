@@ -131,6 +131,42 @@ def Cmatrix1d(x,sigma):
 
 Cmatrix2d = Cmatrix
 
+def test_cmatrix():
+    nx = 15
+    ny = 12
+    x,y = np.where(np.ones((nx,ny))==1)
+
+    smoothing = 1.27 # 3pix/beam
+    C = Cmatrix(x,y,smoothing,smoothing,0)
+    B = Bmatrix(C)
+    from matplotlib import pyplot
+    fig=pyplot.figure(1)#, figsize=(8,12))
+    cmap = pyplot.cm.cubehelix
+    cmap.set_bad('y',1.)
+    kwargs = {'interpolation':'nearest','cmap':cmap,'origin':'upper'}
+
+    ax = fig.add_subplot(2,2,1)
+    ax.imshow(C,**kwargs)
+    ax.set_title('C')
+    rmlabels(ax)
+
+    ax = fig.add_subplot(2,2,2)
+    ax.imshow(inv(C),**kwargs)
+    ax.set_title('inv(C)')
+    rmlabels(ax)
+
+    ax = fig.add_subplot(2,2,3)
+    ax.imshow((inv(C)-B.dot(np.transpose(B)))/inv(C),**kwargs)
+    ax.set_title('(inv(C) = B.Bt)/inv(C)')
+    rmlabels(ax)
+
+    ax = fig.add_subplot(2,2,4)
+    ax.imshow(B.dot(np.transpose(B)),**kwargs)
+    ax.set_title('B.Bt')
+    rmlabels(ax)
+
+    pyplot.show()
+
 def jacobian(pars,x,data=None):
     amp = pars['amp'].value
     cen = pars['cen'].value
@@ -1716,7 +1752,8 @@ def make_data():
 
 if __name__ == '__main__':
     # test1d()
-    test2d()
+    # test2d()
     # test2d_load()
     # test_CRB()
     # JC_err_comp()
+    test_cmatrix()
