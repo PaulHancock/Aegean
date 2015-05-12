@@ -10,26 +10,7 @@ from scipy.ndimage.filters import gaussian_filter1d, gaussian_filter
 from scipy.linalg import sqrtm, eigh, inv, pinv
 import copy
 
-def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
-    """
-    Generate a model 2d Gaussian with the given parameters.
-    Evaluate this model at the given locations x,y.
-
-    :param x,y: locations at which to calculate values
-    :param amp: amplitude of Gaussian
-    :param xo,yo: position of Gaussian
-    :param major,minor: axes (sigmas)
-    :param theta: position angle (radians) CCW from x-axis
-    :return: Gaussian function evaluated at x,y locations
-    """
-    sint, cost = math.sin(theta), math.cos(theta)
-    xxo = x-xo
-    yyo = y-yo
-    exp = (xxo*cost + yyo*sint)**2 / sx**2 \
-        + (xxo*sint - yyo*cost)**2 / sy**2
-    exp *=-1./2
-    return amp*np.exp(exp)
-
+from AegeanTools.fitting import elliptical_gaussian, Cmatrix, Bmatrix, emp_jacobian, CRB_errs, do_lmfit, ntwodgaussian_lmfit
 
 def gaussian(x, amp, cen, sigma):
     return amp * np.exp(-0.5*((x-cen)/sigma)**2)
@@ -64,29 +45,6 @@ def ntwodgaussian_mpfit(inpars):
     return rfunc
 
 
-def ntwodgaussian_lmfit(params):
-    """
-    :param params: model parameters (can be multiple)
-    :return: a functiont that maps (x,y) -> model
-    """
-    def rfunc(x, y):
-        result=None
-        for i in range(params.components):
-            prefix = ""#"c{0}_".format(i)
-            amp = params[prefix+'amp'].value
-            xo = params[prefix+'xo'].value
-            yo = params[prefix+'yo'].value
-            sx = params[prefix+'sx'].value
-            sy = params[prefix+'sy'].value
-            theta = params[prefix+'theta'].value
-            if result is not None:
-                result += elliptical_gaussian(x,y,amp,xo,yo,sx,sy,theta)
-            else:
-                result =  elliptical_gaussian(x,y,amp,xo,yo,sx,sy,theta)
-        return result
-    return rfunc
-
-
 def do_mpfit(data, parinfo, B=None):
     """
     Fit multiple gaussian components to data using the information provided by parinfo.
@@ -113,7 +71,7 @@ def do_mpfit(data, parinfo, B=None):
     return mp, parinfo
 
 
-def do_lmfit(data, params, B=None, D=2, dojac=False):
+def do_lmfit2(data, params, B=None, D=2, dojac=False):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
@@ -121,6 +79,7 @@ def do_lmfit(data, params, B=None, D=2, dojac=False):
            params - and lmfit.Model instance
     return: fit results, modified model
     """
+
     # copy the params so as not to change the initial conditions
     # in case we want to use them elsewhere
     params = copy.deepcopy(params)
@@ -158,49 +117,19 @@ def do_lmfit(data, params, B=None, D=2, dojac=False):
 def theta_limit(theta):
     """
     Position angle is periodic with period 180\deg
-    Constrain pa such that -pi/2<theta<=pi/2
+    Constrain pa such that -90<theta<=90
     """
-    while theta <= -1*np.pi/2:
-        theta += np.pi
-    while theta > np.pi/2:
-        theta -= np.pi
+    while theta <= -90:
+        theta += 180
+    while theta > 90:
+        theta -= 180
     return theta
 
 
-def Cmatrix(x,sigma):
+def Cmatrix1d(x,sigma):
     return np.vstack( [ gaussian(x,1., i, 1.*sigma) for i in x ])
 
-
-def Cmatrix2d(x,y,sigmax,sigmay,theta):
-    """
-
-    :param x:
-    :param y:
-    :param sigmax:
-    :param sigmay:
-    :param theta:
-    :return:
-    """
-
-    # 1.*sigma avoid stupid integer problems within two_d_gaussian
-    f = lambda i,j: elliptical_gaussian(x,y,1,i,j,sigmax,sigmay,theta)
-    C = np.vstack( [ f(i,j) for i,j in zip(x,y)] )
-    return C
-
-
-def Bmatrix(C):
-    # this version of finding the square root of the inverse matrix
-    # suggested by Cath,
-    L,Q = eigh(C)
-    # The abs(L) converts negative eigenvalues into positive ones, and stops the B matrix from having nans
-    if not all(L>0):
-        print L
-        print "at least one eigenvalue is negative, this will cause problems!"
-        sys.exit(1)
-    S = np.diag(1/np.sqrt(L))
-    B = Q.dot(S)
-    return B
-
+Cmatrix2d = Cmatrix
 
 def jacobian(pars,x,data=None):
     amp = pars['amp'].value
@@ -218,15 +147,17 @@ def jacobian(pars,x,data=None):
 
 
 def jacobian2d(pars,xy,data=None,emp=True,errs=None):
-    amp = pars['amp'].value
-    xo = pars['xo'].value
-    yo = pars['yo'].value
-    sx = pars['sx'].value
-    sy = pars['sy'].value
-    theta  = pars['theta'].value
-
-
     x,y = xy
+    if emp:
+        return emp_jacobian(pars, x, y, errs)
+
+    amp = pars['c0_amp'].value
+    xo = pars['c0_xo'].value
+    yo = pars['c0_yo'].value
+    sx = pars['c0_sx'].value
+    sy = pars['c0_sy'].value
+    theta  = pars['c0_theta'].value
+
     # all derivatives are proportional to the model so calculate it first
     model = elliptical_gaussian(x,y, amp,xo, yo, sx, sy, theta)
 
@@ -269,26 +200,6 @@ def jacobian2d(pars,xy,data=None,emp=True,errs=None):
     matrix = np.vstack((dmds,dmdxo,dmdyo,dmdsx,dmdsy,dmdtheta))
     matrix = np.transpose(matrix)
     return matrix
-
-
-def CRB_errs(jac, C, B=None):
-    """
-
-    :param jac: the jacobian
-    :param C: the correlation matrix
-    :param B: B.dot(B') should = inv(C), ie B ~ sqrt(inv(C))
-    :return:
-    """
-    if B is not None:
-        # B is actually only a square root of the inverse covariance matrix
-        fim_inv =  inv(np.transpose(jac).dot(B).dot(np.transpose(B)).dot(jac))
-    else:
-        fim = np.transpose(jac).dot(inv(C)).dot(jac)
-        fim_inv = inv(fim)
-        #fim_inv = pinv(jac).dot(C).dot(pinv(np.transpose(jac)))
-
-    errs = np.sqrt(np.diag(fim_inv))
-    return errs
 
 
 def print_mat(m):
@@ -341,10 +252,10 @@ def test1d():
 
 
         data = signal+noise
-        result,fit_params = do_lmfit(data, params, D=1)
+        result,fit_params = do_lmfit2(data, params, D=1)
         C = Cmatrix(x,smoothing)
         B = Bmatrix(C)
-        result,corr_fit_params = do_lmfit(data, params, D=1, B=B)
+        result,corr_fit_params = do_lmfit2(data, params, D=1, B=B)
 
         if np.all( [fit_params[i].stderr >0 for i in fit_params.valuesdict().keys()]):
             diffs_nocorr.append([ params[i].value -fit_params[i].value for i in fit_params.valuesdict().keys()])
@@ -429,7 +340,7 @@ def test2d():
     #smoothing = 2.12 # 5pix/beam
     #smoothing = 1.5 # ~4.2pix/beam
 
-    snr = 5
+    snr = 10
 
     diffs_nocorr = []
     errs_nocorr = []
@@ -438,80 +349,82 @@ def test2d():
     errs_corr = []
     crb_corr = []
 
-    nj = 150
+    nj = 10
     # The model parameters
     params = lmfit.Parameters()
-    params.add('amp', value=1, min=0.5, max=2)
-    params.add('xo', value=1.*nx/2)
-    params.add('yo', value=1.*ny/2)
-    params.add('sx', value=2*smoothing, min=0.8*smoothing)
-    params.add('sy', value=smoothing, min=0.8*smoothing)
-    params.add('theta',value=0, min=-2*np.pi, max=2*np.pi)
+    params.add('c0_amp', value=1, min=0.5, max=2)
+    params.add('c0_xo', value=1.*nx/2, min=nx/2.-smoothing/2., max=nx/2.+smoothing/2)
+    params.add('c0_yo', value=1.*ny/2, min=ny/2.-smoothing/2., max=ny/2.+smoothing/2.)
+    params.add('c0_sx', value=2*smoothing, min=0.8*smoothing)
+    params.add('c0_sy', value=smoothing, min=0.8*smoothing)
+    params.add('c0_theta',value=0)#, min=-2*np.pi, max=2*np.pi)
     params.components=1
+
+    signal = elliptical_gaussian(x, y,
+                                 params['c0_amp'].value,
+                                 params['c0_xo'].value,
+                                 params['c0_yo'].value,
+                                 params['c0_sx'].value,
+                                 params['c0_sy'].value,
+                                 params['c0_theta'].value).reshape(nx,ny)
 
     for j in xrange(nj):
         np.random.seed(1234567+j)
 
         # The initial guess at the parameters
         init_params = copy.deepcopy(params)
-        init_params['amp'].value += 0.05* 2*(np.random.random()-0.5)
-        init_params['xo'].value += 1*(np.random.random()-0.5)
-        init_params['yo'].value += 1*(np.random.random()-0.5)
-        init_params['sx'].value = smoothing*1.01
-        init_params['sy'].value = smoothing
-        init_params['theta'].value = 0
-
-        signal = elliptical_gaussian(x, y,
-                                     params['amp'].value,
-                                     params['xo'].value,
-                                     params['yo'].value,
-                                     params['sx'].value,
-                                     params['sy'].value,
-                                     params['theta'].value).reshape(nx,ny)
+        init_params['c0_amp'].value += 0.05* 2*(np.random.random()-0.5)
+        init_params['c0_xo'].value += 1*(np.random.random()-0.5)
+        init_params['c0_yo'].value += 1*(np.random.random()-0.5)
+        init_params['c0_sx'].value = smoothing*1.01
+        init_params['c0_sy'].value = smoothing
+        init_params['c0_theta'].value = 0
         noise = np.random.random((nx,ny))
         noise = gaussian_filter(noise, sigma=smoothing)
         noise -= np.mean(noise)
         noise /= np.std(noise)*snr
 
         data = signal + noise
-        mask = np.where(data < 4/snr)
-        #data[mask] = np.nan
+        #snrmask = np.where(data < 4/snr)
+        #cmask = np.where(signal < 0.5)
+        #data[snrmask] = np.nan
+        #data[cmask] = np.nan
         mx,my = np.where(np.isfinite(data))
         if len(mx)<7:
             continue
 
-        result, fit_params = do_lmfit(data,init_params,D=2,dojac=False)
+        result, fit_params = do_lmfit(data,init_params)
 
-        C = Cmatrix2d(mx,my,smoothing,smoothing,0)
+        C = Cmatrix(mx,my,smoothing,smoothing,0)
         B = Bmatrix(C)
-        corr_result,corr_fit_params = do_lmfit(data, init_params, D=2, B=B,dojac=False)
+        corr_result,corr_fit_params = do_lmfit(data, init_params, B=B)
         errs = np.ones(C.shape[0],dtype=np.float32)/snr
 
         if np.all( [fit_params[i].stderr >0 for i in fit_params.valuesdict().keys()]):
-            if fit_params['sy'].value>fit_params['sx'].value:
-                fit_params['sx'],fit_params['sy'] = fit_params['sy'],fit_params['sx']
-                fit_params['theta'].value += np.pi/2
-            fit_params['theta'].value = theta_limit(fit_params['theta'].value)
+            if fit_params['c0_sy'].value>fit_params['c0_sx'].value:
+                fit_params['c0_sx'],fit_params['c0_sy'] = fit_params['c0_sy'],fit_params['c0_sx']
+                fit_params['c0_theta'].value += 90
+            fit_params['c0_theta'].value = theta_limit(fit_params['c0_theta'].value)
             diffs_nocorr.append([ params[i].value -fit_params[i].value for i in fit_params.valuesdict().keys()])
             errs_nocorr.append( [fit_params[i].stderr for i in fit_params.valuesdict().keys()])
             crb_nocorr.append( CRB_errs(jacobian2d(fit_params,(mx,my),emp=True,errs=errs),C) )
 
         if np.all( [corr_fit_params[i].stderr >0 for i in corr_fit_params.valuesdict().keys()]):
-            if corr_fit_params['sy'].value>corr_fit_params['sx'].value:
-                corr_fit_params['sx'],corr_fit_params['sy'] = corr_fit_params['sy'],corr_fit_params['sx']
-                corr_fit_params['theta'].value += np.pi/2
-            corr_fit_params['theta'].value = theta_limit(corr_fit_params['theta'].value)
+            if corr_fit_params['c0_sy'].value>corr_fit_params['c0_sx'].value:
+                corr_fit_params['c0_sx'],corr_fit_params['c0_sy'] = corr_fit_params['c0_sy'],corr_fit_params['c0_sx']
+                corr_fit_params['c0_theta'].value += 90
+            corr_fit_params['c0_theta'].value = theta_limit(corr_fit_params['c0_theta'].value)
             diffs_corr.append([ params[i].value -corr_fit_params[i].value for i in corr_fit_params.valuesdict().keys()])
             errs_corr.append( [corr_fit_params[i].stderr for i in corr_fit_params.valuesdict().keys()])
             crb_corr.append( CRB_errs(jacobian2d(corr_fit_params,(mx,my),emp=True,errs=errs), C) )
-
         if nj<10:
-            print "init ",
+            print "init      ",
             print_par(params)
-            print "model",np.std(result.residual),
+            print "model     ",
             print_par(fit_params)
-            print "corr_model", np.std(corr_result.residual),
+            print "corr_model",
             print_par(corr_fit_params)
+            print
 
     diffs_nocorr = np.array(diffs_nocorr)
     errs_nocorr = np.array(errs_nocorr)
@@ -524,22 +437,22 @@ def test2d():
 
     if True:
         model =  elliptical_gaussian(x, y,
-                                     fit_params['amp'].value,
-                                     fit_params['xo'].value,
-                                     fit_params['yo'].value,
-                                     fit_params['sx'].value,
-                                     fit_params['sy'].value,
-                                     fit_params['theta'].value).reshape(nx,ny)
+                                     fit_params['c0_amp'].value,
+                                     fit_params['c0_xo'].value,
+                                     fit_params['c0_yo'].value,
+                                     fit_params['c0_sx'].value,
+                                     fit_params['c0_sy'].value,
+                                     fit_params['c0_theta'].value).reshape(nx,ny)
         corr_model = elliptical_gaussian(x, y,
-                                     corr_fit_params['amp'].value,
-                                     corr_fit_params['xo'].value,
-                                     corr_fit_params['yo'].value,
-                                     corr_fit_params['sx'].value,
-                                     corr_fit_params['sy'].value,
-                                     corr_fit_params['theta'].value).reshape(nx,ny)
-        print "init ",
+                                     corr_fit_params['c0_amp'].value,
+                                     corr_fit_params['c0_xo'].value,
+                                     corr_fit_params['c0_yo'].value,
+                                     corr_fit_params['c0_sx'].value,
+                                     corr_fit_params['c0_sy'].value,
+                                     corr_fit_params['c0_theta'].value).reshape(nx,ny)
+        print "init      ",
         print_par(params)
-        print "model",
+        print "model     ",
         print_par(fit_params)
         print "corr_model",
         print_par(corr_fit_params)
@@ -597,7 +510,7 @@ def test2d():
         ax.plot(diffs_nocorr[:,2], label='yo')
         ax.plot(diffs_nocorr[:,3], label='sx')
         ax.plot(diffs_nocorr[:,4], label='sy')
-        ax.plot(diffs_nocorr[:,5], label='theta')
+        ax.plot(diffs_nocorr[:,5]/180, label='theta/180')
         ax.set_xlabel("No Corr")
         ax.legend()
 
@@ -607,7 +520,7 @@ def test2d():
         ax.plot(diffs_corr[:,2], label='yo')
         ax.plot(diffs_corr[:,3], label='sx')
         ax.plot(diffs_corr[:,4], label='sy')
-        ax.plot(diffs_corr[:,5], label='theta')
+        ax.plot(diffs_corr[:,5]/180, label='theta/180')
         ax.set_xlabel("Corr")
         ax.legend()
 
@@ -619,7 +532,7 @@ def test2d():
         ax.hist(diffs_nocorr[:,2], label='yo',**hkwargs)
         ax.hist(diffs_nocorr[:,3], label='sx',**hkwargs)
         ax.hist(diffs_nocorr[:,4], label='sy',**hkwargs)
-        ax.hist(diffs_nocorr[:,5], label='theta',**hkwargs)
+        ax.hist(diffs_nocorr[:,5]/180, label='theta/180',**hkwargs)
         ax.set_xlabel("No Corr")
         ax.legend()
 
@@ -629,7 +542,7 @@ def test2d():
         ax.hist(diffs_corr[:,2], label='yo',**hkwargs)
         ax.hist(diffs_corr[:,3], label='sx',**hkwargs)
         ax.hist(diffs_corr[:,4], label='sy',**hkwargs)
-        ax.hist(diffs_corr[:,5], label='theta',**hkwargs)
+        ax.hist(diffs_corr[:,5]/180, label='theta/180',**hkwargs)
         ax.set_xlabel("Corr")
         ax.legend()
 
@@ -672,12 +585,12 @@ def JC_err_comp():
     print snr
     # The model parameters
     params = lmfit.Parameters()
-    params.add('amp', value=1, min=0.5, max=2)
-    params.add('xo', value=1.*nx/2)
-    params.add('yo', value=1.*ny/2)
-    params.add('sx', value=2*smoothing, min=0.8*smoothing)
-    params.add('sy', value=smoothing, min=0.8*smoothing)
-    params.add('theta',value=0, min=-2*np.pi, max=2*np.pi)
+    params.add('c0_amp', value=1, min=0.5, max=2)
+    params.add('c0_xo', value=1.*nx/2)
+    params.add('c0_yo', value=1.*ny/2)
+    params.add('c0_sx', value=2*smoothing, min=0.8*smoothing)
+    params.add('c0_sy', value=smoothing, min=0.8*smoothing)
+    params.add('c0_theta',value=0, min=-2*np.pi, max=2*np.pi)
     params.components=1
 
     for k in xrange(nsnr):
@@ -693,20 +606,20 @@ def JC_err_comp():
 
             # The initial guess at the parameters
             init_params = copy.deepcopy(params)
-            init_params['amp'].value += 0.05* 2*(np.random.random()-0.5)
-            init_params['xo'].value += 1*(np.random.random()-0.5)
-            init_params['yo'].value += 1*(np.random.random()-0.5)
-            init_params['sx'].value = smoothing*1.01
-            init_params['sy'].value = smoothing
-            init_params['theta'].value = 0
+            init_params['c0_amp'].value += 0.05* 2*(np.random.random()-0.5)
+            init_params['c0_xo'].value += 1*(np.random.random()-0.5)
+            init_params['c0_yo'].value += 1*(np.random.random()-0.5)
+            init_params['c0_sx'].value = smoothing*1.01
+            init_params['c0_sy'].value = smoothing
+            init_params['c0_theta'].value = 0
 
             signal = elliptical_gaussian(x, y,
-                                         params['amp'].value,
-                                         params['xo'].value,
-                                         params['yo'].value,
-                                         params['sx'].value,
-                                         params['sy'].value,
-                                         params['theta'].value).reshape(nx,ny)
+                                         params['c0_amp'].value,
+                                         params['c0_xo'].value,
+                                         params['c0_yo'].value,
+                                         params['c0_sx'].value,
+                                         params['c0_sy'].value,
+                                         params['c0_theta'].value).reshape(nx,ny)
 
             noise = np.random.random((nx,ny))
             noise = gaussian_filter(noise, sigma=smoothing)
@@ -717,31 +630,31 @@ def JC_err_comp():
             mask = np.where(data < 4/snr[k])
             data[mask] = np.nan
             mx,my = np.where(np.isfinite(data))
-            if len(mx)<7:
+            if len(mx)<=7:
                 continue
 
-            result, fit_params = do_lmfit(data,init_params,D=2,dojac=False)
+            result, fit_params = do_lmfit(data,init_params)
 
             C = Cmatrix2d(mx,my,smoothing,smoothing,0)
             B = Bmatrix(C)
-            corr_result,corr_fit_params = do_lmfit(data, init_params, D=2, B=B,dojac=False)
+            corr_result,corr_fit_params = do_lmfit(data, init_params, B=B)
             errs = np.ones(C.shape[0],dtype=np.float32)/snr[k]
             I = np.identity(C.shape[0])
 
             if np.all( [fit_params[i].stderr >0 for i in fit_params.valuesdict().keys()]):
-                if fit_params['sy'].value>fit_params['sx'].value:
-                    fit_params['sx'],fit_params['sy'] = fit_params['sy'],fit_params['sx']
-                    fit_params['theta'].value += np.pi/2
-                fit_params['theta'].value = theta_limit(fit_params['theta'].value)
+                if fit_params['c0_sy'].value>fit_params['c0_sx'].value:
+                    fit_params['c0_sx'],fit_params['c0_sy'] = fit_params['c0_sy'],fit_params['c0_sx']
+                    fit_params['c0_theta'].value += np.pi/2
+                fit_params['c0_theta'].value = theta_limit(fit_params['c0_theta'].value)
                 diffs_nocorr.append([ params[i].value -fit_params[i].value for i in fit_params.valuesdict().keys()])
                 errs_nocorr.append( [fit_params[i].stderr for i in fit_params.valuesdict().keys()])
                 crb_nocorr.append( CRB_errs(jacobian2d(fit_params,(mx,my),emp=True,errs=errs),I) )
 
             if np.all( [corr_fit_params[i].stderr >0 for i in corr_fit_params.valuesdict().keys()]):
-                if corr_fit_params['sy'].value>corr_fit_params['sx'].value:
-                    corr_fit_params['sx'],corr_fit_params['sy'] = corr_fit_params['sy'],corr_fit_params['sx']
-                    corr_fit_params['theta'].value += np.pi/2
-                corr_fit_params['theta'].value = theta_limit(corr_fit_params['theta'].value)
+                if corr_fit_params['c0_sy'].value>corr_fit_params['c0_sx'].value:
+                    corr_fit_params['c0_sx'],corr_fit_params['c0_sy'] = corr_fit_params['c0_sy'],corr_fit_params['c0_sx']
+                    corr_fit_params['c0_theta'].value += np.pi/2
+                corr_fit_params['c0_theta'].value = theta_limit(corr_fit_params['c0_theta'].value)
                 diffs_corr.append([ params[i].value -corr_fit_params[i].value for i in corr_fit_params.valuesdict().keys()])
                 errs_corr.append( [corr_fit_params[i].stderr for i in corr_fit_params.valuesdict().keys()])
                 crb_corr.append( CRB_errs(jacobian2d(corr_fit_params,(mx,my),emp=True,errs=errs), C) )
@@ -777,6 +690,7 @@ def JC_err_comp():
 
     pyplot.show()
 
+
 def test2d_load():
     from astropy.io import fits
     #from aegean import do_lmfit
@@ -790,7 +704,7 @@ def test2d_load():
     params.add('theta',value=np.pi/4)
     params.components=1
 
-    result, fit_params = do_lmfit(data,params,dojac=True)
+    result, fit_params = do_lmfit2(data,params,dojac=True)
     #print result.residual
     print np.mean(result.residual), np.std(result.residual)
     print_par(fit_params)
@@ -1802,7 +1716,7 @@ def make_data():
 
 if __name__ == '__main__':
     # test1d()
-    # test2d()
+    test2d()
     # test2d_load()
     # test_CRB()
-    JC_err_comp()
+    # JC_err_comp()

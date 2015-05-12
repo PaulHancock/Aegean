@@ -34,7 +34,7 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     :param theta: position angle (radians) CCW from x-axis
     :return: Gaussian function evaluated at x,y locations
     """
-    sint, cost = math.sin(theta), math.cos(theta)
+    sint, cost = math.sin(np.radians(theta)), math.cos(np.radians(theta))
     xxo = x-xo
     yyo = y-yo
     exp = (xxo*cost + yyo*sint)**2 / sx**2 \
@@ -175,6 +175,7 @@ def calc_errors(source, thetaN=None):
 
 def ntwodgaussian_lmfit(params):
     """
+    theta is in degrees
     :param params: model parameters (can be multiple)
     :return: a functiont that maps (x,y) -> model
     """
@@ -189,9 +190,9 @@ def ntwodgaussian_lmfit(params):
             sy = params[prefix+'sy'].value
             theta = params[prefix+'theta'].value
             if result is not None:
-                result += elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(theta))
+                result += elliptical_gaussian(x,y,amp,xo,yo,sx,sy,theta)
             else:
-                result =  elliptical_gaussian(x,y,amp,xo,yo,sx,sy,np.radians(theta))
+                result =  elliptical_gaussian(x,y,amp,xo,yo,sx,sy,theta)
         return result
     return rfunc
 

@@ -569,8 +569,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         if sy_min == sy_max or sx_min == sx_max: # this will never happen
             summit_flag |= flags.FIXED2PSF
 
-        theta = np.radians(pixbeam.pa)
-        #theta = pixbeam.pa
+        theta = pixbeam.pa # Degrees
         flag = summit_flag
 
         #check to see if we are going to fit this source
@@ -592,7 +591,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
                                                                   sx_max * cc2fwhm))
             log.debug(" - sy {0} {1} {2} | {3} {4}".format(sy, sy_min, sy_max, sy_min * cc2fwhm,
                                                                   sy_max * cc2fwhm))
-            log.debug(" - theta {0} {1} {2}".format(theta, -2*np.pi, 2*np.pi))
+            log.debug(" - theta {0} {1} {2}".format(theta, -180, 180))
             log.debug(" - flags {0}".format(flag))
             log.debug(" - fit?  {0}".format(not maxxed))
 
@@ -607,7 +606,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             psf_vary = not maxxed
         params.add(prefix+'sx', value=sx, min=sx_min, max=sx_max, vary=psf_vary)
         params.add(prefix+'sy', value=sy, min=sy_min, max=sy_max, vary=psf_vary)
-        params.add(prefix+'theta', value=theta, min=-2*np.pi, max=np.pi, vary=psf_vary)
+        params.add(prefix+'theta', value=theta, vary=psf_vary)
         params.add(prefix+'flags',value=summit_flag, vary=False)
 
         i += 1
@@ -663,7 +662,7 @@ def result_to_components(result, model, island_data, flags):
         yo = model[prefix+'yo'].value
         sx = model[prefix+'sx'].value
         sy = model[prefix+'sy'].value
-        theta = np.degrees(model[prefix+'theta'].value)
+        theta = model[prefix+'theta'].value
         amp = model[prefix+'amp'].value
         src_flags |= model[prefix+'flags'].value
 
