@@ -85,13 +85,13 @@ def emp_jacobian(pars, x, y, errs=None):
     """
     eps=1e-5
     matrix = []
-    model = ntwodgaussian_lmfit(pars)
+    model = ntwodgaussian_lmfit(pars)(x,y)
     for i in xrange(pars.components):
         prefix = "c{0}_".format(i)
         # Note: all derivatives are calculated, even if the parameter is fixed
         for p in ['amp','xo','yo','sx','sy','theta']:
             pars[prefix+p].value += eps
-            dmdp = ntwodgaussian_lmfit(pars) - model
+            dmdp = ntwodgaussian_lmfit(pars)(x,y) - model
             matrix.append(dmdp)
             pars[prefix+p].value -= eps
 
@@ -196,7 +196,7 @@ def ntwodgaussian_lmfit(params):
     return rfunc
 
 
-def do_lmfit(data, params):
+def do_lmfit(data, params, B=None):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
@@ -210,7 +210,6 @@ def do_lmfit(data, params):
     data = np.array(data)
     mask = np.where(np.isfinite(data))
 
-    B = None
     #mx, my = mask
     #pixbeam = get_pixbeam()
     #C = Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa)
