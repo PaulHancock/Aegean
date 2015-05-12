@@ -31,7 +31,7 @@ from scipy.ndimage import label, find_objects
 
 # fitting
 import lmfit
-from AegeanTools.fitting import do_lmfit
+from AegeanTools.fitting import do_lmfit, calc_errors
 
 # the glory of astropy
 import astropy
@@ -627,6 +627,7 @@ pass # for code folding purposes only!
 # def CRB_errs(jac, C, B=None):
 # def ntwodgaussian_lmfit(params):
 # def do_lmfit(data, params):
+# def calc_errors(source, thetaN=None):
 
 def result_to_components(result, model, island_data, flags):
     """
@@ -717,7 +718,7 @@ def result_to_components(result, model, island_data, flags):
         source.int_flux /= get_beamarea_pix(source.ra,source.dec) # scale Jy/beam -> Jy
 
         # We currently assume Condon'97 errors for all params.
-        calc_errors(source)
+        calc_errors(source, np.sqrt(get_beamarea_deg2(source.ra,source.dec)/np.pi))
 
         # if we didn't fit xo/yo then there are no ra/dec errors
         if not model[prefix + 'xo'].vary or not model[prefix + 'yo'].vary:
@@ -1412,59 +1413,6 @@ def sky_sep(pix1, pix2):
     pos2 = pix2sky(pix2)
     sep = gcd(pos1[0], pos1[1], pos2[0], pos2[1])
     return sep
-
-
-def calc_errors(source):
-    """
-    Calculate the parameter errors for a fitted source
-    using the description of Condon'97
-    All parameters are assigned errors, assuming that all params were fit.
-    If some params were held fixed then these errors are overestimated.
-    :param source: Source for which errors need to be calculated
-    :return: The same source but with errors assigned.
-    """
-
-    # indices for the calculation or rho
-    alphas = {'amp':(3./2, 3./2),
-              'major':(5./2, 1./2),
-              'xo':(5./2, 1./2),
-              'minor':(1./2, 5./2),
-              'yo':(1./2, 5./2),
-              'pa':(1./2, 5./2)}
-
-    major = source.a/3600 # degrees
-    minor = source.b/3600 # degrees
-    phi = np.radians(source.pa)
-
-    thetaN = np.sqrt(get_beamarea_deg2(source.ra,source.dec)/np.pi)
-    smoothing = major*minor / (thetaN**2)
-    factor1 = (1 + (major / thetaN))
-    factor2 = (1 + (minor / thetaN))
-    snr = source.peak_flux/source.local_rms
-    # calculation of rho2 depends on the parameter being used so we lambda this into a function
-    rho2 = lambda x: smoothing/4 *factor1**alphas[x][0] * factor2**alphas[x][1] *snr**2
-
-    source.err_peak_flux = source.peak_flux * np.sqrt(2/rho2('amp'))
-    source.err_a = major * np.sqrt(2/rho2('major')) *3600 # arcsec
-    source.err_b = minor * np.sqrt(2/rho2('minor')) *3600 # arcsec
-
-    # TODO: proper conversion of x/y errors in ra/dec errors
-    err_xo2 = 2./rho2('xo')*major**2/(8*np.log(2)) # Condon'97 eq 21
-    err_yo2 = 2./rho2('yo')*minor**2/(8*np.log(2))
-    source.err_ra  = np.sqrt( err_xo2*np.sin(phi)**2 + err_yo2*np.cos(phi)**2)
-    source.err_dec = np.sqrt( err_xo2*np.cos(phi)**2 + err_yo2*np.sin(phi)**2)
-
-    # if major/minor are very similar then we should not be able to figure out what pa is.
-    if abs((major/minor)**2+(minor/major)**2 -2) < 0.01:
-        source.err_pa = -1
-    else:
-        source.err_pa = np.degrees(np.sqrt(4/rho2('pa')) * (major*minor/(major**2-minor**2)))
-
-    # integrated flux error
-    err2 = (source.err_peak_flux/source.peak_flux)**2
-    err2 += (thetaN**2/(major*minor)) *( (source.err_a/source.a)**2 + (source.err_b/source.b)**2)
-    source.err_int_flux =source.int_flux * np.sqrt(err2)
-    return
 
 
 ######################################### THE MAIN DRIVING FUNCTIONS ###############
