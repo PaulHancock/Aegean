@@ -31,7 +31,7 @@ from scipy.ndimage import label, find_objects
 
 # fitting
 import lmfit
-from AegeanTools.fitting import do_lmfit, calc_errors
+from AegeanTools.fitting import do_lmfit, calc_errors, Cmatrix, Bmatrix
 
 # the glory of astropy
 import astropy
@@ -569,8 +569,8 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         if sy_min == sy_max or sx_min == sx_max: # this will never happen
             summit_flag |= flags.FIXED2PSF
 
-        #theta = np.radians(pixbeam.pa)
-        theta = pixbeam.pa
+        theta = np.radians(pixbeam.pa)
+        #theta = pixbeam.pa
         flag = summit_flag
 
         #check to see if we are going to fit this source
@@ -592,7 +592,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
                                                                   sx_max * cc2fwhm))
             log.debug(" - sy {0} {1} {2} | {3} {4}".format(sy, sy_min, sy_max, sy_min * cc2fwhm,
                                                                   sy_max * cc2fwhm))
-            log.debug(" - theta {0} {1} {2}".format(theta, -180, 180)) # -1*np.pi, np.pi))
+            log.debug(" - theta {0} {1} {2}".format(theta, -2*np.pi, 2*np.pi))
             log.debug(" - flags {0}".format(flag))
             log.debug(" - fit?  {0}".format(not maxxed))
 
@@ -607,7 +607,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             psf_vary = not maxxed
         params.add(prefix+'sx', value=sx, min=sx_min, max=sx_max, vary=psf_vary)
         params.add(prefix+'sy', value=sy, min=sy_min, max=sy_max, vary=psf_vary)
-        params.add(prefix+'theta', value=theta, min=-180, max=180 , vary=psf_vary)
+        params.add(prefix+'theta', value=theta, min=-2*np.pi, max=np.pi, vary=psf_vary)
         params.add(prefix+'flags',value=summit_flag, vary=False)
 
         i += 1
@@ -663,7 +663,7 @@ def result_to_components(result, model, island_data, flags):
         yo = model[prefix+'yo'].value
         sx = model[prefix+'sx'].value
         sy = model[prefix+'sy'].value
-        theta = model[prefix+'theta'].value
+        theta = np.degrees(model[prefix+'theta'].value)
         amp = model[prefix+'amp'].value
         src_flags |= model[prefix+'flags'].value
 
@@ -693,7 +693,7 @@ def result_to_components(result, model, island_data, flags):
         else:
             major = sy
             axial_ratio = sy/sx #abs(sy*global_data.img.pixscale[1] / (sx * global_data.img.pixscale[0]))
-            theta = theta -90
+            theta = theta - 90
 
         # source.pa is returned in degrees
         (source.ra, source.dec, source.a, source.pa) = pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
@@ -1475,10 +1475,10 @@ def fit_island(island_data):
         is_flag |= flags.NOTFIT
     else:
         # Model is the fitted parameters
-        # C = Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa)
+        #C = Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa)
         # C = np.identity(len(mx))
         # Cmatrix(mx, my, 1.5, 1.5, 0)
-        # B = Bmatrix(C)
+        #B = Bmatrix(C)
         log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa))
         result, model = do_lmfit(idata, params)
         if not result.success:
