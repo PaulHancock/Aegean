@@ -426,7 +426,7 @@ def writeAnn(filename, catalog, fmt):
             print >> out, 'PA SKY'
             print >> out, 'FONT hershey12'
             print >> out, 'COORD W'
-            formatter = "ELLIPSE W {0} {1} {2} {3} {4:+07.3f} #{5}\nTEXT W {0} {1} '{5}'"
+            formatter = "ELLIPSE W {0} {1} {2} {3} {4:+07.3f} #{5}\nTEXT W {0} {1} {5}"
         elif fmt == 'reg':
             new_file = re.sub('.reg$', '_{0}.reg'.format(suffix), filename)
             out = open(new_file, 'w')
