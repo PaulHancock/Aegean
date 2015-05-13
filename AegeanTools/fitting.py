@@ -75,7 +75,7 @@ def Bmatrix(C):
     return B
 
 
-def emp_jacobian(pars, x, y, errs=None):
+def emp_jacobian(pars, x, y, errs=None, B=None):
     """
     An empirical calculation of the jacobian
     :param pars:
@@ -83,21 +83,24 @@ def emp_jacobian(pars, x, y, errs=None):
     :param y:
     :return:
     """
-    eps=1e-5
+    eps=1e-3
     matrix = []
     model = ntwodgaussian_lmfit(pars)(x,y)
     for i in xrange(pars.components):
         prefix = "c{0}_".format(i)
         # Note: all derivatives are calculated, even if the parameter is fixed
         for p in ['amp','xo','yo','sx','sy','theta']:
-            pars[prefix+p].value += eps
-            dmdp = ntwodgaussian_lmfit(pars)(x,y) - model
-            matrix.append(dmdp)
-            pars[prefix+p].value -= eps
-
-    matrix = np.array(matrix)/eps
+            if pars[prefix+p].vary:
+                pars[prefix+p].value += eps
+                dmdp = ntwodgaussian_lmfit(pars)(x,y) - model
+                matrix.append(dmdp/eps)
+                pars[prefix+p].value -= eps
+    matrix = np.array(matrix)
     if errs is not None:
         matrix /=errs**2
+
+    if B is not None:
+        matrix = matrix.dot(B)
     matrix = np.transpose(matrix)
     return matrix
 
@@ -197,7 +200,7 @@ def ntwodgaussian_lmfit(params):
     return rfunc
 
 
-def do_lmfit(data, params, B=None):
+def do_lmfit(data, params, B=None, errs=None):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
@@ -216,7 +219,7 @@ def do_lmfit(data, params, B=None):
     #C = Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa)
     #B = Bmatrix(C)
 
-    def residual(params):
+    def residual(params, B, **kwargs):
         f = ntwodgaussian_lmfit(params)  # A function describing the model
         model = f(*mask)  # The actual model
         if B is None:
@@ -224,6 +227,6 @@ def do_lmfit(data, params, B=None):
         else:
             return (model - data[mask]).dot(B)
 
-    result = lmfit.minimize(residual, params)
+    result = lmfit.minimize(residual, params, kws={'x':mask[0],'y':mask[1],'B':B,'errs':None}, Dfun = emp_jacobian)
     return result, params
 
