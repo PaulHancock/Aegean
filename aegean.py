@@ -31,7 +31,7 @@ from scipy.ndimage import label, find_objects
 
 # fitting
 import lmfit
-from AegeanTools.fitting import do_lmfit, calc_errors, Cmatrix, Bmatrix
+from AegeanTools.fitting import do_lmfit, calc_errors, Cmatrix, Bmatrix, covar_errors
 
 # the glory of astropy
 import astropy
@@ -205,217 +205,6 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
 
 
 ##parameter estimates
-def estimate_mpfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offsets=(0, 0), max_summits=None):
-    """Estimates the number of sources in an island and returns initial parameters for the fit as well as
-    limits on those parameters.
-
-    input:
-    data   - np.ndarray of flux values
-    rmsimg - np.ndarray of 1sigmas values
-    curve  - np.ndarray of curvature values
-    beam   - beam object
-    innerclip - the inner clipping level for flux data, in sigmas
-    offsets - the (x,y) offset of data within it's parent image
-              this is required for proper WCS conversions
-
-    returns:
-    parinfo object for mpfit
-    with all parameters in pixel coords
-    """
-    debug_on = logging.getLogger('Aegean').isEnabledFor(logging.DEBUG)
-    is_flag = 0
-
-    #is this a negative island?
-    isnegative = max(data[np.where(np.isfinite(data))]) < 0
-    if isnegative and debug_on:
-        log.debug("[is a negative island]")
-
-    parinfo = []
-
-    #TODO: remove this later.
-    if outerclip is None:
-        outerclip = innerclip
-
-    pixbeam = global_data.pixbeam
-    if pixbeam is None:
-        if debug_on:
-            log.debug("WCSERR")
-        is_flag = flags.WCSERR
-        pixbeam = Beam(1, 1, 0)
-
-    #set a circular limit based on the size of the pixbeam
-    xo_lim = 0.5*np.hypot(pixbeam.a, pixbeam.b)
-    yo_lim = xo_lim
-
-    if debug_on:
-        log.debug(" - shape {0}".format(data.shape))
-        log.debug(" - xo_lim,yo_lim {0}, {1}".format(xo_lim, yo_lim))
-
-    if not data.shape == curve.shape:
-        log.error("data and curvature are mismatched")
-        log.error("data:{0} curve:{1}".format(data.shape, curve.shape))
-        sys.exit()
-
-    #For small islands we can't do a 6 param fit
-    #Don't count the NaN values as part of the island
-    non_nan_pix = len(data[np.where(np.isfinite(data))].ravel())
-    if 4 <= non_nan_pix <= 6:
-        log.debug("FIXED2PSF")
-        is_flag |= flags.FIXED2PSF
-    elif non_nan_pix < 4:
-        log.debug("FITERRSMALL!")
-        is_flag |= flags.FITERRSMALL
-    else:
-        is_flag = 0
-    if debug_on:
-        log.debug(" - size {0}".format(len(data.ravel())))
-
-    if min(data.shape) <= 2 or (is_flag & flags.FITERRSMALL):
-        #1d islands or small islands only get one source
-        if debug_on:
-            log.debug("Tiny summit detected")
-            log.debug("{0}".format(data))
-        summits = [[data, 0, data.shape[0], 0, data.shape[1]]]
-        #and are constrained to be point sources
-        is_flag |= flags.FIXED2PSF
-    else:
-        if isnegative:
-            #the summit should be able to include all pixels within the island not just those above innerclip
-            kappa_sigma = np.where(curve > 0.5, np.where(data + outerclip * rmsimg < 0, data, np.nan), np.nan)
-        else:
-            kappa_sigma = np.where(-1 * curve > 0.5, np.where(data - outerclip * rmsimg > 0, data, np.nan), np.nan)
-        summits = gen_flood_wrap(kappa_sigma, np.ones(kappa_sigma.shape), 0, domask=False)
-
-    i = 0
-    for summit, xmin, xmax, ymin, ymax in sorted(summits, key=lambda x: np.nanmax(-1.*abs(x[0]))):
-        summit_flag = is_flag
-        if debug_on:
-            log.debug(
-                "Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape, xmin, xmax, ymin, ymax, i))
-        if isnegative:
-            amp = summit[np.isfinite(summit)].min()
-        else:
-            amp = summit[np.isfinite(summit)].max()  #stupid NaNs break all my things
-
-        (xpeak, ypeak) = np.where(summit == amp)
-        if log.getLogger().isEnabledFor(log.DEBUG):
-            log.debug(" - max is {0:f}".format(amp))
-            log.debug(" - peak at {0},{1}".format(xpeak, ypeak))
-        xo = xpeak[0] + xmin
-        yo = ypeak[0] + ymin
-
-        #check to ensure that this summit is brighter than innerclip
-        snr = np.nanmax(abs(data[xmin:xmax+1,ymin:ymax+1] / rmsimg[xmin:xmax+1,ymin:ymax+1]))
-        if snr < innerclip:
-            log.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
-            continue
-
-
-        #allow amp to be 5% or (innerclip) sigma higher
-        #TODO: the 5% should depend on the beam sampling
-        #TODO: when innerclip is 400 this becomes rather stupid
-        if amp > 0:
-            amp_min, amp_max = 0.95 * min(outerclip * rmsimg[xo, yo], amp), amp * 1.05 + innerclip * rmsimg[xo, yo]
-        else:
-            amp_max, amp_min = 0.95 * max(-outerclip * rmsimg[xo, yo], amp), amp * 1.05 - innerclip * rmsimg[xo, yo]
-
-        if debug_on:
-            log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
-
-        xo_min, xo_max = max(xmin, xo - xo_lim), min(xmax, xo + xo_lim)
-        if xo_min == xo_max:  #if we have a 1d summit then allow the position to vary by +/-0.5pix
-            xo_min, xo_max = xo_min - 0.5, xo_max + 0.5
-
-        yo_min, yo_max = max(ymin, yo - yo_lim), min(ymax, yo + yo_lim)
-        if yo_min == yo_max:  #if we have a 1d summit then allow the position to vary by +/-0.5pix
-            yo_min, yo_max = yo_min - 0.5, yo_max + 0.5
-
-        #TODO: The limits on major,minor work well for circular beams or unresolved sources
-        #for elliptical beams *and* resolved sources this isn't good and should be redone
-
-        xsize = xmax - xmin + 1
-        ysize = ymax - ymin + 1
-
-        #initial shape is the pix beam
-        major = pixbeam.a * fwhm2cc
-        minor = pixbeam.b * fwhm2cc
-        # this will make the beam slightly bigger as we move away from zenith
-        if global_data.telescope_lat is not None:
-            _, dec = pix2sky([xo+offsets[0],yo+offsets[1]])
-            major /= np.cos(np.radians(dec-global_data.telescope_lat))
-
-        #constraints are based on the shape of the island
-        major_min, major_max = major * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * fwhm2cc, major * 1.1)
-        minor_min, minor_max = minor * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * fwhm2cc, major * 1.1)
-
-        #TODO: update this to fit a psf for things that are "close" to a psf.
-        #if the min/max of either major,minor are equal then use a PSF fit
-        if minor_min == minor_max or major_min == major_max:
-            summit_flag |= flags.FIXED2PSF
-
-        pa = pa_limit(pixbeam.pa)
-        flag = summit_flag
-
-        #check to see if we are going to fit this source
-        if max_summits is not None:
-            maxxed = i >= max_summits
-        else:
-            maxxed = False
-
-        # if maxxed:
-        #     break
-        if debug_on:
-            log.debug(" - var val min max | min max")
-            log.debug(" - amp {0} {1} {2} ".format(amp, amp_min, amp_max))
-            log.debug(" - xo {0} {1} {2} ".format(xo, xo_min, xo_max))
-            log.debug(" - yo {0} {1} {2} ".format(yo, yo_min, yo_max))
-            log.debug(" - major {0} {1} {2} | {3} {4}".format(major, major_min, major_max, major_min / fwhm2cc,
-                                                                  major_max / fwhm2cc))
-            log.debug(" - minor {0} {1} {2} | {3} {4}".format(minor, minor_min, minor_max, minor_min / fwhm2cc,
-                                                                  minor_max / fwhm2cc))
-            log.debug(" - pa {0} {1} {2}".format(pa, -180, 180))
-            log.debug(" - flags {0}".format(flag))
-            log.debug(" - fit?  {0}".format(not maxxed))
-
-        parinfo.append({'value': amp,
-                        'fixed': False or maxxed,
-                        'parname': '{0}:amp'.format(i),
-                        'limits': [amp_min, amp_max],
-                        'limited': [True, True]})
-        parinfo.append({'value': xo,
-                        'fixed': False or maxxed,
-                        'parname': '{0}:xo'.format(i),
-                        'limits': [xo_min, xo_max],
-                        'limited': [True, True]})
-        parinfo.append({'value': yo,
-                        'fixed': False or maxxed,
-                        'parname': '{0}:yo'.format(i),
-                        'limits': [yo_min, yo_max],
-                        'limited': [True, True]})
-        parinfo.append({'value': major,
-                        'fixed': (flag & flags.FIXED2PSF) > 0 or maxxed,
-                        'parname': '{0}:major'.format(i),
-                        'limits': [major_min, major_max],
-                        'limited': [True, True],
-                        'flags': flag})
-        parinfo.append({'value': minor,
-                        'fixed': (flag & flags.FIXED2PSF) > 0 or maxxed,
-                        'parname': '{0}:minor'.format(i),
-                        'limits': [minor_min, minor_max],
-                        'limited': [True, True],
-                        'flags': flag})
-        parinfo.append({'value': pa,
-                        'fixed': (flag & flags.FIXED2PSF) > 0 or maxxed,
-                        'parname': '{0}:pa'.format(i),
-                        'limits': [-180, 180],
-                        'limited': [False, False],
-                        'flags': flag})
-        i += 1
-    if debug_on:
-        log.debug("Estimated sources: {0}".format(i))
-    return parinfo
-
-
 def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offsets=(0, 0), max_summits=None):
     """Estimates the number of sources in an island and returns initial parameters for the fit as well as
     limits on those parameters.
@@ -1474,12 +1263,16 @@ def fit_island(island_data):
         is_flag |= flags.NOTFIT
     else:
         # Model is the fitted parameters
-        #C = Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa)
+        C = Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa)
         # C = np.identity(len(mx))
         # Cmatrix(mx, my, 1.5, 1.5, 0)
-        #B = Bmatrix(C)
+        B = Bmatrix(C)
         log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa))
-        result, model = do_lmfit(idata, params)
+        errs = np.nanmax(idata)/np.nanmax(rms)
+        result, model = do_lmfit(idata, params, errs=errs, B=B)
+        # get the real parameter errors
+        #model = covar_errors(model, idata, errs=errs, B)
+
         if not result.success:
             is_flag = flags.FITERR
 

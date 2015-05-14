@@ -83,7 +83,7 @@ def emp_jacobian(pars, x, y, errs=None, B=None):
     :param y:
     :return:
     """
-    eps=1e-3
+    eps=1e-5
     matrix = []
     model = ntwodgaussian_lmfit(pars)(x,y)
     for i in xrange(pars.components):
@@ -96,7 +96,7 @@ def emp_jacobian(pars, x, y, errs=None, B=None):
                 pars[prefix+p].value -= eps
     matrix = np.array(matrix)
     if errs is not None:
-        matrix /=errs**2
+        matrix /=errs
 
     if B is not None:
         matrix = matrix.dot(B)
@@ -213,11 +213,6 @@ def do_lmfit(data, params, B=None, errs=None):
     data = np.array(data)
     mask = np.where(np.isfinite(data))
 
-    #mx, my = mask
-    #pixbeam = get_pixbeam()
-    #C = Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa)
-    #B = Bmatrix(C)
-
     def residual(params, B, **kwargs):
         f = ntwodgaussian_lmfit(params)  # A function describing the model
         model = f(*mask)  # The actual model
@@ -226,8 +221,40 @@ def do_lmfit(data, params, B=None, errs=None):
         else:
             return (model - data[mask]).dot(B)
 
-    result = lmfit.minimize(residual, params, kws={'x':mask[0],'y':mask[1],'B':B,'errs':None}, Dfun = emp_jacobian)
+    result = lmfit.minimize(residual, params, kws={'x':mask[0],'y':mask[1],'B':B,'errs':errs}, Dfun = emp_jacobian)
+
     return result, params
+
+def covar_errors(params, data, errs, B):
+
+    mask = np.where(np.isfinite(data))
+    # errs = []
+    # # Calculate the SNR for each source:
+    # for i in xrange(params.components):
+    #     prefix = "c{0}_".format(i)
+    #     x = int(math.floor(params[prefix+'xo']))
+    #     y = int(math.floor(params[prefix+'yo']))
+    #     free_vars = len( [ 1 for a in params.keys() if params[a].vary and prefix in a])
+    #     errs.extend( [rms[x,y]]*free_vars)
+    #
+    # #errs = np.vstack( errs,len(mask[0]))
+    # #print errs
+    # errs = errs[0]
+
+    # now calculate the proper parameter errors and copy them across.
+    J = emp_jacobian(params, mask[0], mask[1], B=B, errs=errs)
+    covar = np.transpose(J).dot(J)
+    onesigma = np.sqrt(np.diag(inv(covar)))
+    for i in xrange(params.components):
+        prefix = "c{0}_".format(i)
+        j=0
+        for p in ['amp','xo','yo','sx','sy','theta']:
+            if params[prefix+p].vary:
+                params[prefix+p].stderr = onesigma[j]
+                j+=1
+
+    return params
+
 
 
 def ntwodgaussian_mpfit(inpars):
