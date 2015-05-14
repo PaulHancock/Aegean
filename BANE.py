@@ -110,9 +110,9 @@ def running_filter(filename, region, step_size, box_size, shape):
         with size = box_size
         """
         x_min = max(0, x-box_size[0]/2)
-        x_max = min(data.shape[0]-1, x+box_size[0]/2)
+        x_max = min(data.shape[1]-1, x+box_size[0]/2)
         y_min = max(0, y-box_size[1]/2)
-        y_max = min(data.shape[1]-1, y+box_size[1]/2)
+        y_max = min(data.shape[0]-1, y+box_size[1]/2)
 
         return x_min,x_max,y_min,y_max
 
@@ -132,6 +132,7 @@ def running_filter(filename, region, step_size, box_size, shape):
         px_min,px_max,py_min,py_max = box(px,py)
         old=[]
         new=[]
+        #logging.info("{0} {1}".format([x_min,x_max,y_min,y_max],[xmin,xmax,ymin,ymax]))
         #we only move in one direction at a time, but don't know which
         if (x_min>px_min) or (x_max>px_max):
             #down
