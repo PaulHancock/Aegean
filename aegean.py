@@ -1255,7 +1255,7 @@ def fit_island(island_data):
     mx,my = np.where(np.isfinite(idata))
     non_blank_pix = len(mx)
     free_vars = len( [ 1 for a in params.keys() if params[a].vary])
-    if non_blank_pix < free_vars:
+    if non_blank_pix < free_vars or free_vars ==0:
         log.debug("Island {0} doesn't have enough pixels to fit the given model".format(isle_num))
         log.debug("non_blank_pix {0}, free_vars {1}".format(non_blank_pix,free_vars))
         result = DummyLM()
@@ -1268,8 +1268,9 @@ def fit_island(island_data):
         # Cmatrix(mx, my, 1.5, 1.5, 0)
         B = Bmatrix(C)
         log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa))
-        errs = np.nanmax(idata)/np.nanmax(rms)
-        result, model = do_lmfit(idata, params, errs=errs, B=B)
+        #snr = np.nanmax(idata)/np.nanmax(rms)
+        #errs = np.nanmax(rms)
+        result, model = do_lmfit(idata, params, B=B)
         # get the real parameter errors
         #model = covar_errors(model, idata, errs=errs, B)
 
