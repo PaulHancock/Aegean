@@ -21,8 +21,8 @@ from AegeanTools.fits_interp import compress
 
 import multiprocessing
 
-__version__ = 'v1.1'
-__date__ = '2015-05-10'
+__version__ = 'v1.0'
+__date__ = '2015-03-03'
 
 ###
 #
