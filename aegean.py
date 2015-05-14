@@ -1892,142 +1892,6 @@ def island_itergen(catalog):
 
 
 #just flux measuring
-def force_measure_flux(radec):
-    """
-    Measure the flux of a point source at each of the specified locations
-    Not fitting is done, just forced measurements
-    Assumes that global_data hase been populated
-    input:
-        img - the image data [array]
-        radec - the locations at which to measure fluxes
-    returns:
-    [(flux,err),...]
-    """
-    log.critical("This ability has been disabled for now")
-    catalog = []
-
-    #this is what we use to denote sources that are we are not able to measure
-    dummy = SimpleSource()
-    dummy.peak_flux = np.nan
-    dummy.peak_pixel = np.nan
-    dummy.flags = flags.FITERR
-
-    shape = global_data.data_pix.shape
-
-    if global_data.telescope_lat is not None:
-        log.warn("No account is being made for telescope latitude, even though it has been supplied")
-    for ra, dec in radec:
-        #find the right pixels from the ra/dec
-        source_x, source_y = sky2pix([ra, dec])
-        x = int(round(source_x))
-        y = int(round(source_y))
-
-        #reject sources that are outside the image bounds, or which have nan data/rms values
-        if not 0 <= x < shape[0] or not 0 <= y < shape[1] or \
-                not np.isfinite(global_data.data_pix[x, y]) or \
-                not np.isfinite(global_data.rmsimg[x, y]):
-            catalog.append(dummy)
-            continue
-
-        flag = 0
-        #make a pixbeam at this location
-        pixbeam = global_data.pixbeam
-        if pixbeam is None:
-            flag |= flags.WCSERR
-            pixbeam = Beam(1, 1, 0)
-        #determine the x and y extent of the beam
-        xwidth = 2 * pixbeam.a * pixbeam.b
-        xwidth /= np.hypot(pixbeam.b * np.sin(np.radians(pixbeam.pa)), pixbeam.a * np.cos(np.radians(pixbeam.pa)))
-        ywidth = 2 * pixbeam.a * pixbeam.b
-        ywidth /= np.hypot(pixbeam.b * np.cos(np.radians(pixbeam.pa)), pixbeam.a * np.sin(np.radians(pixbeam.pa)))
-        #round to an int and add 1
-        ywidth = int(round(ywidth)) + 1
-        xwidth = int(round(xwidth)) + 1
-
-        #cut out an image of this size
-        xmin = max(0, x - xwidth / 2)
-        ymin = max(0, y - ywidth / 2)
-        xmax = min(shape[0], x + xwidth / 2 + 1)
-        ymax = min(shape[1], y + ywidth / 2 + 1)
-        data = global_data.data_pix[xmin:xmax, ymin:ymax]
-
-        # Make a Gaussian equal to the beam with amplitude 1.0 at the position of the source
-        # in terms of the pixel region.
-        amp = 1.0
-        xo = source_x - xmin
-        yo = source_y - ymin
-        params = [amp, xo, yo, pixbeam.a * fwhm2cc, pixbeam.b * fwhm2cc, pixbeam.pa]
-        gaussian_data = ntwodgaussian_mpfit(params)(*np.indices(data.shape))
-
-        # Calculate the "best fit" amplitude as the average of the implied amplitude
-        # for each pixel. Error is stddev.
-        # Only use pixels within the FWHM, ie value>=0.5. Set the others to NaN
-        ratios = np.where(gaussian_data >= 0.5, data / gaussian_data, np.nan)
-        flux, error = gmean(ratios)
-
-        #sources with fluxes or flux errors that are not finite are not valid
-        # an error of identically zero is also not valid.
-        if not np.isfinite(flux) or not np.isfinite(error) or error == 0.0:
-            catalog.append(dummy)
-            continue
-
-        source = SimpleSource()
-        source.ra = ra
-        source.dec = dec
-        source.peak_flux = flux  #* isnegative
-        source.err_peak_flux = error
-        source.background = global_data.bkgimg[x, y]
-        source.flags = flag
-        source.peak_pixel = np.nanmax(data)
-        source.local_rms = global_data.rmsimg[x, y]
-        source.a = global_data.beam.a
-        source.b = global_data.beam.b
-        source.pa = global_data.beam.pa
-
-        catalog.append(source)
-        if log.getLogger().isEnabledFor(log.DEBUG):
-            log.debug("Measured source {0}".format(source))
-            log.debug("  used area = [{0}:{1},{2}:{3}]".format(xmin, xmax, ymin, ymax))
-            log.debug("  xo,yo = {0},{1}".format(xo, yo))
-            log.debug("  params = {0}".format(params))
-            log.debug("  flux at [xmin+xo,ymin+yo] = {0} Jy".format(data[int(xo), int(yo)]))
-            log.debug("  error = {0}".format(error))
-            log.debug("  rms = {0}".format(source.local_rms))
-    return catalog
-
-
-def measure_catalog_fluxes(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
-                           beam=None, lat=None):
-    """
-    Measure the flux at a given set of locations, assuming point sources.
-
-    Input:
-        filename - fits image file name to be read
-        catfile - a catalog of source positions (ra,dec)
-        hdu_index - if fits file has more than one hdu, it can be specified here
-        outfile - the output file to write to
-        bkgin - a background image filename
-        rmsin - an rms image filename
-        cores - cores to use
-        rms - forced rms value
-        beam - beam parameters to override those given in fits header
-
-    """
-    load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
-                 do_curve=False, beam=beam, lat=lat)
-
-    #load catalog
-    radec = load_catalog(catfile)
-    #measure fluxes
-    sources = force_measure_flux(radec)
-    #write output
-    print >> outfile, header.format("{0}-({1})".format(__version__,__date__), filename)
-    print >> outfile, SimpleSource.header
-    for source in sources:
-        print >> outfile, str(source)
-    return sources
-
-
 def VASTP_measure_catalog_fluxes(filename, positions, hdu_index=0, bkgin=None, rmsin=None,
                                  rms=None, cores=1, beam=None, debug=False):
     """
@@ -2043,15 +1907,17 @@ def VASTP_measure_catalog_fluxes(filename, positions, hdu_index=0, bkgin=None, r
         rms - forced rms value
         beam - beam parameters to override those given in fits header
     """
+    logging.critical("Needs development")
+    sys.exit(1)
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, beam=beam, verb=True,
                  do_curve=False)
     #measure fluxes
     if debug:
-        level = log.getLogger().getEffectiveLevel()
-        log.getLogger().setLevel(log.DEBUG)
+        level = logging.getLogger().getEffectiveLevel()
+        logging.getLogger().setLevel(logging.DEBUG)
     sources = force_measure_flux(positions)
     if debug:
-        log.getLogger().setLevel(level)
+        logging.getLogger().setLevel(level)
     return sources
 
 
@@ -2152,8 +2018,6 @@ if __name__ == "__main__":
     parser.add_option('--outbase', dest='outbase', default=None,
                       help='If --save is True, then this specifies the base name of the background and noise images. [default: inferred from input image]')
 
-    parser.add_option('--measure', dest='measure', action='store_true', default=False,
-                      help='Enable forced measurement mode. Requires an input source list via --input. Sets --find to false. [default: false]')
     parser.add_option('--priorized', dest='priorized', default=None, type=int,
                       help="IN TESTING: Enable priorized fitting, with stage = n [default=1]")
     parser.add_option('--ratio', dest='ratio', default=None, type=float,
@@ -2309,23 +2173,8 @@ if __name__ == "__main__":
             log.error("(you probably need to install HealPy)")
             sys.exit()
 
-    #do forced measurements using catfile
     sources = []
-    if options.measure and options.priorized==0:
-        if options.input is None:
-            log.error("Must specify input catalog when --measure is selected")
-            sys.exit(1)
-        if not os.path.exists(options.input):
-            log.error("{0} not found".format(options.input))
-            sys.exit(1)
-        log.info("Measuring fluxes of input catalog.")
-        measurements = measure_catalog_fluxes(filename, catfile=options.input, hdu_index=options.hdu_index,
-                                              outfile=options.outfile, bkgin=options.backgroundimg,
-                                              rmsin=options.noiseimg, beam=options.beam, lat=lat)
-        if len(measurements) == 0:
-            log.info("No measurements made")
-        sources.extend(measurements)
-
+    # do priorized fitting  using catfile
     if options.priorized>0:
         if options.ratio is not None:
             if options.ratio<=0:
