@@ -479,6 +479,15 @@ def test2d():
     many = j>10
 
     if True:
+        print "-- no corr --"
+        for i,val in enumerate(fit_params.valuesdict().keys()):
+            print "{0}: diff {1:6.4f}+/-{2:6.4f}, median(err) {3}, median(crb_err) {4}".format(val,np.median(diffs_nocorr[:,i]), np.std(diffs_nocorr[:,i]), np.median(errs_nocorr[:,i]),np.median(crb_nocorr[:,i]))
+
+        print "--  corr --"
+        for i,val in enumerate(corr_fit_params.valuesdict().keys()):
+            print "{0}: diff {1:6.4f}+/-{2:6.4f}, median(err) {3}, median(crb_err) {4}".format(val,np.median(diffs_corr[:,i]),np.std(diffs_corr[:,i]), np.median(errs_corr[:,i]),np.median(crb_corr[:,i]))
+        print 1./snr
+
         model =  elliptical_gaussian(x, y,
                                      fit_params['c0_amp'].value,
                                      fit_params['c0_xo'].value,
@@ -601,14 +610,6 @@ def test2d():
         ax.set_xlabel("Corr")
         ax.legend()
 
-        print "-- no corr --"
-        for i,val in enumerate(fit_params.valuesdict().keys()):
-            print "{0}: diff {1:6.4f}+/-{2:6.4f}, median(err) {3}, median(crb_err) {4}".format(val,np.median(diffs_nocorr[:,i]), np.std(diffs_nocorr[:,i]), np.median(errs_nocorr[:,i]),np.median(crb_nocorr[:,i]))
-
-        print "--  corr --"
-        for i,val in enumerate(corr_fit_params.valuesdict().keys()):
-            print "{0}: diff {1:6.4f}+/-{2:6.4f}, median(err) {3}, median(crb_err) {4}".format(val,np.median(diffs_corr[:,i]),np.std(diffs_corr[:,i]), np.median(errs_corr[:,i]),np.median(crb_corr[:,i]))
-        print 1./snr
         # jac = jacobian2d(corr_fit_params,(x,y),emp=True,errs=errs)
         # print_mat(jac[:10,:10])
         # print_mat(C[:10,:10])
