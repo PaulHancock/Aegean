@@ -431,7 +431,7 @@ def test2d():
 
         C = Cmatrix(mx,my,smoothing,smoothing,0)
         B = Bmatrix(C)
-        errs = np.ones(C.shape[0],dtype=np.float32)/snr
+        errs = 1./snr
 
         result, fit_params = do_lmfit(data,init_params)#, errs=errs)
         corr_result,corr_fit_params = do_lmfit(data, init_params, B=B)#, errs=errs)
