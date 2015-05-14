@@ -37,14 +37,15 @@ def rf(filename, region, step_size, box_size, shape):
     :param box_size:
     :return:
     """
-    cmin, cmax, rmin, rmax = region
-    #logging.debug('{0}x{1},{2}x{3} starting at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-    hdu = fits.getheader(filename)
-    cmin = max(0, cmin - box_size[0]/2)
-    cmax = min(shape[1], cmax + box_size[0]/2)
-    rmin = max(0, rmin - box_size[1]/2)
-    rmax = min(shape[0], rmax + box_size[1]/2)
-    NAXIS = hdu["NAXIS"]
+    ymin, ymax, xmin, xmax = region
+    logging.debug('{0}x{1},{2}x{3} starting at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    cmin = max(0, xmin - box_size[1]/2)
+    cmax = min(shape[1], xmax + box_size[1]/2)
+    rmin = max(0, ymin - box_size[0]/2)
+    rmax = min(shape[0], ymax + box_size[0]/2)
+
+    # Figure out how many axes are in the datafile
+    NAXIS = fits.getheader(filename)["NAXIS"]
 
     # It seems that I cannot memmap the same file multiple times without errors
     with fits.open(filename, memmap=False) as a:
@@ -59,25 +60,24 @@ def rf(filename, region, step_size, box_size, shape):
             logging.error("fix your file to be more sane")
             sys.exit(1)
 
-    ymin, ymax, xmin, xmax = region
-    xmin -= rmin
-    xmax -= rmin
-    ymin -= cmin
-    ymax -= cmin
+    # x/y min/max should refer to indicies into data
+    # this is the region over which we want to operate
+    xmin -= cmin
+    xmax -= cmin
+    ymin -= rmin
+    ymax -= rmin
 
-
-
-    logging.debug(" region {0}".format(region))
-    logging.debug(" shape {0}".format(data.shape))
-    logging.debug(" rmin,rmax,cmin,cmax {0}".format([rmin,rmax,cmin,cmax]))
-    logging.debug(" xmin/max, ymin/max {0}".format([xmin,xmax,ymin,ymax]))
-    del hdu
+    #logging.debug(" region {0}".format(region))
+    #logging.debug(" shape {0}".format(data.shape))
+    #logging.debug(" rmin,rmax,cmin,cmax {0}".format([rmin,rmax,cmin,cmax]))
+    #logging.debug(" xmin/max, ymin/max {0}".format([xmin,xmax,ymin,ymax]))
 
     # from here on we use (x,y) instead of (y,x) for the data
     # it gets confusing but it currently works
     # many apologies for this!
     xmin,ymin = ymin,xmin
     xmax,ymax = ymax,xmax
+
     #start a new RunningPercentile class
     rp = RP()
 
@@ -109,29 +109,29 @@ def rf(filename, region, step_size, box_size, shape):
         calculate the boundaries of the box centered at x,y
         with size = box_size
         """
-        x_min = max(xmin,x-box_size[0]/2)
-        x_max = min(data.shape[1]-1,x+box_size[0]/2)
-        y_min = max(ymin,y-box_size[1]/2)
-        y_max = min(data.shape[0]-1,y+box_size[1]/2)
+        x_min = max(0, x-box_size[0]/2)
+        x_max = min(data.shape[0]-1, x+box_size[0]/2)
+        y_min = max(0, y-box_size[1]/2)
+        y_max = min(data.shape[1]-1, y+box_size[1]/2)
+
         return x_min,x_max,y_min,y_max
 
+    # setup the arrays to store our data
     bkg_points = []
     rms_points = []
     bkg_values = []
     rms_values = []
+
     #intialise the rp with our first box worth of data
     x_min,x_max,y_min,y_max = box(xmin,ymin)
-    #print "initial box is",x_min,x_max,y_min,y_max
     new = data[x_min:x_max,y_min:y_max].ravel()
-    #print "and has",len(new),"pixels"
     rp.add(new)
+
     for x,y,px,py in locations(step_size, xmin, xmax, ymin, ymax):
         x_min,x_max,y_min,y_max = box(x,y)
         px_min,px_max,py_min,py_max = box(px,py)
         old=[]
         new=[]
-        if x_min<xmin or x_max>data.shape[1] or y_min<ymin or y_max>data.shape[0]:
-            logging.info("{0}".format([xmin,data.shape[1],ymin,data.shape[0],x_min,x_max,y_min,y_max]))
         #we only move in one direction at a time, but don't know which
         if (x_min>px_min) or (x_max>px_max):
             #down
@@ -155,16 +155,16 @@ def rf(filename, region, step_size, box_size, shape):
         rp.sub(old)
         p0,p25,p50,p75,p100 = rp.score()
         if p50 is not None:
-            bkg_points.append((x+cmin,y+rmin)) #the coords need to be indices into the larger array
+            bkg_points.append((x+rmin,y+cmin)) #the coords need to be indices into the larger array
             bkg_values.append(p50)
         if (p75 is not None) and (p25 is not None):
-            rms_points.append((x+cmin,y+rmin))
+            rms_points.append((x+rmin,y+cmin))
             rms_values.append((p75-p25)/1.34896)
 
     #return our lists, the interpolation will be done on the master node
     #also tell the master node where the data came from - using the original coords
     logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-    return xmin,xmax,ymin,ymax,bkg_points,bkg_values,rms_points,rms_values
+    return xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
 
 
 def gen_factors(m,permute=True):
