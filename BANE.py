@@ -2,7 +2,8 @@
 
 #standard imports
 import numpy as np
-import sys, os
+import sys
+import os
 from optparse import OptionParser
 from time import gmtime, strftime
 import logging
@@ -22,20 +23,19 @@ from AegeanTools.fits_interp import compress
 import multiprocessing
 
 __version__ = 'v1.1'
-__date__ = '2015-05-10'
+__date__ = '2015-05-15'
 
-###
-#
-###
 
-def rf(filename, region, step_size, box_size, shape):
+def running_filter(filename, region, step_size, box_size, shape):
     """
+    Perform a running filter over a region within a file.
+    The region can be a sub set of the data within the file - only the useful data will be loaded.
 
     :param filename: File from which to extract data
-    :param region: [ymin,ymax,xmin,xmax] over which we are to operate
-    :param step_size:
-    :param box_size:
-    :return:
+    :param region: [ymin,ymax,xmin,xmax] indices over which we are to operate
+    :param step_size: amount to move filtering box each iteration
+    :param box_size: Size of filtering box
+    :return: xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
     """
     ymin, ymax, xmin, xmax = region
     logging.debug('{0}x{1},{2}x{3} starting at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
@@ -60,7 +60,7 @@ def rf(filename, region, step_size, box_size, shape):
             logging.error("fix your file to be more sane")
             sys.exit(1)
 
-    # x/y min/max should refer to indicies into data
+    # x/y min/max should refer to indices into data
     # this is the region over which we want to operate
     xmin -= cmin
     xmax -= cmin
@@ -228,7 +228,7 @@ def filter_mc(filename, step_size, box_size, cores, shape):
     if cores>1:
         try:
             queue = pprocess.Queue(limit=cores,reuse=1)
-            parfilt = queue.manage(pprocess.MakeReusable(rf))
+            parfilt = queue.manage(pprocess.MakeReusable(running_filter))
         except AttributeError, e:
             if 'poll' in e.message:
                 logging.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
@@ -284,7 +284,7 @@ def filter_mc(filename, step_size, box_size, cores, shape):
     else:
         #single core we do it all at once
         region = [0,img_x,0,img_y]
-        _,_,_,_,bkg_points,bkg_values,rms_points,rms_values=rf(filename,region, step_size, box_size, shape)
+        _,_,_,_,bkg_points,bkg_values,rms_points,rms_values=running_filter(filename,region, step_size, box_size, shape)
     #and do the interpolation etc...
     (gx,gy) = np.mgrid[0:shape[0],0:shape[1]]
     #if the bkg/rms points have len zero this is because they are all nans so we return
