@@ -372,11 +372,11 @@ def test2d():
     ny = 12
     x,y = np.where(np.ones((nx,ny))==1)
 
-    smoothing = 1.27 # 3pix/beam
+    #smoothing = 1.27 # 3pix/beam
     #smoothing = 2.12 # 5pix/beam
-    #smoothing = 1.5 # ~4.2pix/beam
+    smoothing = 1.5 # ~4.2pix/beam
 
-    snr = 10
+    snr = 50
 
     diffs_nocorr = []
     errs_nocorr = []
@@ -385,7 +385,7 @@ def test2d():
     errs_corr = []
     crb_corr = []
 
-    nj = 10
+    nj = 50
     # The model parameters
     params = lmfit.Parameters()
     params.add('c0_amp', value=1, min=0.5, max=2)
@@ -393,7 +393,7 @@ def test2d():
     params.add('c0_yo', value=1.*ny/2, min=ny/2.-smoothing/2., max=ny/2.+smoothing/2.)
     params.add('c0_sx', value=2*smoothing, min=0.8*smoothing)
     params.add('c0_sy', value=smoothing, min=0.8*smoothing)
-    params.add('c0_theta',value=0)#, min=-2*np.pi, max=2*np.pi)
+    params.add('c0_theta',value=16)#, min=-2*np.pi, max=2*np.pi)
     params.components=1
 
     signal = elliptical_gaussian(x, y,
@@ -421,20 +421,20 @@ def test2d():
         noise /= np.std(noise)*snr
 
         data = signal + noise
-        #snrmask = np.where(data < 4/snr)
+        snrmask = np.where(data < 4/snr)
         #cmask = np.where(signal < 0.5)
-        #data[snrmask] = np.nan
+        data[snrmask] = np.nan
         #data[cmask] = np.nan
         mx,my = np.where(np.isfinite(data))
         if len(mx)<7:
             continue
 
-        result, fit_params = do_lmfit(data,init_params)
-
         C = Cmatrix(mx,my,smoothing,smoothing,0)
         B = Bmatrix(C)
-        corr_result,corr_fit_params = do_lmfit(data, init_params, B=B)
         errs = np.ones(C.shape[0],dtype=np.float32)/snr
+
+        result, fit_params = do_lmfit(data,init_params)#, errs=errs)
+        corr_result,corr_fit_params = do_lmfit(data, init_params, B=B)#, errs=errs)
 
         if np.all( [fit_params[i].stderr >0 for i in fit_params.valuesdict().keys()]):
             if fit_params['c0_sy'].value>fit_params['c0_sx'].value:
@@ -442,8 +442,11 @@ def test2d():
                 fit_params['c0_theta'].value += 90
             fit_params['c0_theta'].value = theta_limit(fit_params['c0_theta'].value)
             diffs_nocorr.append([ params[i].value -fit_params[i].value for i in fit_params.valuesdict().keys()])
+            J = emp_jacobian(fit_params,mx,my,errs = errs)
+            #errs_nocorr.append(np.sqrt(np.diag(inv(np.transpose(J).dot(J)))))
             errs_nocorr.append( [fit_params[i].stderr for i in fit_params.valuesdict().keys()])
-            crb_nocorr.append( CRB_errs(jacobian2d(fit_params,(mx,my),emp=True,errs=errs),C) )
+            #crb_nocorr.append( CRB_errs(jacobian2d(fit_params,(mx,my),emp=True,errs=errs),C) )
+            crb_nocorr.append( CRB_errs(J,C) )
 
         if np.all( [corr_fit_params[i].stderr >0 for i in corr_fit_params.valuesdict().keys()]):
             if corr_fit_params['c0_sy'].value>corr_fit_params['c0_sx'].value:
@@ -451,8 +454,12 @@ def test2d():
                 corr_fit_params['c0_theta'].value += 90
             corr_fit_params['c0_theta'].value = theta_limit(corr_fit_params['c0_theta'].value)
             diffs_corr.append([ params[i].value -corr_fit_params[i].value for i in corr_fit_params.valuesdict().keys()])
-            errs_corr.append( [corr_fit_params[i].stderr for i in corr_fit_params.valuesdict().keys()])
-            crb_corr.append( CRB_errs(jacobian2d(corr_fit_params,(mx,my),emp=True,errs=errs), C) )
+            J = emp_jacobian(corr_fit_params,mx,my, errs=errs, B=B)
+            errs_corr.append( np.sqrt(np.diag(inv(np.transpose(J).dot(J)))))
+            #errs_corr.append( [corr_fit_params[i].stderr for i in corr_fit_params.valuesdict().keys()])
+            #crb_corr.append( CRB_errs(jacobian2d(corr_fit_params,(mx,my),emp=True,errs=errs), C) )
+            crb_corr.append( CRB_errs(emp_jacobian(corr_fit_params,mx,my, errs=errs), C) )
+
         if nj<10:
             print "init      ",
             print_par(params)
@@ -531,6 +538,18 @@ def test2d():
         ax.set_title('Data - Model')
         rmlabels(ax)
 
+        # covar = corr_result.covar
+        # J = emp_jacobian(fit_params,mx,my)
+        # JJ = inv(np.transpose(J).dot(inv(C)).dot(J))
+        # #print covar
+        # #print np.diag(covar)
+        # print np.sqrt(np.diag(covar))
+        # #print JJ
+        # #print np.diag(JJ)
+        # print np.sqrt(np.diag(JJ))
+        # print CRB_errs(J,C)
+        # print corr_fit_params
+        # sys.exit()
         ax = fig.add_subplot(3,2,6)
         mappable = ax.imshow(data - corr_model, **kwargs)
         ax.set_title('Data - Corr_model')
@@ -597,6 +616,47 @@ def test2d():
         # print CRB_errs(jac,C)
         # print CRB_errs(jac,C,B)
         pyplot.show()
+
+
+def test_jacobian():
+    nx = 15
+    ny = 12
+    x,y = np.where(np.ones((nx,ny))==1)
+
+    smoothing = 1.27 # 3pix/beam
+    #smoothing = 2.12 # 5pix/beam
+    #smoothing = 1.5 # ~4.2pix/beam
+
+    snr = 10
+    nj = 10
+    # The model parameters
+    params = lmfit.Parameters()
+    params.add('c0_amp', value=1, min=0.5, max=2)
+    params.add('c0_xo', value=1.*nx/2, min=nx/2.-smoothing/2., max=nx/2.+smoothing/2)
+    params.add('c0_yo', value=1.*ny/2, min=ny/2.-smoothing/2., max=ny/2.+smoothing/2.)
+    params.add('c0_sx', value=2*smoothing, min=0.8*smoothing)
+    params.add('c0_sy', value=smoothing, min=0.8*smoothing)
+    params.add('c0_theta',value= 45)
+    params.components=1
+
+
+    from matplotlib import pyplot
+    fig=pyplot.figure(1)#, figsize=(8,12))
+    # This sets all nan pixels to be a nasty yellow colour
+    cmap = pyplot.cm.cubehelix
+    cmap.set_bad('y',1.)
+    kwargs = {'interpolation':'nearest','cmap':cmap,'vmin':-0.1,'vmax':1, 'origin':'lower'}
+
+    C = Cmatrix(x, y, smoothing, smoothing,0)
+    B = Bmatrix(C)
+    jdata = emp_jacobian(params, x, y, B=C)
+    for i,p in enumerate(['amp','xo','yo','sx','sy','theta']):
+
+        ax = fig.add_subplot(3,2,i+1)
+        ax.imshow(jdata[:,i].reshape(nx,ny),**kwargs)
+        ax.set_title(p)
+        rmlabels(ax)
+    pyplot.show()
 
 
 def JC_err_comp():
@@ -1752,8 +1812,9 @@ def make_data():
 
 if __name__ == '__main__':
     # test1d()
-    # test2d()
+    test2d()
     # test2d_load()
     # test_CRB()
     # JC_err_comp()
-    test_cmatrix()
+    # test_cmatrix()
+    # test_jacobian()
