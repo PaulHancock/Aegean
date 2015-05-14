@@ -4,6 +4,10 @@
 MIMAS - The Multi-resolution Image Mask for Aegean Software
 
 Created: Paul Hancock, Oct 2014
+
+TODO: Write an in/out reader for MOC formats described by
+http://arxiv.org/abs/1505.02937
+
 """
 
 import argparse
@@ -19,7 +23,7 @@ from astropy.wcs import wcs as pywcs
 from AegeanTools.regions import Region
 
 __version__ = 'v1.0'
-__date__ = '2015-05-04'
+__date__ = '2015-05-13'
 
 #seems like this fails sometimes
 try:
@@ -293,13 +297,17 @@ if __name__=="__main__":
     group2.add_argument('--reg2mim',dest='reg2mim', action='append',
                        type=str, metavar=('region.reg','region.mim'), nargs=2,
                        help="Converta a .reg file into a .mim file", default=[])
-    group2.add_argument('--mask',dest='mask', action='store',
+    group3 = parser.add_argument_group("Masking fits files")
+    group3.add_argument('--mask',dest='mask', action='store',
                         type=str, metavar=('region.mim','file.fits','masked.fits'), nargs=3, default=[],
                         help='use region.mim to mask file.fits and write masekd.fits')
-    group3 = parser.add_argument_group('Extra options')
+    group3.add_argument('--fitsmask', dest='fits_mask', action='store',
+                        type=str, metavar=('mask.fits','file.fits','masked_file.fits'), nargs=3, default=[],
+                        help='Use a fits file as a mask for another fits file. Values of blank/nan/zero are considered to be mask=True.')
+    group4 = parser.add_argument_group('Extra options')
     #extras
-    group3.add_argument('--debug', dest='debug', action='store_true', help='debug mode [default=False]', default=False)
-    group3.add_argument('--version', action='version', version='%(prog)s '+__version__+"-({0})".format(__date__))
+    group4.add_argument('--debug', dest='debug', action='store_true', help='debug mode [default=False]', default=False)
+    group4.add_argument('--version', action='version', version='%(prog)s '+__version__+"-({0})".format(__date__))
     results = parser.parse_args()
 
     #TODO: see if there is an 'argparse' way of detecting no input
@@ -310,6 +318,10 @@ if __name__=="__main__":
     logging_level = logging.DEBUG if results.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is MIMAS {0}-({1})".format(__version__,__date__))
+
+    if len(results.fits_mask)>0:
+        logging.info("The --fitsmask option is not yet implemented.")
+        sys.exit(1)
 
     if len(results.mim2reg)>0:
         for i,o in results.mim2reg:
