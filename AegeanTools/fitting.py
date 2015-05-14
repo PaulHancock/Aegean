@@ -88,7 +88,6 @@ def emp_jacobian(pars, x, y, errs=None, B=None):
     model = ntwodgaussian_lmfit(pars)(x,y)
     for i in xrange(pars.components):
         prefix = "c{0}_".format(i)
-        # Note: all derivatives are calculated, even if the parameter is fixed
         for p in ['amp','xo','yo','sx','sy','theta']:
             if pars[prefix+p].vary:
                 pars[prefix+p].value += eps
@@ -230,3 +229,31 @@ def do_lmfit(data, params, B=None, errs=None):
     result = lmfit.minimize(residual, params, kws={'x':mask[0],'y':mask[1],'B':B,'errs':None}, Dfun = emp_jacobian)
     return result, params
 
+
+def ntwodgaussian_mpfit(inpars):
+    """
+    Return an array of values represented by multiple Gaussians as parametrized
+    by params = [amp,x0,y0,major,minor,pa]{n}
+    x0,y0,major,minor are in pixels
+    major/minor are interpreted as being sigmas not FWHMs
+    pa is in degrees
+    """
+    try:
+        params = np.array(inpars).reshape(len(inpars) / 6, 6)
+    except ValueError as e:
+        if 'size' in e.message:
+            log.error("inpars requires a multiple of 6 parameters")
+            log.error("only {0} parameters supplied".format(len(inpars)))
+        raise e
+
+    def rfunc(x, y):
+        result = None
+        for p in params:
+            amp, xo, yo, major, minor, pa = p
+            if result is not None:
+                result += elliptical_gaussian(x,y,amp,xo,yo,major,minor,pa)
+            else:
+                result =  elliptical_gaussian(x,y,amp,xo,yo,major,minor,pa)
+        return result
+
+    return rfunc
