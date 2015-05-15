@@ -10,12 +10,13 @@ import sys
 import copy
 import math
 import numpy as np
-from scipy.linalg import eigh, inv
+from scipy.linalg import eigh, inv, pinv
 import lmfit
+from angle_tools import gcd, bear, translate
 
 # Other AegeanTools
 # from models import OutputSource, IslandSource
-
+import flags
 
 # join the Aegean logger
 import logging
@@ -181,7 +182,7 @@ def CRB_errs(jac, C, B=None):
     return errs
 
 
-def calc_errors(source, thetaN=None):
+def condon_errors(source, thetaN=None):
     """
     Calculate the parameter errors for a fitted source
     using the description of Condon'97
@@ -235,6 +236,94 @@ def calc_errors(source, thetaN=None):
     return
 
 
+def errors(source, model, wcshelper):
+    """
+    Convert pixel based errors into sky coord errors
+    :param source: Source object
+    :param wcshelper: WCSHelper object
+    :return:
+    """
+
+    # if the source wasn't fit then all errors are -1
+    if source.flags & (flags.NOTFIT | flags.FITERR):
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
+        source.err_ra = source.err_dec = source.err_int_flux = -1
+        return source
+    # copy the errors from the model
+    prefix = "c{0}_".format(source.source)
+    err_amp = model[prefix+'amp'].stderr
+    xo,yo = model[prefix+'xo'].value, model[prefix+'yo'].value
+    err_xo = model[prefix+'xo'].stderr
+    err_yo = model[prefix+'yo'].stderr
+
+    sx, sy = model[prefix+'sx'].value, model[prefix+'sy'].value
+    err_sx = model[prefix+'sx'].stderr
+    err_sy = model[prefix+'sy'].stderr
+
+    theta = model[prefix+'theta'].value
+    err_theta = model[prefix+'theta'].stderr
+
+    source.err_peak_flux = err_amp
+    pix_errs = [err_xo,err_yo,err_sx,err_sy,err_theta]
+
+    # check for inf/nan errors -> these sources have poor fits.
+    if not all([np.isfinite(a) for a in pix_errs]):
+        source.flags |= flags.FITERR
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
+        source.err_ra = source.err_dec = source.err_int_flux = -1
+        return source
+
+    if any([a is None for a in pix_errs]):
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
+        source.err_ra = source.err_dec = source.err_int_flux = -1
+        logging.warn(" src ({0},{1}) has None for errors".format(source.island,source.source))
+        logging.warn(" flags {0}".format(source.flags))
+        return source
+
+
+    # position errors
+    if model[prefix + 'xo'].vary and model[prefix + 'yo'].vary:
+        ref = wcshelper.pix2sky([xo,yo])
+        offset = wcshelper.pix2sky([xo+err_xo,yo+err_yo])
+        source.err_ra = gcd(ref[0], ref[1], offset[0], ref[1])
+        source.err_dec = gcd(ref[0], ref[1], ref[0], offset[1])
+    else:
+        source.err_ra = source.err_dec = -1
+
+    if model[prefix + 'sx'].vary and model[prefix + 'sy'].vary:
+        # major axis error
+        ref = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta)),yo+sy*np.sin(np.radians(theta))])
+        offset = wcshelper.pix2sky([xo+(sx+err_sx)*np.cos(np.radians(theta)),yo+sy*np.sin(np.radians(theta))])
+        source.err_a = gcd(ref[0],ref[1],offset[0],offset[1]) * 3600
+
+        # minor axis error
+        ref = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta+90)),yo+sy*np.sin(np.radians(theta+90))])
+        offset = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta+90)),yo+(sy+err_sy)*np.sin(np.radians(theta+90))])
+        source.err_b = gcd(ref[0], ref[1], offset[0], offset[1]) * 3600
+    else:
+        source.err_a = source.err_b = -1
+
+
+    if model[prefix+'theta'].vary:
+        # pa error
+        ref = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta)),yo+sy*np.sin(np.radians(theta))])
+        offset = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta+err_theta)),yo+sy*np.sin(np.radians(theta+err_theta))])
+        source.err_pa = bear(ref[0], ref[1], offset[0], offset[1])
+    else:
+        source.err_pa = -1
+
+    sqerr = 0
+    sqerr += (source.err_peak_flux/source.peak_flux)**2 if source.err_peak_flux >0 else 0
+    sqerr += (source.err_a/source.a)**2 if source.err_a > 0 else 0
+    sqerr += (source.err_b/source.b)**2 if source.err_b > 0 else 0
+    source.err_int_flux = source.int_flux*np.sqrt(sqerr)
+
+    # logging.info("src ({0},{1})".format(source.island,source.source))
+    # logging.info(" pixel errs {0}".format([err_xo, err_yo, err_sx, err_sy, err_theta]))
+    # logging.info(" sky   errs {0}".format([source.err_ra, source.err_dec, source.err_a, source.err_b, source.err_pa]))
+    return source
+
+
 def ntwodgaussian_lmfit(params):
     """
     theta is in degrees
@@ -259,7 +348,7 @@ def ntwodgaussian_lmfit(params):
     return rfunc
 
 
-def do_lmfit(data, params, B=None, errs=None):
+def do_lmfit(data, params, B=None, errs=None, dojac=True):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
@@ -281,32 +370,29 @@ def do_lmfit(data, params, B=None, errs=None):
         else:
             return (model - data[mask]).dot(B)
 
-    result = lmfit.minimize(residual, params, kws={'x':mask[0],'y':mask[1],'B':B,'errs':errs}, Dfun = jacobian)
+    if dojac:
+        result = lmfit.minimize(residual, params, kws={'x':mask[0],'y':mask[1],'B':B,'errs':errs}, Dfun = jacobian)
+    else:
+        result = lmfit.minimize(residual, params, kws={'x':mask[0],'y':mask[1],'B':B,'errs':errs})
 
     return result, params
 
 
-def covar_errors(params, data, errs, B):
+def covar_errors(params, data, errs, B, C=None):
 
     mask = np.where(np.isfinite(data))
-    # errs = []
-    # # Calculate the SNR for each source:
-    # for i in xrange(params.components):
-    #     prefix = "c{0}_".format(i)
-    #     x = int(math.floor(params[prefix+'xo']))
-    #     y = int(math.floor(params[prefix+'yo']))
-    #     free_vars = len( [ 1 for a in params.keys() if params[a].vary and prefix in a])
-    #     errs.extend( [rms[x,y]]*free_vars)
-    #
-    # #errs = np.vstack( errs,len(mask[0]))
-    # #print errs
-    # errs = errs[0]
 
-    # now calculate the proper parameter errors and copy them across.
-    #J = emp_jacobian(params, mask[0], mask[1], B=B, errs=errs)
-    J = jacobian(params, mask[0], mask[1], B=B, errs=errs)
-    covar = np.transpose(J).dot(J)
-    onesigma = np.sqrt(np.diag(inv(covar)))
+    # calculate the proper parameter errors and copy them across.
+    if C is not None:
+        J = jacobian(params, mask[0], mask[1], errs=errs)
+        #invcovar = pinv(J).dot(C).dot(np.transpose(pinv(J)))
+        covar = np.transpose(J).dot(inv(C)).dot(J)
+        onesigma = np.sqrt(np.diag(inv(covar)))
+    else:
+        J = jacobian(params, mask[0], mask[1], B=B, errs=errs)
+        covar = np.transpose(J).dot(J)
+        onesigma = np.sqrt(np.diag(inv(covar)))
+
     for i in xrange(params.components):
         prefix = "c{0}_".format(i)
         j=0
