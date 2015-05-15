@@ -104,6 +104,66 @@ def emp_jacobian(pars, x, y, errs=None, B=None):
     return matrix
 
 
+def jacobian(pars, x, y, errs=None, B=None):
+
+    matrix = []
+    model = ntwodgaussian_lmfit(pars)(x,y)
+
+    for i in xrange(pars.components):
+        prefix = "c{0}_".format(i)
+        amp = pars[prefix+'amp'].value
+        xo = pars[prefix+'xo'].value
+        yo = pars[prefix+'yo'].value
+        sx = pars[prefix+'sx'].value
+        sy = pars[prefix+'sy'].value
+        theta  = pars[prefix+'theta'].value
+
+        # precompute for speed
+        sint = np.sin(np.radians(theta))
+        cost = np.cos(np.radians(theta))
+        xxo = x-xo
+        yyo = y-yo
+        xcos, ycos = xxo*cost, yyo*cost
+        xsin, ysin = xxo*sint, yyo*sint
+
+        if pars[prefix+'amp'].vary:
+            dmds = model/amp
+            matrix.append(dmds)
+
+        if pars[prefix+'xo'].vary:
+            dmdxo = cost * (xcos + ysin) /sx**2 + sint * (xsin - ycos) /sy**2
+            dmdxo *= model
+            matrix.append(dmdxo)
+
+        if pars[prefix+'yo'].vary:
+            dmdyo = sint * (xcos + ysin) /sx**2 - cost * (xsin - ycos) /sy**2
+            dmdyo *= model
+            matrix.append(dmdyo)
+
+        if pars[prefix+'sx'].vary:
+            dmdsx = model / sx**3 * (xcos + ysin)**2
+            matrix.append(dmdsx)
+
+        if pars[prefix+'sy'].vary:
+            dmdsy = model / sy**3 * (xsin - ycos)**2
+            matrix.append(dmdsy)
+
+        if pars[prefix+'theta'].vary:
+            dmdtheta = model * (sx**2 - sy**2) * (xsin + ycos) * (xcos + ysin) / sx**2/sy**2
+            matrix.append(dmdtheta)
+
+    matrix=np.vstack(matrix)
+
+    if errs is not None:
+        matrix /=errs
+
+    if B is not None:
+        matrix = matrix.dot(B)
+
+    matrix = np.transpose(matrix)
+    return matrix
+
+
 def CRB_errs(jac, C, B=None):
     """
     Calculate minimum errors given by the Cramer-Rao bound
@@ -221,9 +281,10 @@ def do_lmfit(data, params, B=None, errs=None):
         else:
             return (model - data[mask]).dot(B)
 
-    result = lmfit.minimize(residual, params, kws={'x':mask[0],'y':mask[1],'B':B,'errs':errs}, Dfun = emp_jacobian)
+    result = lmfit.minimize(residual, params, kws={'x':mask[0],'y':mask[1],'B':B,'errs':errs}, Dfun = jacobian)
 
     return result, params
+
 
 def covar_errors(params, data, errs, B):
 
@@ -256,7 +317,6 @@ def covar_errors(params, data, errs, B):
     return params
 
 
-
 def ntwodgaussian_mpfit(inpars):
     """
     Return an array of values represented by multiple Gaussians as parametrized
@@ -284,3 +344,50 @@ def ntwodgaussian_mpfit(inpars):
         return result
 
     return rfunc
+
+
+def test_jacobian():
+    nx = 15
+    ny = 12
+    x,y = np.where(np.ones((nx,ny))==1)
+
+    #smoothing = 1.27 # 3pix/beam
+    #smoothing = 2.12 # 5pix/beam
+    smoothing = 1.5 # ~4.2pix/beam
+
+    # The model parameters
+    params = lmfit.Parameters()
+    params.add('c0_amp', value=1, min=0.5, max=2)
+    params.add('c0_xo', value=1.*nx/2, min=nx/2.-smoothing/2., max=nx/2.+smoothing/2)
+    params.add('c0_yo', value=1.*ny/2, min=ny/2.-smoothing/2., max=ny/2.+smoothing/2.)
+    params.add('c0_sx', value=2*smoothing, min=0.8*smoothing)
+    params.add('c0_sy', value=smoothing, min=0.8*smoothing)
+    params.add('c0_theta',value=45)#, min=-2*np.pi, max=2*np.pi)
+    params.components=1
+
+    def rmlabels(ax):
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    from matplotlib import pyplot
+    fig=pyplot.figure(1)
+    # This sets all nan pixels to be a nasty yellow colour
+    cmap = pyplot.cm.cubehelix
+    cmap.set_bad('y',1.)
+    #kwargs = {'interpolation':'nearest','cmap':cmap,'vmin':-0.1,'vmax':1, 'origin':'lower'}
+    kwargs = {'interpolation':'nearest','cmap':cmap, 'origin':'lower'}
+    for i,jac in enumerate([emp_jacobian,jacobian]):
+        fig = pyplot.figure(i+1,figsize=(4,6))
+        jdata = jac(params, x, y)
+        fig.suptitle(str(jac))
+        for k,p in enumerate(['amp','xo','yo','sx','sy','theta']):
+            ax = fig.add_subplot(3,2,k+1)
+            ax.imshow(jdata[:,k].reshape(nx,ny),**kwargs)
+            ax.set_title(p)
+            rmlabels(ax)
+
+    pyplot.show()
+
+
+if __name__ == "__main__":
+    test_jacobian()
