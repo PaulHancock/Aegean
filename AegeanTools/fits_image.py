@@ -28,6 +28,51 @@ def load_safe(filename):
         hdus = pyfits.open(filename, ignore_missing_end=True)
     return hdus
 
+def get_pixinfo(header):
+    # this is correct at the center of the image for all images, and everywhere for conformal projections
+    if all([a in header for a in ["CDELT1", "CDELT2"]]):
+        pixarea = abs(header["CDELT1"]*header["CDELT2"])
+        pixscale = (header["CDELT1"], header["CDELT2"])
+    elif all([a in header for a in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]]):
+        pixarea = abs(header["CD1_1"]*header["CD2_2"]
+                    - header["CD1_2"]*header["CD2_1"])
+        pixscale = (header["CD1_1"], header["CD2_2"])
+        if not (header["CD1_2"] == 0 and header["CD2_1"] == 0):
+            logging.warn("Pixels don't appear to be square -> pixscale is wrong")
+    elif all([a in header for a in ["CD1_1", "CD2_2"]]):
+        pixarea = abs(header["CD1_1"]*header["CD2_2"])
+        pixscale = (header["CD1_1"], header["CD2_2"])
+    else:
+        logging.critical("cannot determine pixel area, using zero EVEN THOUGH THIS IS WRONG!")
+        pixarea = 0
+        pixscale = (0, 0)
+    return pixarea, pixscale
+
+
+def get_beam(header):
+    # if the bpa isn't specified add it as zero
+    if "BPA" not in header:
+        logging.warn("BPA not present in fits header, using 0")
+        bpa = 0
+    else:
+        bpa = header["BPA"]
+
+    if "BMAJ" not in header:
+        logging.critical("BMAJ not present in fits header.")
+        bmaj = None
+    else:
+        bmaj = header["BMAJ"]
+
+    if "BMIN" not in header:
+        logging.error("BMIN not present in fits header.")
+        bmaj = None
+    else:
+        bmin = header["BMIN"]
+    if None in [bmaj, bmin, bpa]:
+        return None
+    beam = Beam(bmaj, bmin, bpa)
+    return beam
+
 
 class FitsImage():
     def __init__(self, filename=None, hdu_index=0, beam=None):
@@ -76,46 +121,53 @@ class FitsImage():
             
         self.x = self._header['NAXIS1']
         self.y = self._header['NAXIS2']
-        # this is correct at the center of the image for all images, and everywhere for conformal projections
-        if all([a in self._header for a in ["CDELT1", "CDELT2"]]):
-            self.pixarea = abs(self._header["CDELT1"]*self._header["CDELT2"])
-            self.pixscale = (self._header["CDELT1"], self._header["CDELT2"])
-        elif all([a in self._header for a in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]]):
-            self.pixarea = abs(self._header["CD1_1"]*self._header["CD2_2"]
-                               - self._header["CD1_2"]*self._header["CD2_1"])
-            self.pixscale = (self._header["CD1_1"], self._header["CD2_2"])
-            if not (self._header["CD1_2"] == 0 and self._header["CD2_1"] == 0):
-                logging.warn("Pixels don't appear to be square -> pixscale is wrong")
-        elif all([a in self._header for a in ["CD1_1", "CD2_2"]]):
-            self.pixarea = abs(self._header["CD1_1"]*self._header["CD2_2"])
-            self.pixscale = (self._header["CD1_1"], self._header["CD2_2"])
-        else:
-            logging.warn("cannot determine pixel area, using zero EVEN THOUGH THIS IS WRONG!")
-            self.pixarea = 0
-            self.pixscale = (0, 0)
+
+        self.pixarea, self.pixscale = get_pixinfo(self._header)
+        # # this is correct at the center of the image for all images, and everywhere for conformal projections
+        # if all([a in self._header for a in ["CDELT1", "CDELT2"]]):
+        #     self.pixarea = abs(self._header["CDELT1"]*self._header["CDELT2"])
+        #     self.pixscale = (self._header["CDELT1"], self._header["CDELT2"])
+        # elif all([a in self._header for a in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]]):
+        #     self.pixarea = abs(self._header["CD1_1"]*self._header["CD2_2"]
+        #                        - self._header["CD1_2"]*self._header["CD2_1"])
+        #     self.pixscale = (self._header["CD1_1"], self._header["CD2_2"])
+        #     if not (self._header["CD1_2"] == 0 and self._header["CD2_1"] == 0):
+        #         logging.warn("Pixels don't appear to be square -> pixscale is wrong")
+        # elif all([a in self._header for a in ["CD1_1", "CD2_2"]]):
+        #     self.pixarea = abs(self._header["CD1_1"]*self._header["CD2_2"])
+        #     self.pixscale = (self._header["CD1_1"], self._header["CD2_2"])
+        # else:
+        #     logging.warn("cannot determine pixel area, using zero EVEN THOUGH THIS IS WRONG!")
+        #     self.pixarea = 0
+        #     self.pixscale = (0, 0)
         
         if beam is None:
-            # if the bpa isn't specified add it as zero
-            if "BPA" not in self._header:
-                logging.info("BPA not present in fits header, using 0")
-                bpa = 0
-            else:
-                bpa = self._header["BPA"]
-                
-            if "BMAJ" not in self._header:
-                logging.error("BMAJ not present in fits header.")
-                logging.error("BMAJ not supplied by user. Exiting.")
-                sys.exit(0)
-            else:
-                bmaj = self._header["BMAJ"]
-                
-            if "BMIN" not in self._header:
-                logging.error("BMIN not present in fits header.")
-                logging.error("BMIN not supplied by user. Exiting.")
-                sys.exit(0)
-            else:
-                bmin = self._header["BMIN"]
-            self.beam = Beam(bmaj, bmin, bpa)
+            self.beam = get_beam(self._header)
+            if self.beam is None:
+                logging.critical("Beam info is not in fits header.")
+                logging.critical("Beam info not supplied by user. Stopping.")
+                sys.exit(1)
+            # # if the bpa isn't specified add it as zero
+            # if "BPA" not in self._header:
+            #     logging.info("BPA not present in fits header, using 0")
+            #     bpa = 0
+            # else:
+            #     bpa = self._header["BPA"]
+            #
+            # if "BMAJ" not in self._header:
+            #     logging.error("BMAJ not present in fits header.")
+            #     logging.error("BMAJ not supplied by user. Exiting.")
+            #     sys.exit(0)
+            # else:
+            #     bmaj = self._header["BMAJ"]
+            #
+            # if "BMIN" not in self._header:
+            #     logging.error("BMIN not present in fits header.")
+            #     logging.error("BMIN not supplied by user. Exiting.")
+            #     sys.exit(0)
+            # else:
+            #     bmin = self._header["BMIN"]
+            # self.beam = Beam(bmaj, bmin, bpa)
         else:  # use the supplied beam
             self.beam = beam
         self._rms = None
