@@ -23,8 +23,8 @@ log = logging.getLogger('Aegean')
 
 class WCSHelper(object):
 
-    @staticmethod
-    def from_header(header):
+    @classmethod
+    def from_header(cls,header):
         """
         Create a new WCSHelper class from the given header
         This will not set the latitude of the telesocpe so this needs to be set by the user
@@ -43,7 +43,7 @@ class WCSHelper(object):
             logging.critical("Cannot extract beam information")
         _, pixscale = get_pixinfo(header)
 
-        return WCSHelper(wcs, beam, pixscale)
+        return cls(wcs, beam, pixscale)
 
 
     def __init__(self, wcs, beam, pixscale, lat=None):
