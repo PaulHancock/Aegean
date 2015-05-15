@@ -31,7 +31,7 @@ from scipy.ndimage import label, find_objects
 
 # fitting
 import lmfit
-from AegeanTools.fitting import do_lmfit, calc_errors, Cmatrix, Bmatrix, covar_errors
+from AegeanTools.fitting import do_lmfit, condon_errors, Cmatrix, Bmatrix, errors
 
 # the glory of astropy
 import astropy
@@ -54,6 +54,7 @@ import logging.config
 from optparse import OptionParser
 
 # external and support programs
+from AegeanTools.wcs_helpers import WCSHelper
 from AegeanTools.fits_image import FitsImage, Beam
 from AegeanTools.msq2 import MarchingSquares
 from AegeanTools.angle_tools import dec2hms, dec2dms, gcd, bear, translate
@@ -343,7 +344,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         # A proper fix will include the re-calculation of the pixel beam at the given sky location
         # this will make the beam slightly bigger as we move away from zenith
         if global_data.telescope_lat is not None:
-            _, dec = pix2sky([yo+offsets[0],xo+offsets[1]]) #double check x/y here
+            _, dec = global_data.wcshelper.pix2sky([yo+offsets[0],xo+offsets[1]]) #double check x/y here
             sx /= np.cos(np.radians(dec-global_data.telescope_lat))
 
         # lmfit does silly things if we start with these two parameters being equal
@@ -484,7 +485,7 @@ def result_to_components(result, model, island_data, flags):
             theta = theta - 90
 
         # source.pa is returned in degrees
-        (source.ra, source.dec, source.a, source.pa) = pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
+        (source.ra, source.dec, source.a, source.pa) =global_data.wcshelper. pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
         source.a *= 3600  # arcseconds
         source.b = source.a  / axial_ratio
         source.pa = pa_limit(source.pa)
@@ -503,10 +504,10 @@ def result_to_components(result, model, island_data, flags):
 
         # calculate integrated flux
         source.int_flux = source.peak_flux * sx * sy * cc2fwhm ** 2 * np.pi
-        source.int_flux /= get_beamarea_pix(source.ra,source.dec) # scale Jy/beam -> Jy
+        source.int_flux /= global_data.wcshelper.get_beamarea_pix(source.ra,source.dec) # scale Jy/beam -> Jy
 
         # We currently assume Condon'97 errors for all params.
-        calc_errors(source, np.sqrt(get_beamarea_deg2(source.ra,source.dec)/np.pi))
+        condon_errors(source, np.sqrt(global_data.wcshelper.get_beamarea_deg2(source.ra,source.dec)/np.pi))
 
         # if we didn't fit xo/yo then there are no ra/dec errors
         if not model[prefix + 'xo'].vary or not model[prefix + 'yo'].vary:
@@ -555,7 +556,7 @@ def result_to_components(result, model, island_data, flags):
         # positions and background
         positions = np.where(kappa_sigma == source.peak_flux)
         xy = positions[0][0] + xmin, positions[1][0] + ymin
-        radec = pix2sky(xy)
+        radec = global_data.wcshelper.pix2sky(xy)
         source.ra = radec[0]
 
         # convert negative ra's to positive ones
@@ -572,9 +573,9 @@ def result_to_components(result, model, island_data, flags):
         source.extent = [xmin, xmax, ymin, ymax]
 
         # calculate the area of the island as a fraction of the area of the bounding box
-        bl = pix2sky([xmax, ymin])
-        tl = pix2sky([xmax, ymax])
-        tr = pix2sky([xmin, ymax])
+        bl = global_data.wcshelper.pix2sky([xmax, ymin])
+        tl = global_data.wcshelper.pix2sky([xmax, ymax])
+        tr = global_data.wcshelper.pix2sky([xmin, ymax])
         height = gcd(tl[0], tl[1], bl[0], bl[1])
         width = gcd(tl[0], tl[1], tr[0], tr[1])
         area = height * width
@@ -586,9 +587,9 @@ def result_to_components(result, model, island_data, flags):
         # calculate the maximum angular size of this island, brute force method
         source.max_angular_size = 0
         for i, pos1 in enumerate(source.contour):
-            radec1 = pix2sky(pos1)
+            radec1 = global_data.wcshelper.pix2sky(pos1)
             for j, pos2 in enumerate(source.contour[i:]):
-                radec2 = pix2sky(pos2)
+                radec2 = global_data.wcshelper.pix2sky(pos2)
                 dist = gcd(radec1[0], radec1[1], radec2[0], radec2[1])
                 if dist > source.max_angular_size:
                     source.max_angular_size = dist
@@ -599,7 +600,7 @@ def result_to_components(result, model, island_data, flags):
                                                                   positions[1][0]))
 
         # integrated flux
-        beam_area = get_beamarea_pix(source.ra,source.dec)
+        beam_area = global_data.wcshelper.get_beamarea_pix(source.ra,source.dec)
         isize = source.pixels  #number of non zero pixels
         log.debug("- pixels used {0}".format(isize))
         source.int_flux = np.nansum(kappa_sigma)  #total flux Jy/beam
@@ -671,8 +672,9 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
         global_data.region = None
 
     global_data.beam = beam
-    global_data.hdu_header = img.get_hdu_header()
-    global_data.wcs = img.wcs
+    #global_data.hdu_header = img.get_hdu_header()
+    #global_data.wcs = img.wcs
+    global_data.wcshelper = WCSHelper.from_header(img.get_hdu_header())
     #initial values of the three images
     global_data.img = img
     global_data.data_pix = img.get_pixels()
@@ -696,7 +698,7 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
         global_data.dcurve = dcurve
 
     #calculate the pixel beam
-    global_data.pixbeam = get_pixbeam()
+    global_data.pixbeam = global_data.wcshelper.get_pixbeam()
     log.debug("pixbeam is : {0}".format(global_data.pixbeam))
 
     #if either of rms or bkg images are not supplied then calculate them both
@@ -757,7 +759,7 @@ def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
     ycen = int(img_y / 2)
 
     #calculate a local beam from the center of the data
-    pixbeam = get_pixbeam()
+    pixbeam = global_data.wcshelperget_pixbeam()
     if pixbeam is None:
         log.error("Cannot calculate the beam shape at the image center")
         sys.exit()
@@ -1051,121 +1053,6 @@ def gmean(indata):
 
 
 #WCS helper functions
-
-def pix2sky(pixel):
-    """
-    Take pixel=(x,y) coords
-    convert to pos=(ra,dec) coords
-    """
-    x, y = pixel
-    #wcs and pyfits have oposite ideas of x/y
-    return global_data.wcs.wcs_pix2world([[y, x]], 1)[0]
-
-
-def sky2pix(pos):
-    """
-    Take pos = (ra,dec) coords
-    convert to pixel = (x,y) coords
-    """
-    pixel = global_data.wcs.wcs_world2pix([pos], 1)
-    #wcs and pyfits have oposite ideas of x/y
-    return [pixel[0][1], pixel[0][0]]
-
-
-def sky2pix_vec(pos, r, pa):
-    """Convert a vector from sky to pixel corrds
-    vector is calculated at an origin pos=(ra,dec)
-    and has a magnitude (r) [in degrees]
-    and an angle (pa) [in degrees]
-    input:
-        pos - (ra,dec) of vector origin
-        r - magnitude in degrees
-        pa - angle in degrees
-    return:
-    x,y - corresponding to position ra,dec
-    r,theta - magnitude (pixels) and angle (degrees) of the original vector
-    """
-    ra, dec = pos
-    x, y = sky2pix(pos)
-    a = translate(ra, dec, r, pa)
-    #[ra +r*np.sin(np.radians(pa))*np.cos(np.radians(dec)),
-    #     dec+r*np.cos(np.radians(pa))]
-    locations = sky2pix(a)
-    x_off, y_off = locations
-    a = np.sqrt((x - x_off) ** 2 + (y - y_off) ** 2)
-    theta = np.degrees(np.arctan2((y_off - y), (x_off - x)))
-    return x, y, a, theta
-
-
-def pix2sky_vec(pixel, r, theta):
-    """
-    Convert a vector from pixel to sky coords
-    vector is calculated at an origin pixel=(x,y)
-    and has a magnitude (r) [in pixels]
-    and an angle (theta) [in degrees]
-    input:
-        pixel - (x,y) of origin
-        r - magnitude in pixels
-        theta - in degrees
-    return:
-    ra,dec - corresponding to pixels x,y
-    r,pa - magnitude and angle (degrees) of the original vector, as measured on the sky
-    """
-    ra1, dec1 = pix2sky(pixel)
-    x, y = pixel
-    a = [x + r * np.cos(np.radians(theta)),
-         y + r * np.sin(np.radians(theta))]
-    locations = pix2sky(a)
-    ra2, dec2 = locations
-    a = gcd(ra1, dec1, ra2, dec2)
-    pa = bear(ra1, dec1, ra2, dec2)
-    return ra1, dec1, a, pa
-
-
-def get_pixbeam():
-    """
-    Use global_data to get beam (sky scale), and img.pixscale.
-    Calculate a beam in pixel scale, pa is always zero
-    :return: A beam in pixel scale
-    """
-    global global_data
-    beam = global_data.beam
-    pixscale = global_data.img.pixscale
-    # TODO: update this to incorporate elevation scaling when needed
-    major = beam.a/(pixscale[0]*math.sin(math.radians(beam.pa)) +pixscale[1]*math.cos(math.radians(beam.pa)) )
-    minor = beam.b/(pixscale[1]*math.sin(math.radians(beam.pa)) +pixscale[0]*math.cos(math.radians(beam.pa)) )
-    # TODO: calculate the pa of the pixbeam
-    return Beam(abs(major),abs(minor),0)
-
-
-def get_beamarea_deg2(ra,dec):
-    """
-
-    :param ra:
-    :param dec:
-    :return:
-    """
-    beam = global_data.beam
-    barea = abs(beam.a * beam.b * np.pi) # in deg**2 at reference coords
-    if global_data.telescope_lat is not None:
-        barea /= np.cos(np.radians(dec-global_data.telescope_lat))
-    return barea
-
-
-def get_beamarea_pix(ra,dec):
-    """
-    Calculate the area of the beam at a given location
-    scale area based on elevation if the telescope latitude is known.
-    :param ra:
-    :param dec:
-    :return:
-    """
-    pixscale = global_data.img.pixscale
-    parea = abs(pixscale[0] * pixscale[1]) # in deg**2 at reference coords
-    barea = get_beamarea_deg2(ra,dec)
-    return barea/parea
-
-
 def scope2lat(telescope):
     """
     Convert a telescope name into a latitude
@@ -1188,20 +1075,135 @@ def scope2lat(telescope):
         return None
 
 
-def sky_sep(pix1, pix2):
-    """
-    calculate the sky separation between two pixels
-    Input:
-        pix1 = [x1,y1]
-        pix2 = [x2,y2]
-    Returns:
-        sep = separation in degrees
-    """
-    pos1 = pix2sky(pix1)
-    pos2 = pix2sky(pix2)
-    sep = gcd(pos1[0], pos1[1], pos2[0], pos2[1])
-    return sep
-
+# def pix2sky(pixel):
+#     """
+#     Take pixel=(x,y) coords
+#     convert to pos=(ra,dec) coords
+#     """
+#     x, y = pixel
+#     #wcs and pyfits have oposite ideas of x/y
+#     return global_data.wcs.wcs_pix2world([[y, x]], 1)[0]
+#
+#
+# def sky2pix(pos):
+#     """
+#     Take pos = (ra,dec) coords
+#     convert to pixel = (x,y) coords
+#     """
+#     pixel = global_data.wcs.wcs_world2pix([pos], 1)
+#     #wcs and pyfits have oposite ideas of x/y
+#     return [pixel[0][1], pixel[0][0]]
+#
+#
+# def sky2pix_vec(pos, r, pa):
+#     """Convert a vector from sky to pixel corrds
+#     vector is calculated at an origin pos=(ra,dec)
+#     and has a magnitude (r) [in degrees]
+#     and an angle (pa) [in degrees]
+#     input:
+#         pos - (ra,dec) of vector origin
+#         r - magnitude in degrees
+#         pa - angle in degrees
+#     return:
+#     x,y - corresponding to position ra,dec
+#     r,theta - magnitude (pixels) and angle (degrees) of the original vector
+#     """
+#     ra, dec = pos
+#     x, y = sky2pix(pos)
+#     a = translate(ra, dec, r, pa)
+#     #[ra +r*np.sin(np.radians(pa))*np.cos(np.radians(dec)),
+#     #     dec+r*np.cos(np.radians(pa))]
+#     locations = sky2pix(a)
+#     x_off, y_off = locations
+#     a = np.sqrt((x - x_off) ** 2 + (y - y_off) ** 2)
+#     theta = np.degrees(np.arctan2((y_off - y), (x_off - x)))
+#     return x, y, a, theta
+#
+#
+# def pix2sky_vec(pixel, r, theta):
+#     """
+#     Convert a vector from pixel to sky coords
+#     vector is calculated at an origin pixel=(x,y)
+#     and has a magnitude (r) [in pixels]
+#     and an angle (theta) [in degrees]
+#     input:
+#         pixel - (x,y) of origin
+#         r - magnitude in pixels
+#         theta - in degrees
+#     return:
+#     ra,dec - corresponding to pixels x,y
+#     r,pa - magnitude and angle (degrees) of the original vector, as measured on the sky
+#     """
+#     ra1, dec1 = pix2sky(pixel)
+#     x, y = pixel
+#     a = [x + r * np.cos(np.radians(theta)),
+#          y + r * np.sin(np.radians(theta))]
+#     locations = pix2sky(a)
+#     ra2, dec2 = locations
+#     a = gcd(ra1, dec1, ra2, dec2)
+#     pa = bear(ra1, dec1, ra2, dec2)
+#     return ra1, dec1, a, pa
+#
+#
+# def get_pixbeam():
+#     """
+#     Use global_data to get beam (sky scale), and img.pixscale.
+#     Calculate a beam in pixel scale, pa is always zero
+#     :return: A beam in pixel scale
+#     """
+#     global global_data
+#     beam = global_data.beam
+#     pixscale = global_data.img.pixscale
+#     # TODO: update this to incorporate elevation scaling when needed
+#     major = beam.a/(pixscale[0]*math.sin(math.radians(beam.pa)) +pixscale[1]*math.cos(math.radians(beam.pa)) )
+#     minor = beam.b/(pixscale[1]*math.sin(math.radians(beam.pa)) +pixscale[0]*math.cos(math.radians(beam.pa)) )
+#     # TODO: calculate the pa of the pixbeam
+#     return Beam(abs(major),abs(minor),0)
+#
+#
+# def get_beamarea_deg2(ra,dec):
+#     """
+#
+#     :param ra:
+#     :param dec:
+#     :return:
+#     """
+#     beam = global_data.beam
+#     barea = abs(beam.a * beam.b * np.pi) # in deg**2 at reference coords
+#     if global_data.telescope_lat is not None:
+#         barea /= np.cos(np.radians(dec-global_data.telescope_lat))
+#     return barea
+#
+#
+# def get_beamarea_pix(ra,dec):
+#     """
+#     Calculate the area of the beam at a given location
+#     scale area based on elevation if the telescope latitude is known.
+#     :param ra:
+#     :param dec:
+#     :return:
+#     """
+#     pixscale = global_data.img.pixscale
+#     parea = abs(pixscale[0] * pixscale[1]) # in deg**2 at reference coords
+#     barea = get_beamarea_deg2(ra,dec)
+#     return barea/parea
+#
+#
+#
+# def sky_sep(pix1, pix2):
+#     """
+#     calculate the sky separation between two pixels
+#     Input:
+#         pix1 = [x1,y1]
+#         pix2 = [x2,y2]
+#     Returns:
+#         sep = separation in degrees
+#     """
+#     pos1 = pix2sky(pix1)
+#     pos2 = pix2sky(pix2)
+#     sep = gcd(pos1[0], pos1[1], pos2[0], pos2[1])
+#     return sep
+#
 
 ######################################### THE MAIN DRIVING FUNCTIONS ###############
 
@@ -1272,7 +1274,7 @@ def fit_island(island_data):
         #errs = np.nanmax(rms)
         result, model = do_lmfit(idata, params, B=B)
         # get the real parameter errors
-        #model = covar_errors(model, idata, errs=errs, B)
+        #model = covar_errors(model, idata, errs=errs, B=B)
 
         if not result.success:
             is_flag = flags.FITERR
@@ -1469,7 +1471,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     data = global_data.data_pix
     rmsimg = global_data.rmsimg
     shape = data.shape
-    pixbeam = get_pixbeam()
+    pixbeam = global_data.wcshelper.get_pixbeam()
 
     if regroup:
         input_sources = sorted(input_sources, key = lambda x: x.dec)
@@ -1492,7 +1494,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
         island_mask = []
         for src in isle:
             # find the right pixels from the ra/dec
-            source_x, source_y = sky2pix([src.ra, src.dec])
+            source_x, source_y = global_data.wcshelper.sky2pix([src.ra, src.dec])
             source_x -=1
             source_y -=1
             x = int(round(source_x))
@@ -1506,8 +1508,8 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
                 log.info("Source ({0},{1}) not within usable region: skipping".format(src.island,src.source))
                 continue
             # determine the shape parameters in pixel values
-            (_, _, sx, theta) = sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)
-            (_, _, sy, _ ) = sky2pix_vec([src.ra,src.dec], src.b/3600., src.pa+90)
+            (_, _, sx, theta) = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)
+            (_, _, sy, _ ) = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.b/3600., src.pa+90)
             if sy>sx:
                 sx,sy = sy,sx
                 theta +=90
@@ -1624,7 +1626,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
         new_isle.components = params.components
         new_isle.extent = [xmin,xmax,ymin,ymax]
         new_isle.pix_mask = [(a[0] + xmin, a[1] + ymin) for a in zip(*np.where(np.isfinite(idata)))]
-        anchors = [pix2sky([xmin,ymin]), pix2sky([xmax,ymax])]
+        anchors = [global_data.wcshelper.pix2sky([xmin,ymin]), global_data.wcshelper.pix2sky([xmax,ymax])]
         new_isle.max_angular_size_anchors = np.ravel(anchors)
         sources.append(new_isle)
 
@@ -1712,7 +1714,7 @@ def force_measure_flux(radec):
         log.warn("No account is being made for telescope latitude, even though it has been supplied")
     for ra, dec in radec:
         #find the right pixels from the ra/dec
-        source_x, source_y = sky2pix([ra, dec])
+        source_x, source_y = global_data.wcshelper.sky2pix([ra, dec])
         x = int(round(source_x))
         y = int(round(source_y))
 
