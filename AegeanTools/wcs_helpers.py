@@ -5,7 +5,6 @@
 __author__ = 'Paul Hancock'
 
 import numpy as np
-import sys
 import math
 
 from angle_tools import gcd, bear, translate
