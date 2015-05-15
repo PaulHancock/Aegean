@@ -31,7 +31,7 @@ from scipy.ndimage import label, find_objects
 
 # fitting
 import lmfit
-from AegeanTools.fitting import do_lmfit, condon_errors, Cmatrix, Bmatrix, errors
+from AegeanTools.fitting import do_lmfit, condon_errors, Cmatrix, Bmatrix, errors, covar_errors
 
 # the glory of astropy
 import astropy
@@ -151,6 +151,7 @@ class DummyLM(object):
 
     def __init__(self):
         self.residual = [np.nan,np.nan]
+        self.success = False
 
 
 ######################################### FUNCTIONS ###############################
@@ -385,6 +386,8 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             log.debug(" - flags {0}".format(flag))
             log.debug(" - fit?  {0}".format(not maxxed))
 
+        # adjust parameters so that no two have the same initial value
+        stupid_factor = 1+(i+1)/100.
         # TODO: incorporate the circular constraint
         prefix = "c{0}_".format(i)
         params.add(prefix+'amp',value=amp, min=amp_min, max=amp_max, vary= not maxxed)
@@ -394,9 +397,9 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             psf_vary = False
         else:
             psf_vary = not maxxed
-        params.add(prefix+'sx', value=sx, min=sx_min, max=sx_max, vary=psf_vary)
-        params.add(prefix+'sy', value=sy, min=sy_min, max=sy_max, vary=psf_vary)
-        params.add(prefix+'theta', value=theta, vary=psf_vary)
+        params.add(prefix+'sx', value=sx*stupid_factor, min=sx_min, max=sx_max, vary=psf_vary)
+        params.add(prefix+'sy', value=sy*stupid_factor, min=sy_min, max=sy_max, vary=psf_vary)
+        params.add(prefix+'theta', value=(theta+1)*stupid_factor, vary=psf_vary)
         params.add(prefix+'flags',value=summit_flag, vary=False)
 
         i += 1
@@ -437,7 +440,6 @@ def result_to_components(result, model, island_data, flags):
     rms = global_data.rmsimg[xmin:xmax + 1, ymin:ymax + 1]
     bkg = global_data.bkgimg[xmin:xmax + 1, ymin:ymax + 1]
     residual = np.median(result.residual),np.std(result.residual)
-
     is_flag = flags
 
     sources = []
@@ -455,6 +457,13 @@ def result_to_components(result, model, island_data, flags):
         theta = model[prefix+'theta'].value
         amp = model[prefix+'amp'].value
         src_flags |= model[prefix+'flags'].value
+
+
+        # these are goodness of fit statistics for the entire island.
+        source.residual_mean = residual[0]
+        source.residual_std = residual[1]
+        # set the flags
+        source.flags = src_flags
 
         # #pixel pos within island +
         # island offset within region +
@@ -507,32 +516,27 @@ def result_to_components(result, model, island_data, flags):
         source.int_flux /= global_data.wcshelper.get_beamarea_pix(source.ra,source.dec) # scale Jy/beam -> Jy
 
         # We currently assume Condon'97 errors for all params.
-        condon_errors(source, np.sqrt(global_data.wcshelper.get_beamarea_deg2(source.ra,source.dec)/np.pi))
+        #condon_errors(source, np.sqrt(global_data.wcshelper.get_beamarea_deg2(source.ra,source.dec)/np.pi))
+        errors(source, model, global_data.wcshelper)
 
-        # if we didn't fit xo/yo then there are no ra/dec errors
-        if not model[prefix + 'xo'].vary or not model[prefix + 'yo'].vary:
-            source.err_ra = -1
-            source.err_dec = -1
-
-        # if we did't fit sx,xy then there is no major/minor errors
-        if not model[prefix + 'sx'].vary or not model[prefix + 'sy'].vary:
-            source.err_a = -1
-            source.err_b = -1
-
-        # if we didn't fit theta then pa has no error
-        if not model[prefix + 'theta'].vary:
-            source.err_pa = -1
-
-        # to be consistent we also check for amp
-        if not model[prefix + 'amp'].vary:
-            source.err_peak_flux = -1
-            source.err_int_flux = -1
-
-        # these are goodness of fit statistics for the entire island.
-        source.residual_mean = residual[0]
-        source.residual_std = residual[1]
-        # set the flags
-        source.flags = src_flags
+        # #if we didn't fit xo/yo then there are no ra/dec errors
+        # if not model[prefix + 'xo'].vary or not model[prefix + 'yo'].vary:
+        #     source.err_ra = -1
+        #     source.err_dec = -1
+        #
+        # # if we did't fit sx,xy then there is no major/minor errors
+        # if not model[prefix + 'sx'].vary or not model[prefix + 'sy'].vary:
+        #     source.err_a = -1
+        #     source.err_b = -1
+        #
+        # # if we didn't fit theta then pa has no error
+        # if not model[prefix + 'theta'].vary:
+        #     source.err_pa = -1
+        #
+        # # to be consistent we also check for amp
+        # if not model[prefix + 'amp'].vary:
+        #     source.err_peak_flux = -1
+        #     source.err_int_flux = -1
 
         sources.append(source)
         log.debug(source)
@@ -1152,13 +1156,15 @@ def fit_island(island_data):
         B = Bmatrix(C)
         log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa))
         #snr = np.nanmax(idata)/np.nanmax(rms)
-        #errs = np.nanmax(rms)
+        errs = np.nanmax(rms)
         result, model = do_lmfit(idata, params, B=B)
+        if not result.errorbars:
+            is_flag |= flags.FITERR
         # get the real parameter errors
-        #model = covar_errors(model, idata, errs=errs, B=B)
+        model = covar_errors(model, idata, errs=errs, B=B)
 
         if not result.success:
-            is_flag = flags.FITERR
+            is_flag |= flags.FITERR
 
     log.debug(model)
 
