@@ -303,7 +303,8 @@ def covar_errors(params, data, errs, B):
     # errs = errs[0]
 
     # now calculate the proper parameter errors and copy them across.
-    J = emp_jacobian(params, mask[0], mask[1], B=B, errs=errs)
+    #J = emp_jacobian(params, mask[0], mask[1], B=B, errs=errs)
+    J = jacobian(params, mask[0], mask[1], B=B, errs=errs)
     covar = np.transpose(J).dot(J)
     onesigma = np.sqrt(np.diag(inv(covar)))
     for i in xrange(params.components):
