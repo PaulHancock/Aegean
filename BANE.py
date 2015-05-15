@@ -536,7 +536,7 @@ if __name__=="__main__":
     else:
         filename = args[0]
     if not os.path.exists(filename):
-        logging.error("{0} does not exist".format(filename))
+        logging.error("File not found: {0} ".format(filename))
         sys.exit(1)
 
     if options.out_base is None:
