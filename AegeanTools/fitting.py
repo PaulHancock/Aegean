@@ -108,7 +108,6 @@ def emp_jacobian(pars, x, y, errs=None, B=None):
 def jacobian(pars, x, y, errs=None, B=None):
 
     matrix = []
-    model = ntwodgaussian_lmfit(pars)(x,y)
 
     for i in xrange(pars.components):
         prefix = "c{0}_".format(i)
@@ -118,6 +117,10 @@ def jacobian(pars, x, y, errs=None, B=None):
         sx = pars[prefix+'sx'].value
         sy = pars[prefix+'sy'].value
         theta  = pars[prefix+'theta'].value
+
+        # The derivative with respect to component i doesn't depend on any other components
+        # thus the model should not contain the other components
+        model = elliptical_gaussian(x,y,amp,xo,yo,sx,sy,theta)
 
         # precompute for speed
         sint = np.sin(np.radians(theta))
