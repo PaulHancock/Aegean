@@ -619,6 +619,112 @@ def test2d():
         pyplot.show()
 
 
+def test_two_components():
+
+    nx = 20
+    ny = 20
+    x,y = np.where(np.ones((nx,ny))==1)
+
+    #smoothing = 1.27 # 3pix/beam
+    smoothing = 2.12 # 5pix/beam
+    #smoothing = 1.5 # ~4.2pix/beam
+
+    snr = 500
+
+    # The model parameters
+    params = lmfit.Parameters()
+    params.add('c0_amp', value=1, min=0.5, max=2)
+    params.add('c0_xo', value=1.*nx/3, min=nx/3.-smoothing/2., max=nx/3.+smoothing/2.)
+    params.add('c0_yo', value=1.*ny/3, min=ny/3.-smoothing/2., max=ny/3.+smoothing/2.)
+    params.add('c0_sx', value=2*smoothing, min=0.8*smoothing)
+    params.add('c0_sy', value=smoothing, min=0.8*smoothing)
+    params.add('c0_theta',value=45)
+    params.components = 1
+    if True:
+        vary=True
+        params.add('c1_amp', value=0.9, min=0, max=3, vary=vary)
+        params.add('c1_xo', value=2.*nx/3, min=2*nx/3.-smoothing/2., max=2*nx/3.+smoothing/2., vary=vary)
+        params.add('c1_yo', value=2.*ny/3, min=2*ny/3.-smoothing/2., max=2*ny/3.+smoothing/2., vary=vary)
+        params.add('c1_sx', value=2*smoothing, min=0.8*smoothing, vary=vary)
+        params.add('c1_sy', value=smoothing, min=0.8*smoothing, vary=vary)
+        params.add('c1_theta',value=0, vary=vary)
+        params.components=2
+
+    signal = ntwodgaussian_lmfit(params)(x,y).reshape(nx,ny)
+
+    np.random.seed(1234567)
+
+    # The initial guess at the parameters
+    init_params = copy.deepcopy(params)
+    for i in range(params.components):
+        prefix = 'c{0}_'.format(i)
+        init_params[prefix+'amp'].value += 0.05
+        init_params[prefix+'xo'].value += (2*i+1)/100.
+        init_params[prefix+'yo'].value += (2*i+1)/100.
+        init_params[prefix+'sx'].value = smoothing*(1+(2*i+1)/100.)
+        init_params[prefix+'sy'].value = smoothing*(1+(2*i+2)/100.)
+        init_params[prefix+'theta'].value = i
+
+    noise = np.random.random((nx,ny))
+    noise = gaussian_filter(noise, sigma=smoothing)
+    noise -= np.mean(noise)
+    noise /= np.std(noise)*snr
+
+    data = signal + noise
+    #snrmask = np.where(data < 4/snr)
+    #cmask = np.where(signal < 0.5)
+    #data[snrmask] = np.nan
+    #data[cmask] = np.nan
+    mx,my = np.where(np.isfinite(data))
+
+    C = Cmatrix(mx,my,smoothing,smoothing,0)
+    B = Bmatrix(C)
+    #errs = 1./snr
+
+    result, fit_params = do_lmfit(data, init_params, dojac=False)#, errs=errs)
+
+    corr_result,corr_fit_params = do_lmfit(data, init_params, B=B, dojac=False)#, errs=errs)
+
+    print "true    "
+    print_par(params)
+    print "initial "
+    print_par(init_params)
+    print "nocorr  ", np.mean(result.residual), np.std(result.residual)
+    print_par(fit_params)
+
+    print "+corr   ", np.mean(corr_result.residual), np.std(corr_result.residual)
+    print_par(corr_fit_params)
+
+    if True:
+        from matplotlib import pyplot
+        fig=pyplot.figure(1)
+        cmap = pyplot.cm.cubehelix
+        cmap.set_bad('y',1.)
+        kwargs = {'interpolation':'nearest','cmap':cmap,'vmin':-0.1,'vmax':2, 'origin':'lower'}
+        ax = fig.add_subplot(2,2,1)
+        ax.imshow(signal, **kwargs)
+        ax.set_title("signal")
+        rmlabels(ax)
+
+        ax = fig.add_subplot(2,2,2)
+        ax.imshow(ntwodgaussian_lmfit(init_params)(x,y).reshape(nx,ny),**kwargs)
+        ax.set_title("initial")
+        rmlabels(ax)
+
+        ax = fig.add_subplot(2,2,3)
+        ax.imshow(ntwodgaussian_lmfit(fit_params)(x,y).reshape(nx,ny),**kwargs)
+        ax.set_title("-corr")
+        rmlabels(ax)
+
+        ax = fig.add_subplot(2,2,4)
+        ax.imshow(ntwodgaussian_lmfit(corr_fit_params)(x,y).reshape(nx,ny),**kwargs)
+        ax.set_title("+corr")
+        rmlabels(ax)
+
+        pyplot.show()
+
+
+
 def test_jacobian():
     nx = 15
     ny = 12
@@ -1813,9 +1919,10 @@ def make_data():
 
 if __name__ == '__main__':
     # test1d()
-    test2d()
+    # test2d()
     # test2d_load()
     # test_CRB()
     # JC_err_comp()
     # test_cmatrix()
     # test_jacobian()
+    test_two_components()
