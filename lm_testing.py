@@ -11,6 +11,7 @@ from scipy.linalg import sqrtm, eigh, inv, pinv
 import copy
 
 from AegeanTools.fitting import elliptical_gaussian, Cmatrix, Bmatrix, emp_jacobian, CRB_errs, do_lmfit, ntwodgaussian_lmfit
+from AegeanTools.fitting import jacobian as ana_jacobian
 
 def gaussian(x, amp, cen, sigma):
     return amp * np.exp(-0.5*((x-cen)/sigma)**2)
@@ -659,10 +660,10 @@ def test_two_components():
     for i in range(params.components):
         prefix = 'c{0}_'.format(i)
         init_params[prefix+'amp'].value += 0.05
-        init_params[prefix+'xo'].value += (2*i+1)/100.
-        init_params[prefix+'yo'].value += (2*i+1)/100.
-        init_params[prefix+'sx'].value = smoothing*(1+(2*i+1)/100.)
-        init_params[prefix+'sy'].value = smoothing*(1+(2*i+2)/100.)
+        init_params[prefix+'xo'].value += 0.01
+        init_params[prefix+'yo'].value += 0.01
+        init_params[prefix+'sx'].value = smoothing *(1+(2*i+1)/100.)
+        init_params[prefix+'sy'].value = smoothing *(1+(2*i+2)/100.)
         init_params[prefix+'theta'].value = i
 
     noise = np.random.random((nx,ny))
@@ -681,9 +682,9 @@ def test_two_components():
     B = Bmatrix(C)
     #errs = 1./snr
 
-    result, fit_params = do_lmfit(data, init_params, dojac=False)#, errs=errs)
+    result, fit_params = do_lmfit(data, init_params, dojac=True)#, errs=errs)
 
-    corr_result,corr_fit_params = do_lmfit(data, init_params, B=B, dojac=False)#, errs=errs)
+    corr_result,corr_fit_params = do_lmfit(data, init_params, B=B, dojac=True)#, errs=errs)
 
     print "true    "
     print_par(params)
@@ -745,6 +746,15 @@ def test_jacobian():
     params.add('c0_sy', value=smoothing, min=0.8*smoothing)
     params.add('c0_theta',value= 45)
     params.components=1
+    if True:
+        vary=True
+        params.add('c1_amp', value=0.9, min=0, max=3, vary=vary)
+        params.add('c1_xo', value=2.*nx/3, min=2*nx/3.-smoothing/2., max=2*nx/3.+smoothing/2., vary=vary)
+        params.add('c1_yo', value=2.*ny/3, min=2*ny/3.-smoothing/2., max=2*ny/3.+smoothing/2., vary=vary)
+        params.add('c1_sx', value=2*smoothing, min=0.8*smoothing, vary=vary)
+        params.add('c1_sy', value=smoothing, min=0.8*smoothing, vary=vary)
+        params.add('c1_theta',value=0, vary=vary)
+        params.components=2
 
 
     from matplotlib import pyplot
@@ -756,13 +766,18 @@ def test_jacobian():
 
     C = Cmatrix(x, y, smoothing, smoothing,0)
     B = Bmatrix(C)
-    jdata = emp_jacobian(params, x, y, B=C)
-    for i,p in enumerate(['amp','xo','yo','sx','sy','theta']):
+    jdata = emp_jacobian(params, x, y)
+    jdata = ana_jacobian(params, x, y)
+    for i,p in enumerate(['amp','xo','yo','sx','sy','theta']*params.components):
 
-        ax = fig.add_subplot(3,2,i+1)
+        ax = fig.add_subplot(3,6,i+1)
         ax.imshow(jdata[:,i].reshape(nx,ny),**kwargs)
         ax.set_title(p)
         rmlabels(ax)
+    ax = fig.add_subplot(3,6,13)
+    ax.imshow(ntwodgaussian_lmfit(params)(x,y).reshape(nx,ny), **kwargs)
+    ax.set_title("model")
+    rmlabels(ax)
     pyplot.show()
 
 
