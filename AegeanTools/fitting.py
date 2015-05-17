@@ -379,6 +379,9 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     else:
         result = lmfit.minimize(residual, params, kws={'x':mask[0],'y':mask[1],'B':B,'errs':errs})
 
+    # Remake the residual so that it is once again (model - data)
+    if B is not None:
+        result.residual = result.residual.dot(inv(B))
     return result, params
 
 
