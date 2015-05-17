@@ -41,6 +41,7 @@ if __name__ == "__main__":
         xo,yo = wcshelper.sky2pix([src.ra,src.dec])
         _,_,sx,theta = wcshelper.sky2pix_vec([src.ra,src.dec],src.a/3600,src.pa)
         _,_,sy,_ = wcshelper.sky2pix_vec([src.ra,src.dec],src.b/3600,src.pa+90)
+        # TODO: understand why xo/yo -1 is needed
         model = fitting.elliptical_gaussian(x,y,amp,xo-1,yo-1,sx*fwhm2cc,sy*fwhm2cc,theta)
         m[x,y] += model
 
