@@ -309,9 +309,10 @@ def errors(source, model, wcshelper):
 
     if model[prefix+'theta'].vary:
         # pa error
-        ref = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta)),yo+sy*np.sin(np.radians(theta))])
-        offset = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta+err_theta)),yo+sy*np.sin(np.radians(theta+err_theta))])
-        source.err_pa = bear(ref[0], ref[1], offset[0], offset[1])
+        ref = wcshelper.pix2sky([xo,yo])
+        off1 = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta)),yo+sy*np.sin(np.radians(theta))])
+        off2 = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta+err_theta)),yo+sy*np.sin(np.radians(theta+err_theta))])
+        source.err_pa = abs(bear(ref[0], ref[1], off1[0], off1[1]) - bear(ref[0], ref[1], off2[0], off2[1]))
     else:
         source.err_pa = -1
 
@@ -365,7 +366,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     data = np.array(data)
     mask = np.where(np.isfinite(data))
 
-    def residual(params, B, **kwargs):
+    def residual(params, **kwargs):
         f = ntwodgaussian_lmfit(params)  # A function describing the model
         model = f(*mask)  # The actual model
         if B is None:
