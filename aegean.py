@@ -1151,8 +1151,6 @@ def fit_island(island_data):
     else:
         # Model is the fitted parameters
         C = Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa)
-        # C = np.identity(len(mx))
-        # Cmatrix(mx, my, 1.5, 1.5, 0)
         B = Bmatrix(C)
         log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa))
         #snr = np.nanmax(idata)/np.nanmax(rms)
