@@ -191,7 +191,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
         xmin,xmax = f[i][0].start, f[i][0].stop
         ymin,ymax = f[i][1].start, f[i][1].stop
         if np.any(snr[xmin:xmax,ymin:ymax]>innerclip): # obey inner clip constraint
-            data_box = data[xmin:xmax,ymin:ymax]
+            data_box = copy.copy(data[xmin:xmax,ymin:ymax]) # copy so that we don't blank the master data
             data_box[np.where(snr[xmin:xmax,ymin:ymax] < outerclip)] = np.nan
             data_box[np.where(l[xmin:xmax,ymin:ymax] != i+1)] = np.nan # blank out other summits
             if domask and global_data.region is not None:
@@ -292,12 +292,19 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         summit_flag = is_flag
         if debug_on:
             log.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape, ymin, ymax, xmin, xmax, i))
-        if isnegative:
-            amp = np.nanmin(summit)
-            xpeak, ypeak = np.unravel_index(np.nanargmin(summit),summit.shape)
-        else:
-            amp = np.nanmax(summit)
-            xpeak, ypeak = np.unravel_index(np.nanargmax(summit),summit.shape)
+        try:
+            if isnegative:
+                amp = np.nanmin(summit)
+                xpeak, ypeak = np.unravel_index(np.nanargmin(summit),summit.shape)
+            else:
+                amp = np.nanmax(summit)
+                xpeak, ypeak = np.unravel_index(np.nanargmax(summit),summit.shape)
+        except ValueError, e:
+            if "All-NaN" in e.message:
+                logging.warn("Summit of nan's detected - this shouldn't happen")
+                continue
+            else:
+                raise e
 
         if debug_on:
             log.debug(" - max is {0:f}".format(amp))
@@ -393,7 +400,9 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         prefix = "c{0}_".format(i)
         params.add(prefix+'amp',value=amp, min=amp_min, max=amp_max, vary= not maxxed)
         params.add(prefix+'xo',value=xo, min=float(xo_min), max=float(xo_max), vary= not maxxed)
+        #params.add(prefix+'xo',value=xo, vary= not maxxed)
         params.add(prefix+'yo',value=yo, min=float(yo_min), max=float(yo_max), vary= not maxxed)
+        #params.add(prefix+'yo',value=yo, vary= not maxxed)
         if summit_flag & flags.FIXED2PSF > 0:
             psf_vary = False
         else:
@@ -1151,8 +1160,9 @@ def fit_island(island_data):
         is_flag |= flags.NOTFIT
     else:
         # Model is the fitted parameters
-        #B = Bmatrix(Cmatrix(mx, my, pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa))
-        B = None
+        fac = 1/np.sqrt(2) # TODO: why sqrt(2)?
+        B = Bmatrix(Cmatrix(mx, my, pixbeam.a*fwhm2cc*fac, pixbeam.b*fwhm2cc*fac, pixbeam.pa))
+        #B = None
         log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa))
         #snr = np.nanmax(idata)/np.nanmax(rms)
         errs = np.nanmax(rms)
