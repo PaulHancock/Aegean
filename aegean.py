@@ -301,7 +301,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
                 xpeak, ypeak = np.unravel_index(np.nanargmax(summit),summit.shape)
         except ValueError, e:
             if "All-NaN" in e.message:
-                logging.warn("Summit of nan's detected - this shouldn't happen")
+                log.warn("Summit of nan's detected - this shouldn't happen")
                 continue
             else:
                 raise e
@@ -318,6 +318,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         snr = np.nanmax(abs(data[xmin:xmax+1,ymin:ymax+1] / rmsimg[xmin:xmax+1,ymin:ymax+1]))
         if snr < innerclip:
             log.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
+            log.warn("Summit doesn't obey inner clip constraint. This should have been caught earlier.")
             continue
 
 
@@ -431,7 +432,7 @@ pass # for code folding purposes only!
 # def do_lmfit(data, params):
 # def calc_errors(source, thetaN=None):
 
-def result_to_components(result, model, island_data, flags):
+def result_to_components(result, model, island_data, isflags):
     """
     Convert fitting results into a set of components
     :return: a list of components
@@ -450,7 +451,7 @@ def result_to_components(result, model, island_data, flags):
     rms = global_data.rmsimg[xmin:xmax + 1, ymin:ymax + 1]
     bkg = global_data.bkgimg[xmin:xmax + 1, ymin:ymax + 1]
     residual = np.median(result.residual),np.std(result.residual)
-    is_flag = flags
+    is_flag = isflags
 
     sources = []
     for j in range(model.components):
@@ -547,7 +548,7 @@ def result_to_components(result, model, island_data, flags):
         # if not model[prefix + 'amp'].vary:
         #     source.err_peak_flux = -1
         #     source.err_int_flux = -1
-
+        source.flags = src_flags
         sources.append(source)
         log.debug(source)
 
