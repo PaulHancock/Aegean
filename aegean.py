@@ -1161,7 +1161,8 @@ def fit_island(island_data):
     else:
         # Model is the fitted parameters
         fac = 1/np.sqrt(2) # TODO: why sqrt(2)?
-        B = Bmatrix(Cmatrix(mx, my, pixbeam.a*fwhm2cc*fac, pixbeam.b*fwhm2cc*fac, pixbeam.pa))
+        C = Cmatrix(mx, my, pixbeam.a*fwhm2cc*fac, pixbeam.b*fwhm2cc*fac, pixbeam.pa)
+        B = Bmatrix(C)
         #B = None
         log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa))
         #snr = np.nanmax(idata)/np.nanmax(rms)
@@ -1170,7 +1171,7 @@ def fit_island(island_data):
         if not result.errorbars:
             is_flag |= flags.FITERR
         # get the real parameter errors
-        model = covar_errors(model, idata, errs=errs, B=B)
+        model = covar_errors(model, idata, errs=errs, B=B, C=C)
 
         if not result.success:
             is_flag |= flags.FITERR
