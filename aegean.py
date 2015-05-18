@@ -193,6 +193,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
         if np.any(snr[xmin:xmax,ymin:ymax]>innerclip): # obey inner clip constraint
             data_box = data[xmin:xmax,ymin:ymax]
             data_box[np.where(snr[xmin:xmax,ymin:ymax] < outerclip)] = np.nan
+            data_box[np.where(l[xmin:xmax,ymin:ymax] != i+1)] = np.nan # blank out other summits
             if domask and global_data.region is not None:
                 y,x = np.where(snr[xmin:xmax,ymin:ymax] >= outerclip)
                 # convert indices of this sub region to indices in the greater image
@@ -292,16 +293,17 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         if debug_on:
             log.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape, ymin, ymax, xmin, xmax, i))
         if isnegative:
-            amp = summit[np.isfinite(summit)].min()
+            amp = np.nanmin(summit)
+            xpeak, ypeak = np.unravel_index(np.nanargmin(summit),summit.shape)
         else:
-            amp = summit[np.isfinite(summit)].max()  #stupid NaNs break all my things
+            amp = np.nanmax(summit)
+            xpeak, ypeak = np.unravel_index(np.nanargmax(summit),summit.shape)
 
-        (xpeak, ypeak) = np.where(summit == amp)
         if debug_on:
             log.debug(" - max is {0:f}".format(amp))
             log.debug(" - peak at {0},{1}".format(xpeak, ypeak))
-        yo = ypeak[0] + ymin
-        xo = xpeak[0] + xmin
+        yo = ypeak + ymin
+        xo = xpeak + xmin
 
         # Summits are allowed to include pixels that are between the outer and inner clip
         # This means that sometimes we get a summit that has all it's pixels below the inner clip
@@ -1748,12 +1750,14 @@ def save_background_files(image_filename, hdu_index=0, bkgin=None, rmsin=None, b
     log.info("Saving background / RMS maps")
     #load image, and load/create background/rms images
     load_globals(image_filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms,
-                 cores=cores)
+                 cores=cores, do_curve=True)
     img = global_data.img
     bkgimg, rmsimg = global_data.bkgimg, global_data.rmsimg
+    curve = np.array(global_data.dcurve,dtype=np.float32)#curvature(global_data.data_pix)
     #mask these arrays the same as the data
     bkgimg[np.where(np.isnan(global_data.data_pix))] = np.NaN
     rmsimg[np.where(np.isnan(global_data.data_pix))] = np.NaN
+    curve[np.where(np.isnan(global_data.data_pix))] = np.NaN
 
     # Generate the new FITS files by copying the existing HDU and assigning new data.
     # This gives the new files the same WCS projection and other header fields.
@@ -1768,6 +1772,7 @@ def save_background_files(image_filename, hdu_index=0, bkgin=None, rmsin=None, b
         outbase, _ = os.path.splitext(os.path.basename(image_filename))
     noise_out = outbase + '_rms.fits'
     background_out = outbase + '_bkg.fits'
+    curve_out = outbase +'_crv.fits'
 
     new_hdu.data = bkgimg
     new_hdu.writeto(background_out, clobber=True)
@@ -1776,6 +1781,10 @@ def save_background_files(image_filename, hdu_index=0, bkgin=None, rmsin=None, b
     new_hdu.data = rmsimg
     new_hdu.writeto(noise_out, clobber=True)
     log.info("Wrote {0}".format(noise_out))
+
+    new_hdu.data = curve
+    new_hdu.writeto(curve_out, clobber = True)
+    log.info("Wrote {0}".format(curve_out))
     return
 
 #command line version of this program runs from here.
