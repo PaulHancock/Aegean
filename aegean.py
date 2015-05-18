@@ -387,7 +387,6 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             log.debug(" - fit?  {0}".format(not maxxed))
 
         # adjust parameters so that no two have the same initial value
-        stupid_factor = 1+(i+1)/100.
         # TODO: incorporate the circular constraint
         prefix = "c{0}_".format(i)
         params.add(prefix+'amp',value=amp, min=amp_min, max=amp_max, vary= not maxxed)
@@ -397,9 +396,9 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             psf_vary = False
         else:
             psf_vary = not maxxed
-        params.add(prefix+'sx', value=sx*stupid_factor, min=sx_min, max=sx_max, vary=psf_vary)
-        params.add(prefix+'sy', value=sy*stupid_factor, min=sy_min, max=sy_max, vary=psf_vary)
-        params.add(prefix+'theta', value=(theta+1)*stupid_factor, vary=psf_vary)
+        params.add(prefix+'sx', value=sx, min=sx_min, max=sx_max, vary=psf_vary)
+        params.add(prefix+'sy', value=sy, min=sy_min, max=sy_max, vary=psf_vary)
+        params.add(prefix+'theta', value=theta, vary=psf_vary)
         params.add(prefix+'flags',value=summit_flag, vary=False)
 
         i += 1
