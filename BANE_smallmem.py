@@ -25,9 +25,10 @@ import multiprocessing
 __version__ = 'v1.1'
 __date__ = '2015-05-15'
 
-
-def running_filter(filename, region, step_size, box_size, shape):
+def running_filter_borked(filename, region, step_size, box_size, shape):
     """
+    THIS VERSION OF THE FUNCTION IS SUPER BORKED. Use the not borked version instead.
+
     Perform a running filter over a region within a file.
     The region can be a sub set of the data within the file - only the useful data will be loaded.
 
@@ -168,6 +169,141 @@ def running_filter(filename, region, step_size, box_size, shape):
     return xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
 
 
+def running_filter(filename, region, step_size, box_size, shape):
+    """
+    Perform a running filter over a region within a file.
+    The region can be a sub set of the data within the file - only the useful data will be loaded.
+
+    :param filename: File from which to extract data
+    :param region: [xmin,xmax,ymin,ymax] indices over which we are to operate
+    :param step_size: amount to move filtering box each iteration
+    :param box_size: Size of filtering box
+    :return: xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
+    """
+
+    # Caveat emptor: The code that follows is very difficult to read.
+    # xmax is not x_max, and x,y actually should be y,x
+    # TODO: fix the code below so that the above comment can be removed
+
+    ymin,ymax,xmin,xmax = region
+
+    logging.debug('{0}x{1},{2}x{3} starting at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+
+    cmin = max(0, ymin - box_size[1]/2)
+    cmax = min(shape[1], ymax + box_size[1]/2)
+    rmin = max(0, xmin - box_size[0]/2)
+    rmax = min(shape[0], xmax + box_size[0]/2)
+
+    # Figure out how many axes are in the datafile
+    NAXIS = fits.getheader(filename)["NAXIS"]
+
+    # It seems that I cannot memmap the same file multiple times without errors
+    with fits.open(filename, memmap=False) as a:
+        if NAXIS ==2:
+            data = a[0].section[rmin:rmax,cmin:cmax]
+        elif NAXIS == 3:
+            data = a[0].section[0,rmin:rmax,cmin:cmax]
+        elif NAXIS ==4:
+            data = a[0].section[0,0,rmin:rmax,cmin:cmax]
+        else:
+            logging.error("Too many NAXIS for me {0}".format(NAXIS))
+            logging.error("fix your file to be more sane")
+            sys.exit(1)
+
+    # x/y min/max should refer to indices into data
+    # this is the region over which we want to operate
+    ymin -= cmin
+    ymax -= cmin
+    xmin -= rmin
+    xmax -= rmin
+
+    #start a new RunningPercentile class
+    rp = RP()
+    def locations(step_size,xmin,xmax,ymin,ymax):
+        """
+        Generator function to iterate over a grid of x,y coords
+        operates only within the given bounds
+        Returns:
+        x,y,previous_x,previous_y
+        """
+
+        xvals = range(xmin,xmax,step_size[0])
+        if xvals[-1]!=xmax:
+            xvals.append(xmax)
+        yvals = range(ymin,ymax,step_size[1])
+        if yvals[-1]!=ymax:
+            yvals.append(ymax)
+        #initial data
+        px,py=xvals[0],yvals[0]
+        i=1
+        for y in yvals:
+            for x in xvals[::i]:
+                yield x,y,px,py
+                px,py=x,y
+            i*=-1 #change x direction
+
+    def box(x,y):
+        """
+        calculate the boundaries of the box centered at x,y
+        with size = box_size
+        """
+        x_min = max(0,x-box_size[0]/2)
+        x_max = min(data.shape[0]-1,x+box_size[0]/2)
+        y_min = max(0,y-box_size[1]/2)
+        y_max = min(data.shape[1]-1,y+box_size[1]/2)
+        return x_min,x_max,y_min,y_max
+
+    bkg_points = []
+    rms_points = []
+    bkg_values = []
+    rms_values = []
+
+    # intialise the rp with our first box worth of data
+    x_min,x_max,y_min,y_max = box(xmin,ymin)
+    new = data[x_min:x_max,y_min:y_max].ravel()
+    rp.add(new)
+
+    for x,y,px,py in locations(step_size,xmin,xmax,ymin,ymax):
+        x_min,x_max,y_min,y_max = box(x,y)
+        px_min,px_max,py_min,py_max = box(px,py)
+        old=[]
+        new=[]
+        #we only move in one direction at a time, but don't know which
+        if (x_min>px_min) or (x_max>px_max):
+            #down
+            if x_min != px_min:
+                old = data[min(px_min,x_min):max(px_min,x_min),y_min:y_max].ravel()
+            if x_max != px_max:
+                new = data[min(px_max,x_max):max(px_max,x_max),y_min:y_max].ravel()
+        elif (x_min<px_min) or (x_max<px_max):
+            #up
+            if x_min != px_min:
+                new = data[min(px_min,x_min):max(px_min,x_min),y_min:y_max].ravel()
+            if x_max != px_max:
+                old = data[min(px_max,x_max):max(px_max,x_max),y_min:y_max].ravel()
+        else: # x's have not changed
+            #we are moving right
+            if y_min != py_min:
+                old = data[x_min:x_max,min(py_min,y_min):max(py_min,y_min)].ravel()
+            if y_max != py_max:
+                new = data[x_min:x_max,min(py_max,y_max):max(py_max,y_max)].ravel()
+        rp.add(new)
+        rp.sub(old)
+        p0,p25,p50,p75,p100 = rp.score()
+
+        if p50 is not None:
+            bkg_points.append((x+rmin,y+cmin)) #the coords need to be indices into the larger array
+            bkg_values.append(p50)
+        if (p75 is not None) and (p25 is not None):
+            rms_points.append((x+rmin,y+cmin))
+            rms_values.append((p75-p25)/1.34896)
+
+    #return our lists, the interpolation will be done on the master node
+    #also tell the master node where the data came from - using the original coords
+    logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    return xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
+
+
 def gen_factors(m,permute=True):
     """
     Generate a list of integer factors for m
@@ -270,7 +406,6 @@ def filter_mc(filename, step_size, box_size, cores, shape):
             for ymin,ymax in zip(ymins,ymaxs):
                 region = [xmin,xmax,ymin,ymax]
                 parfilt(filename, region, step_size, box_size, shape)
-                time.sleep(0.5)
 
         #now unpack the results
         bkg_points=[]
@@ -362,11 +497,12 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         header = fits.getheader(im_name)
         write_fits(data, header, tempfile)
         tempfile.close()
-        del data, header
+        temp_name = tempfile.name
+        del data, header, tempfile
         logging.info("running second pass to get a better rms")
-        _,rms=filter_mc(tempfile.name,step_size=step_size,box_size=box_size,cores=cores, shape=shape)
+        _,rms=filter_mc(temp_name,step_size=step_size,box_size=box_size,cores=cores, shape=shape)
         #logging.info("cleaning up temp file {0}".format(tempfile.name))
-        os.remove(tempfile.name)
+        os.remove(temp_name)
 
     bkg_out = '_'.join([os.path.expanduser(out_base),'bkg.fits'])
     rms_out = '_'.join([os.path.expanduser(out_base),'rms.fits'])
