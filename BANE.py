@@ -23,7 +23,7 @@ from AegeanTools.fits_interp import compress
 import multiprocessing
 
 __version__ = 'v1.1'
-__date__ = '2015-05-15'
+__date__ = '2015-05-19'
 
 def running_filter_borked(filename, region, step_size, box_size, shape):
     """

@@ -70,7 +70,7 @@ import multiprocessing
 __author__ = 'Paul Hancock'
 
 # Aegean version [Updated via script]
-__version__ = 'v1.9.5-45-ge3cf4c8'
+__version__ = 'v1.9.5-49-g55f87e5'
 __date__ = '2015-05-19'
 
 header = """#Aegean version {0}
