@@ -192,8 +192,11 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
         ymin,ymax = f[i][1].start, f[i][1].stop
         if np.any(snr[xmin:xmax,ymin:ymax]>innerclip): # obey inner clip constraint
             data_box = copy.copy(data[xmin:xmax,ymin:ymax]) # copy so that we don't blank the master data
-            data_box[np.where(snr[xmin:xmax,ymin:ymax] < outerclip)] = np.nan
-            data_box[np.where(l[xmin:xmax,ymin:ymax] != i+1)] = np.nan # blank out other summits
+            data_box[np.where(snr[xmin:xmax,ymin:ymax] < outerclip)] = np.nan # blank pixels that are outside the outerclip
+            data_box[np.where(l[xmin:xmax,ymin:ymax] != i+1)] = np.nan        # blank out other summits
+            # check if there are any pixels left unmasked
+            if not np.any(np.isfinite(data_box)):
+                continue
             if domask and global_data.region is not None:
                 y,x = np.where(snr[xmin:xmax,ymin:ymax] >= outerclip)
                 # convert indices of this sub region to indices in the greater image
@@ -283,12 +286,22 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             kappa_sigma = np.where(curve > 0.5, np.where(data + outerclip * rmsimg < 0, data, np.nan), np.nan)
         else:
             kappa_sigma = np.where(-1 * curve > 0.5, np.where(data - outerclip * rmsimg > 0, data, np.nan), np.nan)
-        summits = gen_flood_wrap(kappa_sigma, np.ones(kappa_sigma.shape), 0, domask=False)
+        summits = list(gen_flood_wrap(kappa_sigma, np.ones(kappa_sigma.shape), 0, domask=False))
 
     params = lmfit.Parameters()
     i = 0
+    summits_considered = 0
+    # This can happen when the image contains regions of nans
+    # the data/noise indicate an island, but the curvature doesn't back it up.
+    if len(summits)<1:
+        log.debug("Island has {0} summits".format(len(summits)))
+        return None
+        # for writing ds9 style regions, prepend with "image"
+        #print "point({0}, {1}) # point=x".format(int(offsets[1]),int(offsets[0]))
+
     # add summits in reverse order of peak SNR
     for summit, xmin, xmax, ymin, ymax in sorted(summits, key=lambda x: np.nanmax(-1.*abs(x[0]))):
+        summits_considered += 1
         summit_flag = is_flag
         if debug_on:
             log.debug("Summit({5}) - shape:{0} x:[{1}-{2}] y:[{3}-{4}]".format(summit.shape, ymin, ymax, xmin, xmax, i))
@@ -318,7 +331,9 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         snr = np.nanmax(abs(data[xmin:xmax+1,ymin:ymax+1] / rmsimg[xmin:xmax+1,ymin:ymax+1]))
         if snr < innerclip:
             log.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
-            log.warn("Summit doesn't obey inner clip constraint. This should have been caught earlier.")
+            #log.warn("Summit doesn't obey inner clip constraint. This should have been caught earlier.")
+            #log.info("snr {0} < innerclip {1}".format(snr,innerclip))
+            #log.info("{0}".format(data[xmin:xmax+1,ymin:ymax+1] / rmsimg[xmin:xmax+1,ymin:ymax+1]))
             continue
 
 
@@ -418,6 +433,8 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         log.debug("Estimated sources: {0}".format(i))
     # remember how many components are fit.
     params.components=i
+    if params.components <1:
+        log.debug("Considered {0} summits, accepted {1}".format(summits_considered,i))
     return params
 
 
@@ -1138,10 +1155,10 @@ def fit_island(island_data):
 
     params = estimate_lmfit_parinfo(idata, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
                                max_summits=max_summits)
-    #TODO: handle islands with estimated sources=0
-    if params.components <1:
-        log.warn("skipped island {0} due to lack of components".format(isle_num))
-        log.warn("This shouldn't really happen")
+
+    # islands at the edge of a region of nans
+    # they result in no components
+    if params is None or params.components <1:
         return []
 
     log.debug("Rms is {0}".format(np.shape(rms)))
