@@ -70,7 +70,7 @@ import multiprocessing
 __author__ = 'Paul Hancock'
 
 # Aegean version [Updated via script]
-__version__ = 'v1.9.5-49-g55f87e5'
+__version__ = 'v1.9.5-51-g9f4363d'
 __date__ = '2015-05-19'
 
 header = """#Aegean version {0}
@@ -1273,8 +1273,6 @@ def refit_islands(group, stage, outerclip, istart):
         errs = np.nanmax(rmsimg[xmin:xmax, ymin:ymax])
         result, model = do_lmfit(idata, params, B=B)
         model = covar_errors(model, idata, errs=errs, B=B, C=C)
-
-        #result, model = do_lmfit(idata,params)
 
         # convert the results to a source object
         offsets = (xmin, xmax, ymin, ymax)
