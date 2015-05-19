@@ -1121,6 +1121,164 @@ pass # The following have been moved into AegeanTools.wcs_helpers
 ######################################### THE MAIN DRIVING FUNCTIONS ###############
 
 #source finding and fitting
+def refit_islands(group, stage, outerclip, istart):
+    """
+    Do island refitting (priorized fitting) on a group of islands.
+    This function is to be driven by code that uses 1 or more cores.
+    :param group: A list of islands group=[ [(0,0),(0,1)],[(1,0)] ...]
+    :param stage: refit stage
+    :param outerclip: outerclip for floodfill. outerclip<0 means no no clipping
+    :param istart: the starting island number
+    :return:
+    """
+
+    sources = []
+
+    data = global_data.data_pix
+    rmsimg = global_data.rmsimg
+    pixbeam = global_data.wcshelper.get_pixbeam()
+
+    for inum, isle in enumerate(group,start=istart):
+        components = len(isle)
+        log.debug("-=-")
+        log.debug("input island = {0}, {1} components".format(isle[0].island, components))
+
+        # set up the parameters for each of the sources within the island
+        i = 0
+        params = lmfit.Parameters()
+        shape = data.shape
+        xmin, ymin = shape
+        xmax = ymax = 0
+
+        island_mask = []
+        for src in isle:
+            # find the right pixels from the ra/dec
+            source_x, source_y = global_data.wcshelper.sky2pix([src.ra, src.dec])
+            source_x -=1
+            source_y -=1
+            x = int(round(source_x))
+            y = int(round(source_y))
+
+            log.debug("pixel location ({0:5.2f},{1:5.2f})".format(source_x,source_y))
+            # reject sources that are outside the image bounds, or which have nan data/rms values
+            if not 0 <= x < shape[0] or not 0 <= y < shape[1] or \
+                    not np.isfinite(data[x, y]) or \
+                    not np.isfinite(rmsimg[x, y]):
+                log.info("Source ({0},{1}) not within usable region: skipping".format(src.island,src.source))
+                continue
+            # determine the shape parameters in pixel values
+            (_, _, sx, theta) = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)
+            (_, _, sy, _ ) = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.b/3600., src.pa+90)
+            if sy>sx:
+                sx,sy = sy,sx
+                theta +=90
+            sx *=fwhm2cc
+            sy *=fwhm2cc
+
+            log.debug("Source shape [sky coords]  {0:5.2f}x{1:5.2f}@{2:05.2f}".format(src.a,src.b,src.pa))
+            log.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
+
+            # choose a region that is 2x the major axis of the source, 4x semimajor axis a
+            width = 2 * sx
+            ywidth = int(round(width)) + 1
+            xwidth = int(round(width)) + 1
+
+            # adjust the size of the island to include this source
+            xmin = min(xmin, max(0, x - xwidth / 2))
+            ymin = min(ymin, max(0, y - ywidth / 2))
+            xmax = max(xmax, min(shape[0], x + xwidth / 2 + 1))
+            ymax = max(ymax, min(shape[1], y + ywidth / 2 + 1))
+
+            s_lims = [0.8 * min(sx,pixbeam.b * fwhm2cc), 2 * sy * math.sqrt(2)]
+
+            # Set up the parameters for the fit, including constraints
+            prefix = "c{0}_".format(i)
+            params.add(prefix + 'amp', value=src.peak_flux*2) # always vary
+            # for now the xo/yo are locations within the main image, we correct this later
+            params.add(prefix + 'xo', value=source_x, min=source_x-sx/2., max=source_x+sx/2., vary= stage>=2)
+            params.add(prefix + 'yo', value=source_y, min=source_y-sy/2., max=source_y+sy/2., vary= stage>=2)
+            params.add(prefix + 'sx', value=sx, min=s_lims[0], max=s_lims[1], vary= stage>=3)
+            params.add(prefix + 'sy', value=sy, min=s_lims[0], max=s_lims[1], vary= stage>=3)
+            params.add(prefix + 'theta', value=theta, vary= stage>=3)
+            params.add(prefix + 'flags', value=0, vary=False)
+            i += 1
+
+            # Use pixels above outerclip sigmas..
+            if outerclip>=0:
+                mask = np.where(data[xmin:xmax,ymin:ymax]-outerclip*rmsimg[xmin:xmax,ymin:ymax]>0)
+            else: # negative outer clip means not clipping at all
+                mask = np.where(data[xmin:xmax,ymin:ymax])
+
+            # convert the pixel indices to be pixels within the parent data set
+            xmask = mask[0] + xmin
+            ymask = mask[1] + ymin
+            island_mask.extend(zip(xmask,ymask))
+
+        if i==0:
+            log.info("No sources found in island {0}".format(src.island))
+            continue
+        params.components = i
+        log.debug(" {0} components being fit".format(i))
+        # now we correct the xo/yo positions to be relative to the sub-image
+        log.debug("xmxxymyx {0} {1} {2} {3}".format(xmin,xmax,ymin,ymax))
+        for i in range(components):
+            prefix = "c{0}_".format(i)
+            params[prefix + 'xo'].value -=xmin
+            params[prefix + 'xo'].min -=xmin
+            params[prefix + 'xo'].max -=xmin
+            params[prefix + 'yo'].value -=ymin
+            params[prefix + 'yo'].min -=ymin
+            params[prefix + 'yo'].max -=ymin
+        log.debug(params)
+        # don't fit if there are no sources
+        if params.components<1:
+            log.info("Island {0} has no components".format(src.island))
+            continue
+
+        # this .copy() will stop us from modifying the parent region when we later apply our mask.
+        idata = data[xmin:xmax, ymin:ymax].copy()
+        # now convert these back to indices within the idata region
+        island_mask = [(x-xmin,y-ymin) for x,y in island_mask]
+        # the mask is for good pixels so we need to reverse it
+        all_pixels = zip(*np.where(idata))
+        mask = zip(*set(all_pixels).difference(set(island_mask)))
+        idata[mask] = np.nan # this is the mask mentioned above
+
+        non_nan_pix = len(np.where(np.isfinite(idata))[0])
+
+        log.debug("island extracted:")
+        log.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
+        log.debug(" max = {0}".format(np.nanmax(idata)))
+        log.debug(" total {0}, masked {1}, not masked {2}".format(len(all_pixels),non_nan_pix,len(all_pixels)-non_nan_pix))
+
+        # determine the number of free parameters and if we have enough data for a fit
+        nfree = np.count_nonzero([params[p].vary for p in params.keys()])
+        if non_nan_pix < nfree:
+            log.debug("More free parameters {0} than available pixels {1}".format(nfree,non_nan_pix))
+            if non_nan_pix >= params.components:
+                log.debug("Fixing all parameters except amplitudes")
+                for i in range(components):
+                    for p in params.keys():
+                        if 'amp' not in p:
+                            params[p].vary = False
+            else:
+                log.debug(" no not-masked pixels, skipping".format(src.island,src.source))
+            continue
+        # do the fit
+        result, model = do_lmfit(idata,params)
+
+        # convert the results to a source object
+        offsets = (xmin, xmax, ymin, ymax)
+        island_data = IslandFittingData(inum, offsets=offsets)
+        new_src = result_to_components(result, model, island_data, src.flags)
+
+        # preserve the uuid so we can do exact matching between catalogs
+        for ns, s in zip(new_src,isle):
+            ns.uuid = s.uuid
+        sources.extend(new_src)
+    return sources
+
+
 def fit_island(island_data):
     """
     Take an Island and do all the parameter estimation and fitting.
@@ -1356,7 +1514,7 @@ def VASTP_find_sources_in_image():
     pass
 
 
-def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
+def priorized_fit_islands_dep(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
                            beam=None, lat=None, stage=3, ratio=1.0, outerclip=3, radius=None, regroup=True):
     """
     Take an input catalog, and image, and optional background/noise images
@@ -1556,14 +1714,121 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     return sources
 
 
-def psf_rescale(srccat, ratio):
+def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
+                           beam=None, lat=None, stage=3, ratio=1.0, outerclip=3, regroup=True):
+    """
+    Take an input catalog, and image, and optional background/noise images
+    fit the flux and ra/dec for each of the given sources, keeping the morphology fixed
+
+    if regroup is true the groups will be recreated based on a matching radius/probability.
+    if regroup is false then the islands of the input catalog will be preserved.
+
+    Multiple cores can be specified, and will be used.
+
+    :param filename: image file or hdu
+    :param catfile: catalog file name
+    :param hdu_index:
+    :param outfile: ouput file for ascii output (not tables)
+    :param bkgin: background image name
+    :param rmsin: noise image name
+    :param cores: number of cores to use
+    :param rms: if not none, then use this constant rms for the entire image
+    :param beam: beam parameters to be used instead of those that may be in the fits header
+    :param lat: latitude of telescope
+    :param stage: refitting stage
+    :param ratio: ratio of image psf to catalog psf
+    :param outerclip: pixels above an snr of this amuont will be used in fitting, <0 -> all pixels.
+    :param regroup:  True - regroup, False - use island data for groups
+    :return: a list of source objects
     """
 
-    :param srccat:
-    :return:
-    """
+    from AegeanTools.cluster import group_iter
+    load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
+                 do_curve=False, beam=beam, lat=lat)
 
-    return srccat
+    beam = global_data.beam
+    # load the table and convert to an input source list
+    input_table = load_table(catfile)
+    input_sources = table_to_source_list(input_table)
+    # the input sources are the intial conditions for our fits.
+    # Expand each source size if needed.
+    if ratio is not None:
+        for src in input_sources:
+            src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
+            src.b = np.sqrt(src.b**2 + (beam.b*3600)**2*(1-1/ratio**2))
+
+
+
+    # redo the grouping if required
+    if regroup:
+        input_sources = sorted(input_sources, key = lambda x: x.dec)
+        groups = list(group_iter(input_sources, eps=np.sqrt(2)))
+    else:
+        groups = list(island_itergen(input_sources))
+
+
+    if cores == 1:  #single-threaded, no parallel processing
+        queue = []
+    else:
+        #This check is also made during start up when running aegean from the command line
+        #However I reproduce it here so that we don't fall over when aegean is being imported
+        #into other codes (eg the VAST pipeline)
+        if cores is None:
+            cores = multiprocessing.cpu_count()
+            log.info("Found {0} cores".format(cores))
+        else:
+            log.info("Using {0} subprocesses".format(cores))
+        try:
+            queue = pprocess.Queue(limit=cores, reuse=1)
+            fit_parallel = queue.manage(pprocess.MakeReusable(refit_islands))
+        except AttributeError, e:
+            if 'poll' in e.message:
+                log.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
+                cores = 1
+                queue = []
+            else:
+                raise e
+
+    sources = []
+
+
+    island_group = []
+    group_size = 20
+
+    for i,island in enumerate(groups):
+        island_group.append(island)
+        # If the island group is full queue it for the subprocesses to fit
+        if len(island_group) >= group_size:
+            if cores > 1:
+                fit_parallel(island_group, stage, outerclip, istart =i)
+            else:
+                res = refit_islands(island_group, stage, outerclip, istart=i)
+                queue.append(res)
+            island_group = []
+
+    # The last partially-filled island group also needs to be queued for fitting
+    if len(island_group) > 0:
+        if cores > 1:
+            fit_parallel(island_group, stage, outerclip, istart =i)
+        else:
+            res = refit_islands(island_group, stage, outerclip, istart=i)
+            queue.append(res)
+
+    # now unpack the fitting results in to a list of sources
+    for s in queue:
+        sources.extend(s)
+
+    sources = sorted(sources)
+
+    # Write the output to the output file (note that None -> stdout)
+    if outfile:
+        print >> outfile, header.format("{0}-({1})".format(__version__,__date__), filename)
+        print >> outfile, OutputSource.header
+    for source in sources:
+        print >> outfile, str(source)
+
+    print "found {0} sources".format(len(sources))
+    return sources
 
 
 def island_itergen(catalog):
@@ -2065,7 +2330,7 @@ if __name__ == "__main__":
                                             outfile=options.outfile, bkgin=options.backgroundimg,
                                             rmsin=options.noiseimg, beam=options.beam, lat=lat,
                                             stage=options.priorized, ratio=options.ratio, outerclip=options.outerclip,
-                                            regroup=options.regroup)
+                                            cores=options.cores, regroup=options.regroup)
         sources.extend(measurements)
 
 
