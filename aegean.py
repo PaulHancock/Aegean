@@ -1244,7 +1244,8 @@ def refit_islands(group, stage, outerclip, istart):
         mask = zip(*set(all_pixels).difference(set(island_mask)))
         idata[mask] = np.nan # this is the mask mentioned above
 
-        non_nan_pix = len(np.where(np.isfinite(idata))[0])
+        mx,my = np.where(np.isfinite(idata))
+        non_nan_pix = len(mx)
 
         log.debug("island extracted:")
         log.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
@@ -1264,8 +1265,16 @@ def refit_islands(group, stage, outerclip, istart):
             else:
                 log.debug(" no not-masked pixels, skipping".format(src.island,src.source))
             continue
+
         # do the fit
-        result, model = do_lmfit(idata,params)
+        fac = 1/np.sqrt(2) # TODO: why sqrt(2)?
+        C = Cmatrix(mx, my, pixbeam.a*fwhm2cc*fac, pixbeam.b*fwhm2cc*fac, pixbeam.pa)
+        B = Bmatrix(C)
+        errs = np.nanmax(rmsimg[xmin:xmax, ymin:ymax])
+        result, model = do_lmfit(idata, params, B=B)
+        model = covar_errors(model, idata, errs=errs, B=B, C=C)
+
+        #result, model = do_lmfit(idata,params)
 
         # convert the results to a source object
         offsets = (xmin, xmax, ymin, ymax)
