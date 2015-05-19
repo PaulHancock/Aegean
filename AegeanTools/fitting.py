@@ -159,7 +159,8 @@ def jacobian(pars, x, y, errs=None, B=None):
     matrix=np.vstack(matrix)
 
     if errs is not None:
-        matrix /=errs
+        matrix /= errs
+        #matrix = matrix.dot(errs)
 
     if B is not None:
         matrix = matrix.dot(B)
