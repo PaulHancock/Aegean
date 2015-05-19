@@ -1,3 +1,6 @@
 *.pyc
 .project
 *.bak
+*.vot
+*.reg
+*.fits
