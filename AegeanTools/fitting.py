@@ -392,13 +392,20 @@ def covar_errors(params, data, errs, B, C=None):
 
     # calculate the proper parameter errors and copy them across.
     if C is not None:
-        J = jacobian(params, mask[0], mask[1], errs=errs)
-        covar = np.transpose(J).dot(inv(C)).dot(J)
-        onesigma = np.sqrt(np.diag(inv(covar)))
-    else:
-        J = jacobian(params, mask[0], mask[1], B=B, errs=errs)
-        covar = np.transpose(J).dot(J)
-        onesigma = np.sqrt(np.diag(inv(covar)))
+        try:
+            J = jacobian(params, mask[0], mask[1], errs=errs)
+            covar = np.transpose(J).dot(inv(C)).dot(J)
+            onesigma = np.sqrt(np.diag(inv(covar)))
+        except np.linalg.linalg.LinAlgErr, e:
+            C = None
+
+    if C is None:
+        try:
+            J = jacobian(params, mask[0], mask[1], B=B, errs=errs)
+            covar = np.transpose(J).dot(J)
+            onesigma = np.sqrt(np.diag(inv(covar)))
+        except np.linalg.linalg.LinAlgErr, e:
+            onesigma = [-1]*len(mask[0])
 
     for i in xrange(params.components):
         prefix = "c{0}_".format(i)
