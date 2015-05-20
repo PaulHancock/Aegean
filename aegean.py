@@ -70,7 +70,7 @@ import multiprocessing
 __author__ = 'Paul Hancock'
 
 # Aegean version [Updated via script]
-__version__ = 'v1.9.5-51-g9f4363d'
+__version__ = 'v1.9.5-52-g7e87ed1'
 __date__ = '2015-05-19'
 
 header = """#Aegean version {0}
@@ -1139,9 +1139,8 @@ def refit_islands(group, stage, outerclip, istart):
     pixbeam = global_data.wcshelper.get_pixbeam()
 
     for inum, isle in enumerate(group,start=istart):
-        components = len(isle)
         log.debug("-=-")
-        log.debug("input island = {0}, {1} components".format(isle[0].island, components))
+        log.debug("input island = {0}, {1} components".format(isle[0].island, len(isle)))
 
         # set up the parameters for each of the sources within the island
         i = 0
@@ -1221,14 +1220,21 @@ def refit_islands(group, stage, outerclip, istart):
         log.debug(" {0} components being fit".format(i))
         # now we correct the xo/yo positions to be relative to the sub-image
         log.debug("xmxxymyx {0} {1} {2} {3}".format(xmin,xmax,ymin,ymax))
-        for i in range(components):
-            prefix = "c{0}_".format(i)
-            params[prefix + 'xo'].value -=xmin
-            params[prefix + 'xo'].min -=xmin
-            params[prefix + 'xo'].max -=xmin
-            params[prefix + 'yo'].value -=ymin
-            params[prefix + 'yo'].min -=ymin
-            params[prefix + 'yo'].max -=ymin
+        for i in range(params.components):
+            try:
+                prefix = "c{0}_".format(i)
+                params[prefix + 'xo'].value -=xmin
+                params[prefix + 'xo'].min -=xmin
+                params[prefix + 'xo'].max -=xmin
+                params[prefix + 'yo'].value -=ymin
+                params[prefix + 'yo'].min -=ymin
+                params[prefix + 'yo'].max -=ymin
+            except Exception, e:
+                log.error(" ARG !")
+                log.info(params)
+                log.info(params.components)
+                log.info("trying to access component {0}".format(i))
+                raise e
         log.debug(params)
         # don't fit if there are no sources
         if params.components<1:
@@ -1258,10 +1264,9 @@ def refit_islands(group, stage, outerclip, istart):
             log.debug("More free parameters {0} than available pixels {1}".format(nfree,non_nan_pix))
             if non_nan_pix >= params.components:
                 log.debug("Fixing all parameters except amplitudes")
-                for i in range(components):
-                    for p in params.keys():
-                        if 'amp' not in p:
-                            params[p].vary = False
+                for p in params.keys():
+                    if 'amp' not in p:
+                        params[p].vary = False
             else:
                 log.debug(" no not-masked pixels, skipping".format(src.island,src.source))
             continue
