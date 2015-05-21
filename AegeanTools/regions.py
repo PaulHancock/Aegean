@@ -1,9 +1,11 @@
 #! /usr/bin/env python
 
+import os
 import healpy as hp #dev on 1.8.1
 import numpy as np #dev on 1.8.1
 from astropy.coordinates import SkyCoord
 import astropy.units as u
+from astropy.io import fits
 
 
 class Region():
@@ -191,6 +193,40 @@ class Region():
                     print>>out, line
         return
 
+    def write_fits(self,filename):
+        """
+
+        :param self:
+        :param filename:
+        :return:
+        """
+        datafile = os.path.join(os.path.dirname(os.path.abspath(__file__)),'data','MOC.fits')
+        hdulist = fits.open(datafile)
+        cols=fits.Column(name='NPIX',array = self._uniq(),format='1K')
+        tbhdu = fits.BinTableHDU.from_columns([cols])
+        hdulist[1] = tbhdu
+        hdulist[1].header['PIXTYPE'] = ('HEALPIX ', 'HEALPix magic code')
+        hdulist[1].header['ORDERING'] = ('NUNIQ ','NUNIQ coding method')
+        hdulist[1].header['COORDSYS']= ('C ','ICRS reference frame')
+        hdulist[1].header['MOCORDER']= (self.maxdepth,'MOC resolution (best order)')
+        hdulist[1].header['MOCTOOL'] = ('MIMASv1.1 ','Name of the MOC generator')
+        hdulist[1].header['MOCTYPE'] = ('CATALOG','Source type (IMAGE or CATALOG)')
+        hdulist[1].header['MOCID'] = (' ','Identifier of the collection')
+        hdulist[1].header['ORIGIN'] = (' ','MOC origin')
+        hdulist.writeto(filename, clobber=True)
+        return
+
+    def _uniq(self):
+        """
+
+        :return:
+        """
+        pd = []
+        for d in xrange(1,self.maxdepth):
+            fn = lambda x: int(4**(d+1) + x)
+            pd.extend(map(fn, self.pixeldict[d]))
+        return sorted(pd)
+
     @classmethod
     def radec2sky(cls,ra,dec):
         """
@@ -374,16 +410,23 @@ def test_poly():
     region.add_poly(positions)
     region.write_reg('test.reg')
 
+def test_write_fits():
+    a = Region()
+    a.add_circles(12,0,0.1)
+    a.write_fits('test_MOC.fits')
+    return
+
 if __name__=="__main__":
-    test_vec2sky_corners()
-    test_reg()
-    test_radec2sky()
-    test_sky2ang_symmetric()
-    test_sky2ang_corners()
-    test_sky2vec2sky()
-    test_poly()
-    test_renorm_demote_symmetric()
-    test_add_circles_list_scalar()
-    test_sky_within()
-    test_pickle()
-    test_sky2vec_corners()
+    # test_vec2sky_corners()
+    # test_reg()
+    # test_radec2sky()
+    # test_sky2ang_symmetric()
+    # test_sky2ang_corners()
+    # test_sky2vec2sky()
+    # test_poly()
+    # test_renorm_demote_symmetric()
+    # test_add_circles_list_scalar()
+    # test_sky_within()
+    # test_pickle()
+    # test_sky2vec_corners()
+    test_write_fits()
