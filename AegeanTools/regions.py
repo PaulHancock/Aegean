@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 import os
+import datetime
 import healpy as hp #dev on 1.8.1
 import numpy as np #dev on 1.8.1
 from astropy.coordinates import SkyCoord
@@ -193,7 +194,7 @@ class Region():
                     print>>out, line
         return
 
-    def write_fits(self,filename):
+    def write_fits(self, filename, moctool=''):
         """
 
         :param self:
@@ -209,10 +210,12 @@ class Region():
         hdulist[1].header['ORDERING'] = ('NUNIQ ','NUNIQ coding method')
         hdulist[1].header['COORDSYS']= ('C ','ICRS reference frame')
         hdulist[1].header['MOCORDER']= (self.maxdepth,'MOC resolution (best order)')
-        hdulist[1].header['MOCTOOL'] = ('MIMASv1.1 ','Name of the MOC generator')
+        hdulist[1].header['MOCTOOL'] = (moctool,'Name of the MOC generator')
         hdulist[1].header['MOCTYPE'] = ('CATALOG','Source type (IMAGE or CATALOG)')
         hdulist[1].header['MOCID'] = (' ','Identifier of the collection')
         hdulist[1].header['ORIGIN'] = (' ','MOC origin')
+        time = datetime.datetime.utcnow()
+        hdulist[1].header['DAATE'] = (datetime.datetime.strftime(time,format="%Y-%m-%dT%H:%m:%SZ"),'MOC creation date')
         hdulist.writeto(filename, clobber=True)
         return
 

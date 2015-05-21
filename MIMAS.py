@@ -22,8 +22,8 @@ from astropy.io import fits as pyfits
 from astropy.wcs import wcs as pywcs
 from AegeanTools.regions import Region
 
-__version__ = 'v1.0'
-__date__ = '2015-05-13'
+__version__ = 'v1.1'
+__date__ = '2015-05-14'
 
 #seems like this fails sometimes
 try:
@@ -98,6 +98,13 @@ def mim2reg(mimfile,regfile):
     region.write_reg(regfile)
     logging.info("Converted {0} -> {1}".format(mimfile,regfile))
     return
+
+def mim2fits(mimfile,fitsfile):
+    region=pickle.load(open(mimfile,'r'))
+    region.write_fits(fitsfile,moctool='MIMAS {0}-{1}'.format(__version__,__date__))
+    logging.info("Converted {0} -> {1}".format(mimfile,fitsfile))
+    return
+
 
 def box2poly(line):
     """
@@ -297,6 +304,9 @@ if __name__=="__main__":
     group2.add_argument('--reg2mim',dest='reg2mim', action='append',
                        type=str, metavar=('region.reg','region.mim'), nargs=2,
                        help="Converta a .reg file into a .mim file", default=[])
+    group2.add_argument('--mim2fits',dest='mim2fits', action='append',
+                        type=str, metavar=('region.mim','region_MOC.fits'),nargs=2,
+                        help="Convert a .mim file into a MOC.fits file", default=[])
     group3 = parser.add_argument_group("Masking fits files")
     group3.add_argument('--mask',dest='mask', action='store',
                         type=str, metavar=('region.mim','file.fits','masked.fits'), nargs=3, default=[],
@@ -333,6 +343,11 @@ if __name__=="__main__":
             reg2mim(i,o,results.maxdepth)
         sys.exit()
 
+    if len(results.mim2fits)>0:
+        for i,o in results.mim2fits:
+            mim2fits(i,o)
+        sys.exit()
+
     if len(results.mask)>0:
         m, i, o = results.mask
         maskfile(m, i, o)
@@ -342,6 +357,4 @@ if __name__=="__main__":
         region=combine_regions(results)
         save_region(region,results.outfile)
 
-    if len(results.mim2reg)>0:
-        for i,o in results.mim2reg:
-            mim2reg(i,o)
+
