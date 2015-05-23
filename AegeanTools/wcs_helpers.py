@@ -23,7 +23,7 @@ log = logging.getLogger('Aegean')
 class WCSHelper(object):
 
     @classmethod
-    def from_header(cls,header):
+    def from_header(cls, header, beam=None):
         """
         Create a new WCSHelper class from the given header
         This will not set the latitude of the telesocpe so this needs to be set by the user
@@ -36,10 +36,14 @@ class WCSHelper(object):
         except:
             wcs = pywcs.WCS(str(header), naxis=2)
 
-        beam = get_beam(header)
+        if beam is None:
+            beam = get_beam(header)
+        else:
+            beam = beam
 
         if beam is None:
-            logging.critical("Cannot extract beam information")
+            logging.critical("Cannot determine beam information")
+
         _, pixscale = get_pixinfo(header)
 
         return cls(wcs, beam, pixscale)

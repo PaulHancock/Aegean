@@ -73,14 +73,14 @@ def get_beam(header):
         bpa = header["BPA"]
 
     if "BMAJ" not in header:
-        logging.critical("BMAJ not present in fits header.")
+        logging.warn("BMAJ not present in fits header.")
         bmaj = None
     else:
         bmaj = header["BMAJ"]
 
     if "BMIN" not in header:
-        logging.error("BMIN not present in fits header.")
-        bmaj = None
+        logging.warn("BMIN not present in fits header.")
+        bmin = None
     else:
         bmin = header["BMIN"]
     if None in [bmaj, bmin, bpa]:

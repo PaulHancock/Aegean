@@ -703,10 +703,11 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
     else:
         global_data.region = None
 
-    global_data.beam = beam
+    #global_data.beam = beam
     #global_data.hdu_header = img.get_hdu_header()
     #global_data.wcs = img.wcs
-    global_data.wcshelper = WCSHelper.from_header(img.get_hdu_header())
+    global_data.wcshelper = WCSHelper.from_header(img.get_hdu_header(), beam)
+    global_data.beam = global_data.wcshelper.beam
     #initial values of the three images
     global_data.img = img
     global_data.data_pix = img.get_pixels()
