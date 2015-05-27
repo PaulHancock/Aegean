@@ -14,13 +14,13 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter
-from scipy.linalg import sqrtm
 from math import floor
-from AegeanTools.mpfit import mpfit
 from matplotlib import pyplot
+import lmfit
 
 smoothing = 1
 
+### OLD CODE THAT NO LONGER WORKS WITH LMFIT VERSION OF AEGEAN ###
 def new_multi_gauss(data, rmsimg, parinfo):
     """
     Fit multiple gaussian components to data using the information provided by parinfo.
@@ -250,6 +250,44 @@ def dk_error_comp():
 
     pyplot.show()
 
+### NEW CODE THAT DOES WORK ###
+def make_params(amp, xo, yo, sx, sy, theta, comp=0):
+    prefix = "c{0}_".format(comp)
+    params = lmfit.Parameters()
+    params.add(prefix+'amp', value=amp)
+    params.add(prefix+'xo', value=xo)
+    params.add(prefix+'yo', value=yo)
+    params.add(prefix+'sx', value=sx)
+    params.add(prefix+'sy', value=sy)
+    params.add(prefix+'theta', value=theta)
+    return params
+
+
+def gen_params():
+    snrlist = np.logspace(np.log10(5),2,100,endpoint=True)
+    palist = [0,15,30,45,60,75,90]
+    majlist = np.linspace(1,5,10,endpoint=True)
+    minlist = [1,2,3]
+    xolist = []
+    yolist = []
+
+    for amp,xo,yo in zip(snrlist,xolist,yolist):
+        yield make_params(amp,xo,yo,majlist[0],minlist[0],palist[0])
+
+
+def gen_sources():
+    for params in gen_params():
+        #convert params to sky_params
+        sky_params = params
+        yield params, sky_params
+
+
+
+
+
+def make_images():
+    return
+
 
 if __name__ == "__main__":
-    dk_error_comp()
+    #dk_error_comp()
