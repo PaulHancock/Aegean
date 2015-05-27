@@ -125,13 +125,13 @@ def save_catalog(filename, catalog):
     elif extension in ['db', 'sqlite']:
         writeDB(filename, catalog)
     elif extension in ['hdf5','fits']:
-        write_table(filename,catalog,extension)
+        write_catalog(filename,catalog,extension)
     elif extension in ascii_table_formats.keys():
-        write_table(filename, catalog, fmt=ascii_table_formats[extension])
+        write_catalog(filename, catalog, fmt=ascii_table_formats[extension])
     else:
         log.warning("extension not recognised {0}".format(extension))
         log.warning("You get tab format")
-        write_table(filename, catalog, fmt='tab')
+        write_catalog(filename, catalog, fmt='tab')
     return
 
 
@@ -198,6 +198,23 @@ def load_table(filename):
     return t
 
 
+def write_table(table,filename):
+
+    try:
+        table.write(filename)
+        log.info("Wrote {0}".format(filename))
+        return
+    except Exception, e:
+        if "Format could not be identified" not in e.message:
+            raise e
+    finally:
+        fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
+        # TODO: figure out the format of files that are not autodetermined
+        log.critical("Cannot auto-determine format for {0}".format(fmt))
+        sys.exit(1)
+    return
+
+
 def table_to_source_list(table, src_type=OutputSource):
     """
     Wrangle a table into a list of sources given by src_type
@@ -222,7 +239,7 @@ def table_to_source_list(table, src_type=OutputSource):
     return source_list
 
 
-def write_table(filename, catalog, fmt=None):
+def write_catalog(filename, catalog, fmt=None):
     """
     """
 
@@ -309,7 +326,7 @@ def writeVOTable(filename, catalog):
     write VOTables for each of the source types that are in the catalog
     append an appropriate prefix to the file name for each type of source
     """
-    write_table(filename, catalog, fmt="vo")
+    write_catalog(filename, catalog, fmt="vo")
 
 
 def writeIslandContours(filename, catalog, fmt):
