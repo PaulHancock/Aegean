@@ -111,9 +111,11 @@ def pairwise_ellpitical_binary(sources, eps, far = None):
 #@profile
 def regroup(catalog, eps, far=None):
     """
+    Regroup the islands of a catalog according to their normalised distance
+    return a list of island groups, sources have their (island,source) parameters relabeled
     :param sources: A list of sources sorted by declination
-    :param eps:
-    :param far:
+    :param eps: maximum normalised distance within which sources are considered to be grouped
+    :param far: (degrees) sources that are further than this distance appart will not be grouped, and will not be tested
     :return: groups of sources
     """
     if isinstance(catalog,str):
@@ -136,7 +138,7 @@ def regroup(catalog, eps, far=None):
     srccat = sorted(srccat, key = lambda x: x.dec)
 
     if far is None:
-        far = 0.5#3*max(a.a/3600 for a in srccat)
+        far = 0.5#10*max(a.a/3600 for a in srccat)
 
     groups = {0:[srccat[0]]}
     last_group = 0
@@ -164,6 +166,7 @@ def regroup(catalog, eps, far=None):
 
     islands = []
     # now that we have the groups, we relabel the sources to have (island,component) in flux order
+    # note that the order of sources within an island list is not changed - just their labels
     for isle in groups.keys():
         for comp, src in enumerate(sorted(groups[isle], key=lambda x: -1*x.peak_flux)):
             src.island = isle
@@ -284,16 +287,8 @@ if __name__ == "__main__":
     # make the catalog stupid big for memory testing.
     #for i in xrange(5):
     #    srccat.extend(srccat)
-    #print "new method"
     groups = regroup(srccat, eps=np.sqrt(2),far=1)
     print "Sources ", len(table)
     print "Groups ", len(groups)
     for g in groups[:10]:
         print len(g),[(a.island,a.source) for a in g]
-    #regroup(srccat, eps=np.sqrt(2))
-
-    #X = pairwise_ellpitical_binary(srccat, eps=np.sqrt(2))
-    #print X[:10,:10]
-    #print "old method"
-    #for g in group_iter(srccat, eps = np.sqrt(2)):
-    #    print len(g),[(a.island,a.source) for a in g]
