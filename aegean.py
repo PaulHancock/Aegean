@@ -1528,13 +1528,13 @@ def VASTP_find_sources_in_image():
 
 
 def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
-                           beam=None, lat=None, stage=3, ratio=1.0, outerclip=3, regroup=True):
+                           beam=None, lat=None, stage=3, ratio=1.0, outerclip=3, doregroup=True):
     """
     Take an input catalog, and image, and optional background/noise images
     fit the flux and ra/dec for each of the given sources, keeping the morphology fixed
 
-    if regroup is true the groups will be recreated based on a matching radius/probability.
-    if regroup is false then the islands of the input catalog will be preserved.
+    if doregroup is true the groups will be recreated based on a matching radius/probability.
+    if doregroup is false then the islands of the input catalog will be preserved.
 
     Multiple cores can be specified, and will be used.
 
@@ -1551,21 +1551,23 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     :param stage: refitting stage
     :param ratio: ratio of image psf to catalog psf
     :param outerclip: pixels above an snr of this amuont will be used in fitting, <0 -> all pixels.
-    :param regroup:  True - regroup, False - use island data for groups
+    :param doregroup:  True - doregroup, False - use island data for groups
     :return: a list of source objects
     """
 
-    from AegeanTools.cluster import group_iter
+    from AegeanTools.cluster import regroup
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
                  do_curve=False, beam=beam, lat=lat)
 
     beam = global_data.beam
+    far = 10*beam.a/3600
     # load the table and convert to an input source list
     input_table = load_table(catfile)
     input_sources = table_to_source_list(input_table)
     # the input sources are the intial conditions for our fits.
     # Expand each source size if needed.
     if ratio is not None:
+        far *= ratio
         for src in input_sources:
             src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
             src.b = np.sqrt(src.b**2 + (beam.b*3600)**2*(1-1/ratio**2))
@@ -1573,9 +1575,9 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
 
 
     # redo the grouping if required
-    if regroup:
-        input_sources = sorted(input_sources, key = lambda x: x.dec)
-        groups = list(group_iter(input_sources, eps=np.sqrt(2)))
+    if doregroup:
+        #input_sources = sorted(input_sources, key = lambda x: x.dec)
+        groups = regroup(input_sources, eps=np.sqrt(2), far=far)
     else:
         groups = list(island_itergen(input_sources))
 
@@ -2143,7 +2145,7 @@ if __name__ == "__main__":
                                             outfile=options.outfile, bkgin=options.backgroundimg,
                                             rmsin=options.noiseimg, beam=options.beam, lat=lat,
                                             stage=options.priorized, ratio=options.ratio, outerclip=options.outerclip,
-                                            cores=options.cores, regroup=options.regroup)
+                                            cores=options.cores, doregroup=options.regroup)
         sources.extend(measurements)
 
 
