@@ -108,6 +108,69 @@ def pairwise_ellpitical_binary(sources, eps, far = None):
             distances[j, i] = distances[i, j]
     return distances
 
+#@profile
+def regroup(catalog, eps, far=None):
+    """
+    :param sources: A list of sources sorted by declination
+    :param eps:
+    :param far:
+    :return: groups of sources
+    """
+    if isinstance(catalog,str):
+        table = load_table(catalog)
+        srccat = table_to_source_list(table)
+    elif isinstance(catalog,list):
+        try:
+            srccat = catalog
+        except AttributeError:
+            logging.error("catalog is as list of something that has no ra/dec attributes")
+            sys.exit(1)
+    else:
+        logging.error("I don't know what catalog is")
+        sys.exit(1)
+
+    log.info("Regrouping islands within catalog")
+    log.debug("Calculating distances")
+
+    # most negative declination first
+    srccat = sorted(srccat, key = lambda x: x.dec)
+
+    if far is None:
+        far = 0.5#3*max(a.a/3600 for a in srccat)
+
+    groups = {0:[srccat[0]]}
+    last_group = 0
+
+    # to parallelize this code, break the list into one part per core
+    # compute the groups within each part
+    # when the groups are found, check the last/first entry of pairs of groups to see if they need to be joined together
+    for s1 in srccat[1:]:
+        done=False
+        for g in xrange(last_group+1):
+            if s1.dec - groups[g][-1].dec > far:
+                continue
+            for s2 in groups[g]:
+                if abs(s2.ra - s1.ra)*np.cos(np.radians(s1.dec)) > far:
+                    continue
+                if norm_dist(s1,s2)<eps:
+                    groups[g].append(s1)
+                    done = True
+                    break
+            if done:
+                break
+        if not done:
+            last_group+=1
+            groups[last_group] = [s1]
+
+    islands = []
+    # now that we have the groups, we relabel the sources to have (island,component) in flux order
+    for isle in groups.keys():
+        for comp, src in enumerate(sorted(groups[isle], key=lambda x: -1*x.peak_flux)):
+            src.island = isle
+            src.source = comp
+        islands.append(groups[isle])
+    return islands
+
 
 def pairwise_distance(positions):
     """
@@ -172,6 +235,7 @@ def group_iter_dep(catalog, eps, min_members=1):
         class_member_mask = (labels == l)
         yield srccat[class_member_mask]
 
+
 def group_iter(catalog, eps, min_members=1):
     """
     :param catalog: List of sources, or filename of a catalog
@@ -213,16 +277,23 @@ if __name__ == "__main__":
     logging.basicConfig()
     log = logging.getLogger('Aegean')
     catalog = '1904_comp.vot'
-    table = load_table(catalog)
+    catalog = 'GLEAM_IDR1.fits'
+    table = load_table(catalog)[:10000]
     positions = np.array(zip(table['ra'],table['dec']))
     srccat = list(table_to_source_list(table))
     # make the catalog stupid big for memory testing.
-    for i in xrange(5):
-        srccat.extend(srccat)
+    #for i in xrange(5):
+    #    srccat.extend(srccat)
+    #print "new method"
+    groups = regroup(srccat, eps=np.sqrt(2),far=1)
+    print "Sources ", len(table)
+    print "Groups ", len(groups)
+    for g in groups[:10]:
+        print len(g),[(a.island,a.source) for a in g]
+    #regroup(srccat, eps=np.sqrt(2))
+
     #X = pairwise_ellpitical_binary(srccat, eps=np.sqrt(2))
     #print X[:10,:10]
-
-    for g in group_iter_binary(srccat, eps=np.sqrt(2)):
-        print len(g),[(a.island,a.source) for a in g]
-    for g in group_iter(srccat, eps = np.sqrt(2)):
-        print len(g),[(a.island,a.source) for a in g]
+    #print "old method"
+    #for g in group_iter(srccat, eps = np.sqrt(2)):
+    #    print len(g),[(a.island,a.source) for a in g]
