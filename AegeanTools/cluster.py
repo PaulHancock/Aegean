@@ -48,7 +48,7 @@ def norm_dist(src1,src2):
     return R
 
 # import line_profiler
-# @profile
+#@profile
 def pairwise_ellpitical(sources, far = None):
     """
     Calculate the probability of an association between each pair of sources.
@@ -78,7 +78,7 @@ def pairwise_ellpitical(sources, far = None):
             distances[j, i] = distances[i, j]
     return distances
 
-
+#@profile
 def pairwise_ellpitical_binary(sources, eps, far = None):
     """
     Calculate the probability of an association between each pair of sources.
@@ -90,7 +90,7 @@ def pairwise_ellpitical_binary(sources, eps, far = None):
     if far is None:
         far = max(a.a/3600 for a in sources)
     l = len(sources)
-    distances = np.full((l, l), fill_value = True, dtype=np.bool)
+    distances = np.ones((l, l), dtype=bool)
     for i in xrange(l):
         for j in xrange(i,l):
             if j<i:
@@ -126,7 +126,7 @@ def pairwise_distance(positions):
     return distances
 
 
-def group_iter(catalog, eps, min_members=1):
+def group_iter_dep(catalog, eps, min_members=1):
     """
     :param catalog: List of sources, or filename of a catalog
     :param eps: Clustering radius in *degrees*
@@ -172,7 +172,7 @@ def group_iter(catalog, eps, min_members=1):
         class_member_mask = (labels == l)
         yield srccat[class_member_mask]
 
-def group_iter_binary(catalog, eps, min_members=1):
+def group_iter(catalog, eps, min_members=1):
     """
     :param catalog: List of sources, or filename of a catalog
     :param eps: Clustering radius in *degrees*
@@ -187,7 +187,7 @@ def group_iter_binary(catalog, eps, min_members=1):
         try:
             srccat = catalog
         except AttributeError:
-            logging.error("catalog is as list of something that has not ra/dec attributes")
+            logging.error("catalog is as list of something that has no ra/dec attributes")
             sys.exit(1)
     else:
         logging.error("I don't know what catalog is")
@@ -216,8 +216,13 @@ if __name__ == "__main__":
     table = load_table(catalog)
     positions = np.array(zip(table['ra'],table['dec']))
     srccat = list(table_to_source_list(table))
-    X = pairwise_ellpitical_binary(srccat, eps=np.sqrt(2))
-    print X[:10,:10]
+    # make the catalog stupid big for memory testing.
+    for i in xrange(5):
+        srccat.extend(srccat)
+    #X = pairwise_ellpitical_binary(srccat, eps=np.sqrt(2))
+    #print X[:10,:10]
 
     for g in group_iter_binary(srccat, eps=np.sqrt(2)):
+        print len(g),[(a.island,a.source) for a in g]
+    for g in group_iter(srccat, eps = np.sqrt(2)):
         print len(g),[(a.island,a.source) for a in g]
