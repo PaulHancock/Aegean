@@ -79,6 +79,36 @@ def pairwise_ellpitical(sources, far = None):
     return distances
 
 
+def pairwise_ellpitical_binary(sources, eps, far = None):
+    """
+    Calculate the probability of an association between each pair of sources.
+    0<= probability <=1
+    Form this into a matrix.
+    :param sources: A list of sources sorted by declination
+    :return: a matrix of probabilities.
+    """
+    if far is None:
+        far = max(a.a/3600 for a in sources)
+    l = len(sources)
+    distances = np.full((l, l), fill_value = True, dtype=np.bool)
+    for i in xrange(l):
+        for j in xrange(i,l):
+            if j<i:
+                continue
+            if i == j:
+                distances[i, j] = False
+                continue
+            src1 = sources[i]
+            src2 = sources[j]
+            if src2.dec - src1.dec > far:
+                break
+            if abs(src2.ra - src1.ra)*np.cos(np.radians(src1.dec)) > far:
+                continue
+            distances[i, j] = norm_dist(src1, src2) > eps
+            distances[j, i] = distances[i, j]
+    return distances
+
+
 def pairwise_distance(positions):
     """
     Calculate the distance between each pair of positions.
@@ -142,6 +172,42 @@ def group_iter(catalog, eps, min_members=1):
         class_member_mask = (labels == l)
         yield srccat[class_member_mask]
 
+def group_iter_binary(catalog, eps, min_members=1):
+    """
+    :param catalog: List of sources, or filename of a catalog
+    :param eps: Clustering radius in *degrees*
+    :param min_members: Minimum number of members to form a cluster, default=1
+    :yield: lists of sources, one list per group. No particular order.
+    """
+
+    if isinstance(catalog,str):
+        table = load_table(catalog)
+        srccat = table_to_source_list(table)
+    elif isinstance(catalog,list):
+        try:
+            srccat = catalog
+        except AttributeError:
+            logging.error("catalog is as list of something that has not ra/dec attributes")
+            sys.exit(1)
+    else:
+        logging.error("I don't know what catalog is")
+        sys.exit(1)
+
+    log.info("Regrouping islands within catalog")
+    log.debug("Calculating distances")
+
+    srccat = np.array(sorted(srccat, key = lambda x: x.dec))
+    X = pairwise_ellpitical_binary(srccat,eps)
+
+    log.debug("Clustering")
+    samples, labels = sklearn.cluster.dbscan(X,eps=0.5, min_samples=min_members, metric='precomputed')
+    # remove repeats and the noise flag of -1
+    unique_labels = set(labels).difference(set([-1]))
+    # Return groups of sources
+    for l in unique_labels:
+        class_member_mask = (labels == l)
+        yield srccat[class_member_mask]
+
 
 if __name__ == "__main__":
     logging.basicConfig()
@@ -150,7 +216,8 @@ if __name__ == "__main__":
     table = load_table(catalog)
     positions = np.array(zip(table['ra'],table['dec']))
     srccat = list(table_to_source_list(table))
-    X = pairwise_ellpitical(srccat)
+    X = pairwise_ellpitical_binary(srccat, eps=np.sqrt(2))
+    print X[:10,:10]
 
-    for g in group_iter(srccat, np.sqrt(2)):
+    for g in group_iter_binary(srccat, eps=np.sqrt(2)):
         print len(g),[(a.island,a.source) for a in g]
