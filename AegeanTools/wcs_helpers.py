@@ -13,6 +13,7 @@ from AegeanTools.fits_image import Beam, get_beam, get_pixinfo
 # the glory of astropy
 import astropy
 import astropy.wcs as pywcs
+from astropy.io import fits
 
 # join the Aegean logger
 import logging
@@ -48,6 +49,21 @@ class WCSHelper(object):
 
         return cls(wcs, beam, pixscale)
 
+    @classmethod
+    def from_file(cls, filename, beam=None):
+        """
+        Create a new WCSHelper class from a given fits file
+        :param filename:
+        :param beam:
+        :return:
+        """
+        """
+        :param filename:
+        :param beam:
+        :return:
+        """
+        header = fits.getheader(filename)
+        return cls.from_header(header,beam)
 
     def __init__(self, wcs, beam, pixscale, lat=None):
         self.wcs = wcs
