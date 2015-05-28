@@ -57,11 +57,6 @@ class WCSHelper(object):
         :param beam:
         :return:
         """
-        """
-        :param filename:
-        :param beam:
-        :return:
-        """
         header = fits.getheader(filename)
         return cls.from_header(header,beam)
 
@@ -146,6 +141,9 @@ class WCSHelper(object):
         Calculate a beam in pixel scale, pa is always zero
         :return: A beam in pixel scale
         """
+        # I think that the following to-do notes can be acheived by using the WCS functions
+        # to convert the sky beam into a pixel beam
+        # It could then be done as a function of ra/dec
         # TODO: update this to incorporate elevation scaling when needed
         major = self.beam.a/(self.pixscale[0]*math.sin(math.radians(self.beam.pa)) +
                              self.pixscale[1]*math.cos(math.radians(self.beam.pa)) )
@@ -196,3 +194,40 @@ class WCSHelper(object):
         sep = gcd(pos1[0], pos1[1], pos2[0], pos2[1])
         return sep
 
+
+class WCSHelperTest(object):
+    """
+    A test class for WCSHelper
+    """
+    def __init__(self):
+        self.helper = WCSHelper.from_file('Test/Images/1904-66_SIN.fits')
+
+
+class PSFHelper(object):
+    """
+    A class that will store information about the PSF, which is assumed to be direction dependent.
+    """
+    def __init__(self, data, wcshelper):
+        self.wcshelper = wcshelper
+        self.data = data
+
+
+    def get_pixbeam(self,ra,dec):
+        """
+        Get the beam shape at this location.
+        :param ra:
+        :param dec:
+        :return:
+        """
+        if self.data is None:
+            return self.wcshelper.get_pixbeam()
+
+class PSFHelperTest(object):
+    """
+
+    """
+    def __init__(self):
+        psffile = "Test/Images/1904_66_SIN_psf.fits"
+        wcsfile = "Test/Images/1904_66_SIN.fits"
+        psfdata = fits.getdata(psffile)
+        self.helper = PSFHelper(psfdata,WCSHelper.from_file(wcsfile))
