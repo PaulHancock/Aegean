@@ -74,7 +74,7 @@ def pairwise_ellpitical_binary(sources, eps, far = None):
             distances[j, i] = distances[i, j]
     return distances
 
-#@profile
+@profile
 def regroup(catalog, eps, far=None):
     """
     Regroup the islands of a catalog according to their normalised distance
@@ -114,11 +114,14 @@ def regroup(catalog, eps, far=None):
     # when the groups are found, check the last/first entry of pairs of groups to see if they need to be joined together
     for s1 in srccat[1:]:
         done=False
-        for g in xrange(last_group+1):
-            if s1.dec - groups[g][-1].dec > far:
-                continue
+        #when an islands largest (last) declination is smaller than decmin, we don't need to look at any more islands
+        decmin = s1.dec - far
+        for g in xrange(last_group,-1,-1):
+            if groups[g][-1].dec < decmin:
+                break
+            cosfactor = np.cos(np.radians(s1.dec))
             for s2 in groups[g]:
-                if abs(s2.ra - s1.ra)*np.cos(np.radians(s1.dec)) > far:
+                if abs(s2.ra - s1.ra)*cosfactor > far:
                     continue
                 if norm_dist(s1,s2)<eps:
                     groups[g].append(s1)
@@ -184,13 +187,13 @@ if __name__ == "__main__":
     log = logging.getLogger('Aegean')
     catalog = '1904_comp.vot'
     catalog = 'GLEAM_IDR1.fits'
-    table = load_table(catalog)[:10000]
+    table = load_table(catalog)[:1000]
     positions = np.array(zip(table['ra'],table['dec']))
     srccat = list(table_to_source_list(table))
     # make the catalog stupid big for memory testing.
     #for i in xrange(5):
     #    srccat.extend(srccat)
-    groups = regroup(srccat, eps=np.sqrt(2),far=1)
+    groups = regroup(srccat, eps=np.sqrt(2),far=0.277289506048)
     print "Sources ", len(table)
     print "Groups ", len(groups)
     for g in groups[:10]:
