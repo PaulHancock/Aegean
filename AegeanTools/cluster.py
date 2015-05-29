@@ -74,7 +74,7 @@ def pairwise_ellpitical_binary(sources, eps, far = None):
             distances[j, i] = distances[i, j]
     return distances
 
-@profile
+#@profile
 def regroup(catalog, eps, far=None):
     """
     Regroup the islands of a catalog according to their normalised distance
@@ -119,9 +119,9 @@ def regroup(catalog, eps, far=None):
         for g in xrange(last_group,-1,-1):
             if groups[g][-1].dec < decmin:
                 break
-            cosfactor = np.cos(np.radians(s1.dec))
+            rafar = far/ np.cos(np.radians(s1.dec))
             for s2 in groups[g]:
-                if abs(s2.ra - s1.ra)*cosfactor > far:
+                if abs(s2.ra - s1.ra) > rafar:
                     continue
                 if norm_dist(s1,s2)<eps:
                     groups[g].append(s1)
@@ -187,7 +187,7 @@ if __name__ == "__main__":
     log = logging.getLogger('Aegean')
     catalog = '1904_comp.vot'
     catalog = 'GLEAM_IDR1.fits'
-    table = load_table(catalog)[:1000]
+    table = load_table(catalog)
     positions = np.array(zip(table['ra'],table['dec']))
     srccat = list(table_to_source_list(table))
     # make the catalog stupid big for memory testing.
@@ -196,5 +196,5 @@ if __name__ == "__main__":
     groups = regroup(srccat, eps=np.sqrt(2),far=0.277289506048)
     print "Sources ", len(table)
     print "Groups ", len(groups)
-    for g in groups[:10]:
+    for g in groups[:50]:
         print len(g),[(a.island,a.source) for a in g]
