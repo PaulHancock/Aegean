@@ -201,7 +201,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
                 y,x = np.where(snr[xmin:xmax,ymin:ymax] >= outerclip)
                 # convert indices of this sub region to indices in the greater image
                 yx = zip(y+ymin,x+xmin)
-                ra, dec = global_data.wcs.wcs_pix2world(yx, 1).transpose()
+                ra, dec = global_data.wcshelper.wcs.wcs_pix2world(yx, 1).transpose()
                 mask = global_data.region.sky_within(ra, dec, degin=True)
                 # if there are no un-masked pixels within the region then we skip this island.
                 if not np.any(mask):
@@ -237,17 +237,6 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
     #TODO: remove this later.
     if outerclip is None:
         outerclip = innerclip
-
-    pixbeam = global_data.pixbeam
-    if pixbeam is None:
-        if debug_on:
-            log.debug("WCSERR")
-        is_flag = flags.WCSERR
-        pixbeam = Beam(1, 1, 0)
-
-    #set a square limit based on the size of the pixbeam
-    xo_lim = 0.5*np.hypot(pixbeam.a, pixbeam.b)
-    yo_lim = xo_lim
 
     if debug_on:
         log.debug(" - shape {0}".format(data.shape))
@@ -348,6 +337,18 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         if debug_on:
             log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
 
+
+        pixbeam = global_data.wcshelper.get_pixbeam_pixel(yo+offsets[0],xo+offsets[1])
+        if pixbeam is None:
+            if debug_on:
+                log.debug("WCSERR")
+            is_flag = flags.WCSERR
+            pixbeam = Beam(1, 1, 0)
+
+        #set a square limit based on the size of the pixbeam
+        xo_lim = 0.5*np.hypot(pixbeam.a, pixbeam.b)
+        yo_lim = xo_lim
+
         yo_min, yo_max = max(ymin, yo - yo_lim), min(ymax, yo + yo_lim)
         if yo_min == yo_max:  #if we have a 1d summit then allow the position to vary by +/-0.5pix
             yo_min, yo_max = yo_min - 0.5, yo_max + 0.5
@@ -369,7 +370,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         # TODO: this assumes that sx is aligned with the major axis, which it need not be
         # A proper fix will include the re-calculation of the pixel beam at the given sky location
         # this will make the beam slightly bigger as we move away from zenith
-        if global_data.telescope_lat is not None:
+        if global_data.wcshelper.lat is not None:
             _, dec = global_data.wcshelper.pix2sky([yo+offsets[0],xo+offsets[1]]) #double check x/y here
             sx /= np.cos(np.radians(dec-global_data.telescope_lat))
 
@@ -522,7 +523,7 @@ def result_to_components(result, model, island_data, isflags):
             theta = theta - 90
 
         # source.pa is returned in degrees
-        (source.ra, source.dec, source.a, source.pa) =global_data.wcshelper. pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
+        (source.ra, source.dec, source.a, source.pa) = global_data.wcshelper.pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
         source.a *= 3600  # arcseconds
         source.b = source.a  / axial_ratio
         source.pa = pa_limit(source.pa)
@@ -732,8 +733,8 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
         global_data.dcurve = dcurve
 
     #calculate the pixel beam
-    global_data.pixbeam = global_data.wcshelper.get_pixbeam()
-    log.debug("pixbeam is : {0}".format(global_data.pixbeam))
+    #global_data.pixbeam = global_data.wcshelper.get_pixbeam()
+    #log.debug("pixbeam is : {0}".format(global_data.pixbeam))
 
     #if either of rms or bkg images are not supplied then calculate them both
     if not (rmsin and bkgin):
@@ -793,7 +794,7 @@ def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
     ycen = int(img_y / 2)
 
     #calculate a local beam from the center of the data
-    pixbeam = global_data.wcshelperget_pixbeam()
+    pixbeam = global_data.wcshelper.get_pixbeam()
     if pixbeam is None:
         log.error("Cannot calculate the beam shape at the image center")
         sys.exit()
@@ -882,7 +883,7 @@ def make_bkg_rms_from_global(mesh_size=20, forced_rms=None, cores=None):
     ycen = int(img_y / 2)
 
     #calculate a local beam from the center of the data
-    pixbeam = global_data.pixbeam
+    pixbeam = global_data.wcshelper.get_pixbeam(xcen,ycen)
     if pixbeam is None:
         log.error("Cannot calculate the beam shape at the image center")
         sys.exit()
@@ -1137,7 +1138,7 @@ def refit_islands(group, stage, outerclip, istart):
 
     data = global_data.data_pix
     rmsimg = global_data.rmsimg
-    pixbeam = global_data.wcshelper.get_pixbeam()
+    #pixbeam = global_data.wcshelper.get_pixbeam()
 
     for inum, isle in enumerate(group,start=istart):
         log.debug("-=-")
@@ -1152,6 +1153,7 @@ def refit_islands(group, stage, outerclip, istart):
 
         island_mask = []
         for src in isle:
+            pixbeam = global_data.wcshelper.get_pixbeam(src.ra,src.dec)
             # find the right pixels from the ra/dec
             source_x, source_y = global_data.wcshelper.sky2pix([src.ra, src.dec])
             source_x -=1
@@ -1317,7 +1319,7 @@ def fit_island(island_data):
     rms = rmsimg[xmin:xmax + 1, ymin:ymax + 1]
 
     is_flag = 0
-    pixbeam = global_data.pixbeam
+    pixbeam = global_data.wcshelper.get_pixbeam_pixel((xmin+xmax)/2., (ymin+ymax)/2.)
     if pixbeam is None:
         is_flag |= flags.WCSERR
 
@@ -1722,7 +1724,7 @@ def force_measure_flux(radec):
 
         flag = 0
         #make a pixbeam at this location
-        pixbeam = global_data.pixbeam
+        pixbeam = global_data.wcshelper.get_pixbeam(ra,dec)
         if pixbeam is None:
             flag |= flags.WCSERR
             pixbeam = Beam(1, 1, 0)

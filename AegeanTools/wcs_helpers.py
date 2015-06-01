@@ -46,8 +46,8 @@ class WCSHelper(object):
             logging.critical("Cannot determine beam information")
 
         _, pixscale = get_pixinfo(header)
-
-        return cls(wcs, beam, pixscale)
+        refpix = (header['CRPIX1'],header['CRPIX2'])
+        return cls(wcs, beam, pixscale, refpix)
 
     @classmethod
     def from_file(cls, filename, beam=None):
@@ -60,10 +60,11 @@ class WCSHelper(object):
         header = fits.getheader(filename)
         return cls.from_header(header,beam)
 
-    def __init__(self, wcs, beam, pixscale, lat=None):
+    def __init__(self, wcs, beam, pixscale, refpix, lat=None):
         self.wcs = wcs
         self.beam = beam
         self.pixscale = pixscale
+        self.refpix = refpix
         self.lat = lat
 
 
@@ -135,23 +136,46 @@ class WCSHelper(object):
         return ra1, dec1, a, pa
 
 
-    def get_pixbeam(self):
+    def get_pixbeam_pixel(self, x, y):
+        """
+        A wrapper around get_pixbeam for when you only know the pixel coords
+        :param x:
+        :param y:
+        :return:
+        """
+        ra,dec = self.pix2sky([x,y])
+        return self.get_pixbeam(ra,dec)
+
+
+    def get_pixbeam(self, ra, dec):
         """
         Use global_data to get beam (sky scale), and img.pixscale.
         Calculate a beam in pixel scale, pa is always zero
         :return: A beam in pixel scale
         """
-        # I think that the following to-do notes can be acheived by using the WCS functions
-        # to convert the sky beam into a pixel beam
-        # It could then be done as a function of ra/dec
         # TODO: update this to incorporate elevation scaling when needed
-        major = self.beam.a/(self.pixscale[0]*math.sin(math.radians(self.beam.pa)) +
-                             self.pixscale[1]*math.cos(math.radians(self.beam.pa)) )
 
-        minor = self.beam.b/(self.pixscale[1]*math.sin(math.radians(self.beam.pa)) +
-                             self.pixscale[0]*math.cos(math.radians(self.beam.pa)) )
-        # TODO: calculate the pa of the pixbeam
-        return Beam(abs(major),abs(minor),0)
+        if ra is None:
+            ra,dec = self.pix2sky(self.refpix)
+        pos = [ra,dec]
+
+        major = abs(self.beam.a/(self.pixscale[0]*math.sin(math.radians(self.beam.pa)) +
+                                 self.pixscale[1]*math.cos(math.radians(self.beam.pa)) ))
+
+        minor = abs(self.beam.b/(self.pixscale[1]*math.sin(math.radians(self.beam.pa)) +
+                                 self.pixscale[0]*math.cos(math.radians(self.beam.pa)) ))
+
+        theta =  self.sky2pix_vec(pos, self.beam.a, self.beam.pa)[3]
+
+        if major<minor:
+            major,minor = minor,major
+            theta -=90
+            if theta < -180:
+                theta += 180
+        if not np.isfinite(theta):
+            theta = 0
+        beam = Beam(major, minor, theta)
+        return beam
 
 
     def get_beamarea_deg2(self, ra, dec):
