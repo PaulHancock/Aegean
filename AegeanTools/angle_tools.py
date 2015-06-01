@@ -2,9 +2,10 @@
 
 """
 tools for manipulating angles on the surface of a sphere
-- great circle distance
+- distance
 - bearing between two points
-- translation along a great circle path
+- translation along a path
+- paths are either great circles or rhumb lines
 
 also angle <-> string conversion tools for Aegean
 Will eventually be replaced with those from Astropy
