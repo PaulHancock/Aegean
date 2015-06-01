@@ -61,7 +61,7 @@ def dec2hms(x):
     return	'{0:02d}:{1:02d}:{2:05.2f}'.format(h,m,s)
 
 
-#The following functions are explained at http://www.movable-type.co.uk/scripts/latlong.html
+# The following functions are explained at http://www.movable-type.co.uk/scripts/latlong.html
 # phi ~ lat ~ Dec
 # lambda ~ lon ~ RA
 def gcd(ra1,dec1,ra2,dec2):
@@ -77,17 +77,20 @@ def gcd(ra1,dec1,ra2,dec2):
     sep = np.degrees(2 * np.arcsin(min(1,np.sqrt(a))))
     return sep
 
+
 def bear(ra1,dec1,ra2,dec2):
-    """Calculate the bearing of point b from point a.
+    """
+    Calculate the bearing of point b from point a.
     bearing is East of North [0,360)
     position angle is East of North (-180,180]
     """
     dlon = ra2 - ra1
-    dlat = dec2 - dec1
+    #dlat = dec2 - dec1
     y = np.sin(np.radians(dlon))*np.cos(np.radians(dec2))
     x = np.cos(np.radians(dec1))*np.sin(np.radians(dec2))
     x-= np.sin(np.radians(dec1))*np.cos(np.radians(dec2))*np.cos(np.radians(dlon))
     return np.degrees(np.arctan2(y,x))
+
 
 def translate(ra,dec,r,theta):
     """
@@ -104,3 +107,86 @@ def translate(ra,dec,r,theta):
     ra_out = ra + np.degrees(np.arctan2(y,x))
     return ra_out,dec_out
 
+
+def dist_rhumb(ra1,dec1,ra2,dec2):
+    """
+    Rhumb line distance between two points
+    distance is in degrees
+    :param ra1:
+    :param dec1:
+    :param ra2:
+    :param dec1:
+    :return:
+    """
+    # verified against website to give correct results
+    phi1 = np.radians(dec1)
+    phi2 = np.radians(dec2)
+    dphi = phi2-phi1
+    lambda1 = np.radians(ra1)
+    lambda2 = np.radians(ra2)
+    dpsi = np.log(np.tan(np.pi/4 + phi2/2)/np.tan(np.pi/4 + phi1/2))
+    if dpsi < 1e-12:
+        q = np.cos(phi1)
+    else:
+        q = dpsi/dphi
+    dlambda = lambda2 - lambda1
+    if dlambda > np.pi:
+        dlambda -= 2*np.pi
+    dist = np.hypot(dphi, q*dlambda)
+    return np.degrees(dist)
+
+
+def bear_rhumb(ra1,dec1,ra2,dec2):
+    """
+    The true bearing of a rhumb line that joins to points
+    return bearing in degrees
+    :param ra1:
+    :param dec1:
+    :param ra2:
+    :param dec2:
+    :return:
+    """
+    # verified against website to give correct results
+    phi1 = np.radians(dec1)
+    phi2 = np.radians(dec2)
+    lambda1 = np.radians(ra1)
+    lambda2 = np.radians(ra2)
+    dlambda = lambda2-lambda1
+
+    dpsi = np.log(np.tan(np.pi/4 + phi2/2)/np.tan(np.pi/4 + phi1/2))
+
+    theta = np.arctan2(dlambda,dpsi)
+    return np.degrees(theta)
+
+
+def translate_rhumb(ra,dec,r,theta):
+    """
+    Translate the point (ra,dec) a distance r (degrees) along angle theta (degrees)
+    The translation is taken along an arc of a rhumb line.
+    Return the (ra,dec) of the translated point.
+    :param ra:
+    :param dec:
+    :param r:
+    :param theta:
+    :return:
+    """
+    # verified against website to give correct results
+    # with the help of http://williams.best.vwh.net/avform.htm#Rhumb
+    delta = np.radians(r)
+    phi1 = np.radians(dec)
+    phi2 = phi1 + delta*np.cos(np.radians(theta))
+    dphi = phi2-phi1
+
+    if abs(dphi) < 1e-9:
+        q = np.cos(phi1)
+    else:
+        dpsi = np.log(np.tan(np.pi/4 + phi2/2)/np.tan(np.pi/4 + phi1/2))
+        q = dphi/dpsi
+
+    lambda1 = np.radians(ra)
+    dlambda = delta*np.sin(np.radians(theta))/q
+    lambda2 = lambda1 + dlambda
+
+    ra_out = np.degrees(lambda2)
+    dec_out = np.degrees(phi2)
+    return ra_out, dec_out
