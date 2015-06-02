@@ -225,6 +225,23 @@ class WCSHelperTest(object):
     """
     def __init__(self):
         self.helper = WCSHelper.from_file('Test/Images/1904-66_SIN.fits')
+        self.vector_test()
+
+    def vector_test(self):
+        print "Testing vector round trip... ",
+        initial = [1,45] #r,theta = 1,45 (degrees)
+        ref = self.helper.refpix
+        ra,dec,dist,ang = self.helper.pix2sky_vec(ref, *initial)
+        x,y,r,theta = self.helper.sky2pix_vec([ra,dec], dist, ang)
+        print "Start: x {0}, y {1}, r {2}, theta {3}".format(ref[0],ref[1],*initial)
+        print "sky: ra {0}, dec {1}, dist {2}, ang {3}".format(ra,dec,dist,ang)
+        print "Final: x {0}, y {1}, r {2}, theta {3}".format(x,y,r,theta)
+        if abs(r-initial[0])<1e-9 and abs(theta-initial[1])<1e-9:
+            print "Pass"
+            return True
+        else:
+            print "Fail"
+            return False
 
 
 class PSFHelper(object):
