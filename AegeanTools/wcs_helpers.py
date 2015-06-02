@@ -159,13 +159,23 @@ class WCSHelper(object):
             ra,dec = self.pix2sky(self.refpix)
         pos = [ra,dec]
 
-        major = abs(self.beam.a/(self.pixscale[0]*math.sin(math.radians(self.beam.pa)) +
-                                 self.pixscale[1]*math.cos(math.radians(self.beam.pa)) ))
+        if self.lat is None:
+            major = abs(self.beam.a/(self.pixscale[0]*math.sin(math.radians(self.beam.pa)) +
+                                     self.pixscale[1]*math.cos(math.radians(self.beam.pa)) ))
 
-        minor = abs(self.beam.b/(self.pixscale[1]*math.sin(math.radians(self.beam.pa)) +
-                                 self.pixscale[0]*math.cos(math.radians(self.beam.pa)) ))
+            minor = abs(self.beam.b/(self.pixscale[1]*math.sin(math.radians(self.beam.pa)) +
+                                     self.pixscale[0]*math.cos(math.radians(self.beam.pa)) ))
+            theta =  self.sky2pix_vec(pos, self.beam.a, self.beam.pa)[3]
+        else:
+            # TODO: proper elevation scaling that can alter pa and minor axis as well.
+            # this works if the pa is zero. For non-zero pa it's a little more difficult
+            major, theta = self.sky2pix_vec(pos,self.beam.a/np.cos(np.radians(dec-self.lat)),self.beam.pa)[2:4]
+            minor = self.sky2pix_vec(pos, self.beam.b, self.beam.pa+90)[2]
+            major = abs(major)
+            minor = abs(minor)
 
-        theta =  self.sky2pix_vec(pos, self.beam.a, self.beam.pa)[3]
+
+
 
         if major<minor:
             major,minor = minor,major
@@ -262,6 +272,7 @@ class PSFHelper(object):
         """
         if self.data is None:
             return self.wcshelper.get_pixbeam()
+
 
 class PSFHelperTest(object):
     """

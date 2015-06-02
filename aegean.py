@@ -367,13 +367,6 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         sx = pixbeam.a * fwhm2cc
         sy = pixbeam.b * fwhm2cc
 
-        # TODO: this assumes that sx is aligned with the major axis, which it need not be
-        # A proper fix will include the re-calculation of the pixel beam at the given sky location
-        # this will make the beam slightly bigger as we move away from zenith
-        if global_data.wcshelper.lat is not None:
-            _, dec = global_data.wcshelper.pix2sky([yo+offsets[0],xo+offsets[1]]) #double check x/y here
-            sx /= np.cos(np.radians(dec-global_data.telescope_lat))
-
         # lmfit does silly things if we start with these two parameters being equal
         sx = max(sx,sy*1.01)
 
@@ -1169,8 +1162,8 @@ def refit_islands(group, stage, outerclip, istart):
                 log.info("Source ({0},{1}) not within usable region: skipping".format(src.island,src.source))
                 continue
             # determine the shape parameters in pixel values
-            (_, _, sx, theta) = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)
-            (_, _, sy, _ ) = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.b/3600., src.pa+90)
+            sx, theta = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)[2:]
+            sy = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.b/3600., src.pa+90)[2]
             if sy>sx:
                 sx,sy = sy,sx
                 theta +=90
