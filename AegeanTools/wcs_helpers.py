@@ -255,7 +255,7 @@ class WCSHelperTest(object):
             return False
 
 
-class PSFHelper(object):
+class PSFHelper_old(object):
     """
     A class that will store information about the PSF, which is assumed to be direction dependent.
     """
@@ -320,7 +320,70 @@ class PSFHelper(object):
         return beam
 
 
+class PSFHelper(WCSHelper):
+    """
+    A class that will store information about the PSF, which is assumed to be direction dependent.
+    """
 
+    def __init__(self, psffile, wcshelper):
+        header = fits.getheader(psffile)
+        data = fits.getdata(psffile)
+        try:
+            wcs = pywcs.WCS(header, naxis=2)
+        except:
+            wcs = pywcs.WCS(str(header), naxis=2)
+        self.wcshelper = wcshelper
+        self.data = data
+        self.wcs = wcs
+        self.lat = None
+
+    def get_psf_sky(self, ra, dec):
+        """
+        :param ra:
+        :param dec:
+        :return:
+        """
+        x,y = self.sky2pix([ra,dec])
+        x = np.clip(x,0,self.data.shape[1]-1)
+        y = np.clip(y,0,self.data.shape[2]-1)
+        psf_sky = self.data[:,x,y]
+        return psf_sky
+
+    def get_psf_pix(self, ra, dec):
+        """
+        :param ra:
+        :param dec:
+        :return:
+        """
+        psf_sky = self.get_psf_sky(ra, dec)
+        psf_pix = self.wcshelper.sky2pix_vec([ra,dec], psf_sky[0], 0)[2],\
+                  self.wcshelper.sky2pix_vec([ra,dec], psf_sky[1], 90)[2]
+        return psf_pix
+
+    def get_pixbeam_pixel(self, x, y):
+
+        ra,dec = self.wcshelper.pix2sky([x,y])
+        return self.get_pixbeam(ra,dec)
+
+    def get_pixbeam(self,ra,dec):
+        """
+        Get the beam shape at this location.
+        :param ra:
+        :param dec:
+        :return:
+        """
+        beam = self.wcshelper.get_pixbeam(ra,dec)
+        if self.data is None:
+            return beam
+        psf = self.get_psf_pix(ra,dec)
+        if psf[0]>1:
+            print '+',
+            beam = Beam(psf[0],psf[1],beam.pa)
+        else:
+            print '-',
+        #beam.a = np.hypot(beam.a, psf[0])
+        #beam.b = np.hypot(beam.b, psf[1])
+        return beam
 
 
 class PSFHelperTest(object):
