@@ -12,21 +12,8 @@ import logging
 import sys
 from fits_interp import expand
 
-
-def load_safe(filename):
-    """
-    Load a fits file, and retry if there is a missing END card in the header
-    :param filename: filename
-    :return: a fits.HDUList object
-    """
-    try:
-        hdus = pyfits.open(filename)
-    except IOError, e:
-        if "END" in e.message:
-            logging.warn(e.message)
-        logging.warn("trying to ignore this, but you should really fix it")
-        hdus = pyfits.open(filename, ignore_missing_end=True)
-    return hdus
+# Join the Aegean logger
+log = logging.getLogger("Aegean")
 
 
 def get_pixinfo(header):
@@ -97,25 +84,9 @@ class FitsImage():
         hdu = a pyfits hdu. if provided the object is constructed from this instead of
               opening the file (filename is ignored)  
         """
-        if isinstance(filename, pyfits.HDUList):
-            logging.debug("accepting already loaded file {0}".format(filename.filename()))
-            # check to see if this image has been compressed
-            # and expand if neccessary
-            if 'BN_CFAC' in filename[hdu_index].header:
-                logging.debug("Expanding file")
-                self.hdu = expand(filename)[hdu_index]
-            else:
-                self.hdu = filename[hdu_index]
-        else:
-            logging.debug("Loading HDU {0} from {1}".format(hdu_index, filename))
-            hdulist = load_safe(filename)
-            self.hdu = hdulist[hdu_index]
-            # check for a compressed file
-            if 'BN_CFAC' in self.hdu.header:
-                logging.debug("Expanding file")
-                self.hdu = expand(hdulist)[hdu_index]
-            del hdulist
-        
+
+        self.hdu = expand(filename)[hdu_index] # auto detects if the file needs expanding
+
         self._header = self.hdu.header
         # need to read these headers before we 'touch' the data or they dissappear
         if "BZERO" in self._header:
