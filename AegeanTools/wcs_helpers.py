@@ -326,16 +326,19 @@ class PSFHelper(WCSHelper):
     """
 
     def __init__(self, psffile, wcshelper):
-        header = fits.getheader(psffile)
-        data = fits.getdata(psffile)
-        try:
-            wcs = pywcs.WCS(header, naxis=2)
-        except:
-            wcs = pywcs.WCS(str(header), naxis=2)
+        if psffile is None:
+            data = None
+            wcs = wcshelper.wcs
+        else:
+            header = fits.getheader(psffile)
+            data = fits.getdata(psffile)
+            try:
+                wcs = pywcs.WCS(header, naxis=2)
+            except:
+                wcs = pywcs.WCS(str(header), naxis=2)
         self.wcshelper = wcshelper
         self.data = data
         self.wcs = wcs
-        self.lat = None
 
     def get_psf_sky(self, ra, dec):
         """
@@ -377,13 +380,17 @@ class PSFHelper(WCSHelper):
             return beam
         psf = self.get_psf_pix(ra,dec)
         if psf[0]>1:
-            print '+',
+        #    print '+',
             beam = Beam(psf[0],psf[1],beam.pa)
-        else:
-            print '-',
+        #else:
+        #    print '-',
         #beam.a = np.hypot(beam.a, psf[0])
         #beam.b = np.hypot(beam.b, psf[1])
         return beam
+
+    def get_beamarea_pix(self, ra, dec):
+        beam = self.get_pixbeam(ra,dec)
+        return beam.a*beam.b*np.pi
 
 
 class PSFHelperTest(object):
