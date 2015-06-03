@@ -9,6 +9,7 @@ import math
 
 from angle_tools import gcd, bear, translate
 from AegeanTools.fits_image import Beam, get_beam, get_pixinfo
+from AegeanTools.fits_interp import expand
 
 # the glory of astropy
 import astropy
@@ -24,7 +25,7 @@ log = logging.getLogger('Aegean')
 class WCSHelper(object):
 
     @classmethod
-    def from_header(cls, header, beam=None):
+    def from_header(cls, header, beam=None, lat=None):
         """
         Create a new WCSHelper class from the given header
         This will not set the latitude of the telesocpe so this needs to be set by the user
@@ -47,7 +48,7 @@ class WCSHelper(object):
 
         _, pixscale = get_pixinfo(header)
         refpix = (header['CRPIX1'],header['CRPIX2'])
-        return cls(wcs, beam, pixscale, refpix)
+        return cls(wcs, beam, pixscale, refpix, lat)
 
     @classmethod
     def from_file(cls, filename, beam=None):
@@ -260,8 +261,47 @@ class PSFHelper(object):
     """
     def __init__(self, data, wcshelper):
         self.wcshelper = wcshelper
-        self.data = data
+        if isinstance(data, str):
+            log.info("Loading PSF map from {0}".format(data))
+            self._load_data(data)
+        else:
+            self.data = data
 
+    def _load_data(self, filename):
+        """
+        :param filename:
+        :return:
+        """
+        # this takes care of compressed images, can work from already loaded hdus
+        # and complains when things don't work right
+        self.data = expand(filename)[0].data
+
+
+    def get_psf_sky(self, ra, dec):
+        """
+        :param ra:
+        :param dec:
+        :return:
+        """
+        x,y = self.wcshelper.sky2pix([ra,dec])
+        psf_sky = self.data[x,y]
+        return psf_sky
+
+    def get_psf_pix(self, ra, dec):
+        """
+        :param ra:
+        :param dec:
+        :return:
+        """
+        # we assume that the wcs of the image and our psf data is the same
+        psf_sky = self.get_psf_sky(ra, dec)
+        psf_pix = self.wcshelper.sky2pix_vec([ra,dec], psf_sky, 0)[2]
+        return psf_pix
+
+    def get_pixbeam_pixel(self, x, y):
+
+        ra,dec = self.wcshelper.pix2sky([x,y])
+        return self.get_pixbeam(ra,dec)
 
     def get_pixbeam(self,ra,dec):
         """
@@ -270,8 +310,17 @@ class PSFHelper(object):
         :param dec:
         :return:
         """
+        beam = self.wcshelper.get_pixbeam(ra,dec)
         if self.data is None:
-            return self.wcshelper.get_pixbeam()
+            return beam
+        psf = self.get_psf_pix(ra,dec)
+        if psf > 1e-6:
+            beam.a = np.hypot(beam.a, psf)
+            beam.b = np.hypot(beam.b, psf)
+        return beam
+
+
+
 
 
 class PSFHelperTest(object):
