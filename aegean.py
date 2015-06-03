@@ -742,7 +742,7 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
     #replace the calculated images with input versions, if the user has supplied them.
     if bkgin:
         if verb:
-            log.info("loading background data from file {0}".format(bkgin))
+            log.info("Loading background data from file {0}".format(bkgin))
         global_data.bkgimg = load_aux_image(img, bkgin)
     if rmsin:
         if verb:
