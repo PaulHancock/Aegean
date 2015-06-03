@@ -1163,10 +1163,9 @@ def refit_islands(group, stage, outerclip, istart):
                 continue
             # determine the shape parameters in pixel values
             sx, theta = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)[2:]
-            sy = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.b/3600., src.pa+90)[2]
-            if sy>sx:
-                sx,sy = sy,sx
-                theta +=90
+            # we have to keep the PA the same here otherwise our shape parameters are incorrect
+            # this may be compensating for an error we made elsewhere but for now it works.
+            sy = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.b/3600., src.pa)[2]
             sx *=fwhm2cc
             sy *=fwhm2cc
 
