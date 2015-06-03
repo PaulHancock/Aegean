@@ -536,7 +536,7 @@ def result_to_components(result, model, island_data, isflags):
 
         # calculate integrated flux
         source.int_flux = source.peak_flux * sx * sy * cc2fwhm ** 2 * np.pi
-        source.int_flux /= global_data.wcshelper.get_beamarea_pix(source.ra,source.dec) # scale Jy/beam -> Jy
+        source.int_flux /= global_data.psfhelper.get_beamarea_pix(source.ra,source.dec) # scale Jy/beam -> Jy
 
         # We currently assume Condon'97 errors for all params.
         #condon_errors(source, np.sqrt(global_data.wcshelper.get_beamarea_deg2(source.ra,source.dec)/np.pi))
