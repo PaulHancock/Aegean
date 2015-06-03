@@ -13,7 +13,6 @@ Created:
 import numpy as np
 from astropy.io import fits
 from scipy.interpolate import griddata
-from math import floor
 import logging
 
 
@@ -27,7 +26,15 @@ def load_file_or_hdu(filename):
     if isinstance(filename, fits.HDUList):
         hdulist = filename
     else:
-        hdulist = fits.open(filename)
+        try:
+            hdulist = fits.open(filename)
+        except IOError, e:
+            if "END" in e.message:
+                logging.warn(e.message)
+                logging.warn("trying to ignore this, but you should really fix it")
+                hdulist = fits.open(filename, ignore_missing_end=True)
+            else:
+                raise e
     return hdulist
 
 
@@ -118,10 +125,9 @@ def expand(datafile, outfile=None, method='linear'):
 
     header = hdulist[0].header
     data = hdulist[0].data
-    # Check for the required key words
+    # Check for the required key words, only expand if they exist
     if not all([a in header for a in ['BN_CFAC', 'BN_NPX1', 'BN_NPX2', 'BN_RPX1', 'BN_RPX2']]):
-        logging.error("This file doesn't have all the right header information")
-        return None
+        return hdulist
 
     factor = header['BN_CFAC']
     (gx, gy) = np.mgrid[0:header['BN_NPX2'], 0:header['BN_NPX1']]
