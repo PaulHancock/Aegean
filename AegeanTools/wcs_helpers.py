@@ -325,13 +325,18 @@ class PSFHelper(WCSHelper):
     A class that will store information about the PSF, which is assumed to be direction dependent.
     """
 
+    # This __init__ overwrites that of the parent class without calling 'super'.
+    # It might be naughty but it beats rewriting many of the get_X functions that I want to replicate.
     def __init__(self, psffile, wcshelper):
-        if psffile is None:
+        if psffile is None: # in this case this class should be transparent
             data = None
             wcs = wcshelper.wcs
         else:
             header = fits.getheader(psffile)
             data = fits.getdata(psffile)
+            if len(data.shape)!=2:
+                log.critical("PSF file needs to have 3 dimensions, only {0} found".format(len(data.shape)))
+                raise Exception("Invalid PSF file {0}".format(psffile))
             try:
                 wcs = pywcs.WCS(header, naxis=2)
             except:
@@ -347,6 +352,8 @@ class PSFHelper(WCSHelper):
         :return:
         """
         x,y = self.sky2pix([ra,dec])
+        # We leave the interpolation in the hands of whoever is making these images
+        # clamping the x,y coords at the image boundaries just makes sense
         x = np.clip(x,0,self.data.shape[1]-1)
         y = np.clip(y,0,self.data.shape[2]-1)
         psf_sky = self.data[:,x,y]
@@ -379,6 +386,9 @@ class PSFHelper(WCSHelper):
         if self.data is None:
             return beam
         psf = self.get_psf_pix(ra,dec)
+        if None in psf:
+            log.warn("PSF requested, returned Null")
+            return None
         if psf[0]>1:
         #    print '+',
             beam = Beam(psf[0],psf[1],beam.pa)
