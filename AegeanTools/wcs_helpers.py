@@ -332,6 +332,7 @@ class PSFHelper(WCSHelper):
             data = None
             wcs = wcshelper.wcs
         else:
+            log.info("Loading PSF data from {0}".format(psffile))
             header = fits.getheader(psffile)
             data = fits.getdata(psffile)
             if len(data.shape)!=3:
