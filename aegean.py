@@ -31,7 +31,7 @@ from scipy.ndimage import label, find_objects
 
 # fitting
 import lmfit
-from AegeanTools.fitting import do_lmfit, condon_errors, Cmatrix, Bmatrix, errors, covar_errors
+from AegeanTools.fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors
 
 # the glory of astropy
 import astropy
@@ -538,28 +538,9 @@ def result_to_components(result, model, island_data, isflags):
         source.int_flux = source.peak_flux * sx * sy * cc2fwhm ** 2 * np.pi
         source.int_flux /= global_data.psfhelper.get_beamarea_pix(source.ra,source.dec) # scale Jy/beam -> Jy
 
-        # We currently assume Condon'97 errors for all params.
-        #condon_errors(source, np.sqrt(global_data.wcshelper.get_beamarea_deg2(source.ra,source.dec)/np.pi))
+        # Calculate errors for params that were fit (and int_flux)
         errors(source, model, global_data.wcshelper)
 
-        # #if we didn't fit xo/yo then there are no ra/dec errors
-        # if not model[prefix + 'xo'].vary or not model[prefix + 'yo'].vary:
-        #     source.err_ra = -1
-        #     source.err_dec = -1
-        #
-        # # if we did't fit sx,xy then there is no major/minor errors
-        # if not model[prefix + 'sx'].vary or not model[prefix + 'sy'].vary:
-        #     source.err_a = -1
-        #     source.err_b = -1
-        #
-        # # if we didn't fit theta then pa has no error
-        # if not model[prefix + 'theta'].vary:
-        #     source.err_pa = -1
-        #
-        # # to be consistent we also check for amp
-        # if not model[prefix + 'amp'].vary:
-        #     source.err_peak_flux = -1
-        #     source.err_int_flux = -1
         source.flags = src_flags
         sources.append(source)
         log.debug(source)
