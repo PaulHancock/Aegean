@@ -334,7 +334,7 @@ class PSFHelper(WCSHelper):
         else:
             header = fits.getheader(psffile)
             data = fits.getdata(psffile)
-            if len(data.shape)!=2:
+            if len(data.shape)!=3:
                 log.critical("PSF file needs to have 3 dimensions, only {0} found".format(len(data.shape)))
                 raise Exception("Invalid PSF file {0}".format(psffile))
             try:
