@@ -1536,7 +1536,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
 
     from AegeanTools.cluster import regroup
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
-                 do_curve=False, beam=beam, lat=lat)
+                 do_curve=False, beam=beam, lat=lat, psf=psf)
 
     beam = global_data.beam
     far = 10*beam.a/3600
