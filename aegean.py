@@ -341,10 +341,12 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         #pixbeam = global_data.wcshelper.get_pixbeam_pixel(yo+offsets[0],xo+offsets[1])
         pixbeam = global_data.psfhelper.get_pixbeam_pixel(yo+offsets[0],xo+offsets[1])
         if pixbeam is None:
-            if debug_on:
-                log.debug("WCSERR")
-            is_flag = flags.WCSERR
-            pixbeam = Beam(1, 1, 0)
+            log.debug(" Summit has invalid WCS/Beam - Skipping.".format(i))
+            continue
+            # if debug_on:
+            #     log.debug("WCSERR")
+            # is_flag = flags.WCSERR
+            # pixbeam = Beam(1, 1, 0)
 
         #set a square limit based on the size of the pixbeam
         xo_lim = 0.5*np.hypot(pixbeam.a, pixbeam.b)
@@ -772,7 +774,7 @@ def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
     pixbeam = global_data.psfhelper.get_pixbeam_pixel(xcen,ycen)
     if pixbeam is None:
         log.error("Cannot calculate the beam shape at the image center")
-        sys.exit()
+        sys.exit(1)
 
     width_x = mesh_size * max(abs(math.cos(np.radians(pixbeam.pa)) * pixbeam.a),
                               abs(math.sin(np.radians(pixbeam.pa)) * pixbeam.b))
@@ -862,7 +864,7 @@ def make_bkg_rms_from_global(mesh_size=20, forced_rms=None, cores=None):
     pixbeam = global_data.psfhelper.get_pixbeam_pixel(xcen,ycen)
     if pixbeam is None:
         log.error("Cannot calculate the beam shape at the image center")
-        sys.exit()
+        sys.exit(1)
 
     width_x = mesh_size * max(abs(math.cos(np.radians(pixbeam.pa)) * pixbeam.a),
                               abs(math.sin(np.radians(pixbeam.pa)) * pixbeam.b))
@@ -1128,6 +1130,7 @@ def refit_islands(group, stage, outerclip, istart):
         xmax = ymax = 0
 
         island_mask = []
+        src_valid_psf = None
         for src in isle:
             #pixbeam = global_data.wcshelper.get_pixbeam(src.ra,src.dec)
             pixbeam = global_data.psfhelper.get_pixbeam(src.ra, src.dec)
@@ -1142,9 +1145,13 @@ def refit_islands(group, stage, outerclip, istart):
             # reject sources that are outside the image bounds, or which have nan data/rms values
             if not 0 <= x < shape[0] or not 0 <= y < shape[1] or \
                     not np.isfinite(data[x, y]) or \
-                    not np.isfinite(rmsimg[x, y]):
+                    not np.isfinite(rmsimg[x, y]) or \
+                    pixbeam is None:
                 log.info("Source ({0},{1}) not within usable region: skipping".format(src.island,src.source))
                 continue
+            else:
+                # Keep track of the last source to have a valid psf so that we can use it later on
+                src_valid_psf = src
             # determine the shape parameters in pixel values
             sx, theta = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)[2:]
             # we have to keep the PA the same here otherwise our shape parameters are incorrect
@@ -1251,6 +1258,9 @@ def refit_islands(group, stage, outerclip, istart):
             continue
 
         # do the fit
+        # if the pixel beam is not valid, then recalculate using the location of the last source to have a valid psf
+        if pixbeam is None:
+            pixbeam = global_data.psfhelper.get_pixbeam(src_valid_psf.ra,src_valid_psf.dec)
         fac = 1/np.sqrt(2) # TODO: why sqrt(2)?
         C = Cmatrix(mx, my, pixbeam.a*fwhm2cc*fac, pixbeam.b*fwhm2cc*fac, pixbeam.pa)
         B = Bmatrix(C)
@@ -1298,7 +1308,9 @@ def fit_island(island_data):
     #pixbeam = global_data.wcshelper.get_pixbeam_pixel((xmin+xmax)/2., (ymin+ymax)/2.)
     pixbeam = global_data.psfhelper.get_pixbeam_pixel((xmin+xmax)/2., (ymin+ymax)/2.)
     if pixbeam is None:
-        is_flag |= flags.WCSERR
+        # This island is not on the sky, ignore it
+        return []
+        #is_flag |= flags.WCSERR
 
     log.debug("=====")
     log.debug("Island ({0})".format(isle_num))
