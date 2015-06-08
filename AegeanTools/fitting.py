@@ -69,8 +69,11 @@ def Bmatrix(C):
     # suggested by Cath,
     L,Q = eigh(C)
     if not all(L>0):
-        log.critical("at least one eigenvalue is negative, this will cause problems!")
-        sys.exit(1)
+        log.warn("At least one eigenvalue is negative, this may cause problems!")
+        log.warn("Forcing eigenvalues to be positive...")
+        log.debug("L = {0}".format(L))
+        L = np.abs(L)
+        #sys.exit(1)
     S = np.diag(1/np.sqrt(L))
     B = Q.dot(S)
     return B
