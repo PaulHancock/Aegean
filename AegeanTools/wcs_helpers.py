@@ -185,7 +185,10 @@ class WCSHelper(object):
                 theta += 180
         if not np.isfinite(theta):
             theta = 0
-        beam = Beam(major, minor, theta)
+        if not all(np.isfinite([major,minor,theta])):
+            beam = None
+        else:
+            beam = Beam(major, minor, theta)
         return beam
 
 
