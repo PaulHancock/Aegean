@@ -123,25 +123,6 @@ class IslandFittingData(object):
         self.doislandflux = doislandflux
 
 
-class DummyMP(object):
-    """
-    A dummy copy of the mpfit class that just holds the parinfo variables
-    This class doesn't do a great deal, but it makes it 'looks' like the mpfit class
-    and makes it easy to estimate source parameters when you don't want to do any fitting.
-    """
-
-    def __init__(self, parinfo, perror):
-        self.params = []
-        for var in parinfo:
-            try:
-                val = var['value'][0]
-            except:
-                val = var['value']
-            self.params.append(val)
-        self.perror = perror
-        self.errmsg = "There is no error, I just didn't bother fitting anything!"
-
-
 class DummyLM(object):
     """
     A dummy copy of the mpfit class that just holds the parinfo variables
