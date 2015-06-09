@@ -1242,10 +1242,11 @@ def refit_islands(group, stage, outerclip, istart):
 
         # do the fit
         # if the pixel beam is not valid, then recalculate using the location of the last source to have a valid psf
-        if pixbeam is None and src_valid_psf is not None:
-            pixbeam = global_data.psfhelper.get_pixbeam(src_valid_psf.ra,src_valid_psf.dec)
-        else:
-            logging.critical("Cannot determine pixel beam")
+        if pixbeam is None:
+            if src_valid_psf is not None:
+                pixbeam = global_data.psfhelper.get_pixbeam(src_valid_psf.ra,src_valid_psf.dec)
+            else:
+                logging.critical("Cannot determine pixel beam")
         fac = 1/np.sqrt(2) # TODO: why sqrt(2)?
         C = Cmatrix(mx, my, pixbeam.a*fwhm2cc*fac, pixbeam.b*fwhm2cc*fac, pixbeam.pa)
         B = Bmatrix(C)
