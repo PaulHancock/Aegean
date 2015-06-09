@@ -986,7 +986,7 @@ def within(x, xm, xx):
     return min(max(x, xm), xx)
 
 
-def fix_shape(source):
+def fix_shape_dep(source):
     """
     Ensure that a>=b
     adjust as required
@@ -1112,6 +1112,7 @@ def refit_islands(group, stage, outerclip, istart):
 
         island_mask = []
         src_valid_psf = None
+        included_sources = [] #the sources that are actually being refit
         for src in isle:
             #pixbeam = global_data.wcshelper.get_pixbeam(src.ra,src.dec)
             pixbeam = global_data.psfhelper.get_pixbeam(src.ra, src.dec)
@@ -1167,6 +1168,7 @@ def refit_islands(group, stage, outerclip, istart):
             params.add(prefix + 'sy', value=sy, min=s_lims[0], max=s_lims[1], vary= stage>=3)
             params.add(prefix + 'theta', value=theta, vary= stage>=3)
             params.add(prefix + 'flags', value=0, vary=False)
+            included_sources.append(src)
             i += 1
 
             # Use pixels above outerclip sigmas..
@@ -1240,8 +1242,10 @@ def refit_islands(group, stage, outerclip, istart):
 
         # do the fit
         # if the pixel beam is not valid, then recalculate using the location of the last source to have a valid psf
-        if pixbeam is None:
+        if pixbeam is None and src_valid_psf is not None:
             pixbeam = global_data.psfhelper.get_pixbeam(src_valid_psf.ra,src_valid_psf.dec)
+        else:
+            logging.critical("Cannot determine pixel beam")
         fac = 1/np.sqrt(2) # TODO: why sqrt(2)?
         C = Cmatrix(mx, my, pixbeam.a*fwhm2cc*fac, pixbeam.b*fwhm2cc*fac, pixbeam.pa)
         B = Bmatrix(C)
@@ -1255,8 +1259,17 @@ def refit_islands(group, stage, outerclip, istart):
         new_src = result_to_components(result, model, island_data, src.flags)
 
         # preserve the uuid so we can do exact matching between catalogs
-        for ns, s in zip(new_src,isle):
+        for ns, s in zip(new_src,included_sources):
             ns.uuid = s.uuid
+            # if the position wasn't fit then copy the errors from the input catalog
+            if stage<2:
+                ns.err_ra = s.err_ra
+                ns.err_dec = s.err_dec
+            # if the shape wasn't fit then copy the errors from the input catalog
+            if stage <3:
+                ns.err_a = s.err_a
+                ns.err_b = s.err_b
+                ns.err_pa = s.err_pa
         sources.extend(new_src)
     return sources
 
