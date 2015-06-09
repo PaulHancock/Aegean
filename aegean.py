@@ -1112,7 +1112,9 @@ def refit_islands(group, stage, outerclip, istart):
 
         island_mask = []
         src_valid_psf = None
-        included_sources = [] #the sources that are actually being refit
+        # keep track of the sources that are actually being refit
+        # this may be a subset of all sources in the island
+        included_sources = []
         for src in isle:
             #pixbeam = global_data.wcshelper.get_pixbeam(src.ra,src.dec)
             pixbeam = global_data.psfhelper.get_pixbeam(src.ra, src.dec)
@@ -1168,6 +1170,7 @@ def refit_islands(group, stage, outerclip, istart):
             params.add(prefix + 'sy', value=sy, min=s_lims[0], max=s_lims[1], vary= stage>=3)
             params.add(prefix + 'theta', value=theta, vary= stage>=3)
             params.add(prefix + 'flags', value=0, vary=False)
+            # this source is being refit so add it to the list
             included_sources.append(src)
             i += 1
 
