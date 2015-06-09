@@ -1260,7 +1260,7 @@ def refit_islands(group, stage, outerclip, istart):
         new_src = result_to_components(result, model, island_data, src.flags)
 
         # preserve the uuid so we can do exact matching between catalogs
-        for ns, s in zip(new_src,included_sources):
+        for ns, s in zip(new_src, included_sources):
             ns.uuid = s.uuid
             # if the position wasn't fit then copy the errors from the input catalog
             if stage<2:
