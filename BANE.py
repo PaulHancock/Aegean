@@ -22,6 +22,7 @@ from AegeanTools.fits_interp import compress
 
 import multiprocessing
 
+__author__ = 'Paul Hancock'
 __version__ = 'v1.1'
 __date__ = '2015-05-19'
 
