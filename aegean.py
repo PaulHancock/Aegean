@@ -493,18 +493,18 @@ def result_to_components(result, model, island_data, isflags):
         # position and shape
         if sx >= sy:
             major = sx
-            axial_ratio = sx/sy #abs(sx*global_data.img.pixscale[0] / (sy * global_data.img.pixscale[1]))
+            minor = sy
         else:
             major = sy
-            axial_ratio = sy/sx #abs(sy*global_data.img.pixscale[1] / (sx * global_data.img.pixscale[0]))
+            minor = sx
             theta = theta - 90
 
         # source.pa is returned in degrees
-        (source.ra, source.dec, source.a, source.pa) = global_data.wcshelper.pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
+        (source.ra, source.dec, source.a, source.pa) = global_data.psfhelper.pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
+        source.b = global_data.psfhelper.pix2sky_vec((x_pix,y_pix), minor * cc2fwhm, theta + 90)[2]
         source.a *= 3600  # arcseconds
-        source.b = source.a  / axial_ratio
+        source.b *= 3600
         source.pa = pa_limit(source.pa)
-        #fix_shape(source)
 
         # if one of these values are nan then there has been some problem with the WCS handling
         if not all(np.isfinite([source.ra, source.dec, source.a, source.pa])):
@@ -1131,7 +1131,7 @@ def refit_islands(group, stage, outerclip, istart):
                     not np.isfinite(data[x, y]) or \
                     not np.isfinite(rmsimg[x, y]) or \
                     pixbeam is None:
-                log.info("Source ({0},{1}) not within usable region: skipping".format(src.island,src.source))
+                log.debug("Source ({0},{1}) not within usable region: skipping".format(src.island,src.source))
                 continue
             else:
                 # Keep track of the last source to have a valid psf so that we can use it later on
@@ -1186,7 +1186,7 @@ def refit_islands(group, stage, outerclip, istart):
             island_mask.extend(zip(xmask,ymask))
 
         if i==0:
-            log.info("No sources found in island {0}".format(src.island))
+            log.debug("No sources found in island {0}".format(src.island))
             continue
         params.components = i
         log.debug(" {0} components being fit".format(i))
@@ -1549,7 +1549,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
                  do_curve=False, beam=beam, lat=lat, psf=psf)
 
     beam = global_data.beam
-    far = 10*beam.a/3600
+    far = 10*beam.a # degrees
     # load the table and convert to an input source list
     input_table = load_table(catfile)
     input_sources = table_to_source_list(input_table)
@@ -1558,10 +1558,13 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     if ratio is not None:
         far *= ratio
         for src in input_sources:
-            src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
-            src.b = np.sqrt(src.b**2 + (beam.b*3600)**2*(1-1/ratio**2))
-
-
+            if 1/np.sqrt(1+(src.a/beam.a/3600)**2)  > ratio:
+                src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
+                src.b = np.sqrt(src.b**2 + (beam.b*3600)**2*(1-1/ratio**2))
+            # force the source to be at least as big as the local psf
+            skybeam = global_data.psfhelper.get_beam(src.ra,src.dec)
+            src.a = np.nanmax([src.a,skybeam.a])
+            src.b = np.nanmax([src.b,skybeam.b])
 
     # redo the grouping if required
     if doregroup:
