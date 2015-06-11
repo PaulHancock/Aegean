@@ -18,7 +18,7 @@ def floor2(a):
     return map(lambda x: int(floor(x)),a)
 
 
-def section(filename, factor=(2,2)):
+def section(filename, factor=(2,2),outdir=''):
     """
 
     :param filename:
@@ -31,12 +31,8 @@ def section(filename, factor=(2,2)):
     buffer = 0.1*shape[0]/factor[0], 0.1*shape[1]/factor[1]
     ysize = shape[0]/factor[0]
     xsize = shape[1]/factor[1]
-    yedges = range(0,shape[0],ysize)
-    if yedges[-1] != shape[0]:
-        yedges.append(shape[0])
-    xedges = range(0,shape[1],xsize)
-    if xedges[-1] != shape[1]:
-        xedges.append(shape[1])
+    yedges = range(0,shape[0]+shape[0]%ysize,ysize)
+    xedges = range(0,shape[1]+shape[1]%xsize,xsize)
 
     for i in zip(yedges[:-1],yedges[1:]):
         ylims = floor2((max(i[0]-buffer[0],0), min(i[1]+buffer[0],shape[0])))
@@ -45,8 +41,10 @@ def section(filename, factor=(2,2)):
             boundaries.append((ylims,xlims))
 
     for i,((ymin,ymax),(xmin,xmax)) in enumerate(boundaries):
-        new_data = fits.open(filename)[0].section[ymin:ymax,xmin:xmax]
+        with fits.open(filename, memmap=False) as hdulist:
+            new_data = hdulist[0].section[ymin:ymax,xmin:xmax]
         new_filename = filename.replace('.fits','_sec{0:02d}.fits'.format(i))
+        new_filename = os.path.join(outdir,new_filename)
         logging.info("{0} -> {1}".format(((ymin,ymax),(xmin,xmax)),new_filename))
 
         # fix the header
@@ -73,12 +71,10 @@ def rejoin(filelist, outfile):
 if __name__ == "__main__":
     usage="usage: %prog [options] FileName.fits"
     parser = OptionParser(usage=usage)
-    parser.add_option("--outdir",dest='out_dir', default='./',
+    parser.add_option("--outdir",dest='out_dir', type='str', nargs=1, default='./',
                       help="Directory for output images default: ./")
     parser.add_option('--factor',dest='factor',type='int',nargs=2, default=(2,2),
                       help='TODO')
-    parser.add_option('--cores',dest='cores',type='int',
-                      help='Number of cores to use. Default = all available.')
     (options, args) = parser.parse_args()
 
     logging_level = logging.INFO
@@ -93,5 +89,4 @@ if __name__ == "__main__":
     if not os.path.exists(filename):
         logging.error("File not found: {0} ".format(filename))
         sys.exit(1)
-
-    section(filename,options.factor)
+    section(filename,options.factor,options.out_dir)
