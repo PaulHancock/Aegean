@@ -393,14 +393,17 @@ class PSFHelper(WCSHelper):
         if None in psf:
             log.warn("PSF requested, returned Null")
             return None
-        if psf[0]>1:
-        #    print '+',
+        if np.isfinite(psf[0]):
             beam = Beam(psf[0],psf[1],beam.pa)
-        #else:
-        #    print '-',
-        #beam.a = np.hypot(beam.a, psf[0])
-        #beam.b = np.hypot(beam.b, psf[1])
         return beam
+
+    def get_beam(self,ra,dec):
+        """
+        """
+        if self.data is None:
+            return self.wcshelper.beam
+        else:
+            return self.get_psf_sky(ra,dec)
 
     def get_beamarea_pix(self, ra, dec):
         beam = self.get_pixbeam(ra,dec)
