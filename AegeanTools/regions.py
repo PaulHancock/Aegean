@@ -88,7 +88,7 @@ class Region():
         pd = self.pixeldict.copy()
         for d in xrange(1,self.maxdepth):
             for p in pd[d]:
-                pd[d+1].update({4*p,4*p+1,4*p+2,4*p+3})
+                pd[d+1].update(set((4*p,4*p+1,4*p+2,4*p+3)))
         self.demoted = list(pd[d+1])
         return
 
