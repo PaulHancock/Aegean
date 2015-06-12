@@ -500,14 +500,14 @@ def result_to_components(result, model, island_data, isflags):
             theta = theta - 90
 
         # source.pa is returned in degrees
-        (source.ra, source.dec, source.a, source.pa) = global_data.psfhelper.pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
+        (source.ra, source.dec, source.a, source.pa) = global_data.wcshelper.pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
         source.b = global_data.psfhelper.pix2sky_vec((x_pix,y_pix), minor * cc2fwhm, theta + 90)[2]
         source.a *= 3600  # arcseconds
         source.b *= 3600
         source.pa = pa_limit(source.pa)
 
         # if one of these values are nan then there has been some problem with the WCS handling
-        if not all(np.isfinite([source.ra, source.dec, source.a, source.pa])):
+        if not all(np.isfinite((source.ra, source.dec, source.a, source.pa))):
             src_flags |= flags.WCSERR
         # negative degrees is valid for RA, but I don't want them.
         if source.ra < 0:
