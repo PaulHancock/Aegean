@@ -339,6 +339,8 @@ class PSFHelper(WCSHelper):
             return self.wcshelper.beam
         else:
             psf = self.get_psf_sky(ra,dec)
+            if not all(np.isfinite(psf)):
+                return None
             return Beam(psf[0],psf[1],psf[2])
 
     def get_beamarea_pix(self, ra, dec):
