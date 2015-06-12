@@ -403,7 +403,8 @@ class PSFHelper(WCSHelper):
         if self.data is None:
             return self.wcshelper.beam
         else:
-            return self.get_psf_sky(ra,dec)
+            psf = self.get_psf_sky(ra,dec)
+            return Beam(psf[0],psf[1],psf[2])
 
     def get_beamarea_pix(self, ra, dec):
         beam = self.get_pixbeam(ra,dec)
