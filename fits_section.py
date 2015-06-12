@@ -8,10 +8,12 @@ import os
 import sys
 import copy
 import logging
-from optparse import OptionParser
+import argparse
+import numpy as np
 from math import floor
 
 import astropy
+import astropy.wcs
 from astropy.io import fits
 
 def floor2(a):
@@ -57,6 +59,39 @@ def section(filename, factor=(2,2),outdir=''):
         logging.info("Wrote {0}".format(new_filename))
 
 
+def sub_image(filename, box, outfile=None):
+    """
+
+    :param filename:
+    :param box:
+    :return:
+    """
+    hdulist = fits.open(filename)
+    header = hdulist[0].header
+    shape = header["NAXIS2"],header["NAXIS1"]
+    wcs = astropy.wcs.WCS(header)
+
+    # figure out the corners of the image in pixel coords
+    ramin,ramax,decmin,decmax = box
+    tl = (ramax, decmax)
+    tr = (ramin, decmax)
+    bl = (ramax, decmin)
+    br = (ramin, decmin)
+    corners = [tl,tr,bl,br]
+    corners_pix = wcs.wcs_world2pix(corners,1)
+    ymax,xmax = map(lambda x: int(floor(x)), np.max(corners_pix, axis=0))
+    ymin,xmin = map(lambda x: int(floor(x)), np.min(corners_pix, axis=0))
+
+    # get the required region
+    data = hdulist[0].section[ymin:ymax,xmin:xmax]
+    if outfile is None:
+        outfile = filename.lower().replace('.fits','_sub.fits')
+    # redo the header so that wcs is correct
+    header['CRPIX1'] -= xmin
+    header['CRPIX2'] -= ymin
+    hdulist[0].data = data
+    hdulist.writeto(outfile,clobber=True)
+    logging.info("Write {0}".format(outfile))
 
 
 
@@ -68,25 +103,31 @@ def rejoin(filelist, outfile):
     """
     return
 
+
 if __name__ == "__main__":
-    usage="usage: %prog [options] FileName.fits"
-    parser = OptionParser(usage=usage)
-    parser.add_option("--outdir",dest='out_dir', type='str', nargs=1, default='./',
-                      help="Directory for output images default: ./")
-    parser.add_option('--factor',dest='factor',type='int',nargs=2, default=(2,2),
-                      help='TODO')
-    (options, args) = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('fitsfile', type=str, help='File for splitting. default: none')
+    group1 = parser.add_argument_group("options for extracting sub regions")
+    group1.add_argument("--outdir",dest='out_dir', type=str, nargs=1, default='./',metavar="DIR",
+                        help="Directory for output images default: ./")
+    group1.add_argument('--factor',dest='factor',type=int,nargs=2, default=None, metavar=("N","M"),
+                         help='Cut the image into a set of NxM sub images')
+    group1.add_argument('--cutout',dest='cutout',type=float, nargs=4, default=None, metavar=("RAmin", "RAmax", "DECmin", "DECmax"),
+                        help="The boundaries of the region to cut out")
+    group1.add_argument('--out', dest='outfile', type=str,default=None,metavar="Filename.fits",
+                        help="A model for the output filename. If more than one file is output then all files will have a number appended to them.")
+    results = parser.parse_args()
 
     logging_level = logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     #logging.info("This is BANE {0}-({1})".format(__version__,__date__))
 
-    if len(args)<1:
-        parser.print_help()
-        sys.exit()
-    else:
-        filename = args[0]
-    if not os.path.exists(filename):
-        logging.error("File not found: {0} ".format(filename))
+    if not os.path.exists(results.fitsfile):
+        logging.error("File not found: {0} ".format(results.fitsfile))
         sys.exit(1)
-    section(filename,options.factor,options.out_dir)
+
+    if results.cutout is not None:
+        sub_image(results.fitsfile,results.cutout,results.outfile)
+
+    if results.factor is not None:
+        section(results.fitsfile,results.factor,results.out_dir)
