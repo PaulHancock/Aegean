@@ -87,15 +87,15 @@ def regroup(catalog, eps, far=None):
     if isinstance(catalog,str):
         table = load_table(catalog)
         srccat = table_to_source_list(table)
-    elif isinstance(catalog,list):
+    else:
         try:
             srccat = catalog
+            _ = catalog[0].ra
+            _ = catalog[0].dec
+
         except AttributeError:
-            logging.error("catalog is as list of something that has no ra/dec attributes")
+            log.error("catalog is as list of something that has no ra/dec attributes")
             sys.exit(1)
-    else:
-        logging.error("I don't know what catalog is")
-        sys.exit(1)
 
     log.info("Regrouping islands within catalog")
     log.debug("Calculating distances")
@@ -160,7 +160,7 @@ def group_iter(catalog, eps, min_members=1):
         try:
             srccat = catalog
         except AttributeError:
-            logging.error("catalog is as list of something that has no ra/dec attributes")
+            logging.error("Catalog is either not iterable, or its elements have not ra/dec attributes")
             sys.exit(1)
     else:
         logging.error("I don't know what catalog is")
