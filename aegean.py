@@ -1556,19 +1556,27 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     src_mask = np.ones(len(input_sources),dtype=bool)
     # the input sources are the intial conditions for our fits.
     # Expand each source size if needed.
-    if ratio is not None:
+    if ratio is None:
+        ratio = 0
+    else:
         far *= ratio
-        for i,src in enumerate(input_sources):
-            if 1/np.sqrt(1+(src.a/beam.a/3600)**2)  > ratio:
-                src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
-                src.b = np.sqrt(src.b**2 + (beam.b*3600)**2*(1-1/ratio**2))
-            # force the source to be at least as big as the local psf
-            skybeam = global_data.psfhelper.get_beam(src.ra,src.dec)
-            if skybeam is None:
-                src_mask[i] = False
-                continue
-            src.a = np.nanmax([src.a,skybeam.a])
-            src.b = np.nanmax([src.b,skybeam.b])
+
+    for i,src in enumerate(input_sources):
+        skybeam = global_data.psfhelper.get_beam(src.ra,src.dec)
+        if skybeam is None:
+            src_mask[i] = False
+            continue
+        #print src.island,src.source,src.a,src.b,
+        if 1/np.sqrt(1+(src.a/beam.a/3600)**2)  < ratio:
+            #print '+',
+            src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
+            src.b = np.sqrt(src.b**2 + (beam.b*3600)**2*(1-1/ratio**2))
+        else:
+            pass#print '-',
+        # force the source to be at least as big as the local psf
+        #print src.a,src.b, skybeam.a*3600,skybeam.b*3600
+        src.a = np.nanmax([src.a,skybeam.a*3600])
+        src.b = np.nanmax([src.b,skybeam.b*3600])
 
     log.info("{0} sources in catalog".format(len(input_sources)))
     log.info("{0} sources accepted".format(sum(src_mask)))
