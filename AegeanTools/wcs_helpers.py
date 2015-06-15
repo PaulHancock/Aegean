@@ -9,7 +9,6 @@ import math
 
 from angle_tools import gcd, bear, translate
 from AegeanTools.fits_image import Beam, get_beam, get_pixinfo
-from AegeanTools.fits_interp import expand
 
 # the glory of astropy
 import astropy
