@@ -82,6 +82,13 @@ def sub_image(filename, box, outfile=None):
     ymax,xmax = map(lambda x: int(floor(x)), np.max(corners_pix, axis=0))
     ymin,xmin = map(lambda x: int(floor(x)), np.min(corners_pix, axis=0))
 
+    ymax = np.clip(ymax,0,shape[0])
+    ymin = np.clip(ymin,0,shape[0])
+    xmax = np.clip(xmax,0,shape[1])
+    xmin = np.clip(xmin,0,shape[1])
+    if ymax<=ymin or xmax<=xmin:
+        print "Requested region not within file"
+        return
     # get the required region
     data = hdulist[0].section[ymin:ymax,xmin:xmax]
     if outfile is None:
