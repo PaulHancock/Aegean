@@ -501,7 +501,7 @@ def result_to_components(result, model, island_data, isflags):
 
         # source.pa is returned in degrees
         (source.ra, source.dec, source.a, source.pa) = global_data.wcshelper.pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
-        source.b = global_data.psfhelper.pix2sky_vec((x_pix,y_pix), minor * cc2fwhm, theta + 90)[2]
+        source.b = global_data.wcshelper.pix2sky_vec((x_pix,y_pix), minor * cc2fwhm, theta + 90)[2]
         source.a *= 3600  # arcseconds
         source.b *= 3600
         source.pa = pa_limit(source.pa)
