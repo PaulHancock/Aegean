@@ -66,7 +66,7 @@ def sub_image(filename, box, outfile=None):
     :param box:
     :return:
     """
-    hdulist = fits.open(filename)
+    hdulist = fits.open(filename,memmap=False)
     header = hdulist[0].header
     shape = header["NAXIS2"],header["NAXIS1"]
     wcs = astropy.wcs.WCS(header)
@@ -79,8 +79,8 @@ def sub_image(filename, box, outfile=None):
     br = (ramin, decmin)
     corners = [tl,tr,bl,br]
     corners_pix = wcs.wcs_world2pix(corners,1)
-    ymax,xmax = map(lambda x: int(floor(x)), np.max(corners_pix, axis=0))
-    ymin,xmin = map(lambda x: int(floor(x)), np.min(corners_pix, axis=0))
+    xmax,ymax = map(lambda x: int(floor(x)), np.max(corners_pix, axis=0))
+    xmin,ymin = map(lambda x: int(floor(x)), np.min(corners_pix, axis=0))
 
     ymax = np.clip(ymax,0,shape[0])
     ymin = np.clip(ymin,0,shape[0])
