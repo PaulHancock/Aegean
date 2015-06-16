@@ -443,8 +443,8 @@ def result_to_components(result, model, island_data, isflags):
     xmin, xmax, ymin, ymax = island_data.offsets
 
 
-    rms = global_data.rmsimg[xmin:xmax + 1, ymin:ymax + 1]
-    bkg = global_data.bkgimg[xmin:xmax + 1, ymin:ymax + 1]
+    rms = global_data.rmsimg[xmin:xmax, ymin:ymax]
+    bkg = global_data.bkgimg[xmin:xmax, ymin:ymax]
     residual = np.median(result.residual),np.std(result.residual)
     is_flag = isflags
 
@@ -1259,7 +1259,7 @@ def refit_islands(group, stage, outerclip, istart):
 
         # convert the results to a source object
         offsets = (xmin, xmax, ymin, ymax)
-        island_data = IslandFittingData(inum, offsets=offsets)
+        island_data = IslandFittingData(inum, i=idata, offsets=offsets, doislandflux=True, scalars=(4,4,None))
         new_src = result_to_components(result, model, island_data, src.flags)
 
         # preserve the uuid so we can do exact matching between catalogs
