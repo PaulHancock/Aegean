@@ -342,7 +342,8 @@ def ntwodgaussian_lmfit(params):
         result=None
         for i in range(params.components):
             prefix = "c{0}_".format(i)
-            amp = params[prefix+'amp'].value
+            # I hope this doesn't kill our run time
+            amp = np.nan_to_num(params[prefix+'amp'].value)
             xo = params[prefix+'xo'].value
             yo = params[prefix+'yo'].value
             sx = params[prefix+'sx'].value
