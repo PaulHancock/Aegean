@@ -545,7 +545,10 @@ def result_to_components(result, model, island_data, isflags):
         log.debug("- peak flux {0}".format(source.peak_flux))
 
         # positions and background
-        positions = np.where(kappa_sigma == source.peak_flux)
+        if np.isfinite(source.peak_flux):
+            positions = np.where(kappa_sigma == source.peak_flux)
+        else: # if a component has been refit then it might have flux = np.nan
+            positions = [[kappa_sigma.shape[0]/2],[ kappa_sigma.shape[1]/2]]
         xy = positions[0][0] + xmin, positions[1][0] + ymin
         radec = global_data.wcshelper.pix2sky(xy)
         source.ra = radec[0]
@@ -1228,34 +1231,60 @@ def refit_islands(group, stage, outerclip, istart):
         log.debug("island extracted:")
         log.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
         log.debug(" max = {0}".format(np.nanmax(idata)))
-        log.debug(" total {0}, masked {1}, not masked {2}".format(len(all_pixels),non_nan_pix,len(all_pixels)-non_nan_pix))
+        log.debug(" total {0}, masked {1}, not masked {2}".format(len(all_pixels),len(all_pixels)-non_nan_pix,non_nan_pix))
+
+        # Check to see that each component has some data within the central 3x3 pixels of it's location
+        # If not then we don't fit that component
+        for i in range(params.components):
+            prefix = "c{0}_".format(i)
+            # figure out a box around the center of this
+            cx,cy = params[prefix+'xo'], params[prefix+'yo'] #central pixel coords
+            xmx,xmn = np.clip(cx+2, 0, idata.shape[1]), np.clip(cx-2, 0, idata.shape[1])
+            ymx,ymn = np.clip(cy+2, 0, idata.shape[0]), np.clip(cy-2, 0, idata.shape[0])
+            square = idata[ymn:ymx,xmn:xmx]
+            # if there are no not-nan pixels in this region then don't vary any parameters
+            if not np.all(np.isfinite(square)):
+                log.debug(" not fitting component {0}".format(i))
+                params[prefix+'amp'].value = np.nan
+                for p in ['amp','xo','yo','sx','sy','theta']:
+                    params[prefix+p].vary=False
+                    params[prefix+p].stderr=np.nan # this results in an error of -1
+                params[prefix+'flags'].value |= flags.NOTFIT
 
         # determine the number of free parameters and if we have enough data for a fit
         nfree = np.count_nonzero([params[p].vary for p in params.keys()])
-        if non_nan_pix < nfree:
-            log.debug("More free parameters {0} than available pixels {1}".format(nfree,non_nan_pix))
-            if non_nan_pix >= params.components:
-                log.debug("Fixing all parameters except amplitudes")
-                for p in params.keys():
-                    if 'amp' not in p:
-                        params[p].vary = False
-            else:
-                log.debug(" no not-masked pixels, skipping".format(src.island,src.source))
-            continue
 
-        # do the fit
-        # if the pixel beam is not valid, then recalculate using the location of the last source to have a valid psf
-        if pixbeam is None:
-            if src_valid_psf is not None:
-                pixbeam = global_data.psfhelper.get_pixbeam(src_valid_psf.ra,src_valid_psf.dec)
-            else:
-                logging.critical("Cannot determine pixel beam")
-        fac = 1/np.sqrt(2) # TODO: why sqrt(2)?
-        C = Cmatrix(mx, my, pixbeam.a*fwhm2cc*fac, pixbeam.b*fwhm2cc*fac, pixbeam.pa)
-        B = Bmatrix(C)
-        errs = np.nanmax(rmsimg[xmin:xmax, ymin:ymax])
-        result, model = do_lmfit(idata, params, B=B)
-        model = covar_errors(model, idata, errs=errs, B=B, C=C)
+
+        if nfree <1:
+            log.debug(" Island has no components to fit")
+            result = DummyLM()
+            model = params
+        else:
+            if non_nan_pix < nfree:
+                log.debug("More free parameters {0} than available pixels {1}".format(nfree,non_nan_pix))
+                if non_nan_pix >= params.components:
+                    log.debug("Fixing all parameters except amplitudes")
+                    for p in params.keys():
+                        if 'amp' not in p:
+                            params[p].vary = False
+                else:
+                    log.debug(" no not-masked pixels, skipping".format(src.island,src.source))
+                continue
+
+            # do the fit
+            # if the pixel beam is not valid, then recalculate using the location of the last source to have a valid psf
+            if pixbeam is None:
+                if src_valid_psf is not None:
+                    pixbeam = global_data.psfhelper.get_pixbeam(src_valid_psf.ra,src_valid_psf.dec)
+                else:
+                    logging.critical("Cannot determine pixel beam")
+            fac = 1/np.sqrt(2) # TODO: why sqrt(2)?
+            C = Cmatrix(mx, my, pixbeam.a*fwhm2cc*fac, pixbeam.b*fwhm2cc*fac, pixbeam.pa)
+            B = Bmatrix(C)
+            errs = np.nanmax(rmsimg[xmin:xmax, ymin:ymax])
+            result, model = do_lmfit(idata, params, B=B)
+            model = covar_errors(model, idata, errs=errs, B=B, C=C)
+
 
         # convert the results to a source object
         offsets = (xmin, xmax, ymin, ymax)
