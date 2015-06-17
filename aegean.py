@@ -1238,12 +1238,14 @@ def refit_islands(group, stage, outerclip, istart):
         for i in range(params.components):
             prefix = "c{0}_".format(i)
             # figure out a box around the center of this
-            cx,cy = params[prefix+'xo'], params[prefix+'yo'] #central pixel coords
-            xmx,xmn = np.clip(cx+2, 0, idata.shape[1]), np.clip(cx-2, 0, idata.shape[1])
-            ymx,ymn = np.clip(cy+2, 0, idata.shape[0]), np.clip(cy-2, 0, idata.shape[0])
-            square = idata[ymn:ymx,xmn:xmx]
+            cx,cy = params[prefix+'xo'].value, params[prefix+'yo'].value #central pixel coords
+            log.debug(" comp {0}".format(i))
+            log.debug("  cx,cy {0} {1}".format(cx,cy))
+            xmx,xmn = np.clip(cx+2, 0, idata.shape[0]), np.clip(cx-1, 0, idata.shape[0])
+            ymx,ymn = np.clip(cy+2, 0, idata.shape[1]), np.clip(cy-1, 0, idata.shape[1])
+            square = idata[xmn:xmx,ymn:ymx]
             # if there are no not-nan pixels in this region then don't vary any parameters
-            if not np.all(np.isfinite(square)):
+            if not np.any(np.isfinite(square)):
                 log.debug(" not fitting component {0}".format(i))
                 params[prefix+'amp'].value = np.nan
                 for p in ['amp','xo','yo','sx','sy','theta']:
