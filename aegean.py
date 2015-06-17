@@ -594,7 +594,7 @@ def result_to_components(result, model, island_data, isflags):
                                                                   positions[1][0]))
 
         # integrated flux
-        beam_area = global_data.wcshelper.get_beamarea_pix(source.ra,source.dec)
+        beam_area = global_data.psfhelper.get_beamarea_pix(source.ra,source.dec)
         isize = source.pixels  #number of non zero pixels
         log.debug("- pixels used {0}".format(isize))
         source.int_flux = np.nansum(kappa_sigma)  #total flux Jy/beam
