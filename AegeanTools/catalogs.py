@@ -358,8 +358,10 @@ def writeIslandContours(filename, catalog, fmt):
         #comment out lines that have invalid ra/dec (WCS problems)
         if np.nan in [c.ra, c.dec]:
             print >> out, '#',
-        print >> out, text_fmt.format(c.ra, c.dec, c.island)
-        print >> out, mas_fmt.format(*[a + 0.5 for a in c.max_angular_size_anchors])
+        # some islands may not have anchors because they don't have any contours
+        if len(c.max_angular_size_anchors)==4:
+            print >> out, text_fmt.format(c.ra, c.dec, c.island)
+            print >> out, mas_fmt.format(*[a + 0.5 for a in c.max_angular_size_anchors])
         for p1, p2 in c.pix_mask:
             # DS9 uses 1-based instead of 0-based indexing
             print >> out, x_fmt.format(p1+1,p2+1)
