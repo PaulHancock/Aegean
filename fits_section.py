@@ -43,8 +43,17 @@ def section(filename, factor=(2,2),outdir=''):
             boundaries.append((ylims,xlims))
 
     for i,((ymin,ymax),(xmin,xmax)) in enumerate(boundaries):
-        with fits.open(filename, memmap=False) as hdulist:
-            new_data = hdulist[0].section[ymin:ymax,xmin:xmax]
+        with fits.open(filename, memmap=False) as hdu:
+            naxis = hdu[0].header["NAXIS"]
+            if naxis==2:
+                new_data = hdu[0].section[ymin:ymax,xmin:xmax]
+            elif naxis==3:
+                new_data = hdu[0].section[0,ymin:ymax,xmin:xmax]
+            elif naxis==4:
+                new_data = hdu[0].section[0,0,ymin:ymax,xmin:xmax]
+            else:
+                logging.critical("Your image has too many axes {0}".format(naxis))
+                sys.exit()
         new_filename = filename.replace('.fits','_sec{0:02d}.fits'.format(i))
         new_filename = os.path.join(outdir,new_filename)
         logging.info("{0} -> {1}".format(((ymin,ymax),(xmin,xmax)),new_filename))
@@ -54,6 +63,11 @@ def section(filename, factor=(2,2),outdir=''):
         new_header['CRPIX1'] -= xmin
         new_header['CRPIX2'] -= ymin
 
+        # return the data to the original number of dimensions
+        new_shape = [1 for i in range(naxis-2)]+list(new_data.shape)
+        new_data = np.reshape(new_data,new_shape)
+        
+        # save the data
         hdulist = fits.HDUList([fits.PrimaryHDU(data=new_data, header=new_header)])
         hdulist.writeto(new_filename,clobber=True)
         logging.info("Wrote {0}".format(new_filename))
@@ -115,7 +129,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('fitsfile', type=str, help='File for splitting. default: none')
     group1 = parser.add_argument_group("options for extracting sub regions")
-    group1.add_argument("--outdir",dest='out_dir', type=str, nargs=1, default='./',metavar="DIR",
+    group1.add_argument("--outdir",dest='out_dir', type=str, default='./',metavar="DIR",
                         help="Directory for output images default: ./")
     group1.add_argument('--factor',dest='factor',type=int,nargs=2, default=None, metavar=("N","M"),
                          help='Cut the image into a set of NxM sub images')
