@@ -193,12 +193,20 @@ class OutputSource(SimpleSource):
         elif self.island < other.island:
             return -1
         else:
-            if self.source > other.source:
-                return 1
-            elif self.source < other.source:
+            # if we try to compare a component to and island we put the
+            if not hasattr(other,'source'):
                 return -1
-            else:
-                return 0
+            try:
+                if self.source > other.source:
+                    return 1
+                elif self.source < other.source:
+                    return -1
+                else:
+                    return 0
+            except AttributeError:
+                # if we try to compare a component to and island we put the island first
+                if not hasattr(other,'source'):
+                    return 1
 
 
 class GlobalFittingData(object):
