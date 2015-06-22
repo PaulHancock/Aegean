@@ -188,7 +188,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
                 if not np.any(mask):
                     continue
                 log.debug("Mask {0}".format(mask))
-            yield data_box, xmin, xmax-1, ymin, ymax-1
+            yield data_box, xmin, xmax, ymin, ymax
 
 
 ##parameter estimates
@@ -1330,8 +1330,8 @@ def fit_island(island_data):
     xmin, xmax, ymin, ymax = island_data.offsets
 
     # isle = Island(idata)
-    icurve = dcurve[xmin:xmax + 1, ymin:ymax + 1]
-    rms = rmsimg[xmin:xmax + 1, ymin:ymax + 1]
+    icurve = dcurve[xmin:xmax, ymin:ymax]
+    rms = rmsimg[xmin:xmax, ymin:ymax]
 
     is_flag = 0
     #pixbeam = global_data.wcshelper.get_pixbeam_pixel((xmin+xmax)/2., (ymin+ymax)/2.)
@@ -1588,7 +1588,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     # the input sources are the intial conditions for our fits.
     # Expand each source size if needed.
     if ratio is None:
-        ratio = 0
+        ratio = 1
     else:
         far *= ratio
 
@@ -1597,17 +1597,15 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
         if skybeam is None:
             src_mask[i] = False
             continue
-        #print src.island,src.source,src.a,src.b,
-        if 1/np.sqrt(1+(src.a/beam.a/3600)**2)  < ratio:
-            #print '+',
-            src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
-            src.b = np.sqrt(src.b**2 + (beam.b*3600)**2*(1-1/ratio**2))
-        else:
-            pass#print '-',
+        src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
+        src.b = np.sqrt(src.b**2 + (beam.b*3600)**2*(1-1/ratio**2))
         # force the source to be at least as big as the local psf
-        #print src.a,src.b, skybeam.a*3600,skybeam.b*3600
-        src.a = np.nanmax([src.a,skybeam.a*3600])
-        src.b = np.nanmax([src.b,skybeam.b*3600])
+        # and replace any that have nan values with the psf (if the above gives crazy answers)
+        if src.a*src.b < skybeam.a*skybeam.b*3600**2 or not np.all(np.isfinite((src.a,src.b))):
+            # replace the source shape with the local psf
+            src.a = skybeam.a*3600
+            src.b = skybeam.b*3600
+            src.pa = skybeam.pa
 
     log.info("{0} sources in catalog".format(len(input_sources)))
     log.info("{0} sources accepted".format(sum(src_mask)))
