@@ -490,18 +490,9 @@ def result_to_components(result, model, island_data, isflags):
         source.local_rms = rms[x, y]
         source.peak_flux = amp
 
-        # position and shape
-        if sx >= sy:
-            major = sx
-            minor = sy
-        else:
-            major = sy
-            minor = sx
-            theta = theta - 90
-
         # source.pa is returned in degrees
-        (source.ra, source.dec, source.a, source.pa) = global_data.wcshelper.pix2sky_vec((x_pix, y_pix), major * cc2fwhm, theta)
-        source.b = global_data.wcshelper.pix2sky_vec((x_pix,y_pix), minor * cc2fwhm, theta + 90)[2]
+        (source.ra, source.dec, source.a, source.pa) = global_data.wcshelper.pix2sky_vec((x_pix, y_pix), sx * cc2fwhm, theta)
+        source.b = global_data.wcshelper.pix2sky_vec((x_pix,y_pix), sy * cc2fwhm, theta + 90)[2]
         source.a *= 3600  # arcseconds
         source.b *= 3600
         # force a>=b
@@ -1164,8 +1155,10 @@ def refit_islands(group, stage, outerclip, istart):
             xmax = max(xmax, min(shape[0], x + xwidth / 2 + 1))
             ymax = max(ymax, min(shape[1], y + ywidth / 2 + 1))
 
-            s_lims = [0.8 * min(sx,pixbeam.b * fwhm2cc), 2 * sy * math.sqrt(2)]
+            s_lims = [0.8 * min(sx,pixbeam.b * fwhm2cc), max(sy,sx) * 1.25]
 
+            if not s_lims[0]<sx<s_lims[1] or not s_lims[0]<sy<s_lims[1]:
+                log.info("sx, sy, s_lims: {0}, {1}, {2}".format(sx, sy, s_lims))
             # Set up the parameters for the fit, including constraints
             prefix = "c{0}_".format(i)
             params.add(prefix + 'amp', value=src.peak_flux*2) # always vary
