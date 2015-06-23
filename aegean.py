@@ -504,6 +504,9 @@ def result_to_components(result, model, island_data, isflags):
         source.b = global_data.wcshelper.pix2sky_vec((x_pix,y_pix), minor * cc2fwhm, theta + 90)[2]
         source.a *= 3600  # arcseconds
         source.b *= 3600
+        # force a>=b
+        fix_shape(source)
+        # limit the pa to be in (-90,90]
         source.pa = pa_limit(source.pa)
 
         # if one of these values are nan then there has been some problem with the WCS handling
@@ -989,7 +992,7 @@ def within(x, xm, xx):
     return min(max(x, xm), xx)
 
 
-def fix_shape_dep(source):
+def fix_shape(source):
     """
     Ensure that a>=b
     adjust as required
@@ -1143,7 +1146,7 @@ def refit_islands(group, stage, outerclip, istart):
             sx, theta = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)[2:]
             # we have to keep the PA the same here otherwise our shape parameters are incorrect
             # this may be compensating for an error we made elsewhere but for now it works.
-            sy = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.b/3600., src.pa)[2]
+            sy = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.b/3600., src.pa+90)[2]
             sx *=fwhm2cc
             sy *=fwhm2cc
 
@@ -1587,21 +1590,28 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     src_mask = np.ones(len(input_sources),dtype=bool)
     # the input sources are the intial conditions for our fits.
     # Expand each source size if needed.
-    if ratio is None:
-        ratio = 1
-    else:
+    if ratio is not None:
         far *= ratio
+        for src in input_sources:
+            src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
+            src.b = np.sqrt(src.b**2 + (beam.b*3600)**2*(1-1/ratio**2))
+
+
 
     for i,src in enumerate(input_sources):
+        # check to see if the skybeam is known, if not then we cannot use this source
+        # and we mark it for exclusion
         skybeam = global_data.psfhelper.get_beam(src.ra,src.dec)
         if skybeam is None:
             src_mask[i] = False
             continue
-        src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
-        src.b = np.sqrt(src.b**2 + (beam.b*3600)**2*(1-1/ratio**2))
+        # source with funky a/b are also rejected
+        if not np.all(np.isfinite((src.a,src.b))):
+            src_mask[i] = False
+            continue
         # force the source to be at least as big as the local psf
         # and replace any that have nan values with the psf (if the above gives crazy answers)
-        if src.a*src.b < skybeam.a*skybeam.b*3600**2 or not np.all(np.isfinite((src.a,src.b))):
+        if False: #src.a*src.b < skybeam.a*skybeam.b*3600**2 or not np.all(np.isfinite((src.a,src.b))):
             # replace the source shape with the local psf
             src.a = skybeam.a*3600
             src.b = skybeam.b*3600
