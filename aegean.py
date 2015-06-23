@@ -1157,8 +1157,8 @@ def refit_islands(group, stage, outerclip, istart):
 
             s_lims = [0.8 * min(sx,pixbeam.b * fwhm2cc), max(sy,sx) * 1.25]
 
-            if not s_lims[0]<sx<s_lims[1] or not s_lims[0]<sy<s_lims[1]:
-                log.info("sx, sy, s_lims: {0}, {1}, {2}".format(sx, sy, s_lims))
+            #if not s_lims[0]<sx<s_lims[1] or not s_lims[0]<sy<s_lims[1]:
+            #    log.info("sx, sy, s_lims: {0}, {1}, {2}".format(sx, sy, s_lims))
             # Set up the parameters for the fit, including constraints
             prefix = "c{0}_".format(i)
             params.add(prefix + 'amp', value=src.peak_flux*2) # always vary
