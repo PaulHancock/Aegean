@@ -23,7 +23,7 @@ from AegeanTools.fits_interp import compress
 import multiprocessing
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.1'
+__version__ = 'v1.2'
 __date__ = '2015-06-09'
 
 def running_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=None):
