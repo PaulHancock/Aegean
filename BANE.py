@@ -161,6 +161,97 @@ def running_filter(filename, region, step_size, box_size, shape):
     return xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
 
 
+def dummy_filter(filename, region, step_size, box_size, shape):
+    """
+    Perform a running filter over a region within a file.
+    The region can be a sub set of the data within the file - only the useful data will be loaded.
+
+    :param filename: File from which to extract data
+    :param region: [xmin,xmax,ymin,ymax] indices over which we are to operate
+    :param step_size: amount to move filtering box each iteration
+    :param box_size: Size of filtering box
+    :return: xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
+    """
+
+    # Caveat emptor: The code that follows is very difficult to read.
+    # xmax is not x_max, and x,y actually should be y,x
+    # TODO: fix the code below so that the above comment can be removed
+
+    ymin,ymax,xmin,xmax = region
+
+    logging.debug('{0}x{1},{2}x{3} starting at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+
+    cmin = max(0, ymin - box_size[1]/2)
+    cmax = min(shape[1], ymax + box_size[1]/2)
+    rmin = max(0, xmin - box_size[0]/2)
+    rmax = min(shape[0], xmax + box_size[0]/2)
+
+    # x/y min/max should refer to indices into data
+    # this is the region over which we want to operate
+    ymin -= cmin
+    ymax -= cmin
+    xmin -= rmin
+    xmax -= rmin
+
+    #start a new RunningPercentile class
+    def locations(step_size,xmin,xmax,ymin,ymax):
+        """
+        Generator function to iterate over a grid of x,y coords
+        operates only within the given bounds
+        Returns:
+        x,y,previous_x,previous_y
+        """
+
+        xvals = range(xmin,xmax,step_size[0])
+        if xvals[-1]!=xmax:
+            xvals.append(xmax)
+        yvals = range(ymin,ymax,step_size[1])
+        if yvals[-1]!=ymax:
+            yvals.append(ymax)
+        #initial data
+        px,py=xvals[0],yvals[0]
+        i=1
+        for y in yvals:
+            for x in xvals[::i]:
+                yield x,y,px,py
+                px,py=x,y
+            i*=-1 #change x direction
+
+    def box(x,y):
+        """
+        calculate the boundaries of the box centered at x,y
+        with size = box_size
+        """
+        x_min = max(0,x-box_size[0]/2)
+        x_max = min(data.shape[0]-1,x+box_size[0]/2)
+        y_min = max(0,y-box_size[1]/2)
+        y_max = min(data.shape[1]-1,y+box_size[1]/2)
+        return x_min,x_max,y_min,y_max
+
+    bkg_points = []
+    rms_points = []
+    bkg_values = []
+    rms_values = []
+
+    for x,y,px,py in locations(step_size,xmin,xmax,ymin,ymax):
+        p0,p25,p50,p75,p100=0,1,2,3,4
+
+        if p50 is not None:
+            bkg_points.append((x+rmin,y+cmin)) #the coords need to be indices into the larger array
+            bkg_values.append(p50)
+        if (p75 is not None) and (p25 is not None):
+            rms_points.append((x+rmin,y+cmin))
+            rms_values.append((p75-p25)/1.34896)
+        if len(bkg_points)>1e6:
+            break
+
+    #return our lists, the interpolation will be done on the master node
+    #also tell the master node where the data came from - using the original coords
+    ymin,ymax,xmin,xmax = region
+    logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    return xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
+
+
 def gen_factors(m,permute=True):
     """
     Generate a list of integer factors for m
@@ -208,7 +299,10 @@ def mask_img(data,mask_data):
     :param mask_data:
     :return:
     """
+    # This breaks if mask_data has no nan values
     mask = np.where(np.isnan(mask_data))
+    logging.debug(" mask, data = {0} {1}".format(len(mask),data.shape))
+    logging.debug(" mask = {0}".format(mask))
     data[mask]=np.NaN
 
 
@@ -223,6 +317,7 @@ def filter_mc(filename, step_size, box_size, cores, shape):
         try:
             queue = pprocess.Queue(limit=cores,reuse=1)
             parfilt = queue.manage(pprocess.MakeReusable(running_filter))
+            #parfilt = queue.manage(pprocess.MakeReusable(dummy_filter))
         except AttributeError, e:
             if 'poll' in e.message:
                 logging.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
@@ -269,7 +364,8 @@ def filter_mc(filename, step_size, box_size, cores, shape):
         bkg_values=[]
         rms_points=[]
         rms_values=[]
-        for xmin,xmax,ymin,ymax,bkg_p,bkg_v,rms_p,rms_v in queue:
+        for i,(xmin,xmax,ymin,ymax,bkg_p,bkg_v,rms_p,rms_v) in enumerate(queue):
+            logging.debug("Unpacking results from {0}: {1}x{2} {3}x{4}".format(i,xmin,xmax,ymin,ymax))
             bkg_points.extend(bkg_p)
             bkg_values.extend(bkg_v)
             rms_points.extend(rms_p)
@@ -279,9 +375,11 @@ def filter_mc(filename, step_size, box_size, cores, shape):
         region = [0,img_x,0,img_y]
         _,_,_,_,bkg_points,bkg_values,rms_points,rms_values=running_filter(filename,region, step_size, box_size, shape)
     #and do the interpolation etc...
+    logging.debug("Making grid points")
     (gx,gy) = np.mgrid[0:shape[0],0:shape[1]]
     #if the bkg/rms points have len zero this is because they are all nans so we return
     # arrays of nans
+    logging.debug("regridding start at {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     if len(bkg_points)>0:
         interpolated_bkg = griddata(bkg_points,bkg_values,(gx,gy),method='linear')
     else:
@@ -290,6 +388,7 @@ def filter_mc(filename, step_size, box_size, cores, shape):
         interpolated_rms = griddata(rms_points,rms_values,(gx,gy),method='linear')
     else:
         interpolated_rms=gx*np.nan
+    logging.debug("regridding end at {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
     if cores>1:
         del queue, parfilt
