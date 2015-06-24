@@ -12,7 +12,7 @@ from tempfile import NamedTemporaryFile
 import time
 
 #image manipulation 
-from scipy.interpolate import griddata
+from scipy.interpolate import griddata, LinearNDInterpolator, interp2d
 from astropy.io import fits
 
 #Aegean tools
@@ -26,7 +26,7 @@ __author__ = 'Paul Hancock'
 __version__ = 'v1.1'
 __date__ = '2015-06-09'
 
-def running_filter(filename, region, step_size, box_size, shape):
+def running_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=None):
     """
     Perform a running filter over a region within a file.
     The region can be a sub set of the data within the file - only the useful data will be loaded.
@@ -155,13 +155,35 @@ def running_filter(filename, region, step_size, box_size, shape):
             rms_points.append((x+rmin,y+cmin))
             rms_values.append((p75-p25)/1.34896)
 
-    #return our lists, the interpolation will be done on the master node
-    #also tell the master node where the data came from - using the original coords
-    logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-    return xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
+    ymin,ymax,xmin,xmax = region
+    # check if we have been passed some shared memory references
+    # and do the interpolation if we have
+    # otherwise pass back our coords and lists so that interpolation can be done elsewhere
+    if ibkg is not None and irms is not None:
+        gx,gy = np.mgrid[xmin:xmax,ymin:ymax]
+        ifunc = LinearNDInterpolator(rms_points ,rms_values)
+        interpolated_rms = ifunc((gx,gy))
+        with irms.get_lock():
+            for i,row in enumerate(interpolated_rms):
+                start_idx = np.ravel_multi_index((xmin + i,ymin), shape)
+                end_idx = start_idx + len(row)
+                irms[start_idx:end_idx] = row
+
+        ifunc = LinearNDInterpolator(bkg_points ,bkg_values)
+        interpolated_bkg = ifunc((gx,gy))
+        with ibkg.get_lock():
+            for i,row in enumerate(interpolated_bkg):
+                start_idx = np.ravel_multi_index((xmin + i,ymin), shape)
+                end_idx = start_idx + len(row)
+                ibkg[start_idx:end_idx] = row
+        logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+        return
+    else:
+        logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+        return xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
 
 
-def dummy_filter(filename, region, step_size, box_size, shape):
+def dummy_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=None):
     """
     Perform a running filter over a region within a file.
     The region can be a sub set of the data within the file - only the useful data will be loaded.
@@ -179,7 +201,7 @@ def dummy_filter(filename, region, step_size, box_size, shape):
 
     ymin,ymax,xmin,xmax = region
 
-    logging.debug('{0}x{1},{2}x{3} starting at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    logging.debug('{0}x{1},{2}x{3} starting at {4} - dummy'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
     cmin = max(0, ymin - box_size[1]/2)
     cmax = min(shape[1], ymax + box_size[1]/2)
@@ -234,22 +256,41 @@ def dummy_filter(filename, region, step_size, box_size, shape):
     rms_values = []
 
     for x,y,px,py in locations(step_size,xmin,xmax,ymin,ymax):
-        p0,p25,p50,p75,p100=0,1,2,3,4
+        bkg_points.append((x+rmin,y+cmin)) #the coords need to be indices into the larger array
+        bkg_values.append(region[0])
 
-        if p50 is not None:
-            bkg_points.append((x+rmin,y+cmin)) #the coords need to be indices into the larger array
-            bkg_values.append(p50)
-        if (p75 is not None) and (p25 is not None):
-            rms_points.append((x+rmin,y+cmin))
-            rms_values.append((p75-p25)/1.34896)
-        if len(bkg_points)>1e6:
-            break
+        rms_points.append((x+rmin,y+cmin))
+        rms_values.append(region[2])
 
     #return our lists, the interpolation will be done on the master node
     #also tell the master node where the data came from - using the original coords
     ymin,ymax,xmin,xmax = region
-    logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-    return xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
+
+    # check if we have been passed some shared memory references
+    if ibkg is not None and irms is not None:
+        gx,gy = np.mgrid[xmin:xmax,ymin:ymax]
+        ifunc = LinearNDInterpolator(rms_points ,rms_values)
+        interpolated_rms = ifunc((gx,gy))
+        with irms.get_lock():
+            for i,row in enumerate(interpolated_rms):
+                start_idx = np.ravel_multi_index((xmin + i,ymin), shape)
+                end_idx = start_idx + len(row)
+                #print len(row), len(irms[start_idx:end_idx])
+                irms[start_idx:end_idx] = row
+
+        ifunc = LinearNDInterpolator(bkg_points ,bkg_values)
+        interpolated_bkg = ifunc((gx,gy))
+        with ibkg.get_lock():
+            for i,row in enumerate(interpolated_bkg):
+                start_idx = np.ravel_multi_index((xmin + i,ymin), shape)
+                end_idx = start_idx + len(row)
+                #print len(row), len(irms[start_idx:end_idx])
+                ibkg[start_idx:end_idx] = row
+        logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+        return
+    else:
+        logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin,xmax,ymin,ymax,strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+        return xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
 
 
 def gen_factors(m,permute=True):
@@ -305,6 +346,90 @@ def mask_img(data,mask_data):
     logging.debug(" mask = {0}".format(mask))
     data[mask]=np.NaN
 
+def filter_mc_sharemem(filename, step_size, box_size, cores, shape):
+    """
+    Perform a running filter over multiple cores
+    """
+
+    if cores is None:
+        cores = multiprocessing.cpu_count()
+    if cores>1:
+        try:
+            queue = pprocess.Queue(limit=cores,reuse=1)
+            parfilt = queue.manage(pprocess.MakeReusable(running_filter))
+            #parfilt = queue.manage(pprocess.MakeReusable(dummy_filter))
+        except AttributeError, e:
+            if 'poll' in e.message:
+                logging.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
+                cores=1
+            else:
+                logging.error("Your system can't seem to make a queue, try using --cores=1")
+                raise e
+    img_y,img_x = shape
+    # initialise some shared memory
+    alen = shape[0]*shape[1]
+    ibkg = multiprocessing.Array('f',alen)
+    irms = multiprocessing.Array('f',alen)
+    if cores>1:
+        logging.info("using {0} cores".format(cores))
+        nx,ny=optimum_sections(cores, shape)
+
+        #box widths should be multiples of the step_size, and not zero
+        width_x = max(img_x/nx/step_size[0],1)*step_size[0]
+        width_y = max(img_y/ny/step_size[1],1)*step_size[1]
+
+        xstart=width_x
+        ystart=width_y
+        xend=img_x - img_x%width_x #the end point of the last "full" box
+        yend=img_y - img_y%width_y
+
+        #locations of the box edges
+        xmins=[0]
+        xmins.extend(range(xstart,xend,width_x))
+
+        xmaxs=[xstart]
+        xmaxs.extend(range(xstart+width_x,xend+1,width_x))
+        xmaxs[-1]=img_x
+
+        ymins=[0]
+        ymins.extend(range(ystart,yend,width_y))
+
+        ymaxs=[ystart]
+        ymaxs.extend(range(ystart+width_y,yend+1,width_y))
+        ymaxs[-1]=img_y
+
+        for xmin,xmax in zip(xmins,xmaxs):
+            for ymin,ymax in zip(ymins,ymaxs):
+                region = [xmin,xmax,ymin,ymax]
+                parfilt(filename, region, step_size, box_size, shape, ibkg, irms)
+
+        for _ in queue: # is this needed?
+            pass
+        #now unpack the results
+        # bkg_points=[]
+        # bkg_values=[]
+        # rms_points=[]
+        # rms_values=[]
+        # for i,(xmin,xmax,ymin,ymax,bkg_p,bkg_v,rms_p,rms_v) in enumerate(queue):
+        #     logging.debug("Unpacking results from {0}: {1}x{2} {3}x{4}".format(i,xmin,xmax,ymin,ymax))
+        #     bkg_points.extend(bkg_p)
+        #     bkg_values.extend(bkg_v)
+        #     rms_points.extend(rms_p)
+        #     rms_values.extend(rms_v)
+    else:
+        #single core we do it all at once
+        region = [0,img_x,0,img_y]
+        running_filter(filename,region, step_size, box_size, shape, ibkg, irms)
+    #and do the interpolation etc...
+    logging.debug("reshaping bkg")
+    interpolated_bkg = np.reshape(ibkg, shape)
+    logging.debug("reshaping rms")
+    interpolated_rms = np.reshape(irms, shape)
+
+    if cores>1:
+        del queue, parfilt
+    return interpolated_bkg,interpolated_rms
+
 
 def filter_mc(filename, step_size, box_size, cores, shape):
     """
@@ -317,7 +442,6 @@ def filter_mc(filename, step_size, box_size, cores, shape):
         try:
             queue = pprocess.Queue(limit=cores,reuse=1)
             parfilt = queue.manage(pprocess.MakeReusable(running_filter))
-            #parfilt = queue.manage(pprocess.MakeReusable(dummy_filter))
         except AttributeError, e:
             if 'poll' in e.message:
                 logging.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
@@ -381,11 +505,24 @@ def filter_mc(filename, step_size, box_size, cores, shape):
     # arrays of nans
     logging.debug("regridding start at {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     if len(bkg_points)>0:
-        interpolated_bkg = griddata(bkg_points,bkg_values,(gx,gy),method='linear')
+        #interpolated_bkg = griddata(bkg_points,bkg_values,(gx,gy),method='linear')
+        x,y = zip(*bkg_points)
+        print x[:10],y[:10]
+        logging.debug("making ifunc")
+        ifunc = interp2d(x,y,bkg_values)
+        logging.debug("using ifunc")
+        interpolated_bkg = ifunc(gx[:,0],gy[0])
+        #ifunc = LinearNDInterpolator(bkg_points,bkg_values)
+        #interpolated_bkg = ifunc((gx,gy))
     else:
         interpolated_bkg=gx*np.nan
     if len(rms_points)>0:
-        interpolated_rms = griddata(rms_points,rms_values,(gx,gy),method='linear')
+        #interpolated_rms = griddata(rms_points,rms_values,(gx,gy),method='linear')
+        x,y = zip(*rms_points)
+        ifunc = interp2d(x,y,rms_values)
+        interpolated_rms = ifunc(gx[:,0],gy[0])
+        #ifunc = LinearNDInterpolator(rms_points,rms_values)
+        #interpolated_rms = ifunc((gx,gy))
     else:
         interpolated_rms=gx*np.nan
     logging.debug("regridding end at {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
@@ -443,7 +580,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 
     logging.info("using grid_size {0}, box_size {1}".format(step_size,box_size))
     logging.info("on data shape {0}".format(shape))
-    bkg,rms = filter_mc(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape)
+    bkg,rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape)
     logging.info("done")
 
     if twopass:
@@ -456,7 +593,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         temp_name = tempfile.name
         del data, header, tempfile
         logging.info("running second pass to get a better rms")
-        _,rms=filter_mc(temp_name,step_size=step_size,box_size=box_size,cores=cores, shape=shape)
+        _,rms=filter_mc_sharemem(temp_name,step_size=step_size,box_size=box_size,cores=cores, shape=shape)
         #logging.info("cleaning up temp file {0}".format(tempfile.name))
         os.remove(temp_name)
 
