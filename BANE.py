@@ -346,6 +346,7 @@ def mask_img(data,mask_data):
     logging.debug(" mask = {0}".format(mask))
     data[mask]=np.NaN
 
+
 def filter_mc_sharemem(filename, step_size, box_size, cores, shape):
     """
     Perform a running filter over multiple cores
@@ -548,7 +549,6 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
     header = fits.getheader(im_name)
     shape = (header['NAXIS2'],header['NAXIS1'])
 
-    #TODO: if CDELT1 is not found, then look for CD1_1 instead, etc for CDELT2
     if step_size is None:
         if 'BMAJ' in header and 'BMIN' in header:
             beam_size = np.sqrt(abs(header['BMAJ']*header['BMIN']))
@@ -565,13 +565,14 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
             #default to 4x the synthesized beam width
             step_size = int(np.ceil(4*beam_size/pix_scale))
         else:
-            logging.info("BMAJ and/or BMIN not in fits header. Using step_size = 4 pixels")
-            step_size = 4
+            logging.info("BMAJ and/or BMIN not in fits header.")
+            logging.info("Assuming 4 pix/beam, so we have step_size = 16 pixels")
+            step_size = 16
         step_size = (step_size,step_size)
 
     if box_size is None:
-        #default to 5x the step size
-        box_size = (step_size[0]*5,step_size[1]*5)
+        #default to 6x the step size so we have ~ 30beams
+        box_size = (step_size[0]*6,step_size[1]*6)
 
     if compressed:
         if not step_size[0] == step_size[1]:
