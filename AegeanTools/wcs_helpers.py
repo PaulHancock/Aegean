@@ -136,6 +136,72 @@ class WCSHelper(object):
         return ra1, dec1, a, pa
 
 
+    def sky2pix_ellipse(self, pos, a, b, pa):
+        """
+        Convert an ellipse from sky to pixel corrds
+        a/b vectors are calculated at an origin pos=(ra,dec)
+        All input parameters are in degrees
+        Output parameters are:
+        x,y - the x,y pixels corresponding to the ra/dec position
+        sx, sy - the major minor axes (FWHM) in pixels
+        theta - the position angle in degrees
+
+        :param pos: [ra,dec] of the ellipse center
+        :param a: major axis
+        :param b: minor axis
+        :param pa: position angle
+        :return: x, y, sx, sy, theta
+        """
+        ra, dec = pos
+        x, y = self.sky2pix(pos)
+
+        x_off, y_off = self.sky2pix(translate(ra, dec, a, pa))
+        sx = np.sqrt((x - x_off) ** 2 + (y - y_off) ** 2)
+        theta = np.degrees(np.arctan2((y_off - y), (x_off - x)))
+
+        x_off, y_off = self.sky2pix(translate(ra, dec, b, pa+90))
+        sy = np.sqrt((x - x_off) ** 2 + (y - y_off) ** 2)
+        defect = theta - np.degrees(np.arctan2((y_off - y), (x_off - x))) - 90
+
+        sy /= np.cos(np.radians(defect))
+        # TODO: Check for sy>sx and see if we need to fix it
+
+        return x, y, sx, sy, theta
+
+    def pix2sky_ellipse(self, pos, sx, sy, theta):
+        """
+        Convert an ellipse from pixel to sky coords
+        sx/sy vectors are calculated at an origin pos=(x,y)
+        Input parameters are:
+        x,y - the x,y pixels corresponding to the ra/dec position
+        sx, sy - the major minor axes (FWHM) in pixels
+        theta - the position angle in degrees
+        Output params are all in degrees
+
+        :param pos: [x,y] of the ellipse center
+        :param sx: major axis
+        :param sy: minor axis
+        :param theta: position angle
+        :return: ra, dec, a, b, pa
+        """
+        ra, dec = self.pix2sky(pos)
+        x, y = pos
+        v_sx = [x + sx * np.cos(np.radians(theta)),
+                y + sy * np.sin(np.radians(theta))]
+        ra2, dec2 = self.pix2sky(v_sx)
+        major = gcd(ra, dec, ra2, dec2)
+        pa = bear(ra, dec, ra2, dec2)
+
+        v_sy = [x + sx * np.sin(np.radians(theta)),
+                y + sy * np.cos(np.radians(theta))]
+        ra2, dec2 = self.pix2sky(v_sy)
+        minor = gcd(ra, dec, ra2, dec2)
+        defect = pa - bear(ra, dec, ra2, dec2) - 90
+
+        minor *= np.cos(np.radians(defect))
+        return ra, dec, major, minor, pa
+
+
     def get_pixbeam_pixel(self, x, y):
         """
         A wrapper around get_pixbeam for when you only know the pixel coords
