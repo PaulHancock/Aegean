@@ -24,7 +24,7 @@ import multiprocessing
 
 __author__ = 'Paul Hancock'
 __version__ = 'v1.2'
-__date__ = '2015-06-09'
+__date__ = '2015-06-24'
 
 def running_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=None):
     """
@@ -709,6 +709,7 @@ def write_fits(data, header, file_name):
     hdu.header = header
     hdulist = fits.HDUList([hdu])
     hdulist.writeto(file_name, clobber=True)
+    logging.info("Wrote {0}".format(file_name))
 
 
 def save_image(hdu,data,im_name):
