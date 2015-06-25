@@ -14,6 +14,7 @@ import sys
 import os
 import numpy as np
 import re
+from time import gmtime, strftime
 
 # Other AegeanTools
 from models import OutputSource, IslandSource, SimpleSource, classify_catalog
@@ -243,10 +244,15 @@ def write_catalog(filename, catalog, fmt=None):
     """
     """
 
-    def writer(filename, catalog, fmt=None):
+    def writer(filename, catalog, fmt=None, meta={}):
         # construct a dict of the data
         # this method preserves the data types in the VOTable
-        meta = {'AegeanVersion':"{0}-({1})".format(__version__,__date__)}
+        if not 'DATE' in meta:
+            meta['DATE'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
+        if not 'PROGRAM' in meta:
+            meta['PROGRAM'] = "AegeanTools.catalogs"
+            meta['VERSION'] = "{0}-({1})".format(__version__,__date__)
+
         tab_dict = {}
         for name in catalog[0].names:
             tab_dict[name] = [getattr(c, name, None) for c in catalog]
@@ -257,7 +263,7 @@ def write_catalog(filename, catalog, fmt=None):
             if fmt in ["vot", "vo", "xml"]:
                 vot = from_table(t)
                 # description of this votable
-                vot.description = "Aegean version {0}-({1})".format(__version__,__date__)
+                vot.description = repr(meta)
                 writetoVO(vot, filename)
             elif fmt in ['hdf5']:
                 t.write(filename,path='data',overwrite=True)
@@ -317,7 +323,8 @@ def writeFITSTable(filename,table):
         cols.append(fits.Column(name=name, format=FITSTableType(table[name][0]), array=table[name]))
     cols = fits.ColDefs(cols)
     tbhdu = fits.BinTableHDU.from_columns(cols)
-    tbhdu.header['HISTORY'] = "Aegean {0}".format(__version__)
+    for k in table.meta:
+        tbhdu.header['HISTORY'] = ':'.join((k,table.meta[k]))
     tbhdu.writeto(filename, clobber=True)
 
 
