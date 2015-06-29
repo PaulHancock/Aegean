@@ -12,7 +12,7 @@ from tempfile import NamedTemporaryFile
 import time
 
 #image manipulation 
-from scipy.interpolate import griddata, LinearNDInterpolator, interp2d
+from scipy.interpolate import LinearNDInterpolator, interp2d
 from astropy.io import fits
 
 #Aegean tools
