@@ -163,7 +163,7 @@ class WCSHelper(object):
         sy = np.sqrt((x - x_off) ** 2 + (y - y_off) ** 2)
         defect = theta - np.degrees(np.arctan2((y_off - y), (x_off - x))) - 90
 
-        sy /= np.cos(np.radians(defect))
+        sy /= abs(np.cos(np.radians(defect)))
         # TODO: Check for sy>sx and see if we need to fix it
 
         return x, y, sx, sy, theta
@@ -187,18 +187,18 @@ class WCSHelper(object):
         ra, dec = self.pix2sky(pos)
         x, y = pos
         v_sx = [x + sx * np.cos(np.radians(theta)),
-                y + sy * np.sin(np.radians(theta))]
+                y + sx * np.sin(np.radians(theta))]
         ra2, dec2 = self.pix2sky(v_sx)
         major = gcd(ra, dec, ra2, dec2)
         pa = bear(ra, dec, ra2, dec2)
 
-        v_sy = [x + sx * np.sin(np.radians(theta)),
-                y + sy * np.cos(np.radians(theta))]
+        v_sy = [x + sy * np.cos(np.radians(theta-90)),
+                y + sy * np.sin(np.radians(theta-90))]
         ra2, dec2 = self.pix2sky(v_sy)
         minor = gcd(ra, dec, ra2, dec2)
         defect = pa - bear(ra, dec, ra2, dec2) - 90
 
-        minor *= np.cos(np.radians(defect))
+        minor *= abs(np.cos(np.radians(defect)))
         return ra, dec, major, minor, pa
 
 
