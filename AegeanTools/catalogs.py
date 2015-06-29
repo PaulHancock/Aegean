@@ -108,7 +108,18 @@ def get_table_formats():
     return fmts
 
 
-def save_catalog(filename, catalog):
+def update_meta_data(meta=None):
+    if meta is None:
+        meta = {}
+    if not 'DATE' in meta:
+        meta['DATE'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
+    if not 'PROGRAM' in meta:
+        meta['PROGRAM'] = "AegeanTools.catalogs"
+        meta['PROGVER'] = "{0}-({1})".format(__version__,__date__)
+
+
+
+def save_catalog(filename, catalog, meta=None):
     """
     input:
         filename - name of file to write, format determined by extension
@@ -118,17 +129,16 @@ def save_catalog(filename, catalog):
     """
     ascii_table_formats = {'csv': 'csv', 'tab': 'tab', 'tex': 'latex', 'html': 'html'}
     #.ann and .reg are handled by me
+    meta = update_meta_data(meta)
     extension = os.path.splitext(filename)[1][1:].lower()
     if extension in ['ann', 'reg']:
         writeAnn(filename, catalog, extension)
-    elif extension in ['vo', 'vot', 'xml']:
-        writeVOTable(filename, catalog)
     elif extension in ['db', 'sqlite']:
-        writeDB(filename, catalog)
-    elif extension in ['hdf5','fits']:
-        write_catalog(filename,catalog,extension)
+        writeDB(filename, catalog, meta)
+    elif extension in ['hdf5','fits', 'vo', 'vot', 'xml']:
+        write_catalog(filename,catalog, extension, meta)
     elif extension in ascii_table_formats.keys():
-        write_catalog(filename, catalog, fmt=ascii_table_formats[extension])
+        write_catalog(filename, catalog, fmt=ascii_table_formats[extension], meta=meta)
     else:
         log.warning("extension not recognised {0}".format(extension))
         log.warning("You get tab format")
@@ -240,19 +250,15 @@ def table_to_source_list(table, src_type=OutputSource):
     return source_list
 
 
-def write_catalog(filename, catalog, fmt=None):
+def write_catalog(filename, catalog, fmt=None, meta=None):
     """
     """
+    if meta is None:
+        meta = {}
 
-    def writer(filename, catalog, fmt=None, meta={}):
+    def writer(filename, catalog, fmt=None):
         # construct a dict of the data
         # this method preserves the data types in the VOTable
-        if not 'DATE' in meta:
-            meta['DATE'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-        if not 'PROGRAM' in meta:
-            meta['PROGRAM'] = "AegeanTools.catalogs"
-            meta['VERSION'] = "{0}-({1})".format(__version__,__date__)
-
         tab_dict = {}
         for name in catalog[0].names:
             tab_dict[name] = [getattr(c, name, None) for c in catalog]
@@ -328,7 +334,7 @@ def writeFITSTable(filename,table):
     tbhdu.writeto(filename, clobber=True)
 
 
-def writeVOTable(filename, catalog):
+def writeVOTable_dep(filename, catalog):
     """
     write VOTables for each of the source types that are in the catalog
     append an appropriate prefix to the file name for each type of source
@@ -485,14 +491,13 @@ def writeAnn(filename, catalog, fmt):
     return
 
 
-def writeDB(filename, catalog):
+def writeDB(filename, catalog, meta=None):
     """
     Output an sqlite3 database containing one table for each source type
     inputs:
     filename - output filename
     catalog - a catalog of sources to populated the database with
     """
-
     def sqlTypes(obj, names):
         """
         Return the sql type corresponding to each named parameter in obj
@@ -533,8 +538,9 @@ def writeDB(filename, catalog):
         db.executemany(stmnt, [map(nulls, r.as_list()) for r in t])
         log.info("Created table {0}".format(tn))
     # metadata add some meta data
-    db.execute("CREATE TABLE meta (author VARCHAR, version VARCHAR)")
-    db.execute("INSERT INTO meta (author,version) VALUES (?,?)",('Aegean',"{0}-({1})".format(__version__,__date__)))
+    db.execute("CREATE TABLE meta (key VARCHAR, val VARCHAR)")
+    for k in meta:
+        db.execute("INSERT INTO meta (key, val) VALUES (?,?)",(k,meta[k]))
     conn.commit()
     log.info(db.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall())
     conn.close()
