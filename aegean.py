@@ -491,8 +491,7 @@ def result_to_components(result, model, island_data, isflags):
         source.peak_flux = amp
 
         # source.pa is returned in degrees
-        (source.ra, source.dec, source.a, source.pa) = global_data.wcshelper.pix2sky_vec((x_pix, y_pix), sx * cc2fwhm, theta)
-        source.b = global_data.wcshelper.pix2sky_vec((x_pix,y_pix), sy * cc2fwhm, theta + 90)[2]
+        source.ra, source.dec, source.a, source.b, source.pa = global_data.wcshelper.pix2sky_ellipse((x_pix, y_pix), sx*cc2fwhm, sy*cc2fwhm, theta)
         source.a *= 3600  # arcseconds
         source.b *= 3600
         # force a>=b
@@ -1078,7 +1077,7 @@ pass # The following have been moved into AegeanTools.wcs_helpers
 
 ######################################### THE MAIN DRIVING FUNCTIONS ###############
 
-#source finding and fitting
+# source finding and fitting
 def refit_islands(group, stage, outerclip, istart):
     """
     Do island refitting (priorized fitting) on a group of islands.
@@ -1094,7 +1093,6 @@ def refit_islands(group, stage, outerclip, istart):
 
     data = global_data.data_pix
     rmsimg = global_data.rmsimg
-    #pixbeam = global_data.wcshelper.get_pixbeam()
 
     for inum, isle in enumerate(group,start=istart):
         log.debug("-=-")
@@ -1113,7 +1111,6 @@ def refit_islands(group, stage, outerclip, istart):
         # this may be a subset of all sources in the island
         included_sources = []
         for src in isle:
-            #pixbeam = global_data.wcshelper.get_pixbeam(src.ra,src.dec)
             pixbeam = global_data.psfhelper.get_pixbeam(src.ra, src.dec)
             # find the right pixels from the ra/dec
             source_x, source_y = global_data.wcshelper.sky2pix([src.ra, src.dec])
@@ -1134,12 +1131,16 @@ def refit_islands(group, stage, outerclip, istart):
                 # Keep track of the last source to have a valid psf so that we can use it later on
                 src_valid_psf = src
             # determine the shape parameters in pixel values
-            sx, theta = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.a/3600., src.pa)[2:]
-            # we have to keep the PA the same here otherwise our shape parameters are incorrect
-            # this may be compensating for an error we made elsewhere but for now it works.
-            sy = global_data.wcshelper.sky2pix_vec([src.ra,src.dec], src.b/3600., src.pa+90)[2]
+            _, _, sx, sy, theta = global_data.wcshelper.sky2pix_ellipse([src.ra,src.dec],src.a/3600, src.b/3600, src.pa)
             sx *=fwhm2cc
             sy *=fwhm2cc
+
+            if False:
+                # check the back conversion of our coords
+                ra,dec,major,minor,pa = global_data.wcshelper.pix2sky_ellipse([source_x,source_y], sx*cc2fwhm, sy*cc2fwhm, theta)
+                if abs(minor*3600- src.b)>1:
+                    print 'ellipse({0},{1},{2},{3},{4})'.format(src.ra,src.dec,src.a/3600,src.b/3600,src.pa,)
+                #print abs(ra-src.ra), abs(dec-src.dec), abs(major*3600-src.a), abs(minor*3600- src.b), abs(pa - src.pa)
 
             log.debug("Source shape [sky coords]  {0:5.2f}x{1:5.2f}@{2:05.2f}".format(src.a,src.b,src.pa))
             log.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
@@ -2210,5 +2211,8 @@ if __name__ == "__main__":
         sources.extend(detections)
 
     if len(sources) > 0 and options.tables:
+        meta = {"PROGRAM":"Aegegan",
+                "PROGVER":"{0}-({1})".format(__version__,__date__),
+                "FITSFILE":filename}
         for t in options.tables.split(','):
             save_catalog(t, sources)
