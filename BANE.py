@@ -344,7 +344,11 @@ def mask_img(data,mask_data):
     mask = np.where(np.isnan(mask_data))
     logging.debug(" mask, data = {0} {1}".format(len(mask),data.shape))
     logging.debug(" mask = {0}".format(mask))
-    data[mask]=np.NaN
+    try:
+        data[mask]=np.NaN
+    except IndexError:
+        logging.info("failed to mask file, not a critical failure")
+
 
 
 def filter_mc_sharemem(filename, step_size, box_size, cores, shape):
