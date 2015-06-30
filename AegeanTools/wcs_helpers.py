@@ -156,15 +156,15 @@ class WCSHelper(object):
         x, y = self.sky2pix(pos)
 
         x_off, y_off = self.sky2pix(translate(ra, dec, a, pa))
-        sx = np.sqrt((x - x_off) ** 2 + (y - y_off) ** 2)
+        sx = np.hypot((x - x_off),(y - y_off))
         theta = np.arctan2((y_off - y), (x_off - x))
 
-        x_off, y_off = self.sky2pix(translate(ra, dec, b, pa+90))
-        sy = np.sqrt((x - x_off) ** 2 + (y - y_off) ** 2)
+        x_off, y_off = self.sky2pix(translate(ra, dec, b, pa-90))
+        sy = np.hypot((x - x_off), (y - y_off))
         theta2 = np.arctan2((y_off - y), (x_off - x)) - np.pi/2
         defect = theta - theta2
 
-        sy /= abs(np.cos(defect))
+        sy *= abs(np.cos(defect))
         # TODO: Check for sy>sx and see if we need to fix it
 
         return x, y, sx, sy, np.degrees(theta)
@@ -310,6 +310,7 @@ class WCSHelperTest(object):
         self.helper = WCSHelper.from_file('Test/Week2_small.fits')
         #self.test_vector_round_trip()
         self.test_ellipse_round_trip()
+        #self.test_defect()
 
     def tes_vector_round_trip(self):
         print "Testing vector round trip... ",
@@ -326,6 +327,7 @@ class WCSHelperTest(object):
         else:
             print "Fail"
             return False
+
 
     def test_ellipse_round_trip(self):
         """
@@ -360,6 +362,39 @@ class WCSHelperTest(object):
         pyplot.show()
 
 
+    def test_defect(self):
+        """
+        """
+        print "Testing defect"
+        # raref, decref = self.helper.pix2sky(self.helper.refpix)
+        a = 2*self.helper.beam.a
+        b = self.helper.beam.b
+        pa = self.helper.beam.pa+45
+        ralist = range(-60,181,5)
+        declist = range(-85,86,5)
+        ras, decs = np.meshgrid(ralist,declist)
+        # fmt = "RA: {0:5.2f} DEC: {1:5.2f} a: {2:5.2f} b: {3:5.2f} pa: {4:5.2f}"
+        bgrid = np.empty(ras.shape[0]*ras.shape[1],dtype=np.float)
+        for i,(ra, dec) in enumerate(zip(ras.ravel(),decs.ravel())):
+            if ra<0:
+                ra+=360
+            initial = (ra,dec,a,b,pa)
+            x,y,sx,theta = self.helper.sky2pix_vec([ra,dec],a,pa)
+            _, _, sy, theta2 = self.helper.sky2pix_vec([ra,dec],b,pa+90)
+            #final = self.helper.pix2sky_ellipse([x,y],sx,sy,theta)
+            defect = theta-theta2-90
+            bgrid[i] = 1/np.cos(np.radians(defect))
+            # print '-'
+            # print fmt.format(*initial),"->"
+            # print fmt.format(*final)
+        bgrid = bgrid.reshape(ras.shape)
+
+        from matplotlib import pyplot
+        figure = pyplot.figure()
+        ax = figure.add_subplot(111)
+        mappable = ax.imshow(bgrid, interpolation='nearest')
+        cax = pyplot.colorbar(mappable)
+        pyplot.show()
 
 class PSFHelper(WCSHelper):
     """
