@@ -227,29 +227,24 @@ class WCSHelper(object):
         Calculate a beam in pixel scale, pa is always zero
         :return: A beam in pixel scale
         """
-        # TODO: update this to incorporate elevation scaling when needed
 
         if ra is None:
             ra,dec = self.pix2sky(self.refpix)
         pos = [ra,dec]
 
+        # check to see if we need to scale the major axis based on the declination
         if self.lat is None:
-            major = abs(self.beam.a/(self.pixscale[0]*math.sin(math.radians(self.beam.pa)) +
-                                     self.pixscale[1]*math.cos(math.radians(self.beam.pa)) ))
-
-            minor = abs(self.beam.b/(self.pixscale[1]*math.sin(math.radians(self.beam.pa)) +
-                                     self.pixscale[0]*math.cos(math.radians(self.beam.pa)) ))
-            theta =  self.sky2pix_vec(pos, self.beam.a, self.beam.pa)[3]
+            factor = 1
+            # major = abs(self.beam.a/(self.pixscale[0]*math.sin(math.radians(self.beam.pa)) +
+            #                          self.pixscale[1]*math.cos(math.radians(self.beam.pa)) ))
+            #
+            # minor = abs(self.beam.b/(self.pixscale[1]*math.sin(math.radians(self.beam.pa)) +
+            #                          self.pixscale[0]*math.cos(math.radians(self.beam.pa)) ))
+            # theta =  self.sky2pix_vec(pos, self.beam.a, self.beam.pa)[3]
         else:
-            # TODO: proper elevation scaling that can alter pa and minor axis as well.
             # this works if the pa is zero. For non-zero pa it's a little more difficult
-            major, theta = self.sky2pix_vec(pos,self.beam.a/np.cos(np.radians(dec-self.lat)),self.beam.pa)[2:4]
-            minor = self.sky2pix_vec(pos, self.beam.b, self.beam.pa+90)[2]
-            major = abs(major)
-            minor = abs(minor)
-
-
-
+            factor = np.cos(np.radians(dec-self.lat))
+        _, _, major, minor, theta = self.sky2pix_ellipse(pos, self.beam.a/factor,self.beam.b,self.beam.pa)
 
         if major<minor:
             major,minor = minor,major
@@ -400,6 +395,7 @@ class WCSHelperTest(object):
         mappable = ax.imshow(bgrid, interpolation='nearest')
         cax = pyplot.colorbar(mappable)
         pyplot.show()
+
 
 class PSFHelper(WCSHelper):
     """
