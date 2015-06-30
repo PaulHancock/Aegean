@@ -170,7 +170,7 @@ class WCSHelper(object):
         return x, y, sx, sy, np.degrees(theta)
 
 
-    def pix2sky_ellipse(self, pos, sx, sy, theta):
+    def pix2sky_ellipse(self, pixel, sx, sy, theta):
         """
         Convert an ellipse from pixel to sky coords
         sx/sy vectors are calculated at an origin pos=(x,y)
@@ -180,22 +180,22 @@ class WCSHelper(object):
         theta - the position angle in degrees
         Output params are all in degrees
 
-        :param pos: [x,y] of the ellipse center
+        :param pixel: [x,y] of the ellipse center
         :param sx: major axis
         :param sy: minor axis
         :param theta: position angle
         :return: ra, dec, a, b, pa
         """
-        ra, dec = self.pix2sky(pos)
-        x, y = pos
+        ra, dec = self.pix2sky(pixel)
+        x, y = pixel
         v_sx = [x + sx * np.cos(np.radians(theta)),
                 y + sx * np.sin(np.radians(theta))]
         ra2, dec2 = self.pix2sky(v_sx)
         major = gcd(ra, dec, ra2, dec2)
         pa = bear(ra, dec, ra2, dec2)
 
-        v_sy = [x + sy * np.cos(np.radians(theta+90)),
-                y + sy * np.sin(np.radians(theta+90))]
+        v_sy = [x + sy * np.cos(np.radians(theta-90)),
+                y + sy * np.sin(np.radians(theta-90))]
         ra2, dec2 = self.pix2sky(v_sy)
         minor = gcd(ra, dec, ra2, dec2)
         pa2 = bear(ra, dec, ra2, dec2) - 90
