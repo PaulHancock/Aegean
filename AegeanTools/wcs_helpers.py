@@ -162,10 +162,12 @@ class WCSHelper(object):
         x_off, y_off = self.sky2pix(translate(ra, dec, b, pa-90))
         sy = np.hypot((x - x_off), (y - y_off))
         theta2 = np.arctan2((y_off - y), (x_off - x)) - np.pi/2
-        defect = theta - theta2
 
+        # The a/b vectors are perpendicular in sky space, but not always in pixel space
+        # so we have to account for this by calculating the angle between the two vectors
+        # and modifying the minor axis length
+        defect = theta - theta2
         sy *= abs(np.cos(defect))
-        # TODO: Check for sy>sx and see if we need to fix it
 
         return x, y, sx, sy, np.degrees(theta)
 
@@ -199,8 +201,11 @@ class WCSHelper(object):
         ra2, dec2 = self.pix2sky(v_sy)
         minor = gcd(ra, dec, ra2, dec2)
         pa2 = bear(ra, dec, ra2, dec2) - 90
-        defect = pa - pa2
 
+        # The a/b vectors are perpendicular in sky space, but not always in pixel space
+        # so we have to account for this by calculating the angle between the two vectors
+        # and modifying the minor axis length
+        defect = pa - pa2
         minor *= abs(np.cos(np.radians(defect)))
         return ra, dec, major, minor, pa
 
