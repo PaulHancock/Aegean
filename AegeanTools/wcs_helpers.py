@@ -157,16 +157,18 @@ class WCSHelper(object):
 
         x_off, y_off = self.sky2pix(translate(ra, dec, a, pa))
         sx = np.sqrt((x - x_off) ** 2 + (y - y_off) ** 2)
-        theta = np.degrees(np.arctan2((y_off - y), (x_off - x)))
+        theta = np.arctan2((y_off - y), (x_off - x))
 
         x_off, y_off = self.sky2pix(translate(ra, dec, b, pa+90))
         sy = np.sqrt((x - x_off) ** 2 + (y - y_off) ** 2)
-        defect = theta - np.degrees(np.arctan2((y_off - y), (x_off - x))) - 90
+        theta2 = np.arctan2((y_off - y), (x_off - x)) - np.pi/2
+        defect = theta - theta2
 
-        sy /= abs(np.cos(np.radians(defect)))
+        sy /= abs(np.cos(defect))
         # TODO: Check for sy>sx and see if we need to fix it
 
-        return x, y, sx, sy, theta
+        return x, y, sx, sy, np.degrees(theta)
+
 
     def pix2sky_ellipse(self, pos, sx, sy, theta):
         """
@@ -192,11 +194,12 @@ class WCSHelper(object):
         major = gcd(ra, dec, ra2, dec2)
         pa = bear(ra, dec, ra2, dec2)
 
-        v_sy = [x + sy * np.cos(np.radians(theta-90)),
-                y + sy * np.sin(np.radians(theta-90))]
+        v_sy = [x + sy * np.cos(np.radians(theta+90)),
+                y + sy * np.sin(np.radians(theta+90))]
         ra2, dec2 = self.pix2sky(v_sy)
         minor = gcd(ra, dec, ra2, dec2)
-        defect = pa - bear(ra, dec, ra2, dec2) - 90
+        pa2 = bear(ra, dec, ra2, dec2) - 90
+        defect = pa - pa2
 
         minor *= abs(np.cos(np.radians(defect)))
         return ra, dec, major, minor, pa
@@ -303,10 +306,12 @@ class WCSHelperTest(object):
     A test class for WCSHelper
     """
     def __init__(self):
-        self.helper = WCSHelper.from_file('Test/Images/1904-66_SIN.fits')
-        self.vector_test()
+        #self.helper = WCSHelper.from_file('Test/Images/1904-66_SIN.fits')
+        self.helper = WCSHelper.from_file('Test/Week2_small.fits')
+        #self.test_vector_round_trip()
+        self.test_ellipse_round_trip()
 
-    def vector_test(self):
+    def tes_vector_round_trip(self):
         print "Testing vector round trip... ",
         initial = [1,45] #r,theta = 1,45 (degrees)
         ref = self.helper.refpix
@@ -321,6 +326,39 @@ class WCSHelperTest(object):
         else:
             print "Fail"
             return False
+
+    def test_ellipse_round_trip(self):
+        """
+        """
+        print "Testing ellipse round trip"
+        # raref, decref = self.helper.pix2sky(self.helper.refpix)
+        a = 2*self.helper.beam.a
+        b = self.helper.beam.b
+        pa = self.helper.beam.pa+45
+        ralist = range(-60,181,5)
+        declist = range(-85,86,5)
+        ras, decs = np.meshgrid(ralist,declist)
+        # fmt = "RA: {0:5.2f} DEC: {1:5.2f} a: {2:5.2f} b: {3:5.2f} pa: {4:5.2f}"
+        bgrid = np.empty(ras.shape[0]*ras.shape[1],dtype=np.float)
+        for i,(ra, dec) in enumerate(zip(ras.ravel(),decs.ravel())):
+            if ra<0:
+                ra+=360
+            initial = (ra,dec,a,b,pa)
+            x,y,sx,sy,theta = self.helper.sky2pix_ellipse([ra,dec],a,b,pa)
+            final = self.helper.pix2sky_ellipse([x,y],sx,sy,theta)
+            bgrid[i] = final[3]
+            # print '-'
+            # print fmt.format(*initial),"->"
+            # print fmt.format(*final)
+        bgrid = np.log(bgrid.reshape(ras.shape)/b)
+
+        from matplotlib import pyplot
+        figure = pyplot.figure()
+        ax = figure.add_subplot(111)
+        mappable = ax.imshow(bgrid, interpolation='nearest')
+        cax = pyplot.colorbar(mappable)
+        pyplot.show()
+
 
 
 class PSFHelper(WCSHelper):
