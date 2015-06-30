@@ -335,15 +335,15 @@ def optimum_sections(cores,data_shape):
 
 def mask_img(data,mask_data):
     """
-
-    :param data:
-    :param mask_data:
-    :return:
+    Take two images of the same shape, and transfer the mask from one to the other.
+    Masking is done via np.nan values (or any not finite values).
+    :param data: A 2d array of data
+    :param mask_data: An image of at least 2d, some of which may be nan/blank
+    :return: None, data is modified to be np.nan in the places where mask_data is not finite
     """
-    # This breaks if mask_data has no nan values
     mask = np.where(np.isnan(mask_data))
-    logging.debug(" mask, data = {0} {1}".format(len(mask),data.shape))
-    logging.debug(" mask = {0}".format(mask))
+    # If the input image has more than 2 dimensions then the mask has too many dimensions
+    # our data has only 2d so we use just the last two dimensions of the mask.
     if len(mask)>2:
         mask = mask[-2], mask[-1]
         logging.debug("mask = {0}".format(mask))
