@@ -344,6 +344,9 @@ def mask_img(data,mask_data):
     mask = np.where(np.isnan(mask_data))
     logging.debug(" mask, data = {0} {1}".format(len(mask),data.shape))
     logging.debug(" mask = {0}".format(mask))
+    if len(mask)>2:
+        mask = mask[-2], mask[-1]
+        logging.debug("mask = {0}".format(mask))
     try:
         data[mask]=np.NaN
     except IndexError:
