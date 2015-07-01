@@ -48,9 +48,13 @@ try:
 except ImportError:
     region_available = False
 
-# logging and nice options
+# logging import and setupOB
 import logging
 import logging.config
+logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
+log = logging.getLogger("Aegean")
+
+# command line option handler
 from optparse import OptionParser
 
 # external and support programs
@@ -207,7 +211,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
 
     returns: an instance of lmfit.Parameters()
     """
-    debug_on = logging.getLogger('Aegean').isEnabledFor(logging.DEBUG)
+    debug_on = log.isEnabledFor(logging.DEBUG)
     is_flag = 0
 
     #is this a negative island?
@@ -218,10 +222,8 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
     #TODO: remove this later.
     if outerclip is None:
         outerclip = innerclip
-
-    if debug_on:
-        log.debug(" - shape {0}".format(data.shape))
-        log.debug(" - xo_lim,yo_lim {0}, {1}".format(xo_lim, yo_lim))
+        
+    log.debug(" - shape {0}".format(data.shape))
 
     if not data.shape == curve.shape:
         log.error("data and curvature are mismatched")
@@ -2010,10 +2012,9 @@ if __name__ == "__main__":
     # configure logging
     global log
     logging_level = logging.DEBUG if options.debug else logging.INFO
-    config = {"level":logging_level, "format":"%(module)s:%(levelname)s %(message)s"}
-    logging.basicConfig(**config)
     # set up logging for Aegean which other modules can join
-    log = logging.getLogger("Aegean")
+    #log = logging.getLogger("Aegean")
+    log.setLevel(logging_level)
     log.info("This is Aegean {0}-({1})".format(__version__,__date__))
 
 
