@@ -74,7 +74,7 @@ def test_corr_noise_error():
     # figure out the smoothing for our noise
     scale = abs(hdulist[0].header['CDELT1']*hdulist[0].header['CDELT2'])
     smoothing = hdulist[0].header['BMAJ'] * hdulist[0].header['BMIN'] / scale
-    smoothing = np.sqrt(smoothing) * ae.fwhm2cc
+    smoothing = np.sqrt(smoothing) * ae.FWHM2CC
     print smoothing
 
     # create some correlated noise
@@ -124,7 +124,7 @@ def test_corr_noise_error():
         pa = 0
         ra, dec = ae.pix2sky([yo+1,xo+1]) # not sure why I need +1 here
         print xo,yo,"->",ra,dec
-        print >>out, ','.join(map(str,[f, ra, dec, major*np.sqrt(scale)*ae.cc2fwhm *3600, minor*np.sqrt(scale)*ae.cc2fwhm *3600, pa]))
+        print >>out, ','.join(map(str,[f, ra, dec, major*np.sqrt(scale)*ae.CC2FHWM *3600, minor*np.sqrt(scale)*ae.CC2FHWM *3600, pa]))
     out.close()
 
 def dk_error_comp():
@@ -139,7 +139,7 @@ def dk_error_comp():
     # figure out the smoothing for our noise
     scale = abs(hdulist[0].header['CDELT1']*hdulist[0].header['CDELT2'])
     smoothing = hdulist[0].header['BMAJ'] * hdulist[0].header['BMIN'] / scale
-    smoothing = np.sqrt(smoothing) * ae.fwhm2cc
+    smoothing = np.sqrt(smoothing) * ae.FWHM2CC
     print smoothing
 
     print "making noises"
