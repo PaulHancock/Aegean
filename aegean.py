@@ -63,8 +63,8 @@ from AegeanTools.fits_image import FitsImage, Beam
 from AegeanTools.msq2 import MarchingSquares
 from AegeanTools.angle_tools import dec2hms, dec2dms, gcd, bear, translate
 import AegeanTools.flags as flags
-from AegeanTools.catalogs import show_formats, check_table_formats, load_table, load_catalog, table_to_source_list, save_catalog
-
+from AegeanTools.catalogs import show_formats, check_table_formats, load_table, \
+                                 load_catalog, table_to_source_list, save_catalog
 from AegeanTools.models import OutputSource, IslandSource, SimpleSource, classify_catalog
 
 #multiple cores support
@@ -195,31 +195,32 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
             yield data_box, xmin, xmax, ymin, ymax
 
 
-##parameter estimates
+## parameter estimates
 def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offsets=(0, 0), max_summits=None):
-    """Estimates the number of sources in an island and returns initial parameters for the fit as well as
+    """
+    Estimates the number of sources in an island and returns initial parameters for the fit as well as
     limits on those parameters.
 
-    input:
-    data   - np.ndarray of flux values
-    rmsimg - np.ndarray of 1sigma values
-    curve  - np.ndarray of curvature values
-    beam   - beam object
-    innerclip - the inner clipping level for flux data, in sigmas
-    offsets - the (x,y) offset of data within it's parent image
-              this is required for proper WCS conversions
-
-    returns: an instance of lmfit.Parameters()
+    :param data: np.ndarray of flux values
+    :param rmsimg: np.ndarray of 1sigma values
+    :param curve: np.ndarray of curvature values
+    :param beam: beam object
+    :param innerclip: the inner clipping level for flux data, in sigmas
+    :param outerclip: the outer clipping level for flux data, in sigmas
+    :param offsets: the (x,y) offset of data within it's parent image
+    :param max_summits: if not None, only this many summits/components will be fit. More components may be
+                        present in the island, but subsequent components will not have free parameters
+    :return: an lmfit.Parameters object that describes our model
     """
+
     debug_on = log.isEnabledFor(logging.DEBUG)
     is_flag = 0
 
-    #is this a negative island?
+    # check to see if this island is a negative peak since we need to treat such cases slightly differently
     isnegative = max(data[np.where(np.isfinite(data))]) < 0
-    if isnegative and debug_on:
+    if isnegative:
         log.debug("[is a negative island]")
 
-    #TODO: remove this later.
     if outerclip is None:
         outerclip = innerclip
         
@@ -230,8 +231,8 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         log.error("data:{0} curve:{1}".format(data.shape, curve.shape))
         raise AssertionError()
 
-    #For small islands we can't do a 6 param fit
-    #Don't count the NaN values as part of the island
+    # For small islands we can't do a 6 param fit
+    # Don't count the NaN values as part of the island
     non_nan_pix = len(data[np.where(np.isfinite(data))].ravel())
     if 4 <= non_nan_pix <= 6:
         log.debug("FIXED2PSF")
@@ -245,16 +246,16 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         log.debug(" - size {0}".format(len(data.ravel())))
 
     if min(data.shape) <= 2 or (is_flag & flags.FITERRSMALL) or (is_flag & flags.FIXED2PSF):
-        #1d islands or small islands only get one source
+        # 1d islands or small islands only get one source
         if debug_on:
             log.debug("Tiny summit detected")
             log.debug("{0}".format(data))
         summits = [[data, 0, data.shape[0], 0, data.shape[1]]]
-        #and are constrained to be point sources
+        # and are constrained to be point sources
         is_flag |= flags.FIXED2PSF
     else:
         if isnegative:
-            #the summit should be able to include all pixels within the island not just those above innerclip
+            # the summit should be able to include all pixels within the island not just those above innerclip
             kappa_sigma = np.where(curve > 0.5, np.where(data + outerclip * rmsimg < 0, data, np.nan), np.nan)
         else:
             kappa_sigma = np.where(-1 * curve > 0.5, np.where(data - outerclip * rmsimg > 0, data, np.nan), np.nan)
@@ -268,10 +269,8 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
     if len(summits)<1:
         log.debug("Island has {0} summits".format(len(summits)))
         return None
-        # for writing ds9 style regions, prepend with "image"
-        #print "point({0}, {1}) # point=x".format(int(offsets[1]),int(offsets[0]))
 
-    # add summits in reverse order of peak SNR
+    # add summits in reverse order of peak SNR - ie brightest first
     for summit, xmin, xmax, ymin, ymax in sorted(summits, key=lambda x: np.nanmax(-1.*abs(x[0]))):
         summits_considered += 1
         summit_flag = is_flag
@@ -303,15 +302,12 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         snr = np.nanmax(abs(data[xmin:xmax+1,ymin:ymax+1] / rmsimg[xmin:xmax+1,ymin:ymax+1]))
         if snr < innerclip:
             log.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
-            #log.warn("Summit doesn't obey inner clip constraint. This should have been caught earlier.")
-            #log.info("snr {0} < innerclip {1}".format(snr,innerclip))
-            #log.info("{0}".format(data[xmin:xmax+1,ymin:ymax+1] / rmsimg[xmin:xmax+1,ymin:ymax+1]))
             continue
 
 
         # allow amp to be 5% or (innerclip) sigma higher
         # TODO: the 5% should depend on the beam sampling
-        # when innerclip is 400 this becomes rather stupid
+        # note: when innerclip is 400 this becomes rather stupid
         if amp > 0:
             amp_min, amp_max = 0.95 * min(outerclip * rmsimg[xo, yo], amp), amp * 1.05 + innerclip * rmsimg[xo, yo]
         else:
@@ -321,59 +317,47 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
 
 
-        #pixbeam = global_data.wcshelper.get_pixbeam_pixel(yo+offsets[0],xo+offsets[1])
         pixbeam = global_data.psfhelper.get_pixbeam_pixel(yo+offsets[0],xo+offsets[1])
         if pixbeam is None:
             log.debug(" Summit has invalid WCS/Beam - Skipping.".format(i))
             continue
-            # if debug_on:
-            #     log.debug("WCSERR")
-            # is_flag = flags.WCSERR
-            # pixbeam = Beam(1, 1, 0)
 
-        #set a square limit based on the size of the pixbeam
+        # set a square limit based on the size of the pixbeam
         xo_lim = 0.5*np.hypot(pixbeam.a, pixbeam.b)
         yo_lim = xo_lim
 
         yo_min, yo_max = max(ymin, yo - yo_lim), min(ymax, yo + yo_lim)
-        if yo_min == yo_max:  #if we have a 1d summit then allow the position to vary by +/-0.5pix
+        if yo_min == yo_max:  # if we have a 1d summit then allow the position to vary by +/-0.5pix
             yo_min, yo_max = yo_min - 0.5, yo_max + 0.5
 
         xo_min, xo_max = max(xmin, xo - xo_lim), min(xmax, xo + xo_lim)
-        if xo_min == xo_max:  #if we have a 1d summit then allow the position to vary by +/-0.5pix
+        if xo_min == xo_max:  # if we have a 1d summit then allow the position to vary by +/-0.5pix
             xo_min, xo_max = xo_min - 0.5, xo_max + 0.5
-
-        #TODO: The limits on sx,sy work well for circular beams or unresolved sources
-        #for elliptical beams *and* resolved sources this isn't good and should be redone
 
         xsize = xmax - xmin + 1
         ysize = ymax - ymin + 1
 
-        #initial shape is the pix beam
+        # initial shape is the psf
         sx = pixbeam.a * FWHM2CC
         sy = pixbeam.b * FWHM2CC
 
         # lmfit does silly things if we start with these two parameters being equal
         sx = max(sx,sy*1.01)
 
-        #constraints are based on the shape of the island
+        # constraints are based on the shape of the island
         sx_min, sx_max = sx * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * FWHM2CC, sx * 1.1)
         sy_min, sy_max = sy * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * FWHM2CC, sx * 1.1)
-
-        #TODO: update this to fit a psf for things that are "close" to a psf.
-        #if the min/max of either sx,sy are equal then use a PSF fit
-        if sy_min == sy_max or sx_min == sx_max: # this will never happen
-            summit_flag |= flags.FIXED2PSF
 
         theta = pixbeam.pa # Degrees
         flag = summit_flag
 
-        #check to see if we are going to fit this source
+        # check to see if we are going to fit this component
         if max_summits is not None:
             maxxed = i >= max_summits
         else:
             maxxed = False
 
+        # components that are not fit need appropriate flags
         if maxxed:
             summit_flag |= flags.NOTFIT
             summit_flag |= flags.FIXED2PSF
@@ -391,14 +375,12 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             log.debug(" - flags {0}".format(flag))
             log.debug(" - fit?  {0}".format(not maxxed))
 
-        # adjust parameters so that no two have the same initial value
-        # TODO: incorporate the circular constraint
+        # TODO: figure out how incorporate the circular constraint on xo/yo
         prefix = "c{0}_".format(i)
         params.add(prefix+'amp',value=amp, min=amp_min, max=amp_max, vary= not maxxed)
         params.add(prefix+'xo',value=xo, min=float(xo_min), max=float(xo_max), vary= not maxxed)
-        #params.add(prefix+'xo',value=xo, vary= not maxxed)
         params.add(prefix+'yo',value=yo, min=float(yo_min), max=float(yo_max), vary= not maxxed)
-        #params.add(prefix+'yo',value=yo, vary= not maxxed)
+
         if summit_flag & flags.FIXED2PSF > 0:
             psf_vary = False
         else:
@@ -418,21 +400,15 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
     return params
 
 
-pass # for code folding purposes only!
-# Modelling and fitting functions (now in AegeanTools.fitting)
-# def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
-# def Cmatrix(x,y,sx,sy,theta):
-# def Bmatrix(C):
-# def emp_jacobian(pars, x, y, errs=None):
-# def CRB_errs(jac, C, B=None):
-# def ntwodgaussian_lmfit(params):
-# def do_lmfit(data, params):
-# def calc_errors(source, thetaN=None):
-
 def result_to_components(result, model, island_data, isflags):
     """
     Convert fitting results into a set of components
-    :return: a list of components
+
+    :param result: the results from lmfit (pixel data etc.)
+    :param model: the model that was fit
+    :param island_data: an IslandFittingData object
+    :param isflags: flags that should be added to this island (in addition to those within the model)
+    :return: a list of components [and islands]
     """
 
     global global_data
@@ -440,8 +416,6 @@ def result_to_components(result, model, island_data, isflags):
     # island data
     isle_num = island_data.isle_num
     idata = island_data.i
-    if island_data.scalars is not None:
-        innerclip, outerclip, max_summits = island_data.scalars
     xmin, xmax, ymin, ymax = island_data.offsets
 
 
@@ -485,14 +459,14 @@ def result_to_components(result, model, island_data, isflags):
 
         # fluxes
         # the background is taken from background map
-        # Clamp the pixel location to the edge of the background map (see Trac #51)
+        # Clamp the pixel location to the edge of the background map
         y = max(min(int(round(y_pix - ymin)), bkg.shape[1] - 1), 0)
         x = max(min(int(round(x_pix - xmin)), bkg.shape[0] - 1), 0)
         source.background = bkg[x, y]
         source.local_rms = rms[x, y]
         source.peak_flux = amp
 
-        # source.pa is returned in degrees
+        # all params are in degrees
         source.ra, source.dec, source.a, source.b, source.pa = global_data.wcshelper.pix2sky_ellipse((x_pix, y_pix), sx*CC2FHWM, sy*CC2FHWM, theta)
         source.a *= 3600  # arcseconds
         source.b *= 3600
@@ -502,7 +476,7 @@ def result_to_components(result, model, island_data, isflags):
         source.pa = pa_limit(source.pa)
 
         # if one of these values are nan then there has been some problem with the WCS handling
-        if not all(np.isfinite((source.ra, source.dec, source.a, source.pa))):
+        if not all(np.isfinite((source.ra, source.dec, source.a, source.b, source.pa))):
             src_flags |= flags.WCSERR
         # negative degrees is valid for RA, but I don't want them.
         if source.ra < 0:
@@ -514,9 +488,10 @@ def result_to_components(result, model, island_data, isflags):
 
         # calculate integrated flux
         source.int_flux = source.peak_flux * sx * sy * CC2FHWM ** 2 * np.pi
-        source.int_flux /= global_data.psfhelper.get_beamarea_pix(source.ra,source.dec) # scale Jy/beam -> Jy
+        # scale Jy/beam -> Jy using the area of the psf
+        source.int_flux /= global_data.psfhelper.get_beamarea_pix(source.ra,source.dec)
 
-        # Calculate errors for params that were fit (and int_flux)
+        # Calculate errors for params that were fit (as well as int_flux)
         errors(source, model, global_data.wcshelper)
 
         source.flags = src_flags
@@ -525,6 +500,7 @@ def result_to_components(result, model, island_data, isflags):
 
     # calculate the integrated island flux if required
     if island_data.doislandflux:
+        _, outerclip, _ = island_data.scalars
         log.debug("Integrated flux for island {0}".format(isle_num))
         kappa_sigma = np.where(abs(idata) - outerclip * rms > 0, idata, np.NaN)
         log.debug("- island shape is {0}".format(kappa_sigma.shape))
@@ -561,6 +537,7 @@ def result_to_components(result, model, island_data, isflags):
         source.pixels = int(sum(np.isfinite(kappa_sigma).ravel() * 1.0))
         source.extent = [xmin, xmax, ymin, ymax]
 
+        # TODO: investigate what happens when the sky coords are skewed w.r.t the pixel coords
         # calculate the area of the island as a fraction of the area of the bounding box
         bl = global_data.wcshelper.pix2sky([xmax, ymin])
         tl = global_data.wcshelper.pix2sky([xmax, ymax])
@@ -590,9 +567,9 @@ def result_to_components(result, model, island_data, isflags):
 
         # integrated flux
         beam_area = global_data.psfhelper.get_beamarea_pix(source.ra,source.dec)
-        isize = source.pixels  #number of non zero pixels
+        isize = source.pixels  # number of non zero pixels
         log.debug("- pixels used {0}".format(isize))
-        source.int_flux = np.nansum(kappa_sigma)  #total flux Jy/beam
+        source.int_flux = np.nansum(kappa_sigma)  # total flux Jy/beam
         log.debug("- sum of pixles {0}".format(source.int_flux))
         source.int_flux /= beam_area
         log.debug("- integrated flux {0}".format(source.int_flux))
@@ -2012,8 +1989,6 @@ if __name__ == "__main__":
     # configure logging
     global log
     logging_level = logging.DEBUG if options.debug else logging.INFO
-    # set up logging for Aegean which other modules can join
-    #log = logging.getLogger("Aegean")
     log.setLevel(logging_level)
     log.info("This is Aegean {0}-({1})".format(__version__,__date__))
 
