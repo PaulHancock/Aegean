@@ -589,32 +589,37 @@ def load_aux_image(image, auxfile):
     """
     Load a fits file (bkg/rms/curve) and make sure that
     it is the same shape as the main image.
-    image = main image object
-    auxfile = filename of auxiliary file
+    :param image: main FitsImage object
+    :param auxfile: filename of auxiliary file to be loaded
+    :return: FitsImage(auxfile)
     """
     auximg = FitsImage(auxfile, beam=global_data.beam).get_pixels()
     if auximg.shape != image.get_pixels().shape:
         log.error("file {0} is not the same size as the image map".format(auxfile))
         log.error("{0}= {1}, image = {2}".format(auxfile, auximg.shape, image.get_pixels().shape))
-        sys.exit()
+        sys.exit(1)
     return auximg
-
-
-def load_bkg_rms_image(image, bkgfile, rmsfile):
-    """
-    Load the background and rms images.
-    Deprecation iminent:
-      use load_aux_image on individual images
-    """
-    bkgimg = load_aux_image(image, bkgfile)
-    rmsimg = load_aux_image(image, rmsfile)
-    return bkgimg, rmsimg
 
 
 def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, cores=1, csigma=None,
                  do_curve=True, mask=None, lat=None, psf=None):
     """
-    populate the global_data object by loading or calculating the various components
+    Populate the global_data object by loading or calculating the various components
+
+    :param filename: Main image which source finding is run on
+    :param hdu_index: HDU index of the image within the fits file, default is 0 (first)
+    :param bkgin: background image filename or HDUList
+    :param rmsin: rms/noise image filename or HDUList
+    :param beam: Beam object representing the synthsized beam. Will replace what is in the FITS header.
+    :param verb: write extra lines to INFO level log
+    :param rms: a float that represents a constant rms level for the entire image
+    :param cores: number of cores to use if different from what is autodetected
+    :param csigma: float value that represents the 1sigma value for the curvature map (don't use please)
+    :param do_curve: if True a curvature map will be created, default=True
+    :param mask: filename or Region object
+    :param lat: latitude of the observing telescope (declination of zenith)
+    :param psf: filename or HDUList of a psf image
+    :return: None
     """
     global global_data
 
@@ -637,13 +642,9 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
     else:
         global_data.region = None
 
-    #global_data.beam = beam
-    #global_data.hdu_header = img.get_hdu_header()
-    #global_data.wcs = img.wcs
     global_data.wcshelper = WCSHelper.from_header(img.get_hdu_header(), beam, lat)
     global_data.psfhelper = PSFHelper(psf, global_data.wcshelper)
     global_data.beam = global_data.wcshelper.beam
-    #initial values of the three images
     global_data.img = img
     global_data.data_pix = img.get_pixels()
     global_data.dtype = type(global_data.data_pix[0][0])
@@ -651,8 +652,9 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
     global_data.rmsimg = np.zeros(global_data.data_pix.shape, dtype=global_data.dtype)
     global_data.pixarea = img.pixarea
     global_data.dcurve = None
+
     if do_curve:
-        #calculate curvature but store it as -1,0,+1
+        # calculate curvature but store it as -1,0,+1
         cimg = curvature(global_data.data_pix)
         if csigma is None:
             log.info("Calculating curvature csigma")
@@ -664,21 +666,17 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
 
         global_data.dcurve = dcurve
 
-    #calculate the pixel beam
-    #global_data.pixbeam = global_data.wcshelper.get_pixbeam()
-    #log.debug("pixbeam is : {0}".format(global_data.pixbeam))
-
-    #if either of rms or bkg images are not supplied then calculate them both
+    # if either of rms or bkg images are not supplied then calculate them both
     if not (rmsin and bkgin):
         if verb:
             log.info("Calculating background and rms data")
         make_bkg_rms_from_global(mesh_size=20, forced_rms=rms, cores=cores)
 
-    #if a forced rms was supplied use that instead
+    # if a forced rms was supplied use that instead
     if rms is not None:
         global_data.rmsimg = np.ones(global_data.data_pix.shape) * rms
 
-    #replace the calculated images with input versions, if the user has supplied them.
+    # replace the calculated images with input versions, if the user has supplied them.
     if bkgin:
         if verb:
             log.info("Loading background data from file {0}".format(bkgin))
@@ -688,7 +686,7 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
             log.info("Loading rms data from file {0}".format(rmsin))
         global_data.rmsimg = load_aux_image(img, rmsin)
 
-    #subtract the background image from the data image and save
+    # subtract the background image from the data image and save
     if verb and debug:
         log.debug("Data max is {0}".format(img.get_pixels()[np.isfinite(img.get_pixels())].max()))
         log.debug("Doing background subtraction")
@@ -699,10 +697,10 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
 
     return
 
-#image manipulation
+# image manipulation
 def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
     """
-    [legacy version used by the pipeline]
+    [legacy version used by the VAST pipeline]
 
     Calculate an rms image and a bkg image
 
