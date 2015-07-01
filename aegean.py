@@ -81,8 +81,8 @@ header = """#Aegean version {0}
 # on dataset: {1}"""
 
 #global constants
-fwhm2cc = 1 / (2 * math.sqrt(2 * math.log(2)))
-cc2fwhm = (2 * math.sqrt(2 * math.log(2)))
+FWHM2CC = 1 / (2 * math.sqrt(2 * math.log(2)))
+CC2FHWM = (2 * math.sqrt(2 * math.log(2)))
 
 ####################################### CLASSES ####################################
 class GlobalFittingData(object):
@@ -350,15 +350,15 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         ysize = ymax - ymin + 1
 
         #initial shape is the pix beam
-        sx = pixbeam.a * fwhm2cc
-        sy = pixbeam.b * fwhm2cc
+        sx = pixbeam.a * FWHM2CC
+        sy = pixbeam.b * FWHM2CC
 
         # lmfit does silly things if we start with these two parameters being equal
         sx = max(sx,sy*1.01)
 
         #constraints are based on the shape of the island
-        sx_min, sx_max = sx * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * fwhm2cc, sx * 1.1)
-        sy_min, sy_max = sy * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * fwhm2cc, sx * 1.1)
+        sx_min, sx_max = sx * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * FWHM2CC, sx * 1.1)
+        sy_min, sy_max = sy * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * FWHM2CC, sx * 1.1)
 
         #TODO: update this to fit a psf for things that are "close" to a psf.
         #if the min/max of either sx,sy are equal then use a PSF fit
@@ -383,10 +383,10 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             log.debug(" - amp {0} {1} {2} ".format(amp, amp_min, amp_max))
             log.debug(" - xo {0} {1} {2} ".format(xo, xo_min, xo_max))
             log.debug(" - yo {0} {1} {2} ".format(yo, yo_min, yo_max))
-            log.debug(" - sx {0} {1} {2} | {3} {4}".format(sx, sx_min, sx_max, sx_min * cc2fwhm,
-                                                                  sx_max * cc2fwhm))
-            log.debug(" - sy {0} {1} {2} | {3} {4}".format(sy, sy_min, sy_max, sy_min * cc2fwhm,
-                                                                  sy_max * cc2fwhm))
+            log.debug(" - sx {0} {1} {2} | {3} {4}".format(sx, sx_min, sx_max, sx_min * CC2FHWM,
+                                                                  sx_max * CC2FHWM))
+            log.debug(" - sy {0} {1} {2} | {3} {4}".format(sy, sy_min, sy_max, sy_min * CC2FHWM,
+                                                                  sy_max * CC2FHWM))
             log.debug(" - theta {0} {1} {2}".format(theta, -180, 180))
             log.debug(" - flags {0}".format(flag))
             log.debug(" - fit?  {0}".format(not maxxed))
@@ -493,7 +493,7 @@ def result_to_components(result, model, island_data, isflags):
         source.peak_flux = amp
 
         # source.pa is returned in degrees
-        source.ra, source.dec, source.a, source.b, source.pa = global_data.wcshelper.pix2sky_ellipse((x_pix, y_pix), sx*cc2fwhm, sy*cc2fwhm, theta)
+        source.ra, source.dec, source.a, source.b, source.pa = global_data.wcshelper.pix2sky_ellipse((x_pix, y_pix), sx*CC2FHWM, sy*CC2FHWM, theta)
         source.a *= 3600  # arcseconds
         source.b *= 3600
         # force a>=b
@@ -513,7 +513,7 @@ def result_to_components(result, model, island_data, isflags):
 
 
         # calculate integrated flux
-        source.int_flux = source.peak_flux * sx * sy * cc2fwhm ** 2 * np.pi
+        source.int_flux = source.peak_flux * sx * sy * CC2FHWM ** 2 * np.pi
         source.int_flux /= global_data.psfhelper.get_beamarea_pix(source.ra,source.dec) # scale Jy/beam -> Jy
 
         # Calculate errors for params that were fit (and int_flux)
@@ -1134,12 +1134,12 @@ def refit_islands(group, stage, outerclip, istart):
                 src_valid_psf = src
             # determine the shape parameters in pixel values
             _, _, sx, sy, theta = global_data.wcshelper.sky2pix_ellipse([src.ra,src.dec],src.a/3600, src.b/3600, src.pa)
-            sx *=fwhm2cc
-            sy *=fwhm2cc
+            sx *=FWHM2CC
+            sy *=FWHM2CC
 
             if False:
                 # check the back conversion of our coords
-                ra,dec,major,minor,pa = global_data.wcshelper.pix2sky_ellipse([source_x,source_y], sx*cc2fwhm, sy*cc2fwhm, theta)
+                ra,dec,major,minor,pa = global_data.wcshelper.pix2sky_ellipse([source_x,source_y], sx*CC2FHWM, sy*CC2FHWM, theta)
                 if abs(minor*3600- src.b)>1:
                     print 'ellipse({0},{1},{2},{3},{4})'.format(src.ra,src.dec,src.a/3600,src.b/3600,src.pa,)
                 #print abs(ra-src.ra), abs(dec-src.dec), abs(major*3600-src.a), abs(minor*3600- src.b), abs(pa - src.pa)
@@ -1158,7 +1158,7 @@ def refit_islands(group, stage, outerclip, istart):
             xmax = max(xmax, min(shape[0], x + xwidth / 2 + 1))
             ymax = max(ymax, min(shape[1], y + ywidth / 2 + 1))
 
-            s_lims = [0.8 * min(sx,pixbeam.b * fwhm2cc), max(sy,sx) * 1.25]
+            s_lims = [0.8 * min(sx,pixbeam.b * FWHM2CC), max(sy,sx) * 1.25]
 
             #if not s_lims[0]<sx<s_lims[1] or not s_lims[0]<sy<s_lims[1]:
             #    log.info("sx, sy, s_lims: {0}, {1}, {2}".format(sx, sy, s_lims))
@@ -1280,7 +1280,7 @@ def refit_islands(group, stage, outerclip, istart):
                 else:
                     logging.critical("Cannot determine pixel beam")
             fac = 1/np.sqrt(2) # TODO: why sqrt(2)?
-            C = Cmatrix(mx, my, pixbeam.a*fwhm2cc*fac, pixbeam.b*fwhm2cc*fac, pixbeam.pa)
+            C = Cmatrix(mx, my, pixbeam.a*FWHM2CC*fac, pixbeam.b*FWHM2CC*fac, pixbeam.pa)
             B = Bmatrix(C)
             errs = np.nanmax(rmsimg[xmin:xmax, ymin:ymax])
             result, model = do_lmfit(idata, params, B=B)
@@ -1369,10 +1369,10 @@ def fit_island(island_data):
     else:
         # Model is the fitted parameters
         fac = 1/np.sqrt(2) # TODO: why sqrt(2)?
-        C = Cmatrix(mx, my, pixbeam.a*fwhm2cc*fac, pixbeam.b*fwhm2cc*fac, pixbeam.pa)
+        C = Cmatrix(mx, my, pixbeam.a*FWHM2CC*fac, pixbeam.b*FWHM2CC*fac, pixbeam.pa)
         B = Bmatrix(C)
         #B = None
-        log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*fwhm2cc, pixbeam.b*fwhm2cc, pixbeam.pa))
+        log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*FWHM2CC, pixbeam.b*FWHM2CC, pixbeam.pa))
         #snr = np.nanmax(idata)/np.nanmax(rms)
         errs = np.nanmax(rms)
         result, model = do_lmfit(idata, params, B=B)
@@ -1790,7 +1790,7 @@ def force_measure_flux(radec):
         amp = 1.0
         xo = source_x - xmin
         yo = source_y - ymin
-        params = [amp, xo, yo, pixbeam.a * fwhm2cc, pixbeam.b * fwhm2cc, pixbeam.pa]
+        params = [amp, xo, yo, pixbeam.a * FWHM2CC, pixbeam.b * FWHM2CC, pixbeam.pa]
         gaussian_data = ntwodgaussian_mpfit(params)(*np.indices(data.shape))
 
         # Calculate the "best fit" amplitude as the average of the implied amplitude
