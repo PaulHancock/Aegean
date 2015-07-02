@@ -51,6 +51,7 @@ except ImportError:
 # logging import and setupOB
 import logging
 import logging.config
+global log
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
 
@@ -90,7 +91,6 @@ class GlobalFittingData(object):
     The global data used for fitting.
     (should be) Read-only once created.
     Used by island fitting subprocesses.
-    wcs parameter used by most functions.
     """
 
     def __init__(self):
@@ -129,17 +129,13 @@ class IslandFittingData(object):
 
 class DummyLM(object):
     """
-    A dummy copy of the mpfit class that just holds the parinfo variables
-    This class doesn't do a great deal, but it makes it 'looks' like the mpfit class
-    and makes it easy to estimate source parameters when you don't want to do any fitting.
+    A dummy copy of the lmfit results, for use when no fitting was done.
     """
 
     def __init__(self):
         self.residual = [np.nan,np.nan]
         self.success = False
 
-
-######################################### FUNCTIONS ###############################
 
 def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
     """
@@ -195,7 +191,7 @@ def gen_flood_wrap(data, rmsimg, innerclip, outerclip=None, domask=False):
             yield data_box, xmin, xmax, ymin, ymax
 
 
-## parameter estimates
+# parameter estimates
 def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None, offsets=(0, 0), max_summits=None):
     """
     Estimates the number of sources in an island and returns initial parameters for the fit as well as
@@ -1966,7 +1962,6 @@ if __name__ == "__main__":
 
 
     # configure logging
-    global log
     logging_level = logging.DEBUG if options.debug else logging.INFO
     log.setLevel(logging_level)
     log.info("This is Aegean {0}-({1})".format(__version__,__date__))
