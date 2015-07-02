@@ -1481,9 +1481,9 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
     if len(island_group) > 0:
         fit_parallel(island_group)
 
-    for sources in queue:
-        if sources:  # ignore empty lists
-            for src in sources:
+    for srcs in queue:
+        if srcs:  # ignore empty lists
+            for src in srcs:
                 # ignore sources that we have been told to ignore
                 if (src.peak_flux > 0 and nopositive) or (src.peak_flux < 0 and nonegative):
                     continue
@@ -2019,7 +2019,7 @@ if __name__ == "__main__":
         except AttributeError, e:
             if 'poll' in e.message:
                 log.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
-                cores = 1
+                options.cores = 1
                 queue = None
                 temp = None
             else:
