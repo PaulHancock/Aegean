@@ -51,7 +51,6 @@ except ImportError:
 # logging import and setupOB
 import logging
 import logging.config
-global log
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
 
@@ -68,7 +67,7 @@ from AegeanTools.catalogs import show_formats, check_table_formats, load_table, 
                                  load_catalog, table_to_source_list, save_catalog
 from AegeanTools.models import OutputSource, IslandSource, SimpleSource, classify_catalog
 
-#multiple cores support
+# multiple cores support
 import AegeanTools.pprocess as pprocess
 import multiprocessing
 
@@ -81,11 +80,11 @@ __date__ = '2015-07-02'
 header = """#Aegean version {0}
 # on dataset: {1}"""
 
-#global constants
+# global constants
 FWHM2CC = 1 / (2 * math.sqrt(2 * math.log(2)))
 CC2FHWM = (2 * math.sqrt(2 * math.log(2)))
 
-####################################### CLASSES ####################################
+
 class GlobalFittingData(object):
     """
     The global data used for fitting.
@@ -1380,7 +1379,7 @@ def fit_islands(islands):
 
 def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_summits=None, csigma=None, innerclip=5,
                           outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
-                          returnrms=False, nopositive=False, nonegative=False, mask=None, lat=None, psf=None):
+                          returnrms=False, nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None):
     """
     Run the Aegean source finder.
 
@@ -1407,7 +1406,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
     :param mask: the filename of a region file created by MIMAS.
                  Islands outside of this region will be ignored.
     :param lat: The latitude of the telescope (or declination of zenith)
-    :param psf: filename or HDUList for a psf image.
+    :param imgpsf: filename or HDUList for a psf image.
     :return: list of sources [and an rms image if returnrms is True]
     """
     # Tell numpy to be quiet
@@ -1416,7 +1415,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
         assert (cores >= 1), "cores must be one or more"
 
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, cores=cores,
-                 csigma=csigma, verb=True, mask=mask, lat=lat, psf=psf)
+                 csigma=csigma, verb=True, mask=mask, lat=lat, psf=imgpsf)
 
     rmsimg = global_data.rmsimg
     data = global_data.data_pix
@@ -1500,7 +1499,7 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
 
 
 def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1, rms=None,
-                           beam=None, lat=None, psf=None, stage=3, ratio=1.0, outerclip=3, doregroup=True):
+                           beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=1.0, outerclip=3, doregroup=True):
     """
     Take an input catalog, and image, and optional background/noise images
     fit the flux and ra/dec for each of the given sources, keeping the morphology fixed
@@ -1513,33 +1512,53 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     :param filename: image file or hdu
     :param catfile: catalog file name
     :param hdu_index:
-    :param outfile: ouput file for ascii output (not tables)
+    :param outfile: output file for ascii output (not tables)
     :param bkgin: background image name
     :param rmsin: noise image name
     :param cores: number of cores to use
     :param rms: if not none, then use this constant rms for the entire image
     :param beam: beam parameters to be used instead of those that may be in the fits header
     :param lat: latitude of telescope
+    :param imgpsf: a psf map that corresponds to the input image
+    :param catpsf: a psf map that corresponds to the input catalog
     :param stage: refitting stage
     :param ratio: ratio of image psf to catalog psf
-    :param outerclip: pixels above an snr of this amuont will be used in fitting, <0 -> all pixels.
+    :param outerclip: pixels above an snr of this amount will be used in fitting, <0 -> all pixels.
     :param doregroup:  True - doregroup, False - use island data for groups
     :return: a list of source objects
     """
 
     from AegeanTools.cluster import regroup
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
-                 do_curve=False, beam=beam, lat=lat, psf=psf)
+                 do_curve=False, beam=beam, lat=lat, psf=imgpsf)
 
     beam = global_data.beam
-    far = 10*beam.a # degrees
+    far = 10*beam.a  # degrees
     # load the table and convert to an input source list
     input_table = load_table(catfile)
     input_sources = np.array(table_to_source_list(input_table))
     src_mask = np.ones(len(input_sources),dtype=bool)
     # the input sources are the initial conditions for our fits.
     # Expand each source size if needed.
-    if ratio is not None:
+    if catpsf is not None:
+        log.info("Using catalog PSF from {0}".format(catpsf))
+        psf_helper = PSFHelper(catpsf, None)  # might need to set the WCSHelper to be not None
+        for src in input_sources:
+            catbeam = psf_helper.get_beam(src.ra, src.dec)
+            imbeam = global_data.psfhelper.get_beam(src.ra, src.dec)
+            src.a = (src.a/3600)**2 - catbeam.a**2 + imbeam.a**2  # degrees
+            if src.a < 0:
+                src.a = imbeam.a*3600  # arcsec
+            else:
+                src.a = np.sqrt(src.a)*3600  # arcsec
+
+            src.b = (src.b/3600)**2 - catbeam.b**2 + imbeam.b**2
+            if src.b <0:
+                src.b = imbeam.b*3600  # arcsec
+            else:
+                src.b = np.sqrt(src.b)*3600  # arcsec
+
+    elif ratio is not None:
         far *= ratio
         for src in input_sources:
             src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
@@ -1548,7 +1567,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     for i,src in enumerate(input_sources):
         # check to see if the skybeam is known, if not then we cannot use this source
         # and we mark it for exclusion
-        skybeam = global_data.psfhelper.get_beam(src.ra,src.dec)
+        skybeam = global_data.psfhelper.get_beam(src.ra, src.dec)
         if skybeam is None:
             src_mask[i] = False
             continue
@@ -1566,8 +1585,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     else:
         groups = list(island_itergen(input_sources))
 
-
-    if cores == 1:  #single-threaded, no parallel processing
+    if cores == 1:  # single-threaded, no parallel processing
         queue = []
     else:
         # This check is also made during start up when running aegean from the command line
@@ -1594,7 +1612,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     island_group = []
     group_size = 20
 
-    for i,island in enumerate(groups):
+    for i, island in enumerate(groups):
         island_group.append(island)
         # If the island group is full queue it for the subprocesses to fit
         if len(island_group) >= group_size:
@@ -1911,11 +1929,16 @@ if __name__ == "__main__":
     parser.add_option("--forcerms", dest='rms', type='float', default=None,
                       help="Assume a single image noise of rms, and a background of zero. [default: false]")
     parser.add_option("--noise", dest='noiseimg', default=None,
-                      help="A .fits file that represents the image noise (rms), created from Aegean with --save or BANE. [default: none]")
+                      help="A .fits file that represents the image noise (rms), created from Aegean with --save " +
+                           "or BANE. [default: none]")
     parser.add_option('--background', dest='backgroundimg', default=None,
-                      help="A .fits file that represents the background level, created from Aegean with --save or BANE. [default: none]")
-    parser.add_option('--psf', dest='psfimg',default=None,
-                      help="A .fits file that represents the size (degrees) of a blurring disk. This disk is convolved with the BMAJ/BMIN listed in the FITS header and the result becomes the local PSF.")
+                      help="A .fits file that represents the background level, created from Aegean with --save " +
+                           "or BANE. [default: none]")
+    parser.add_option('--psf', dest='imgpsf',default=None,
+                      help="A .fits file that represents the size (degrees) of a blurring disk. " +
+                           "This disk is convolved with the BMAJ/BMIN listed in the FITS header and " +
+                           "the result becomes the local PSF.")
+
     parser.add_option('--autoload', dest='autoload', action="store_true", default=False,
                       help="Automatically look for background, noise, region, and psf files using the input filename as a hint. [default: don't do this]")
     parser.add_option("--maxsummits", dest='max_summits', type='float', default=None,
@@ -1957,15 +1980,16 @@ if __name__ == "__main__":
                       help='Do not regroup islands before priorized fitting.')
     parser.add_option('--input', dest='input', default=None,
                       help='If --measure is true, this gives the filename for a catalog of locations at which fluxes will be measured. [default: none]')
+    parser.add_option('--catpsf', dest='catpsf', default=None,
+                      help='A psf map corresponding to the input catalog. This will allow for the correct resizing of '+
+                           'sources when the catalog and image psfs differ.')
 
     (options, args) = parser.parse_args()
-
 
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
     log.setLevel(logging_level)
     log.info("This is Aegean {0}-({1})".format(__version__,__date__))
-
 
     if options.table_formats:
         show_formats()
@@ -2058,7 +2082,7 @@ if __name__ == "__main__":
         save_background_files(filename, hdu_index=hdu_index, cores=options.cores, beam=options.beam,
                               outbase=options.outbase)
 
-    # autoload background, noise, psf and region files
+    # auto-load background, noise, psf and region files
     if options.autoload:
         basename = os.path.splitext(filename)[0]
         if os.path.exists(basename+'_bkg.fits'):
@@ -2071,9 +2095,8 @@ if __name__ == "__main__":
             options.region = basename+".mim"
             log.info("Found region {0}".format(options.region))
         if os.path.exists(basename+"_psf.fits"):
-            options.psfimg = basename +"_psf.fits"
-            log.info("Found psf {0}".format(options.psfimg))
-
+            options.imgpsf = basename +"_psf.fits"
+            log.info("Found psf {0}".format(options.imgpsf))
 
     # check that the aux input files exist
     if options.backgroundimg and not os.path.exists(options.backgroundimg):
@@ -2082,8 +2105,11 @@ if __name__ == "__main__":
     if options.noiseimg and not os.path.exists(options.noiseimg):
         log.error("{0} not found".format(options.noiseimg))
         sys.exit(1)
-    if options.psfimg and not os.path.exists(options.psfimg):
-        log.error("{0} not found".format(options.psfimg))
+    if options.imgpsf and not os.path.exists(options.imgpsf):
+        log.error("{0} not found".format(options.imgpsf))
+        sys.exit(1)
+    if options.catpsf and not os.path.exists(options.catpsf):
+        log.error("{0} not found".format(options.catpsf))
         sys.exit(1)
 
     if options.region is not None:
@@ -2143,7 +2169,8 @@ if __name__ == "__main__":
         measurements = priorized_fit_islands(filename, catfile=options.input, hdu_index=options.hdu_index,
                                             rms=options.rms,
                                             outfile=options.outfile, bkgin=options.backgroundimg,
-                                            rmsin=options.noiseimg, beam=options.beam, lat=lat, psf=options.psfimg,
+                                            rmsin=options.noiseimg, beam=options.beam, lat=lat, imgpsf=options.imgpsf,
+                                            catpsf=options.catpsf,
                                             stage=options.priorized, ratio=options.ratio, outerclip=options.outerclip,
                                             cores=options.cores, doregroup=options.regroup)
         sources.extend(measurements)
@@ -2159,7 +2186,7 @@ if __name__ == "__main__":
                                            bkgin=options.backgroundimg, beam=options.beam,
                                            doislandflux=options.doislandflux,
                                            nonegative=not options.negative, nopositive=options.nopositive,
-                                           mask=options.region, lat=lat, psf=options.psfimg)
+                                           mask=options.region, lat=lat, imgpsf=options.imgpsf)
         if len(detections) == 0:
             log.info("No sources found in image")
         sources.extend(detections)
