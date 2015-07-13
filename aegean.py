@@ -1537,15 +1537,21 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     # load the table and convert to an input source list
     input_table = load_table(catfile)
     input_sources = np.array(table_to_source_list(input_table))
-    src_mask = np.ones(len(input_sources),dtype=bool)
+    src_mask = np.ones(len(input_sources), dtype=bool)
+
     # the input sources are the initial conditions for our fits.
     # Expand each source size if needed.
     if catpsf is not None:
         log.info("Using catalog PSF from {0}".format(catpsf))
         psf_helper = PSFHelper(catpsf, None)  # might need to set the WCSHelper to be not None
-        for src in input_sources:
+        for i, src in enumerate(input_sources):
             catbeam = psf_helper.get_beam(src.ra, src.dec)
             imbeam = global_data.psfhelper.get_beam(src.ra, src.dec)
+            # If either of the above are None then we skip this source.
+            if catbeam is None or imbeam is None:
+                src_mask[i] = False
+                log.info("Excluding source ({0.island},{0.source}) due to lack of psf knowledge".format(src))
+                continue
             src.a = (src.a/3600)**2 - catbeam.a**2 + imbeam.a**2  # degrees
             if src.a < 0:
                 src.a = imbeam.a*3600  # arcsec
@@ -1553,28 +1559,23 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
                 src.a = np.sqrt(src.a)*3600  # arcsec
 
             src.b = (src.b/3600)**2 - catbeam.b**2 + imbeam.b**2
-            if src.b <0:
+            if src.b < 0:
                 src.b = imbeam.b*3600  # arcsec
             else:
                 src.b = np.sqrt(src.b)*3600  # arcsec
 
     elif ratio is not None:
         far *= ratio
-        for src in input_sources:
+        for i, src in enumerate(input_sources):
+            skybeam = global_data.psfhelper.get_beam(src.ra, src.dec)
+            if skybeam is None:
+                src_mask[i] = False
+                continue
             src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
             src.b = np.sqrt(src.b**2 + (beam.b*3600)**2*(1-1/ratio**2))
-
-    for i,src in enumerate(input_sources):
-        # check to see if the skybeam is known, if not then we cannot use this source
-        # and we mark it for exclusion
-        skybeam = global_data.psfhelper.get_beam(src.ra, src.dec)
-        if skybeam is None:
-            src_mask[i] = False
-            continue
-        # source with funky a/b are also rejected
-        if not np.all(np.isfinite((src.a,src.b))):
-            src_mask[i] = False
-            continue
+            # source with funky a/b are also rejected
+            if not np.all(np.isfinite((src.a,src.b))):
+                src_mask[i] = False
 
     log.info("{0} sources in catalog".format(len(input_sources)))
     log.info("{0} sources accepted".format(sum(src_mask)))
