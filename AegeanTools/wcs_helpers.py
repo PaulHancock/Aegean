@@ -1,11 +1,12 @@
 #! /usr/bin/env python
 """
-
+This module contains two classes that provide WCS functions that are not
+part of the WCS toolkit, as well as some wrappers around the provided tools
+to make them a lot easier to use.
 """
 __author__ = 'Paul Hancock'
 
 import numpy as np
-import math
 
 from angle_tools import gcd, bear, translate
 from AegeanTools.fits_image import Beam, get_beam, get_pixinfo
@@ -18,7 +19,6 @@ from astropy.io import fits
 # join the Aegean logger
 import logging
 log = logging.getLogger('Aegean')
-
 
 
 class WCSHelper(object):
@@ -67,7 +67,6 @@ class WCSHelper(object):
         self.refpix = refpix
         self.lat = lat
 
-
     def pix2sky(self, pixel):
         """
         Take pixel=(x,y) coords
@@ -77,7 +76,6 @@ class WCSHelper(object):
         #wcs and pyfits have oposite ideas of x/y
         return self.wcs.wcs_pix2world([[y, x]], 1)[0]
 
-
     def sky2pix(self, pos):
         """
         Take pos = (ra,dec) coords
@@ -86,7 +84,6 @@ class WCSHelper(object):
         pixel = self.wcs.wcs_world2pix([pos], 1)
         #wcs and pyfits have oposite ideas of x/y
         return [pixel[0][1], pixel[0][0]]
-
 
     def sky2pix_vec(self, pos, r, pa):
         """Convert a vector from sky to pixel corrds
@@ -109,7 +106,6 @@ class WCSHelper(object):
         a = np.sqrt((x - x_off) ** 2 + (y - y_off) ** 2)
         theta = np.degrees(np.arctan2((y_off - y), (x_off - x)))
         return x, y, a, theta
-
 
     def pix2sky_vec(self, pixel, r, theta):
         """
@@ -134,7 +130,6 @@ class WCSHelper(object):
         a = gcd(ra1, dec1, ra2, dec2)
         pa = bear(ra1, dec1, ra2, dec2)
         return ra1, dec1, a, pa
-
 
     def sky2pix_ellipse(self, pos, a, b, pa):
         """
@@ -170,7 +165,6 @@ class WCSHelper(object):
         sy *= abs(np.cos(defect))
 
         return x, y, sx, sy, np.degrees(theta)
-
 
     def pix2sky_ellipse(self, pixel, sx, sy, theta):
         """
@@ -209,7 +203,6 @@ class WCSHelper(object):
         minor *= abs(np.cos(np.radians(defect)))
         return ra, dec, major, minor, pa
 
-
     def get_pixbeam_pixel(self, x, y):
         """
         A wrapper around get_pixbeam for when you only know the pixel coords
@@ -219,7 +212,6 @@ class WCSHelper(object):
         """
         ra,dec = self.pix2sky([x,y])
         return self.get_pixbeam(ra,dec)
-
 
     def get_pixbeam(self, ra, dec):
         """
@@ -259,7 +251,6 @@ class WCSHelper(object):
             beam = Beam(major, minor, theta)
         return beam
 
-
     def get_beamarea_deg2(self, ra, dec):
         """
 
@@ -272,7 +263,6 @@ class WCSHelper(object):
             barea /= np.cos(np.radians(dec-self.lat))
         return barea
 
-
     def get_beamarea_pix(self, ra, dec):
         """
         Calculate the area of the beam at a given location
@@ -284,7 +274,6 @@ class WCSHelper(object):
         parea = abs(self.pixscale[0] * self.pixscale[1]) # in deg**2 at reference coords
         barea = self.get_beamarea_deg2(ra,dec)
         return barea/parea
-
 
     def sky_sep(self, pix1, pix2):
         """
