@@ -32,6 +32,7 @@ from scipy.ndimage import label, find_objects
 # fitting
 import lmfit
 from AegeanTools.fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors
+from AegeanTools.fitting import ntwodgaussian_lmfit
 
 # the glory of astropy
 import astropy
@@ -1090,7 +1091,7 @@ def refit_islands(group, stage, outerclip, istart):
         xmin, ymin = shape
         xmax = ymax = 0
 
-        island_mask = []
+        # island_mask = []
         src_valid_psf = None
         # keep track of the sources that are actually being refit
         # this may be a subset of all sources in the island
@@ -1124,7 +1125,7 @@ def refit_islands(group, stage, outerclip, istart):
             log.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
 
             # choose a region that is 2x the major axis of the source, 4x semimajor axis a
-            width = 2 * sx
+            width = 4 * sx
             ywidth = int(round(width)) + 1
             xwidth = int(round(width)) + 1
 
@@ -1150,16 +1151,17 @@ def refit_islands(group, stage, outerclip, istart):
             included_sources.append(src)
             i += 1
 
-            # Use pixels above outerclip sigmas..
-            if outerclip>=0:
-                mask = np.where(data[xmin:xmax,ymin:ymax]-outerclip*rmsimg[xmin:xmax,ymin:ymax]>0)
-            else: # negative outer clip means use all the pixels
-                mask = np.where(data[xmin:xmax,ymin:ymax])
-
-            # convert the pixel indices to be pixels within the parent data set
-            xmask = mask[0] + xmin
-            ymask = mask[1] + ymin
-            island_mask.extend(zip(xmask,ymask))
+            # TODO: Allow this mask to be used in conjunction with the FWHM mask that is defined further on
+            # # Use pixels above outerclip sigmas..
+            # if outerclip>=0:
+            #     mask = np.where(data[xmin:xmax,ymin:ymax]-outerclip*rmsimg[xmin:xmax,ymin:ymax]>0)
+            # else: # negative outer clip means use all the pixels
+            #     mask = np.where(data[xmin:xmax,ymin:ymax])
+            #
+            # # convert the pixel indices to be pixels within the parent data set
+            # xmask = mask[0] + xmin
+            # ymask = mask[1] + ymin
+            # island_mask.extend(zip(xmask,ymask))
 
         if i==0:
             log.debug("No sources found in island {0}".format(src.island))
@@ -1192,19 +1194,34 @@ def refit_islands(group, stage, outerclip, istart):
         # this .copy() will stop us from modifying the parent region when we later apply our mask.
         idata = data[xmin:xmax, ymin:ymax].copy()
         # now convert these back to indices within the idata region
-        island_mask = [(x-xmin,y-ymin) for x,y in island_mask]
-        # the mask is for good pixels so we need to reverse it
-        all_pixels = zip(*np.where(idata))
-        mask = zip(*set(all_pixels).difference(set(island_mask)))
-        idata[mask] = np.nan # this is the mask mentioned above
+        # island_mask = np.array([(x-xmin, y-ymin) for x, y in island_mask])
 
-        mx,my = np.where(np.isfinite(idata))
+        allx, ally = np.indices(idata.shape)
+        # mask to include pixels that are withn the FWHM of the sources being fit
+        mask_params = copy.deepcopy(params)
+        for i in range(mask_params.components):
+            prefix = 'c{0}_'.format(i)
+            mask_params[prefix+'amp'].value = 1
+        mask_model = ntwodgaussian_lmfit(mask_params)
+        mask = np.where(mask_model(allx.ravel(), ally.ravel())<=0.1)
+        mask = allx.ravel()[mask], ally.ravel()[mask]
+        del mask_params
+
+        idata[mask] = np.nan
+        # mask = mask[0].tolist()#, mask[1].tolist()
+        #
+        # # the mask is for good pixels so we need to reverse it
+        # all_pixels = zip(*np.where(idata))
+        # mask = zip(*set(all_pixels).difference(set(island_mask)))
+        # idata[mask] = np.nan # this is the mask mentioned above
+
+        mx, my = np.where(np.isfinite(idata))
         non_nan_pix = len(mx)
 
         log.debug("island extracted:")
         log.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
         log.debug(" max = {0}".format(np.nanmax(idata)))
-        log.debug(" total {0}, masked {1}, not masked {2}".format(len(all_pixels),len(all_pixels)-non_nan_pix,non_nan_pix))
+        log.debug(" total {0}, masked {1}, not masked {2}".format(len(allx),len(allx)-non_nan_pix,non_nan_pix))
 
         # Check to see that each component has some data within the central 3x3 pixels of it's location
         # If not then we don't fit that component
@@ -1618,7 +1635,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
         # If the island group is full queue it for the subprocesses to fit
         if len(island_group) >= group_size:
             if cores > 1:
-                fit_parallel(island_group, stage, outerclip, istart =i)
+                fit_parallel(island_group, stage, outerclip, istart=i)
             else:
                 res = refit_islands(island_group, stage, outerclip, istart=i)
                 queue.append(res)
