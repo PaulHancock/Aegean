@@ -52,8 +52,6 @@ except ImportError:
 # logging import and setupOB
 import logging
 import logging.config
-logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
-log = logging.getLogger("Aegean")
 
 # command line option handler
 from optparse import OptionParser
@@ -81,6 +79,7 @@ __date__ = '2015-07-13'
 header = """#Aegean version {0}
 # on dataset: {1}"""
 
+log = None
 # global constants
 FWHM2CC = 1 / (2 * math.sqrt(2 * math.log(2)))
 CC2FHWM = (2 * math.sqrt(2 * math.log(2)))
@@ -1426,6 +1425,10 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
     :param imgpsf: filename or HDUList for a psf image.
     :return: list of sources [and an rms image if returnrms is True]
     """
+    if log is None:
+        global log
+        log = logging.getLogger()
+
     # Tell numpy to be quiet
     np.seterr(invalid='ignore')
     if cores is not None:
@@ -2005,6 +2008,8 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     # configure logging
+    logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
+    log = logging.getLogger("Aegean")
     logging_level = logging.DEBUG if options.debug else logging.INFO
     log.setLevel(logging_level)
     log.info("This is Aegean {0}-({1})".format(__version__,__date__))
