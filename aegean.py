@@ -75,7 +75,7 @@ __date__ = '2015-05-20'
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
-
+log = None
 #global constants
 fwhm2cc = 1 / (2 * math.sqrt(2 * math.log(2)))
 cc2fwhm = (2 * math.sqrt(2 * math.log(2)))
@@ -1428,6 +1428,12 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
     else:
         [OuputSource,... ]
     """
+    # If there is no logger defined then get a new one
+    # This can happen when aegean is imported as a module instead of being run from the command line.
+    if log is None:
+        global log
+        log = logging.getLogger()
+
     np.seterr(invalid='ignore')
     if cores is not None:
         assert (cores >= 1), "cores must be one or more"
