@@ -336,7 +336,7 @@ def ntwodgaussian_lmfit(params):
     """
     theta is in degrees
     :param params: model parameters (can be multiple)
-    :return: a functiont that maps (x,y) -> model
+    :return: a function that maps (x,y) -> model
     """
     def rfunc(x, y):
         result=None

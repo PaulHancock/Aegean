@@ -129,7 +129,7 @@ def save_catalog(filename, catalog, meta=None):
     """
     ascii_table_formats = {'csv': 'csv', 'tab': 'tab', 'tex': 'latex', 'html': 'html'}
     #.ann and .reg are handled by me
-    meta = update_meta_data(meta)
+    update_meta_data(meta)
     extension = os.path.splitext(filename)[1][1:].lower()
     if extension in ['ann', 'reg']:
         writeAnn(filename, catalog, extension)
