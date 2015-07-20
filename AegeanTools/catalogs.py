@@ -209,9 +209,11 @@ def load_table(filename):
     return t
 
 
-def write_table(table,filename):
+def write_table(table, filename):
 
     try:
+        if os.path.exists(filename):
+            os.remove(filename)
         table.write(filename)
         log.info("Wrote {0}".format(filename))
         return
