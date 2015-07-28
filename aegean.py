@@ -1063,7 +1063,7 @@ def scope2lat(telescope):
 ######################################### THE MAIN DRIVING FUNCTIONS ###############
 
 # source finding and fitting
-def refit_islands(group, stage, outerclip, istart):
+def refit_islands(group, stage, outerclip, istart=0):
     """
     Do island refitting (priorized fitting) on a group of islands.
 
@@ -1868,6 +1868,53 @@ def VASTP_measure_catalog_fluxes(filename, positions, hdu_index=0, bkgin=None, r
     if debug:
         log.getLogger().setLevel(level)
     return sources
+
+
+def VASTP_refit_sources(filename, sources, hdu_index=0, bkgin=None, rmsin=None, rms=None, cores=1, beam=None, debug=False):
+    """
+    A version of priorized_fit_islands that will work with the vast pipeline
+    Input:
+        filename - fits image file name to be read
+        sources - a list of source objects
+        hdu_index - if fits file has more than one hdu, it can be specified here
+        outfile - the output file to write to
+        bkgin - a background image filename
+        rmsin - an rms image filename
+        cores - cores to use
+        rms - forced rms value
+        beam - beam parameters to override those given in fits header
+    """
+    logging.info(" refitting {0} sources".format(len(sources)))
+    if len(sources)<1:
+        return []
+    stage = 1
+    outerclip = 4 # ultimately ignored but required for now
+
+    load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
+                 do_curve=False, beam=beam)
+
+    new_sources = []
+
+    for src in sources:
+        res = refit_islands([[src]], stage, outerclip)
+        # if the source is not able to be fit then we dummy the source
+        if len(res)<1:
+            d = OutputSource()
+            d.peak_flux = np.nan
+            res = [d]
+        elif len(res)!=2:
+            logging.error("expecting two sources, but got {0}".format(len(res)))
+        s = res[0]
+        s.flags = 0
+        # convert a/b from deg->arcsec to emulate a mistake that was made in forcemeasurements
+        # and then corrected in the vast pipeline (ugh).
+        s.a /=3600
+        s.b /=3600
+
+        new_sources.append(s)
+
+    logging.info("Returning {0} sources".format(len(new_sources)))
+    return new_sources
 
 
 def save_background_files(image_filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, rms=None, cores=1,
