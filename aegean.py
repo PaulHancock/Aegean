@@ -483,13 +483,19 @@ def result_to_components(result, model, island_data, isflags):
 
         # calculate integrated flux
         source.int_flux = source.peak_flux * sx * sy * CC2FHWM ** 2 * np.pi
-        # scale Jy/beam -> Jy using the area of the psf
-        source.int_flux /= global_data.psfhelper.get_beamarea_pix(source.ra,source.dec)
+        # scale Jy/beam -> Jy using the area of the beam
+        source.int_flux /= global_data.wcshelper.get_beamarea_pix(source.ra, source.dec)
 
         # Calculate errors for params that were fit (as well as int_flux)
         errors(source, model, global_data.wcshelper)
 
         source.flags = src_flags
+        # add psf info if a psf file has been supplied
+        if global_data.psfhelper.data is not None:
+            a,b,pa = global_data.psfhelper.get_psf_sky(source.ra, source.dec)
+            source.psf_a = a/3600
+            source.psf_b = b/3600
+            source.psf_pa = pa/3600
         sources.append(source)
         log.debug(source)
 
@@ -639,6 +645,11 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
 
     global_data.wcshelper = WCSHelper.from_header(img.get_hdu_header(), beam, lat)
     global_data.psfhelper = PSFHelper(psf, global_data.wcshelper)
+    # If a psf map was supplied then we add the psf parameters to the list of names of
+    # columns that are going to be written to our tables
+    if global_data.psfhelper.data is not None:
+        OutputSource.names.extend(['psf_a','psf_b','psf_pa'])
+
     global_data.beam = global_data.wcshelper.beam
     global_data.img = img
     global_data.data_pix = img.get_pixels()
