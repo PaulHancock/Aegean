@@ -167,6 +167,10 @@ class OutputSource(SimpleSource):
         self.flags = 0x0
         self.residual_mean = 0
         self.residual_std = 0
+        #
+        self.psf_a = 0
+        self.psf_b = 0
+        self.psf_pa = 0
 
     def __str__(self):
         self.sanitise()
