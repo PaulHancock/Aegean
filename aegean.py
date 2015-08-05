@@ -1840,7 +1840,7 @@ def measure_catalog_fluxes(filename, catfile, hdu_index=0, outfile=None, bkgin=N
     """
 
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
-                 do_curve=False, beam=beam, lat=lat, psf=psf)
+                 do_curve=False, beam=beam, lat=lat)
 
     # load catalog
     radec = load_catalog(catfile)
