@@ -2031,7 +2031,7 @@ if __name__ == "__main__":
     parser.add_option('--telescope', dest='telescope', type=str, default=None,
                       help='The name of the telescope used to collect data. [MWA|VLA|ATCA|LOFAR]')
     parser.add_option('--lat', dest='lat', type=float, default=None,
-                      help='The latitude of the tlescope used to collect data.')
+                      help='The latitude of the telescope used to collect data.')
     parser.add_option('--versions', dest='file_versions', action="store_true", default=False,
                       help='Show the file versions of relevant modules. [default: false]')
     parser.add_option('--island', dest='doislandflux', action="store_true", default=False,
