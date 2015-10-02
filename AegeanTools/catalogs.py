@@ -14,6 +14,7 @@ import sys
 import os
 import numpy as np
 import re
+from time import gmtime, strftime
 
 # Other AegeanTools
 from models import OutputSource, IslandSource, SimpleSource, classify_catalog
@@ -107,7 +108,18 @@ def get_table_formats():
     return fmts
 
 
-def save_catalog(filename, catalog):
+def update_meta_data(meta=None):
+    if meta is None:
+        meta = {}
+    if not 'DATE' in meta:
+        meta['DATE'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
+    if not 'PROGRAM' in meta:
+        meta['PROGRAM'] = "AegeanTools.catalogs"
+        meta['PROGVER'] = "{0}-({1})".format(__version__,__date__)
+
+
+
+def save_catalog(filename, catalog, meta=None):
     """
     input:
         filename - name of file to write, format determined by extension
@@ -117,21 +129,20 @@ def save_catalog(filename, catalog):
     """
     ascii_table_formats = {'csv': 'csv', 'tab': 'tab', 'tex': 'latex', 'html': 'html'}
     #.ann and .reg are handled by me
+    update_meta_data(meta)
     extension = os.path.splitext(filename)[1][1:].lower()
     if extension in ['ann', 'reg']:
         writeAnn(filename, catalog, extension)
-    elif extension in ['vo', 'vot', 'xml']:
-        writeVOTable(filename, catalog)
     elif extension in ['db', 'sqlite']:
-        writeDB(filename, catalog)
-    elif extension in ['hdf5','fits']:
-        write_table(filename,catalog,extension)
+        writeDB(filename, catalog, meta)
+    elif extension in ['hdf5','fits', 'vo', 'vot', 'xml']:
+        write_catalog(filename,catalog, extension, meta)
     elif extension in ascii_table_formats.keys():
-        write_table(filename, catalog, fmt=ascii_table_formats[extension])
+        write_catalog(filename, catalog, fmt=ascii_table_formats[extension], meta=meta)
     else:
         log.warning("extension not recognised {0}".format(extension))
         log.warning("You get tab format")
-        write_table(filename, catalog, fmt='tab')
+        write_catalog(filename, catalog, fmt='tab')
     return
 
 
@@ -198,6 +209,25 @@ def load_table(filename):
     return t
 
 
+def write_table(table, filename):
+
+    try:
+        if os.path.exists(filename):
+            os.remove(filename)
+        table.write(filename)
+        log.info("Wrote {0}".format(filename))
+        return
+    except Exception, e:
+        if "Format could not be identified" not in e.message:
+            raise e
+    finally:
+        fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
+        # TODO: figure out the format of files that are not autodetermined
+        log.critical("Cannot auto-determine format for {0}".format(fmt))
+        sys.exit(1)
+    return
+
+
 def table_to_source_list(table, src_type=OutputSource):
     """
     Wrangle a table into a list of sources given by src_type
@@ -222,14 +252,15 @@ def table_to_source_list(table, src_type=OutputSource):
     return source_list
 
 
-def write_table(filename, catalog, fmt=None):
+def write_catalog(filename, catalog, fmt=None, meta=None):
     """
     """
+    if meta is None:
+        meta = {}
 
     def writer(filename, catalog, fmt=None):
         # construct a dict of the data
         # this method preserves the data types in the VOTable
-        meta = {'AegeanVersion':"{0}-({1})".format(__version__,__date__)}
         tab_dict = {}
         for name in catalog[0].names:
             tab_dict[name] = [getattr(c, name, None) for c in catalog]
@@ -240,7 +271,7 @@ def write_table(filename, catalog, fmt=None):
             if fmt in ["vot", "vo", "xml"]:
                 vot = from_table(t)
                 # description of this votable
-                vot.description = "Aegean version {0}-({1})".format(__version__,__date__)
+                vot.description = repr(meta)
                 writetoVO(vot, filename)
             elif fmt in ['hdf5']:
                 t.write(filename,path='data',overwrite=True)
@@ -300,16 +331,17 @@ def writeFITSTable(filename,table):
         cols.append(fits.Column(name=name, format=FITSTableType(table[name][0]), array=table[name]))
     cols = fits.ColDefs(cols)
     tbhdu = fits.BinTableHDU.from_columns(cols)
-    tbhdu.header['HISTORY'] = "Aegean {0}".format(__version__)
+    for k in table.meta:
+        tbhdu.header['HISTORY'] = ':'.join((k,table.meta[k]))
     tbhdu.writeto(filename, clobber=True)
 
 
-def writeVOTable(filename, catalog):
+def writeVOTable_dep(filename, catalog):
     """
     write VOTables for each of the source types that are in the catalog
     append an appropriate prefix to the file name for each type of source
     """
-    write_table(filename, catalog, fmt="vo")
+    write_catalog(filename, catalog, fmt="vo")
 
 
 def writeIslandContours(filename, catalog, fmt):
@@ -341,8 +373,10 @@ def writeIslandContours(filename, catalog, fmt):
         #comment out lines that have invalid ra/dec (WCS problems)
         if np.nan in [c.ra, c.dec]:
             print >> out, '#',
-        print >> out, text_fmt.format(c.ra, c.dec, c.island)
-        print >> out, mas_fmt.format(*[a + 0.5 for a in c.max_angular_size_anchors])
+        # some islands may not have anchors because they don't have any contours
+        if len(c.max_angular_size_anchors)==4:
+            print >> out, text_fmt.format(c.ra, c.dec, c.island)
+            print >> out, mas_fmt.format(*[a + 0.5 for a in c.max_angular_size_anchors])
         for p1, p2 in c.pix_mask:
             # DS9 uses 1-based instead of 0-based indexing
             print >> out, x_fmt.format(p1+1,p2+1)
@@ -459,14 +493,13 @@ def writeAnn(filename, catalog, fmt):
     return
 
 
-def writeDB(filename, catalog):
+def writeDB(filename, catalog, meta=None):
     """
     Output an sqlite3 database containing one table for each source type
     inputs:
     filename - output filename
     catalog - a catalog of sources to populated the database with
     """
-
     def sqlTypes(obj, names):
         """
         Return the sql type corresponding to each named parameter in obj
@@ -507,8 +540,9 @@ def writeDB(filename, catalog):
         db.executemany(stmnt, [map(nulls, r.as_list()) for r in t])
         log.info("Created table {0}".format(tn))
     # metadata add some meta data
-    db.execute("CREATE TABLE meta (author VARCHAR, version VARCHAR)")
-    db.execute("INSERT INTO meta (author,version) VALUES (?,?)",('Aegean',"{0}-({1})".format(__version__,__date__)))
+    db.execute("CREATE TABLE meta (key VARCHAR, val VARCHAR)")
+    for k in meta:
+        db.execute("INSERT INTO meta (key, val) VALUES (?,?)",(k,meta[k]))
     conn.commit()
     log.info(db.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall())
     conn.close()

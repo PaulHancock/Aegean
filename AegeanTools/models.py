@@ -167,6 +167,10 @@ class OutputSource(SimpleSource):
         self.flags = 0x0
         self.residual_mean = 0
         self.residual_std = 0
+        #
+        self.psf_a = 0
+        self.psf_b = 0
+        self.psf_pa = 0
 
     def __str__(self):
         self.sanitise()
@@ -193,12 +197,20 @@ class OutputSource(SimpleSource):
         elif self.island < other.island:
             return -1
         else:
-            if self.source > other.source:
-                return 1
-            elif self.source < other.source:
+            # if we try to compare a component to and island we put the
+            if not hasattr(other,'source'):
                 return -1
-            else:
-                return 0
+            try:
+                if self.source > other.source:
+                    return 1
+                elif self.source < other.source:
+                    return -1
+                else:
+                    return 0
+            except AttributeError:
+                # if we try to compare a component to and island we put the island first
+                if not hasattr(other,'source'):
+                    return 1
 
 
 class GlobalFittingData(object):

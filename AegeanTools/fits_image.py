@@ -12,21 +12,8 @@ import logging
 import sys
 from fits_interp import expand
 
-
-def load_safe(filename):
-    """
-    Load a fits file, and retry if there is a missing END card in the header
-    :param filename: filename
-    :return: a fits.HDUList object
-    """
-    try:
-        hdus = pyfits.open(filename)
-    except IOError, e:
-        if "END" in e.message:
-            logging.warn(e.message)
-        logging.warn("trying to ignore this, but you should really fix it")
-        hdus = pyfits.open(filename, ignore_missing_end=True)
-    return hdus
+# Join the Aegean logger
+log = logging.getLogger("Aegean")
 
 
 def get_pixinfo(header):
@@ -46,12 +33,12 @@ def get_pixinfo(header):
                     - header["CD1_2"]*header["CD2_1"])
         pixscale = (header["CD1_1"], header["CD2_2"])
         if not (header["CD1_2"] == 0 and header["CD2_1"] == 0):
-            logging.warn("Pixels don't appear to be square -> pixscale is wrong")
+            log.warn("Pixels don't appear to be square -> pixscale is wrong")
     elif all([a in header for a in ["CD1_1", "CD2_2"]]):
         pixarea = abs(header["CD1_1"]*header["CD2_2"])
         pixscale = (header["CD1_1"], header["CD2_2"])
     else:
-        logging.critical("cannot determine pixel area, using zero EVEN THOUGH THIS IS WRONG!")
+        log.critical("cannot determine pixel area, using zero EVEN THOUGH THIS IS WRONG!")
         pixarea = 0
         pixscale = (0, 0)
     return pixarea, pixscale
@@ -67,19 +54,19 @@ def get_beam(header):
     """
 
     if "BPA" not in header:
-        logging.warn("BPA not present in fits header, using 0")
+        log.warn("BPA not present in fits header, using 0")
         bpa = 0
     else:
         bpa = header["BPA"]
 
     if "BMAJ" not in header:
-        logging.warn("BMAJ not present in fits header.")
+        log.warn("BMAJ not present in fits header.")
         bmaj = None
     else:
         bmaj = header["BMAJ"]
 
     if "BMIN" not in header:
-        logging.warn("BMIN not present in fits header.")
+        log.warn("BMIN not present in fits header.")
         bmin = None
     else:
         bmin = header["BMIN"]
@@ -97,25 +84,9 @@ class FitsImage():
         hdu = a pyfits hdu. if provided the object is constructed from this instead of
               opening the file (filename is ignored)  
         """
-        if isinstance(filename, pyfits.HDUList):
-            logging.debug("accepting already loaded file {0}".format(filename.filename()))
-            # check to see if this image has been compressed
-            # and expand if neccessary
-            if 'BN_CFAC' in filename[hdu_index].header:
-                logging.debug("Expanding file")
-                self.hdu = expand(filename)[hdu_index]
-            else:
-                self.hdu = filename[hdu_index]
-        else:
-            logging.debug("Loading HDU {0} from {1}".format(hdu_index, filename))
-            hdulist = load_safe(filename)
-            self.hdu = hdulist[hdu_index]
-            # check for a compressed file
-            if 'BN_CFAC' in self.hdu.header:
-                logging.debug("Expanding file")
-                self.hdu = expand(hdulist)[hdu_index]
-            del hdulist
-        
+
+        self.hdu = expand(filename)[hdu_index] # auto detects if the file needs expanding
+
         self._header = self.hdu.header
         # need to read these headers before we 'touch' the data or they dissappear
         if "BZERO" in self._header:
@@ -142,8 +113,8 @@ class FitsImage():
         if beam is None:
             self.beam = get_beam(self._header)
             if self.beam is None:
-                logging.critical("Beam info is not in fits header.")
-                logging.critical("Beam info not supplied by user. Stopping.")
+                log.critical("Beam info is not in fits header.")
+                log.critical("Beam info not supplied by user. Stopping.")
                 sys.exit(1)
         else:  # use the supplied beam
             self.beam = beam
@@ -152,7 +123,7 @@ class FitsImage():
         # convert +/- inf to nan
         self._pixels[numpy.where(numpy.isinf(self._pixels))] = numpy.nan
         # del self.hdu
-        logging.debug("Using axes {0} and {1}".format(self._header['CTYPE1'], self._header['CTYPE2']))
+        log.debug("Using axes {0} and {1}".format(self._header['CTYPE1'], self._header['CTYPE2']))
 
     def get_pixels(self):
         return self._pixels
