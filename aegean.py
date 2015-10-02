@@ -1436,8 +1436,8 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
     :param imgpsf: filename or HDUList for a psf image.
     :return: list of sources [and an rms image if returnrms is True]
     """
+    global log
     if log is None:
-        global log
         log = logging.getLogger()
 
     # Tell numpy to be quiet
