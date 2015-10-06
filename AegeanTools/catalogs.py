@@ -116,6 +116,7 @@ def update_meta_data(meta=None):
     if not 'PROGRAM' in meta:
         meta['PROGRAM'] = "AegeanTools.catalogs"
         meta['PROGVER'] = "{0}-({1})".format(__version__,__date__)
+    return meta
 
 
 
@@ -129,7 +130,7 @@ def save_catalog(filename, catalog, meta=None):
     """
     ascii_table_formats = {'csv': 'csv', 'tab': 'tab', 'tex': 'latex', 'html': 'html'}
     #.ann and .reg are handled by me
-    update_meta_data(meta)
+    meta = update_meta_data(meta)
     extension = os.path.splitext(filename)[1][1:].lower()
     if extension in ['ann', 'reg']:
         writeAnn(filename, catalog, extension)
