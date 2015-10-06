@@ -24,8 +24,8 @@ from AegeanTools.fits_interp import compress
 import multiprocessing
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.2'
-__date__ = '2015-06-24'
+__version__ = 'v1.3'
+__date__ = '2015-10-06'
 
 
 def sigma_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=None):

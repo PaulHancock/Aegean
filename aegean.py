@@ -73,8 +73,8 @@ import multiprocessing
 __author__ = 'Paul Hancock'
 
 # Aegean version [Updated via script]
-__version__ = 'v1.9.6-103-gb9b0e73'
-__date__ = '2015-10-02'
+__version__ = 'v1.9.6-107-geb1c4e6'
+__date__ = '2015-10-06'
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
