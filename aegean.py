@@ -389,8 +389,9 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
     if debug_on:
         log.debug("Estimated sources: {0}".format(i))
     # remember how many components are fit.
-    params.components=i
-    if params.components <1:
+    params.add('components',value=i, vary=False)
+    #params.components=i
+    if params['components'].value <1:
         log.debug("Considered {0} summits, accepted {1}".format(summits_considered,i))
     return params
 
@@ -420,7 +421,7 @@ def result_to_components(result, model, island_data, isflags):
     is_flag = isflags
 
     sources = []
-    for j in range(model.components):
+    for j in range(model['components'].value):
         src_flags = is_flag
         source = OutputSource()
         source.island = isle_num
@@ -1176,11 +1177,12 @@ def refit_islands(group, stage, outerclip, istart=0):
         if i==0:
             log.debug("No sources found in island {0}".format(src.island))
             continue
-        params.components = i
+        params.add('components', value=i, vary=False)
+        # params.components = i
         log.debug(" {0} components being fit".format(i))
         # now we correct the xo/yo positions to be relative to the sub-image
         log.debug("xmxxymyx {0} {1} {2} {3}".format(xmin,xmax,ymin,ymax))
-        for i in range(params.components):
+        for i in range(params['components'].value):
             try:
                 prefix = "c{0}_".format(i)
                 params[prefix + 'xo'].value -=xmin
@@ -1192,12 +1194,12 @@ def refit_islands(group, stage, outerclip, istart=0):
             except Exception, e:
                 log.error(" ARG !")
                 log.info(params)
-                log.info(params.components)
+                log.info(params['components'].value)
                 log.info("trying to access component {0}".format(i))
                 raise e
         log.debug(params)
         # don't fit if there are no sources
-        if params.components<1:
+        if params['components'].value<1:
             log.info("Island {0} has no components".format(src.island))
             continue
 
@@ -1209,7 +1211,7 @@ def refit_islands(group, stage, outerclip, istart=0):
         allx, ally = np.indices(idata.shape)
         # mask to include pixels that are withn the FWHM of the sources being fit
         mask_params = copy.deepcopy(params)
-        for i in range(mask_params.components):
+        for i in range(mask_params['components'].value):
             prefix = 'c{0}_'.format(i)
             mask_params[prefix+'amp'].value = 1
         mask_model = ntwodgaussian_lmfit(mask_params)
@@ -1235,7 +1237,7 @@ def refit_islands(group, stage, outerclip, istart=0):
 
         # Check to see that each component has some data within the central 3x3 pixels of it's location
         # If not then we don't fit that component
-        for i in range(params.components):
+        for i in range(params['components'].value):
             prefix = "c{0}_".format(i)
             # figure out a box around the center of this
             cx,cy = params[prefix+'xo'].value, params[prefix+'yo'].value #central pixel coords
@@ -1264,7 +1266,7 @@ def refit_islands(group, stage, outerclip, istart=0):
         else:
             if non_nan_pix < nfree:
                 log.debug("More free parameters {0} than available pixels {1}".format(nfree,non_nan_pix))
-                if non_nan_pix >= params.components:
+                if non_nan_pix >= params['components'].value:
                     log.debug("Fixing all parameters except amplitudes")
                     for p in params.keys():
                         if 'amp' not in p:
@@ -1346,7 +1348,7 @@ def fit_island(island_data):
 
     # islands at the edge of a region of nans
     # result in no components
-    if params is None or params.components <1:
+    if params is None or params['components'].value <1:
         return []
 
     log.debug("Rms is {0}".format(np.shape(rms)))
