@@ -12,7 +12,6 @@ from tempfile import NamedTemporaryFile
 import time
 
 from scipy.interpolate import LinearNDInterpolator, interp2d
-from scipy.stats import sigmaclip
 from astropy.io import fits
 
 
@@ -26,6 +25,27 @@ import multiprocessing
 __author__ = 'Paul Hancock'
 __version__ = 'v1.3'
 __date__ = '2015-10-06'
+
+
+def sigmaclip(arr, lo, hi):
+    """
+    Perform sigma clipping on an array.
+    Return an array whose elements c obey:
+     mean - std*lo < c < mean + std*hi
+    where mean/std refers to the mean/std of the input array.
+
+    I'd like scipy to do this, but it appears that only scipy v0.16+ has a useful sigmaclip function.
+
+    :param arr: Input array
+    :param lo: Lower limit (mean -std*lo)
+    :param hi: Upper limit (mean +std*hi)
+    :return: clipped array
+    """
+    mean = np.mean(arr)
+    std = np.std(arr)
+    clipped = arr[np.where(arr>mean-std*lo)]
+    clipped = clipped[np.where(clipped < mean+std*hi)]
+    return clipped
 
 
 def sigma_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=None):
@@ -123,7 +143,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=N
         x_min,x_max,y_min,y_max = box(x,y)
         new = data[x_min:x_max,y_min:y_max]
         new = np.ravel(new[np.isfinite(new)])
-        new = sigmaclip(new, 3, 3).clipped
+        new = sigmaclip(new, 3, 3)
         bkg = np.median(new)
         rms = np.std(new)
 
