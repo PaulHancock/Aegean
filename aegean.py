@@ -547,7 +547,7 @@ def result_to_components(result, model, island_data, isflags):
         height = gcd(tl[0], tl[1], bl[0], bl[1])
         width = gcd(tl[0], tl[1], tr[0], tr[1])
         area = height * width
-        source.area = area * source.pixels / source.x_width / source.y_width
+        source.area = area * source.pixels / source.x_width / source.y_width  # area is in deg^2
 
         # create contours
         msq = MarchingSquares(idata)
@@ -568,12 +568,13 @@ def result_to_components(result, model, island_data, isflags):
                                                                   positions[1][0]))
 
         # integrated flux
-        beam_area = global_data.psfhelper.get_beamarea_pix(source.ra,source.dec)
+        beam_area = global_data.psfhelper.get_beamarea_deg2(source.ra, source.dec)  # beam in deg^2
+        # get_beamarea_pix(source.ra, source.dec)  # beam is in pix^2
         isize = source.pixels  # number of non zero pixels
         log.debug("- pixels used {0}".format(isize))
         source.int_flux = np.nansum(kappa_sigma)  # total flux Jy/beam
         log.debug("- sum of pixles {0}".format(source.int_flux))
-        source.int_flux /= beam_area
+        source.int_flux *= beam_area  # total flux in Jy
         log.debug("- integrated flux {0}".format(source.int_flux))
         eta = erf(np.sqrt(-1 * np.log(abs(source.local_rms * outerclip / source.peak_flux)))) ** 2
         log.debug("- eta {0}".format(eta))
