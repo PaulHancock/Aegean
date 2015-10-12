@@ -227,12 +227,6 @@ class WCSHelper(object):
         # check to see if we need to scale the major axis based on the declination
         if self.lat is None:
             factor = 1
-            # major = abs(self.beam.a/(self.pixscale[0]*math.sin(math.radians(self.beam.pa)) +
-            #                          self.pixscale[1]*math.cos(math.radians(self.beam.pa)) ))
-            #
-            # minor = abs(self.beam.b/(self.pixscale[1]*math.sin(math.radians(self.beam.pa)) +
-            #                          self.pixscale[0]*math.cos(math.radians(self.beam.pa)) ))
-            # theta =  self.sky2pix_vec(pos, self.beam.a, self.beam.pa)[3]
         else:
             # this works if the pa is zero. For non-zero pa it's a little more difficult
             factor = np.cos(np.radians(dec-self.lat))
@@ -272,7 +266,7 @@ class WCSHelper(object):
         :return:
         """
         parea = abs(self.pixscale[0] * self.pixscale[1]) # in deg**2 at reference coords
-        barea = self.get_beamarea_deg2(ra,dec)
+        barea = self.get_beamarea_deg2(ra, dec)
         return barea/parea
 
     def sky_sep(self, pix1, pix2):
@@ -401,7 +395,7 @@ class PSFHelper(WCSHelper):
             log.info("Loading PSF data from {0}".format(psffile))
             header = fits.getheader(psffile)
             data = fits.getdata(psffile)
-            if len(data.shape)!=3:
+            if len(data.shape) != 3:
                 log.critical("PSF file needs to have 3 dimensions, only {0} found".format(len(data.shape)))
                 raise Exception("Invalid PSF file {0}".format(psffile))
             try:
@@ -442,7 +436,7 @@ class PSFHelper(WCSHelper):
         ra,dec = self.wcshelper.pix2sky([x,y])
         return self.get_pixbeam(ra,dec)
 
-    def get_pixbeam(self,ra,dec):
+    def get_pixbeam(self, ra, dec):
         """
         Get the beam shape at this location.
         :param ra:
@@ -460,7 +454,7 @@ class PSFHelper(WCSHelper):
             beam = Beam(psf[0],psf[1],beam.pa)
         return beam
 
-    def get_beam(self,ra,dec):
+    def get_beam(self, ra, dec):
         """
         """
         if self.data is None:
@@ -472,7 +466,17 @@ class PSFHelper(WCSHelper):
             return Beam(psf[0],psf[1],psf[2])
 
     def get_beamarea_pix(self, ra, dec):
-        beam = self.get_pixbeam(ra,dec)
+        beam = self.get_pixbeam(ra, dec)
+        return beam.a*beam.b*np.pi
+
+    def get_beamarea_deg2(self, ra, dec):
+        """
+
+        :param ra:
+        :param dec:
+        :return:
+        """
+        beam = self.get_beam(ra, dec)
         return beam.a*beam.b*np.pi
 
 
