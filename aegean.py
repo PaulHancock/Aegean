@@ -1371,6 +1371,9 @@ def fit_island(island_data):
         fac = 1/np.sqrt(2)
         C = Cmatrix(mx, my, pixbeam.a*FWHM2CC*fac, pixbeam.b*FWHM2CC*fac, pixbeam.pa)
         B = Bmatrix(C)
+        ## For testing the fitting without the inverse co-variance matrix, set these to None
+        # B = None
+        # C = None
         log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*FWHM2CC, pixbeam.b*FWHM2CC, pixbeam.pa))
         errs = np.nanmax(rms)
         result, model = do_lmfit(idata, params, B=B)

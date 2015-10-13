@@ -699,7 +699,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 # Alternate Filters
 # Used only for testing algorithm speeds, not really useful
 ###
-def scipy_filter(im_name,out_base,step_size,box_size,cores=None):
+def scipy_filter(im_name, out_base, step_size, box_size, cores=None):
     from scipy.ndimage.filters import generic_filter
     from scipy.stats import nanmedian,nanstd,scoreatpercentile
 
