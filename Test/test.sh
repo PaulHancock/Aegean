@@ -58,7 +58,10 @@ tst "python aegean.py Test/Images/MultiHDU.fits --hdu=1 --out=out.cat"
 tst "python aegean.py Test/Images/1904-66_SIN.fits --measure --input=out.cat --find --island --table=out.db"
 
 #test WCS problem handling
-#tst "python aegean.py Test/Images/WCS_edge.fits"
+tst "python aegean.py Test/Images/WCS_edge.fits"
+
+# Test on an image that has a very large island in it. Ideally should finish within 30s.
+# tst "timeout -sHUP 30s python aegean.py --autoload Test/Images/Bright.fits"
 
 echo "to clean up:"
 echo "rm 1904-66_SIN_{bkg,rms}.fits aux_{bkg,rms}.fits out{_comp,_isle}.vot out.{cat,db} table_comp.{xml,vo,csv,tex,tab} kvis_simp.ann ds9{_comp,_isle}.reg my.db"
