@@ -85,10 +85,11 @@ class Region():
         """
         Represent this region as pixels at maxdepth only
         """
-        pd = self.pixeldict.copy()
+        pd = self.pixeldict
         for d in xrange(1,self.maxdepth):
             for p in pd[d]:
                 pd[d+1].update(set((4*p,4*p+1,4*p+2,4*p+3)))
+            pd[d] = set()  # clear the pixels from this level
         self.demoted = list(pd[d+1])
         return
 
@@ -97,13 +98,11 @@ class Region():
         Remake the pixel dictionary, merging groups of pixels at level N into a single pixel
         at level N-1
         """
-        #convert all to lowest level
+        # convert all to lowest level
         self._demote_all()
-        #store this for later
-        self.demoted=self.pixeldict
-        #now promote as needed
-        for d in xrange(self.maxdepth,2,-1):
-            plist=self.pixeldict[d].copy()
+        # now promote as needed
+        for d in xrange(self.maxdepth, 2, -1):
+            plist = self.pixeldict[d].copy()
             for p in plist:
                 if p%4==0:
                     nset=set((p,p+1,p+2,p+3))
