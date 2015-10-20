@@ -183,7 +183,7 @@ def poly2poly(line):
     return coords
 
 
-def reg2mim(regfile,mimfile,maxdepth):
+def reg2mim(regfile, mimfile, maxdepth):
     """
     Read a ds9 regions file and create a mim file from it
     :param regfile:
@@ -289,7 +289,24 @@ def save_region(region, filename):
     logging.info("Wrote {0}".format(filename))
     return
 
-if __name__=="__main__":
+
+def save_as_image(region, filename):
+    """
+
+    :param region:
+    :param filename:
+    :return:
+    """
+    import healpy as hp
+    pixels = list(region.get_demoted())
+    order = region.maxdepth
+    m = np.arange(hp.nside2npix(2**order))
+    m[:] = 0
+    m[pixels] = 1
+    hp.write_map(filename, m, nest=True, coord='C')
+    return
+
+if __name__ == "__main__":
     epilog = 'Regions are added/subtracted in the following order, +r -r +c -c +p -p. ' + \
              'This means that you might have to take multiple passes to construct overly complicated regions.'
     parser = argparse.ArgumentParser(epilog=epilog, prefix_chars='+-')
@@ -297,7 +314,7 @@ if __name__=="__main__":
     group1 = parser.add_argument_group('Creating/modifying regions', 'Must specify -o, plus or more [+-][cr]')
     # tools for creating .mim files
     group1.add_argument('-o', dest='outfile', action='store', help='output filename', default=None)
-    group1.add_argument('-depth', dest='maxdepth',action='store',
+    group1.add_argument('-depth', dest='maxdepth', action='store',
                         metavar='N', default=8, type=int,
                         help='maximum nside=2**N to be used to represent this region. [Default=8]')
     group1.add_argument('+r', dest='add_region', action='append',
@@ -333,7 +350,7 @@ if __name__=="__main__":
                         type=str, metavar=('region.reg', 'region.mim'), nargs=2,
                         help="Converta a .reg file into a .mim file", default=[])
     group2.add_argument('--mim2fits',dest='mim2fits', action='append',
-                        type=str, metavar=('region.mim', 'region_MOC.fits'),nargs=2,
+                        type=str, metavar=('region.mim', 'region_MOC.fits'), nargs=2,
                         help="Convert a .mim file into a MOC.fits file", default=[])
     group3 = parser.add_argument_group("Masking fits files")
     group3.add_argument('--mask', dest='mask', action='store',
@@ -345,6 +362,8 @@ if __name__=="__main__":
                              'Values of blank/nan/zero are considered to be mask=True.')
     group4 = parser.add_argument_group('Extra options')
     # extras
+    group4.add_argument('--fitsimage', dest='mim2img', action='store_true',
+                        default=False, help='Save the region as a fits image')
     group4.add_argument('--debug', dest='debug', action='store_true', help='debug mode [default=False]', default=False)
     group4.add_argument('--version', action='version', version='%(prog)s '+__version__+"-({0})".format(__date__))
     results = parser.parse_args()
@@ -380,6 +399,11 @@ if __name__=="__main__":
     if len(results.mask) > 0:
         m, i, o = results.mask
         maskfile(m, i, o)
+        sys.exit()
+
+    if results.mim2img:
+        region = combine_regions(results)
+        save_as_image(region, results.outfile)
         sys.exit()
 
     if results.outfile is not None:
