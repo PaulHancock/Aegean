@@ -22,8 +22,8 @@ from astropy.io import fits as pyfits
 from astropy.wcs import wcs as pywcs
 from AegeanTools.regions import Region
 
-__version__ = 'v1.1'
-__date__ = '2015-05-21'
+__version__ = 'v1.2'
+__date__ = '2015-10-20'
 
 # seems like this fails sometimes
 try:
