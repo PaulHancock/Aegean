@@ -198,7 +198,7 @@ def aegean2cat(filename):
     # this will break if I change the number of properties that are reported.
     colnames = ['src_isle']  + OutputSource.names[2:-3]
     t = ascii.read(filename,delimiter='\s', names = colnames)
-    source = Column(name='src', data= np.array([ int(a.split(',')[1][:-1]) for a in t['src_isle']]))
+    source = Column(name='source', data= np.array([ int(a.split(',')[1][:-1]) for a in t['src_isle']]))
     isle =  Column(name='island', data=np.array([ int(a.split(',')[0][1:]) for a in t['src_isle']]))
     t.add_column(isle, 0)
     t.add_column(source, 1)
