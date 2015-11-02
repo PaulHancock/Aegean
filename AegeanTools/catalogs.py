@@ -22,6 +22,7 @@ from models import OutputSource, IslandSource, SimpleSource, classify_catalog
 # input/output table formats
 import astropy
 from astropy.table.table import Table
+from astropy.table import Column
 from astropy.io import ascii
 from astropy.io import fits
 
@@ -187,6 +188,23 @@ def load_catalog(filename):
     return catalog
 
 
+def aegean2cat(filename):
+    """
+
+    @param filename:
+    @return:
+    """
+    from models import OutputSource
+    # this will break if I change the number of properties that are reported.
+    colnames = ['src_isle']  + OutputSource.names[2:-3]
+    t = ascii.read(filename,delimiter='\s', names = colnames)
+    source = Column(name='source', data= np.array([ int(a.split(',')[1][:-1]) for a in t['src_isle']]))
+    isle =  Column(name='island', data=np.array([ int(a.split(',')[0][1:]) for a in t['src_isle']]))
+    t.add_column(isle, 0)
+    t.add_column(source, 1)
+
+    return t
+
 def load_table(filename):
     """
 
@@ -204,9 +222,13 @@ def load_table(filename):
         log.info("Reading file {0}".format(filename))
         t = Table.read(filename)
     else:
-        log.error("Table format not recognized or supported")
-        log.error("{0} [{1}]".format(filename,fmt))
-        t= None
+        if open(filename).readline().startswith(('#Aegean')):
+            log.info('Detected Aegean format, reading file {0}'.format(filename))
+            t = aegean2cat(filename)
+        else:
+            log.error("Table format not recognized or supported")
+            log.error("{0} [{1}]".format(filename,fmt))
+            sys.exit(0)
     return t
 
 

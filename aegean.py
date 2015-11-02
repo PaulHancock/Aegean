@@ -73,8 +73,8 @@ import multiprocessing
 __author__ = 'Paul Hancock'
 
 # Aegean version [Updated via script]
-__version__ = 'v1.9.6-113-gdb9fc65'
-__date__ = '2015-10-12'
+__version__ = 'v1.9.6-123-ga3fa9a4'
+__date__ = '2015-10-27'
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -1282,7 +1282,7 @@ def refit_islands(group, stage, outerclip, istart=0):
                 if src_valid_psf is not None:
                     pixbeam = global_data.psfhelper.get_pixbeam(src_valid_psf.ra,src_valid_psf.dec)
                 else:
-                    logging.critical("Cannot determine pixel beam")
+                    log.critical("Cannot determine pixel beam")
             fac = 1/np.sqrt(2)
             C = Cmatrix(mx, my, pixbeam.a*FWHM2CC*fac, pixbeam.b*FWHM2CC*fac, pixbeam.pa)
             B = Bmatrix(C)
@@ -1293,7 +1293,8 @@ def refit_islands(group, stage, outerclip, istart=0):
 
         # convert the results to a source object
         offsets = (xmin, xmax, ymin, ymax)
-        island_data = IslandFittingData(inum, i=idata, offsets=offsets, doislandflux=True, scalars=(4,4,None))
+        # TODO allow for island fluxes in the refitting.
+        island_data = IslandFittingData(inum, i=idata, offsets=offsets, doislandflux=False, scalars=(4,4,None))
         new_src = result_to_components(result, model, island_data, src.flags)
 
         # preserve the uuid so we can do exact matching between catalogs
@@ -1679,10 +1680,14 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     if outfile:
         print >> outfile, header.format("{0}-({1})".format(__version__,__date__), filename)
         print >> outfile, OutputSource.header
-    for source in sources:
-        print >> outfile, str(source)
 
-    print "fit {0} sources".format(len(sources))
+    components = 0
+    for source in sources:
+        if type(source) == OutputSource:
+            components +=1
+            print >> outfile, str(source)
+
+    log.info("fit {0} components".format(components))
     return sources
 
 
@@ -2253,6 +2258,8 @@ if __name__ == "__main__":
         log.info("Priorized fitting of sources in input catalog.")
 
         log.info("Stage = {0}".format(options.priorized))
+        if options.doislandflux:
+            log.warn("--island requested but not yet supported for priorized fitting")
         measurements = priorized_fit_islands(filename, catfile=options.input, hdu_index=options.hdu_index,
                                             rms=options.rms,
                                             outfile=options.outfile, bkgin=options.backgroundimg,
