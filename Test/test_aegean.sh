@@ -23,7 +23,6 @@ return ${code}
 
 
 echo "Testing Aegean"
-rm out.log err.log
 # show module versions
 tst "python aegean.py --versions"
 
@@ -45,9 +44,9 @@ tst "python aegean.py Test/Images/1904-66_SIN.fits --out=out.cat --table=table.x
 tst "python aegean.py Test/Images/1904-66_SIN.fits --measure --input=out.cat --table=kvis.ann"
 
 # do priorized measurements with an input catalog
-tst "python aegean.py Test/Images/1904-66_SIN.fits --input table.vot --priorized 1 --table table_prior.vot"
-tst "python aegean.py Test/Images/1904-66_SIN.fits --input table.vot --priorized 1 --table table_prior.vot --ratio 0.9"
-tst "python aegean.py Test/Images/1904-66_SIN.fits --input table.vot --priorized 1 --table table_prior.vot --ratio 1.4"
+tst "python aegean.py Test/Images/1904-66_SIN.fits --input table_comp.vot --priorized 1 --table table_prior.vot"
+tst "python aegean.py Test/Images/1904-66_SIN.fits --input table_comp.vot --priorized 1 --table table_prior.vot --ratio 0.9"
+tst "python aegean.py Test/Images/1904-66_SIN.fits --input table_comp.vot --priorized 1 --table table_prior.vot --ratio 1.4"
 
 # do island fitting and ouput a ds9 reg file and an sqlite3 database
 tst "python aegean.py Test/Images/1904-66_SIN.fits --island --table=ds9.reg,my.db"
@@ -68,12 +67,12 @@ tst "python aegean.py Test/Images/1904-66_SIN.fits --measure --input=out.cat --f
 tst "python aegean.py Test/Images/WCS_edge.fits"
 
 # Test on an image that has a very large island in it. Ideally should finish within 30s.
-echo "This next test will probably fail."
+echo "This next test will probably fail because Aegean is slow for large islands."
 tst "timeout -sHUP 30s python aegean.py --autoload Test/Images/Bright.fits"
 
 echo "to clean up:"
-echo "rm 1904-66_SIN_{bkg,rms}.fits aux_{bkg,rms}.fits out{_comp,_isle}.vot"
-echo "rm out.{cat,db} table_comp.{xml,vo,csv,tex,tab} kvis_simp.ann ds9{_comp,_isle}.reg my.db"
-echo "rm table_proir.vot"
+echo "rm 1904-66_SIN_{bkg,rms}.fits aux_{bkg,rms,crv}.fits out{_comp,_isle}.vot"
+echo "rm out.{cat,db} table_comp.{xml,vot,csv,tex,tab} kvis_simp.ann ds9{_comp,_isle}.reg my.db"
+echo "rm table_proir_comp.vot"
 
 
