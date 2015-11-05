@@ -22,6 +22,7 @@ import flags
 import logging
 log = logging.getLogger('Aegean')
 
+
 # Modelling and fitting functions
 def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     """
@@ -40,7 +41,7 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     yyo = y-yo
     exp = (xxo*cost + yyo*sint)**2 / sx**2 \
         + (xxo*sint - yyo*cost)**2 / sy**2
-    exp *=-1./2
+    exp *= -1./2
     return amp*np.exp(exp)
 
 
@@ -372,9 +373,9 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
             return (model - data[mask]).dot(B)
 
     if dojac:
-        result = lmfit.minimize(residual, params, kws={'x':mask[0],'y':mask[1],'B':B,'errs':errs}, Dfun = jacobian)
+        result = lmfit.minimize(residual, params, kws={'x':mask[0], 'y':mask[1], 'B':B, 'errs':errs}, Dfun = jacobian)
     else:
-        result = lmfit.minimize(residual, params, kws={'x':mask[0],'y':mask[1],'B':B,'errs':errs})
+        result = lmfit.minimize(residual, params, kws={'x':mask[0], 'y':mask[1], 'B':B, 'errs':errs})
 
     # Remake the residual so that it is once again (model - data)
     if B is not None:
