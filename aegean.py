@@ -73,8 +73,8 @@ import multiprocessing
 __author__ = 'Paul Hancock'
 
 # Aegean version [Updated via script]
-__version__ = 'v1.9.6-130-ge390396'
-__date__ = '2015-11-03'
+__version__ = 'v1.9.6-136-g561f83c'
+__date__ = '2015-11-12'
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -1368,11 +1368,11 @@ def fit_island(island_data):
         # C = None
         log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*FWHM2CC, pixbeam.b*FWHM2CC, pixbeam.pa))
         errs = np.nanmax(rms)
-        result, model = do_lmfit(idata, params, B=B)
+        result, _ = do_lmfit(idata, params, B=B)
         if not result.errorbars:
             is_flag |= flags.FITERR
         # get the real (sky) parameter errors
-        model = covar_errors(model, idata, errs=errs, B=B, C=C)
+        model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
 
         if not result.success:
             is_flag |= flags.FITERR
