@@ -140,7 +140,7 @@ class OutputSource(SimpleSource):
                 "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:06b}"
     names = ['island', 'source', 'background', 'local_rms', 'ra_str', 'dec_str', 'ra', 'err_ra', 'dec', 'err_dec',
              'peak_flux', 'err_peak_flux', 'int_flux', 'err_int_flux', 'a', 'err_a', 'b', 'err_b', 'pa', 'err_pa',
-             'flags','residual_mean','residual_std','uuid']
+             'flags','residual_mean','residual_std','uuid','psf_a','psf_b','psf_pa']
 
     def __init__(self):
         SimpleSource.__init__(self)
