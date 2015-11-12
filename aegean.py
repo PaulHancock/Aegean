@@ -492,10 +492,10 @@ def result_to_components(result, model, island_data, isflags):
         source.flags = src_flags
         # add psf info if a psf file has been supplied
         if global_data.psfhelper.data is not None:
-            a,b,pa = global_data.psfhelper.get_psf_sky(source.ra, source.dec)
-            source.psf_a = a/3600
-            source.psf_b = b/3600
-            source.psf_pa = pa/3600
+            a, b, pa = global_data.psfhelper.get_psf_sky(source.ra, source.dec)
+            source.psf_a = a*3600
+            source.psf_b = b*3600
+            source.psf_pa = pa*3600
         sources.append(source)
         log.debug(source)
 
