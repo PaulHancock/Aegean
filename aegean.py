@@ -1603,17 +1603,20 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
                 src.b = np.sqrt(src.b)*3600  # arcsec
 
     elif ratio is not None:
+        log.info("Using ratio of {0} to scale input source shapes".format(ratio))
         far *= ratio
         for i, src in enumerate(input_sources):
             skybeam = global_data.psfhelper.get_beam(src.ra, src.dec)
             if skybeam is None:
                 src_mask[i] = False
                 continue
-            src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
-            src.b = np.sqrt(src.b**2 + (beam.b*3600)**2*(1-1/ratio**2))
+            src.a = np.sqrt(src.a**2 + (skybeam.a*3600)**2*(1-1/ratio**2))
+            src.b = np.sqrt(src.b**2 + (skybeam.b*3600)**2*(1-1/ratio**2))
             # source with funky a/b are also rejected
             if not np.all(np.isfinite((src.a,src.b))):
                 src_mask[i] = False
+    else:
+        log.info("Not scaling input source sizes")
 
     log.info("{0} sources in catalog".format(len(input_sources)))
     log.info("{0} sources accepted".format(sum(src_mask)))
