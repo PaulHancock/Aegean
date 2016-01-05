@@ -23,7 +23,7 @@ import multiprocessing
 
 __author__ = 'Paul Hancock'
 __version__ = 'v1.3'
-__date__ = '2015-10-12'
+__date__ = '2016-01-05'
 
 
 def sigmaclip(arr, lo, hi, reps = 3):
