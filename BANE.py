@@ -5,6 +5,7 @@ import numpy as np
 import sys
 import os
 from optparse import OptionParser
+import time
 from time import gmtime, strftime
 import logging
 import copy
@@ -532,8 +533,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, fn=sigma_fil
         cores = multiprocessing.cpu_count()
     if cores > 1:
         try:
-            queue = pprocess.Queue(limit=cores, reuse=1)
-            parfilt = queue.manage(pprocess.MakeReusable(fn))
+            queue = pprocess.Queue(limit=cores, reuse=0)
+            parfilt = queue.manage(pprocess.MakeParallel(fn))
         except AttributeError, e:
             if 'poll' in e.message:
                 logging.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
@@ -580,8 +581,12 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, fn=sigma_fil
                 region = [xmin, xmax, ymin, ymax]
                 parfilt(filename, region, step_size, box_size, shape, ibkg, irms)
 
-        for _ in queue:  # exhaust the queue - might not actually be needed.
+        # Need to wait for the queue to finish processing before we continue
+        # This requires that we have reuse=0 and makeparallel when we start the queue
+        for _ in queue:
             pass
+
+
     else:
         # single core we do it all at once
         region = [0, img_x, 0, img_y]
