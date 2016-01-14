@@ -239,15 +239,14 @@ def write_table(table, filename):
             os.remove(filename)
         table.write(filename)
         log.info("Wrote {0}".format(filename))
-        return
     except Exception, e:
         if "Format could not be identified" not in e.message:
             raise e
-    finally:
-        fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
-        # TODO: figure out the format of files that are not autodetermined
-        log.critical("Cannot auto-determine format for {0}".format(fmt))
-        sys.exit(1)
+        else:
+            fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
+            # TODO: figure out the format of files that are not autodetermined
+            log.critical("Cannot auto-determine format for {0}".format(fmt))
+            sys.exit(1)
     return
 
 
