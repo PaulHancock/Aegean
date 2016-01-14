@@ -636,16 +636,21 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
 
     debug = logging.getLogger('Aegean').isEnabledFor(logging.DEBUG)
 
-    if mask is not None and region_available:
+    if mask is None:
+        global_data.region=None
+    elif not region_available:
+        log.warn("Mask supplied but functionality not available")
+        global_data.region=None
+    else:
         # allow users to supply and object instead of a filename
-        if isinstance(mask,Region):
+        if isinstance(mask, Region):
             global_data.region = mask
         elif os.path.exists(mask):
+            log.info("Loading mask from {0}".format(mask))
             global_data.region = pickle.load(open(mask))
         else:
             log.error("File {0} not found for loading".format(mask))
-    else:
-        global_data.region = None
+            global_data.region=None
 
     global_data.wcshelper = WCSHelper.from_header(img.get_hdu_header(), beam, lat)
     global_data.psfhelper = PSFHelper(psf, global_data.wcshelper)
