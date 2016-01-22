@@ -145,6 +145,10 @@ def sigma_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=N
         new = data[x_min:x_max, y_min:y_max]
         new = np.ravel(new)
         new = sigmaclip(new, 3, 3)
+        # If we are left with (or started with) no data, then just move on
+        if len(new)<1:
+            continue
+
         bkg = np.median(new)
         rms = np.std(new)
 
@@ -161,16 +165,23 @@ def sigma_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=N
     # otherwise pass back our coords and lists so that interpolation can be done elsewhere
     if ibkg is not None and irms is not None:
         gx,gy = np.mgrid[xmin:xmax,ymin:ymax]
-        ifunc = LinearNDInterpolator(rms_points, rms_values)
-        interpolated_rms = ifunc((gx, gy))
+        # If the bkg/rms calculation above didn't yield any points, then our interpolated values are all nans
+        if len(rms_points)>1:
+            ifunc = LinearNDInterpolator(rms_points, rms_values)
+            interpolated_rms = ifunc((gx, gy))
+        else:
+            interpolated_rms = np.empty((len(gx),len(gy)))*np.nan
         with irms.get_lock():
             for i,row in enumerate(interpolated_rms):
                 start_idx = np.ravel_multi_index((xmin + i, ymin), shape)
                 end_idx = start_idx + len(row)
                 irms[start_idx:end_idx] = row
 
-        ifunc = LinearNDInterpolator(bkg_points, bkg_values)
-        interpolated_bkg = ifunc((gx, gy))
+        if len(bkg_points)>1:
+            ifunc = LinearNDInterpolator(bkg_points, bkg_values)
+            interpolated_bkg = ifunc((gx, gy))
+        else:
+            interpolated_bkg = np.empty((len(gx),len(gy)))*np.nan
         with ibkg.get_lock():
             for i,row in enumerate(interpolated_bkg):
                 start_idx = np.ravel_multi_index((xmin + i,ymin), shape)
