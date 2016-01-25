@@ -168,22 +168,23 @@ def sigma_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=N
         # If the bkg/rms calculation above didn't yield any points, then our interpolated values are all nans
         if len(rms_points)>1:
             ifunc = LinearNDInterpolator(rms_points, rms_values)
-            interpolated_rms = ifunc((gx, gy))
+            # force 32 bit floats
+            interpolated_rms = np.array(ifunc((gx, gy)), dtype=np.float32)
         else:
-            interpolated_rms = np.empty((len(gx),len(gy)))*np.nan
+            interpolated_rms = np.empty((len(gx), len(gy)), dtype=np.float32)*np.nan
         with irms.get_lock():
-            for i,row in enumerate(interpolated_rms):
+            for i, row in enumerate(interpolated_rms):
                 start_idx = np.ravel_multi_index((xmin + i, ymin), shape)
                 end_idx = start_idx + len(row)
                 irms[start_idx:end_idx] = row
 
         if len(bkg_points)>1:
             ifunc = LinearNDInterpolator(bkg_points, bkg_values)
-            interpolated_bkg = ifunc((gx, gy))
+            interpolated_bkg = np.array(ifunc((gx, gy)), dtype=np.float32)
         else:
-            interpolated_bkg = np.empty((len(gx),len(gy)))*np.nan
+            interpolated_bkg = np.empty((len(gx), len(gy)), dtype=np.float32)*np.nan
         with ibkg.get_lock():
-            for i,row in enumerate(interpolated_bkg):
+            for i, row in enumerate(interpolated_bkg):
                 start_idx = np.ravel_multi_index((xmin + i,ymin), shape)
                 end_idx = start_idx + len(row)
                 ibkg[start_idx:end_idx] = row
@@ -604,9 +605,14 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, fn=sigma_fil
         fn(filename, region, step_size, box_size, shape, ibkg, irms)
     # reshape our 1d arrays back into a 2d image
     logging.debug("reshaping bkg")
-    interpolated_bkg = np.reshape(ibkg, shape)
+    interpolated_bkg = np.reshape(np.array(ibkg[:], dtype=np.float32), shape)
+    logging.debug(" bkg is {0}".format(interpolated_bkg.dtype))
+    logging.debug(" ... done at {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    del ibkg
     logging.debug("reshaping rms")
-    interpolated_rms = np.reshape(irms, shape)
+    interpolated_rms = np.reshape(np.array(irms[:], dtype=np.float32), shape)
+    logging.debug(" ... done at {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    del irms
 
     if cores > 1:
         del queue, parfilt
@@ -673,13 +679,15 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 
     if twopass:
         # TODO: check what this does for our memory usage
+        # Answer: The interpolation step peaks at about 5x the normal value.
         tempfile = NamedTemporaryFile(delete=False)
         data = fits.getdata(im_name) - bkg
         header = fits.getheader(im_name)
-        write_fits(data, header, tempfile)
+        # write 32bit floats to reduce memory overhead
+        write_fits(np.array(data, dtype=np.float32), header, tempfile)
         tempfile.close()
         temp_name = tempfile.name
-        del data, header, tempfile
+        del data, header, tempfile, rms
         logging.info("running second pass to get a better rms")
         _, rms = filter_mc_sharemem(temp_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, fn=func)
         os.remove(temp_name)
