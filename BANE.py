@@ -5,7 +5,6 @@ import numpy as np
 import sys
 import os
 from optparse import OptionParser
-import time
 from time import gmtime, strftime
 import logging
 import copy
@@ -16,7 +15,6 @@ from astropy.io import fits
 
 
 # Aegean tools
-import AegeanTools.pprocess as pprocess
 from AegeanTools.fits_interp import compress
 
 import multiprocessing
@@ -55,7 +53,14 @@ def sigmaclip(arr, lo, hi, reps = 3):
     return clipped
 
 
-def sigma_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=None, dobkg=True):
+def sf2(args):
+    """
+    Wrapper for sigma_filter
+    """
+    return sigma_filter(*args)
+
+
+def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     """
 
     :param filename:
@@ -160,32 +165,24 @@ def sigma_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=N
 
     ymin, ymax, xmin, xmax = region
 
-    # if we are not given shared memory references then just return the values as is
-    if irms is None and ibkg is None:
-        logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin, xmax, ymin, ymax,
-                                                               strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-        return xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
+    gx, gy = np.mgrid[xmin:xmax, ymin:ymax]
+    # If the bkg/rms calculation above didn't yield any points, then our interpolated values are all nans
+    if len(rms_points) > 1:
+        logging.debug("Interpolating rms")
+        ifunc = LinearNDInterpolator(rms_points, rms_values)
+        # force 32 bit floats
+        interpolated_rms = np.array(ifunc((gx, gy)), dtype=np.float32)
+    else:
+        interpolated_rms = np.empty((len(gx), len(gy)), dtype=np.float32)*np.nan
+    with irms.get_lock():
+        logging.debug("Writing rms to sharemem")
+        for i, row in enumerate(interpolated_rms):
+            start_idx = np.ravel_multi_index((xmin + i, ymin), shape)
+            end_idx = start_idx + len(row)
+            irms[start_idx:end_idx] = row
+    logging.debug(" .. done writing rms")
 
-    # if we have been passed some shared memory references do interpolation
-    if irms is not None:
-        gx, gy = np.mgrid[xmin:xmax, ymin:ymax]
-        # If the bkg/rms calculation above didn't yield any points, then our interpolated values are all nans
-        if len(rms_points) > 1:
-            logging.debug("Interpolating rms")
-            ifunc = LinearNDInterpolator(rms_points, rms_values)
-            # force 32 bit floats
-            interpolated_rms = np.array(ifunc((gx, gy)), dtype=np.float32)
-        else:
-            interpolated_rms = np.empty((len(gx), len(gy)), dtype=np.float32)*np.nan
-        with irms.get_lock():
-            logging.debug("Writing rms to sharemem")
-            for i, row in enumerate(interpolated_rms):
-                start_idx = np.ravel_multi_index((xmin + i, ymin), shape)
-                end_idx = start_idx + len(row)
-                irms[start_idx:end_idx] = row
-        logging.debug(" .. done writing rms")
-
-    if dobkg and ibkg is not None:
+    if dobkg:
         gx, gy = np.mgrid[xmin:xmax, ymin:ymax]
         if len(bkg_points)>1:
             logging.debug("Interpolating bkg")
@@ -552,70 +549,55 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, fn=sigma_fil
 
     if cores is None:
         cores = multiprocessing.cpu_count()
-    if cores > 1:
-        try:
-            queue = pprocess.Queue(limit=cores, reuse=0)
-            parfilt = queue.manage(pprocess.MakeParallel(fn))
-        except AttributeError, e:
-            if 'poll' in e.message:
-                logging.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
-                cores = 1
-            else:
-                logging.error("Your system can't seem to make a queue, try using --cores=1")
-                raise e
+
     img_y, img_x = shape
     # initialise some shared memory
     alen = shape[0]*shape[1]
     if dobkg:
+        global ibkg
         ibkg = multiprocessing.Array('f', alen)
     else:
         ibkg = None
+    global irms
     irms = multiprocessing.Array('f', alen)
 
-    if cores > 1:
-        logging.info("using {0} cores".format(cores))
-        nx, ny = optimum_sections(cores, shape)
+    logging.info("using {0} cores".format(cores))
+    nx, ny = optimum_sections(cores, shape)
 
-        # box widths should be multiples of the step_size, and not zero
-        width_x = max(img_x/nx/step_size[0], 1) * step_size[0]
-        width_y = max(img_y/ny/step_size[1], 1) * step_size[1]
+    # box widths should be multiples of the step_size, and not zero
+    width_x = max(img_x/nx/step_size[0], 1) * step_size[0]
+    width_y = max(img_y/ny/step_size[1], 1) * step_size[1]
 
-        xstart = width_x
-        ystart = width_y
-        xend = img_x - img_x % width_x  # the end point of the last "full" box
-        yend = img_y - img_y % width_y
+    xstart = width_x
+    ystart = width_y
+    xend = img_x - img_x % width_x  # the end point of the last "full" box
+    yend = img_y - img_y % width_y
 
-        # locations of the box edges
-        xmins = [0]
-        xmins.extend(range(xstart, xend, width_x))
+    # locations of the box edges
+    xmins = [0]
+    xmins.extend(range(xstart, xend, width_x))
 
-        xmaxs = [xstart]
-        xmaxs.extend(range(xstart+width_x, xend+1, width_x))
-        xmaxs[-1] = img_x
+    xmaxs = [xstart]
+    xmaxs.extend(range(xstart+width_x, xend+1, width_x))
+    xmaxs[-1] = img_x
 
-        ymins = [0]
-        ymins.extend(range(ystart, yend, width_y))
+    ymins = [0]
+    ymins.extend(range(ystart, yend, width_y))
 
-        ymaxs = [ystart]
-        ymaxs.extend(range(ystart+width_y, yend+1, width_y))
-        ymaxs[-1] = img_y
+    ymaxs = [ystart]
+    ymaxs.extend(range(ystart+width_y, yend+1, width_y))
+    ymaxs[-1] = img_y
 
-        for xmin, xmax in zip(xmins, xmaxs):
-            for ymin, ymax in zip(ymins, ymaxs):
-                region = [xmin, xmax, ymin, ymax]
-                parfilt(filename, region, step_size, box_size, shape, ibkg, irms)
+    args = []
+    for xmin, xmax in zip(xmins, xmaxs):
+        for ymin, ymax in zip(ymins, ymaxs):
+            region = [xmin, xmax, ymin, ymax]
+            args.append((filename, region, step_size, box_size, shape, dobkg))
 
-        # Need to wait for the queue to finish processing before we continue
-        # This requires that we have reuse=0 and makeparallel when we start the queue
-        for i in queue:
-            pass
-    else:
-        # single core we do it all at once
-        region = [0, img_x, 0, img_y]
-        fn(filename, region, step_size, box_size, shape, ibkg, irms)
-
-    if cores > 1:
-        del queue, parfilt, i
+    pool = multiprocessing.Pool(processes=cores)
+    pool.map(sf2, args)
+    pool.close()
+    pool.join()
 
     # reshape our 1d arrays back into a 2d image
     if dobkg:
