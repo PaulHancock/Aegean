@@ -55,7 +55,7 @@ def sigmaclip(arr, lo, hi, reps = 3):
     return clipped
 
 
-def sigma_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=None):
+def sigma_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=None, dobkg=True):
     """
 
     :param filename:
@@ -65,6 +65,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=N
     :param shape:
     :param ibkg:
     :param irms:
+    :param dobkg: True = do background calculation.
     :return:
     """
 
@@ -136,8 +137,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=N
         return x_min, x_max, y_min, y_max
 
     bkg_points = []
-    rms_points = []
     bkg_values = []
+    rms_points = []
     rms_values = []
 
     for x, y in locations(step_size, xmin, xmax, ymin, ymax):
@@ -149,52 +150,60 @@ def sigma_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=N
         if len(new)<1:
             continue
 
-        bkg = np.median(new)
-        rms = np.std(new)
-
-        if bkg is not None:
+        if dobkg:
+            bkg = np.median(new)
             bkg_points.append((x+rmin, y+cmin))  # these coords need to be indices into the larger array
             bkg_values.append(bkg)
-        if rms is not None:
-            rms_points.append((x+rmin, y+cmin))
-            rms_values.append(rms)
+        rms = np.std(new)
+        rms_points.append((x+rmin, y+cmin))
+        rms_values.append(rms)
 
     ymin, ymax, xmin, xmax = region
-    # check if we have been passed some shared memory references
-    # and if so do the interpolation
-    # otherwise pass back our coords and lists so that interpolation can be done elsewhere
-    if ibkg is not None and irms is not None:
-        gx,gy = np.mgrid[xmin:xmax,ymin:ymax]
+
+    # if we are not given shared memory references then just return the values as is
+    if irms is None and ibkg is None:
+        logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin, xmax, ymin, ymax,
+                                                               strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+        return xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
+
+    # if we have been passed some shared memory references do interpolation
+    if irms is not None:
+        gx, gy = np.mgrid[xmin:xmax, ymin:ymax]
         # If the bkg/rms calculation above didn't yield any points, then our interpolated values are all nans
-        if len(rms_points)>1:
+        if len(rms_points) > 1:
+            logging.debug("Interpolating rms")
             ifunc = LinearNDInterpolator(rms_points, rms_values)
             # force 32 bit floats
             interpolated_rms = np.array(ifunc((gx, gy)), dtype=np.float32)
         else:
             interpolated_rms = np.empty((len(gx), len(gy)), dtype=np.float32)*np.nan
         with irms.get_lock():
+            logging.debug("Writing rms to sharemem")
             for i, row in enumerate(interpolated_rms):
                 start_idx = np.ravel_multi_index((xmin + i, ymin), shape)
                 end_idx = start_idx + len(row)
                 irms[start_idx:end_idx] = row
+        logging.debug(" .. done writing rms")
 
+    if dobkg and ibkg is not None:
+        gx, gy = np.mgrid[xmin:xmax, ymin:ymax]
         if len(bkg_points)>1:
+            logging.debug("Interpolating bkg")
             ifunc = LinearNDInterpolator(bkg_points, bkg_values)
             interpolated_bkg = np.array(ifunc((gx, gy)), dtype=np.float32)
         else:
             interpolated_bkg = np.empty((len(gx), len(gy)), dtype=np.float32)*np.nan
         with ibkg.get_lock():
+            logging.debug("Writing bkg to sharemem")
             for i, row in enumerate(interpolated_bkg):
-                start_idx = np.ravel_multi_index((xmin + i,ymin), shape)
+                start_idx = np.ravel_multi_index((xmin + i, ymin), shape)
                 end_idx = start_idx + len(row)
                 ibkg[start_idx:end_idx] = row
-        logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin, xmax, ymin, ymax,
-                                                               strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-        return
-    else:
-        logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin, xmax, ymin, ymax,
-                                                               strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-        return xmin, xmax, ymin, ymax, bkg_points, bkg_values, rms_points, rms_values
+        logging.debug(" .. done writing bkg")
+    logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin, xmax, ymin, ymax,
+                                                           strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    del ifunc
+    return
 
 
 def running_filter(filename, region, step_size, box_size, shape, ibkg=None, irms=None):
@@ -528,7 +537,7 @@ def mask_img(data, mask_data):
         logging.info("failed to mask file, not a critical failure")
 
 
-def filter_mc_sharemem(filename, step_size, box_size, cores, shape, fn=sigma_filter):
+def filter_mc_sharemem(filename, step_size, box_size, cores, shape, fn=sigma_filter, dobkg=True):
     """
     Perform a running filter over multiple cores
 
@@ -557,7 +566,10 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, fn=sigma_fil
     img_y, img_x = shape
     # initialise some shared memory
     alen = shape[0]*shape[1]
-    ibkg = multiprocessing.Array('f', alen)
+    if dobkg:
+        ibkg = multiprocessing.Array('f', alen)
+    else:
+        ibkg = None
     irms = multiprocessing.Array('f', alen)
 
     if cores > 1:
@@ -595,27 +607,30 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, fn=sigma_fil
 
         # Need to wait for the queue to finish processing before we continue
         # This requires that we have reuse=0 and makeparallel when we start the queue
-        for _ in queue:
+        for i in queue:
             pass
-
-
     else:
         # single core we do it all at once
         region = [0, img_x, 0, img_y]
         fn(filename, region, step_size, box_size, shape, ibkg, irms)
+
+    if cores > 1:
+        del queue, parfilt, i
+
     # reshape our 1d arrays back into a 2d image
-    logging.debug("reshaping bkg")
-    interpolated_bkg = np.reshape(np.array(ibkg[:], dtype=np.float32), shape)
-    logging.debug(" bkg is {0}".format(interpolated_bkg.dtype))
-    logging.debug(" ... done at {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    if dobkg:
+        logging.debug("reshaping bkg")
+        interpolated_bkg = np.reshape(np.array(ibkg[:], dtype=np.float32), shape)
+        logging.debug(" bkg is {0}".format(interpolated_bkg.dtype))
+        logging.debug(" ... done at {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    else:
+        interpolated_bkg = None
     del ibkg
     logging.debug("reshaping rms")
     interpolated_rms = np.reshape(np.array(irms[:], dtype=np.float32), shape)
     logging.debug(" ... done at {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     del irms
 
-    if cores > 1:
-        del queue, parfilt
     return interpolated_bkg, interpolated_rms
 
 
@@ -689,7 +704,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         temp_name = tempfile.name
         del data, header, tempfile, rms
         logging.info("running second pass to get a better rms")
-        _, rms = filter_mc_sharemem(temp_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, fn=func)
+        _, rms = filter_mc_sharemem(temp_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, fn=func, dobkg=False)
         os.remove(temp_name)
 
     bkg_out = '_'.join([os.path.expanduser(out_base), 'bkg.fits'])
@@ -871,7 +886,7 @@ if __name__=="__main__":
     if not options.clobber:
         bkgout, rmsout = options.out_base+'_bkg.fits', options.out_base+'_rms.fits'
         if os.path.exists(bkgout) and os.path.exists(rmsout):
-            logging.error("{0} and {1} exist and you said noclobber".format(bkgout,rmsout))
+            logging.error("{0} and {1} exist and you said noclobber".format(bkgout, rmsout))
             logging.error("Not running")
             sys.exit(1)
 
