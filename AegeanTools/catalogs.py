@@ -488,7 +488,7 @@ def writeAnn(filename, catalog, fmt):
             out = open(new_file, 'w')
             print >> out, "#Aegean version {0}-({1})".format(__version__,__date__)
             print >> out, "fk5"
-            formatter = 'ellipse {0} {1} {2}d {3}d {4:+07.3f}d # text="{5}"'
+            formatter = 'ellipse {0} {1} {2:.9f}d {3:.9f}d {4:+07.3f}d # text="{5}"'
             #DS9 has some strange ideas about position angle
             pas = [a - 90 for a in pas]
 
