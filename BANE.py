@@ -370,9 +370,10 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
                 pix_scale = np.sqrt(abs(header['CDELT1']*header['CDELT2']))
             elif 'CD1_1' in header:
                 pix_scale = np.sqrt(abs(header['CD1_1']*header['CD2_2']))
-                if header['CD1_2'] != 0 or header['CD2_1']!=0:
-                    logging.warn("CD1_2 and/or CD2_1 are non-zero and I don't know what to do with them")
-                    logging.warn("Ingoring them")
+                if 'CD1_2' in header and 'CD2_1' in header:
+                    if header['CD1_2'] != 0 or header['CD2_1']!=0:
+                        logging.warn("CD1_2 and/or CD2_1 are non-zero and I don't know what to do with them")
+                        logging.warn("Ingoring them")
             else:
                 logging.warn("Cannot determine pixel scale, assuming 4 pixels per beam")
                 pix_scale = beam_size/4.
