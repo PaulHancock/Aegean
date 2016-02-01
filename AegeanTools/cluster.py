@@ -3,7 +3,8 @@
 """
 Cluster and crossmatch tools and analysis functions.
 
-DBSCAN clustering
+Includes:
+- DBSCAN clustering
 """
 
 __author__= "Paul Hancock"
@@ -23,12 +24,13 @@ cc2fwhm = (2 * math.sqrt(2 * math.log(2)))
 fwhm2cc = 1/cc2fwhm
 
 
-def norm_dist(src1,src2):
+def norm_dist(src1, src2):
     """
     Calculate the normalised distance between two sources.
-    Sources are elliptical gaussians.
-    :param src1:
-    :param src2:
+
+    Sources are elliptical Gaussians.
+    :param src1: type Aegean.models.SimpleSource
+    :param src2: type Aegean.models.SimpleSource
     :return:
     """
     if src1 == src2:
@@ -37,16 +39,28 @@ def norm_dist(src1,src2):
 
     # the angle between the ellipse centers
     phi = bear(src1.ra, src1.dec, src2.ra, src2.dec) # Degrees
-    # Calculate the radius of each ellpise along a line that joins their centers.
+    # Calculate the radius of each ellipse along a line that joins their centers.
     r1 = src1.a*src1.b / np.hypot(src1.a * np.sin(np.radians(phi - src1.pa)),
                                   src1.b * np.cos(np.radians(phi - src1.pa)))
     r2 = src2.a*src2.b / np.hypot(src2.a * np.sin(np.radians(180 + phi - src2.pa)),
                                   src2.b * np.cos(np.radians(180 + phi - src2.pa)))
-    R = dist / (np.hypot(r1,r2) / 3600)
+    R = dist / (np.hypot(r1, r2) / 3600)
     return R
 
 
-def pairwise_ellpitical_binary(sources, eps, far = None):
+def sky_dist(src1, src2):
+    """
+    Return the distance between two sources in degrees
+
+    A light wrapper around angle_tools.gcd
+    """
+
+    if src1 == src2:
+        return 0
+    return gcd(src1.ra, src1.dec, src2.ra, src2.dec) # degrees
+
+
+def pairwise_ellpitical_binary(sources, eps, far=None):
     """
     Calculate the probability of an association between each pair of sources.
     0<= probability <=1
@@ -76,13 +90,14 @@ def pairwise_ellpitical_binary(sources, eps, far = None):
     return distances
 
 
-def regroup(catalog, eps, far=None):
+def regroup(catalog, eps, far=None, dist=norm_dist):
     """
     Regroup the islands of a catalog according to their normalised distance
     return a list of island groups, sources have their (island,source) parameters relabeled
     :param catalog: A list of sources sorted by declination
     :param eps: maximum normalised distance within which sources are considered to be grouped
     :param far: (degrees) sources that are further than this distance appart will not be grouped, and will not be tested
+    :param dist: a function that calculates the distance between two sources must accept two SimpleSource objects.
     :return: groups of sources
     """
     if isinstance(catalog, str):
@@ -124,7 +139,7 @@ def regroup(catalog, eps, far=None):
             for s2 in groups[g]:
                 if abs(s2.ra - s1.ra) > rafar:
                     continue
-                if norm_dist(s1, s2) < eps:
+                if dist(s1, s2) < eps:
                     groups[g].append(s1)
                     done = True
                     break
@@ -143,6 +158,7 @@ def regroup(catalog, eps, far=None):
             src.source = comp
         islands.append(groups[isle])
     return islands
+
 
 def group_iter(catalog, eps, min_members=1):
     """
