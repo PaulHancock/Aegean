@@ -492,13 +492,14 @@ def result_to_components(result, model, island_data, isflags):
         source.flags = src_flags
         # add psf info
         local_beam = global_data.psfhelper.get_beam(source.ra, source.dec)
-        a = local_beam.a
-        b = local_beam.b
-        pa = local_beam.pa
-
-        source.psf_a = a*3600
-        source.psf_b = b*3600
-        source.psf_pa = pa*3600
+        if local_beam is not None:
+            source.psf_a = local_beam.a*3600
+            source.psf_b = local_beam.b*3600
+            source.psf_pa = local_beam.pa*3600
+        else:
+            source.psf_a = None
+            source.psf_b = None
+            source.psf_pa = None
         sources.append(source)
         log.debug(source)
 
