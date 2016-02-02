@@ -467,6 +467,8 @@ class PSFHelper(WCSHelper):
 
     def get_beamarea_pix(self, ra, dec):
         beam = self.get_pixbeam(ra, dec)
+        if beam is None:
+            return None
         return beam.a*beam.b*np.pi
 
     def get_beamarea_deg2(self, ra, dec):
@@ -477,6 +479,8 @@ class PSFHelper(WCSHelper):
         :return:
         """
         beam = self.get_beam(ra, dec)
+        if beam is None:
+            return None
         return beam.a*beam.b*np.pi
 
 
