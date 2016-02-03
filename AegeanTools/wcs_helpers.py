@@ -388,7 +388,7 @@ class PSFHelper(WCSHelper):
     # This __init__ overwrites that of the parent class without calling 'super'.
     # It might be naughty but it beats rewriting many of the get_X functions that I want to replicate.
     def __init__(self, psffile, wcshelper):
-        if psffile is None: # in this case this class should be transparent
+        if psffile is None:  # in this case this class should be transparent
             data = None
             wcs = wcshelper.wcs
         else:
@@ -412,12 +412,12 @@ class PSFHelper(WCSHelper):
         :param dec:
         :return:
         """
-        x,y = self.sky2pix([ra,dec])
+        x, y = self.sky2pix([ra, dec])
         # We leave the interpolation in the hands of whoever is making these images
         # clamping the x,y coords at the image boundaries just makes sense
-        x = np.clip(x,0,self.data.shape[1]-1)
-        y = np.clip(y,0,self.data.shape[2]-1)
-        psf_sky = self.data[:,x,y]
+        x = int(np.clip(x, 0, self.data.shape[1]-1))
+        y = int(np.clip(y, 0, self.data.shape[2]-1))
+        psf_sky = self.data[:, x, y]
         return psf_sky
 
     def get_psf_pix(self, ra, dec):
@@ -433,8 +433,8 @@ class PSFHelper(WCSHelper):
 
     def get_pixbeam_pixel(self, x, y):
 
-        ra,dec = self.wcshelper.pix2sky([x,y])
-        return self.get_pixbeam(ra,dec)
+        ra, dec = self.wcshelper.pix2sky([x, y])
+        return self.get_pixbeam(ra, dec)
 
     def get_pixbeam(self, ra, dec):
         """
@@ -443,7 +443,7 @@ class PSFHelper(WCSHelper):
         :param dec:
         :return:
         """
-        beam = self.wcshelper.get_pixbeam(ra,dec)
+        beam = self.wcshelper.get_pixbeam(ra, dec)
         if self.data is None:
             return beam
         psf = self.get_psf_pix(ra,dec)
@@ -451,7 +451,7 @@ class PSFHelper(WCSHelper):
             log.warn("PSF requested, returned Null")
             return None
         if np.isfinite(psf[0]):
-            beam = Beam(psf[0],psf[1],beam.pa)
+            beam = Beam(psf[0], psf[1], beam.pa)
         return beam
 
     def get_beam(self, ra, dec):
@@ -460,15 +460,15 @@ class PSFHelper(WCSHelper):
         if self.data is None:
             return self.wcshelper.beam
         else:
-            psf = self.get_psf_sky(ra,dec)
+            psf = self.get_psf_sky(ra, dec)
             if not all(np.isfinite(psf)):
                 return None
-            return Beam(psf[0],psf[1],psf[2])
+            return Beam(psf[0], psf[1], psf[2])
 
     def get_beamarea_pix(self, ra, dec):
         beam = self.get_pixbeam(ra, dec)
         if beam is None:
-            return None
+            return 0
         return beam.a*beam.b*np.pi
 
     def get_beamarea_deg2(self, ra, dec):
@@ -480,7 +480,7 @@ class PSFHelper(WCSHelper):
         """
         beam = self.get_beam(ra, dec)
         if beam is None:
-            return None
+            return 0
         return beam.a*beam.b*np.pi
 
 
