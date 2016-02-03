@@ -497,9 +497,9 @@ def result_to_components(result, model, island_data, isflags):
             source.psf_b = local_beam.b*3600
             source.psf_pa = local_beam.pa
         else:
-            source.psf_a = None
-            source.psf_b = None
-            source.psf_pa = None
+            source.psf_a = 0
+            source.psf_b = 0
+            source.psf_pa = 0
         sources.append(source)
         log.debug(source)
 
