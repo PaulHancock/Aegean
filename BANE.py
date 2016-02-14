@@ -20,8 +20,8 @@ from AegeanTools.fits_interp import compress
 import multiprocessing
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.4'
-__date__ = '2016-01-28'
+__version__ = 'v1.4.1'
+__date__ = '2016-02-15'
 
 
 def sigmaclip(arr, lo, hi, reps = 3):
