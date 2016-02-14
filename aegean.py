@@ -73,8 +73,9 @@ import multiprocessing
 __author__ = 'Paul Hancock'
 
 # Aegean version [Updated via script]
-__version__ = 'v1.9.6-127-g088562b'
-__date__ = '2015-10-02'
+__version__ = 'v1.9.7-0-g053427d'
+__date__ = '2016-02-15'
+
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -389,8 +390,9 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
     if debug_on:
         log.debug("Estimated sources: {0}".format(i))
     # remember how many components are fit.
-    params.components=i
-    if params.components <1:
+    params.add('components',value=i, vary=False)
+    #params.components=i
+    if params['components'].value <1:
         log.debug("Considered {0} summits, accepted {1}".format(summits_considered,i))
     return params
 
@@ -413,14 +415,13 @@ def result_to_components(result, model, island_data, isflags):
     idata = island_data.i
     xmin, xmax, ymin, ymax = island_data.offsets
 
-
     rms = global_data.rmsimg[xmin:xmax, ymin:ymax]
     bkg = global_data.bkgimg[xmin:xmax, ymin:ymax]
-    residual = np.median(result.residual),np.std(result.residual)
+    residual = np.median(result.residual), np.std(result.residual)
     is_flag = isflags
 
     sources = []
-    for j in range(model.components):
+    for j in range(model['components'].value):
         src_flags = is_flag
         source = OutputSource()
         source.island = isle_num
@@ -490,12 +491,16 @@ def result_to_components(result, model, island_data, isflags):
         errors(source, model, global_data.wcshelper)
 
         source.flags = src_flags
-        # add psf info if a psf file has been supplied
-        if global_data.psfhelper.data is not None:
-            a,b,pa = global_data.psfhelper.get_psf_sky(source.ra, source.dec)
-            source.psf_a = a/3600
-            source.psf_b = b/3600
-            source.psf_pa = pa/3600
+        # add psf info
+        local_beam = global_data.psfhelper.get_beam(source.ra, source.dec)
+        if local_beam is not None:
+            source.psf_a = local_beam.a*3600
+            source.psf_b = local_beam.b*3600
+            source.psf_pa = local_beam.pa
+        else:
+            source.psf_a = 0
+            source.psf_b = 0
+            source.psf_pa = 0
         sources.append(source)
         log.debug(source)
 
@@ -546,7 +551,7 @@ def result_to_components(result, model, island_data, isflags):
         height = gcd(tl[0], tl[1], bl[0], bl[1])
         width = gcd(tl[0], tl[1], tr[0], tr[1])
         area = height * width
-        source.area = area * source.pixels / source.x_width / source.y_width
+        source.area = area * source.pixels / source.x_width / source.y_width  # area is in deg^2
 
         # create contours
         msq = MarchingSquares(idata)
@@ -567,12 +572,13 @@ def result_to_components(result, model, island_data, isflags):
                                                                   positions[1][0]))
 
         # integrated flux
-        beam_area = global_data.psfhelper.get_beamarea_pix(source.ra,source.dec)
+        beam_area = global_data.psfhelper.get_beamarea_deg2(source.ra, source.dec)  # beam in deg^2
+        # get_beamarea_pix(source.ra, source.dec)  # beam is in pix^2
         isize = source.pixels  # number of non zero pixels
         log.debug("- pixels used {0}".format(isize))
         source.int_flux = np.nansum(kappa_sigma)  # total flux Jy/beam
         log.debug("- sum of pixles {0}".format(source.int_flux))
-        source.int_flux /= beam_area
+        source.int_flux *= beam_area  # total flux in Jy
         log.debug("- integrated flux {0}".format(source.int_flux))
         eta = erf(np.sqrt(-1 * np.log(abs(source.local_rms * outerclip / source.peak_flux)))) ** 2
         log.debug("- eta {0}".format(eta))
@@ -632,23 +638,24 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
 
     debug = logging.getLogger('Aegean').isEnabledFor(logging.DEBUG)
 
-    if mask is not None and region_available:
+    if mask is None:
+        global_data.region=None
+    elif not region_available:
+        log.warn("Mask supplied but functionality not available")
+        global_data.region=None
+    else:
         # allow users to supply and object instead of a filename
-        if isinstance(mask,Region):
+        if isinstance(mask, Region):
             global_data.region = mask
         elif os.path.exists(mask):
+            log.info("Loading mask from {0}".format(mask))
             global_data.region = pickle.load(open(mask))
         else:
             log.error("File {0} not found for loading".format(mask))
-    else:
-        global_data.region = None
+            global_data.region=None
 
     global_data.wcshelper = WCSHelper.from_header(img.get_hdu_header(), beam, lat)
     global_data.psfhelper = PSFHelper(psf, global_data.wcshelper)
-    # If a psf map was supplied then we add the psf parameters to the list of names of
-    # columns that are going to be written to our tables
-    if global_data.psfhelper.data is not None:
-        OutputSource.names.extend(['psf_a','psf_b','psf_pa'])
 
     global_data.beam = global_data.wcshelper.beam
     global_data.img = img
@@ -1110,29 +1117,29 @@ def refit_islands(group, stage, outerclip, istart=0):
             pixbeam = global_data.psfhelper.get_pixbeam(src.ra, src.dec)
             # find the right pixels from the ra/dec
             source_x, source_y = global_data.wcshelper.sky2pix([src.ra, src.dec])
-            source_x -=1
-            source_y -=1
+            source_x -= 1
+            source_y -= 1
             x = int(round(source_x))
             y = int(round(source_y))
 
-            log.debug("pixel location ({0:5.2f},{1:5.2f})".format(source_x,source_y))
+            log.debug("pixel location ({0:5.2f},{1:5.2f})".format(source_x, source_y))
             # reject sources that are outside the image bounds, or which have nan data/rms values
             if not 0 <= x < shape[0] or not 0 <= y < shape[1] or \
                     not np.isfinite(data[x, y]) or \
                     not np.isfinite(rmsimg[x, y]) or \
                     pixbeam is None:
-                log.debug("Source ({0},{1}) not within usable region: skipping".format(src.island,src.source))
+                log.debug("Source ({0},{1}) not within usable region: skipping".format(src.island, src.source))
                 continue
             else:
                 # Keep track of the last source to have a valid psf so that we can use it later on
                 src_valid_psf = src
             # determine the shape parameters in pixel values
-            _, _, sx, sy, theta = global_data.wcshelper.sky2pix_ellipse([src.ra,src.dec],src.a/3600, src.b/3600, src.pa)
-            sx *=FWHM2CC
-            sy *=FWHM2CC
+            _, _, sx, sy, theta = global_data.wcshelper.sky2pix_ellipse([src.ra, src.dec], src.a/3600, src.b/3600, src.pa)
+            sx *= FWHM2CC
+            sy *= FWHM2CC
 
-            log.debug("Source shape [sky coords]  {0:5.2f}x{1:5.2f}@{2:05.2f}".format(src.a,src.b,src.pa))
-            log.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx,sy,theta))
+            log.debug("Source shape [sky coords]  {0:5.2f}x{1:5.2f}@{2:05.2f}".format(src.a, src.b, src.pa))
+            log.debug("Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(sx, sy, theta))
 
             # choose a region that is 2x the major axis of the source, 4x semimajor axis a
             width = 4 * sx
@@ -1145,17 +1152,17 @@ def refit_islands(group, stage, outerclip, istart=0):
             xmax = max(xmax, min(shape[0], x + xwidth / 2 + 1))
             ymax = max(ymax, min(shape[1], y + ywidth / 2 + 1))
 
-            s_lims = [0.8 * min(sx,pixbeam.b * FWHM2CC), max(sy,sx) * 1.25]
+            s_lims = [0.8 * min(sx, pixbeam.b * FWHM2CC), max(sy, sx) * 1.25]
 
             # Set up the parameters for the fit, including constraints
             prefix = "c{0}_".format(i)
             params.add(prefix + 'amp', value=src.peak_flux, vary=True)
             # for now the xo/yo are locations within the main image, we correct this later
-            params.add(prefix + 'xo', value=source_x, min=source_x-sx/2., max=source_x+sx/2., vary= stage>=2)
-            params.add(prefix + 'yo', value=source_y, min=source_y-sy/2., max=source_y+sy/2., vary= stage>=2)
-            params.add(prefix + 'sx', value=sx, min=s_lims[0], max=s_lims[1], vary= stage>=3)
-            params.add(prefix + 'sy', value=sy, min=s_lims[0], max=s_lims[1], vary= stage>=3)
-            params.add(prefix + 'theta', value=theta, vary= stage>=3)
+            params.add(prefix + 'xo', value=source_x, min=source_x-sx/2., max=source_x+sx/2., vary=stage>=2)
+            params.add(prefix + 'yo', value=source_y, min=source_y-sy/2., max=source_y+sy/2., vary=stage>=2)
+            params.add(prefix + 'sx', value=sx, min=s_lims[0], max=s_lims[1], vary=stage>=3)
+            params.add(prefix + 'sy', value=sy, min=s_lims[0], max=s_lims[1], vary=stage>=3)
+            params.add(prefix + 'theta', value=theta, vary=stage>=3)
             params.add(prefix + 'flags', value=0, vary=False)
             # this source is being refit so add it to the list
             included_sources.append(src)
@@ -1176,28 +1183,29 @@ def refit_islands(group, stage, outerclip, istart=0):
         if i==0:
             log.debug("No sources found in island {0}".format(src.island))
             continue
-        params.components = i
+        params.add('components', value=i, vary=False)
+        # params.components = i
         log.debug(" {0} components being fit".format(i))
         # now we correct the xo/yo positions to be relative to the sub-image
-        log.debug("xmxxymyx {0} {1} {2} {3}".format(xmin,xmax,ymin,ymax))
-        for i in range(params.components):
+        log.debug("xmxxymyx {0} {1} {2} {3}".format(xmin, xmax, ymin, ymax))
+        for i in range(params['components'].value):
             try:
                 prefix = "c{0}_".format(i)
-                params[prefix + 'xo'].value -=xmin
-                params[prefix + 'xo'].min -=xmin
-                params[prefix + 'xo'].max -=xmin
-                params[prefix + 'yo'].value -=ymin
-                params[prefix + 'yo'].min -=ymin
-                params[prefix + 'yo'].max -=ymin
+                params[prefix + 'xo'].value -= xmin
+                params[prefix + 'xo'].min -= xmin
+                params[prefix + 'xo'].max -= xmin
+                params[prefix + 'yo'].value -= ymin
+                params[prefix + 'yo'].min -= ymin
+                params[prefix + 'yo'].max -= ymin
             except Exception, e:
                 log.error(" ARG !")
                 log.info(params)
-                log.info(params.components)
+                log.info(params['components'].value)
                 log.info("trying to access component {0}".format(i))
                 raise e
-        log.debug(params)
+        # log.debug(params)
         # don't fit if there are no sources
-        if params.components<1:
+        if params['components'].value<1:
             log.info("Island {0} has no components".format(src.island))
             continue
 
@@ -1209,68 +1217,61 @@ def refit_islands(group, stage, outerclip, istart=0):
         allx, ally = np.indices(idata.shape)
         # mask to include pixels that are withn the FWHM of the sources being fit
         mask_params = copy.deepcopy(params)
-        for i in range(mask_params.components):
+        for i in range(mask_params['components'].value):
             prefix = 'c{0}_'.format(i)
             mask_params[prefix+'amp'].value = 1
         mask_model = ntwodgaussian_lmfit(mask_params)
-        mask = np.where(mask_model(allx.ravel(), ally.ravel())<=0.1)
+        mask = np.where(mask_model(allx.ravel(), ally.ravel()) <= 0.1)
         mask = allx.ravel()[mask], ally.ravel()[mask]
         del mask_params
 
         idata[mask] = np.nan
-        # mask = mask[0].tolist()#, mask[1].tolist()
-        #
-        # # the mask is for good pixels so we need to reverse it
-        # all_pixels = zip(*np.where(idata))
-        # mask = zip(*set(all_pixels).difference(set(island_mask)))
-        # idata[mask] = np.nan # this is the mask mentioned above
 
         mx, my = np.where(np.isfinite(idata))
         non_nan_pix = len(mx)
 
         log.debug("island extracted:")
-        log.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin,xmax,ymin,ymax))
+        log.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin, xmax, ymin, ymax))
         log.debug(" max = {0}".format(np.nanmax(idata)))
-        log.debug(" total {0}, masked {1}, not masked {2}".format(len(allx),len(allx)-non_nan_pix,non_nan_pix))
+        log.debug(" total {0}, masked {1}, not masked {2}".format(len(allx), len(allx)-non_nan_pix, non_nan_pix))
 
         # Check to see that each component has some data within the central 3x3 pixels of it's location
         # If not then we don't fit that component
-        for i in range(params.components):
+        for i in range(params['components'].value):
             prefix = "c{0}_".format(i)
             # figure out a box around the center of this
-            cx,cy = params[prefix+'xo'].value, params[prefix+'yo'].value #central pixel coords
+            cx, cy = params[prefix+'xo'].value, params[prefix+'yo'].value  # central pixel coords
             log.debug(" comp {0}".format(i))
-            log.debug("  cx,cy {0} {1}".format(cx,cy))
-            xmx,xmn = np.clip(cx+2, 0, idata.shape[0]), np.clip(cx-1, 0, idata.shape[0])
-            ymx,ymn = np.clip(cy+2, 0, idata.shape[1]), np.clip(cy-1, 0, idata.shape[1])
-            square = idata[xmn:xmx,ymn:ymx]
+            log.debug("  cx,cy {0} {1}".format(cx ,cy))
+            xmx, xmn = np.clip(cx+2, 0, idata.shape[0]), np.clip(cx-1, 0, idata.shape[0])
+            ymx, ymn = np.clip(cy+2, 0, idata.shape[1]), np.clip(cy-1, 0, idata.shape[1])
+            square = idata[xmn:xmx, ymn:ymx]
             # if there are no not-nan pixels in this region then don't vary any parameters
             if not np.any(np.isfinite(square)):
                 log.debug(" not fitting component {0}".format(i))
                 params[prefix+'amp'].value = np.nan
-                for p in ['amp','xo','yo','sx','sy','theta']:
-                    params[prefix+p].vary=False
-                    params[prefix+p].stderr=np.nan # this results in an error of -1 later on
+                for p in ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']:
+                    params[prefix+p].vary = False
+                    params[prefix+p].stderr = np.nan  # this results in an error of -1 later on
                 params[prefix+'flags'].value |= flags.NOTFIT
 
         # determine the number of free parameters and if we have enough data for a fit
         nfree = np.count_nonzero([params[p].vary for p in params.keys()])
-
-
-        if nfree <1:
+        log.debug(params)
+        if nfree < 1:
             log.debug(" Island has no components to fit")
             result = DummyLM()
             model = params
         else:
             if non_nan_pix < nfree:
-                log.debug("More free parameters {0} than available pixels {1}".format(nfree,non_nan_pix))
-                if non_nan_pix >= params.components:
+                log.debug("More free parameters {0} than available pixels {1}".format(nfree, non_nan_pix))
+                if non_nan_pix >= params['components'].value:
                     log.debug("Fixing all parameters except amplitudes")
                     for p in params.keys():
                         if 'amp' not in p:
                             params[p].vary = False
                 else:
-                    log.debug(" no not-masked pixels, skipping".format(src.island,src.source))
+                    log.debug(" no not-masked pixels, skipping".format(src.island, src.source))
                 continue
 
             # do the fit
@@ -1279,18 +1280,19 @@ def refit_islands(group, stage, outerclip, istart=0):
                 if src_valid_psf is not None:
                     pixbeam = global_data.psfhelper.get_pixbeam(src_valid_psf.ra,src_valid_psf.dec)
                 else:
-                    logging.critical("Cannot determine pixel beam")
+                    log.critical("Cannot determine pixel beam")
             fac = 1/np.sqrt(2)
             C = Cmatrix(mx, my, pixbeam.a*FWHM2CC*fac, pixbeam.b*FWHM2CC*fac, pixbeam.pa)
             B = Bmatrix(C)
             errs = np.nanmax(rmsimg[xmin:xmax, ymin:ymax])
-            result, model = do_lmfit(idata, params, B=B)
-            model = covar_errors(model, idata, errs=errs, B=B, C=C)
+            result, _ = do_lmfit(idata, params, B=B)
+            model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
 
 
         # convert the results to a source object
         offsets = (xmin, xmax, ymin, ymax)
-        island_data = IslandFittingData(inum, i=idata, offsets=offsets, doislandflux=True, scalars=(4,4,None))
+        # TODO allow for island fluxes in the refitting.
+        island_data = IslandFittingData(inum, i=idata, offsets=offsets, doislandflux=False, scalars=(4,4,None))
         new_src = result_to_components(result, model, island_data, src.flags)
 
         # preserve the uuid so we can do exact matching between catalogs
@@ -1346,7 +1348,7 @@ def fit_island(island_data):
 
     # islands at the edge of a region of nans
     # result in no components
-    if params is None or params.components <1:
+    if params is None or params['components'].value <1:
         return []
 
     log.debug("Rms is {0}".format(np.shape(rms)))
@@ -1368,13 +1370,16 @@ def fit_island(island_data):
         fac = 1/np.sqrt(2)
         C = Cmatrix(mx, my, pixbeam.a*FWHM2CC*fac, pixbeam.b*FWHM2CC*fac, pixbeam.pa)
         B = Bmatrix(C)
+        ## For testing the fitting without the inverse co-variance matrix, set these to None
+        # B = None
+        # C = None
         log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*FWHM2CC, pixbeam.b*FWHM2CC, pixbeam.pa))
         errs = np.nanmax(rms)
-        result, model = do_lmfit(idata, params, B=B)
+        result, _ = do_lmfit(idata, params, B=B)
         if not result.errorbars:
             is_flag |= flags.FITERR
         # get the real (sky) parameter errors
-        model = covar_errors(model, idata, errs=errs, B=B, C=C)
+        model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
 
         if not result.success:
             is_flag |= flags.FITERR
@@ -1596,17 +1601,20 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
                 src.b = np.sqrt(src.b)*3600  # arcsec
 
     elif ratio is not None:
+        log.info("Using ratio of {0} to scale input source shapes".format(ratio))
         far *= ratio
         for i, src in enumerate(input_sources):
             skybeam = global_data.psfhelper.get_beam(src.ra, src.dec)
             if skybeam is None:
                 src_mask[i] = False
                 continue
-            src.a = np.sqrt(src.a**2 + (beam.a*3600)**2*(1-1/ratio**2))
-            src.b = np.sqrt(src.b**2 + (beam.b*3600)**2*(1-1/ratio**2))
+            src.a = np.sqrt(src.a**2 + (skybeam.a*3600)**2*(1-1/ratio**2))
+            src.b = np.sqrt(src.b**2 + (skybeam.b*3600)**2*(1-1/ratio**2))
             # source with funky a/b are also rejected
             if not np.all(np.isfinite((src.a,src.b))):
                 src_mask[i] = False
+    else:
+        log.info("Not scaling input source sizes")
 
     log.info("{0} sources in catalog".format(len(input_sources)))
     log.info("{0} sources accepted".format(sum(src_mask)))
@@ -1673,10 +1681,14 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     if outfile:
         print >> outfile, header.format("{0}-({1})".format(__version__,__date__), filename)
         print >> outfile, OutputSource.header
-    for source in sources:
-        print >> outfile, str(source)
 
-    print "fit {0} sources".format(len(sources))
+    components = 0
+    for source in sources:
+        if type(source) == OutputSource:
+            components +=1
+            print >> outfile, str(source)
+
+    log.info("fit {0} components".format(components))
     return sources
 
 
@@ -2080,6 +2092,12 @@ if __name__ == "__main__":
         log.info("Numpy {0} from {1} ".format(np.__version__, np.__file__))
         log.info("Scipy {0} from {1}".format(scipy.__version__, scipy.__file__))
         log.info("AstroPy {0} from {1}".format(astropy.__version__, astropy.__file__))
+        log.info("LMFit {0} from {1}".format(lmfit.__version__, lmfit.__file__))
+        try:
+            import h5py
+            log.info("h5py {0} from {1}".format(h5py.__version__, h5py.__file__))
+        except ImportError:
+            log.info("h5py not found")
         sys.exit(0)
 
     # print help if the user enters no options or filename
@@ -2247,6 +2265,8 @@ if __name__ == "__main__":
         log.info("Priorized fitting of sources in input catalog.")
 
         log.info("Stage = {0}".format(options.priorized))
+        if options.doislandflux:
+            log.warn("--island requested but not yet supported for priorized fitting")
         measurements = priorized_fit_islands(filename, catfile=options.input, hdu_index=options.hdu_index,
                                             rms=options.rms,
                                             outfile=options.outfile, bkgin=options.backgroundimg,

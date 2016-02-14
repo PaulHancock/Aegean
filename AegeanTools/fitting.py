@@ -22,6 +22,7 @@ import flags
 import logging
 log = logging.getLogger('Aegean')
 
+
 # Modelling and fitting functions
 def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     """
@@ -40,7 +41,7 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     yyo = y-yo
     exp = (xxo*cost + yyo*sint)**2 / sx**2 \
         + (xxo*sint - yyo*cost)**2 / sy**2
-    exp *=-1./2
+    exp *= -1./2
     return amp*np.exp(exp)
 
 
@@ -90,7 +91,7 @@ def emp_jacobian(pars, x, y, errs=None, B=None):
     eps=1e-5
     matrix = []
     model = ntwodgaussian_lmfit(pars)(x,y)
-    for i in xrange(pars.components):
+    for i in xrange(pars['components'].value):
         prefix = "c{0}_".format(i)
         for p in ['amp','xo','yo','sx','sy','theta']:
             if pars[prefix+p].vary:
@@ -112,7 +113,7 @@ def jacobian(pars, x, y, errs=None, B=None):
 
     matrix = []
 
-    for i in xrange(pars.components):
+    for i in xrange(pars['components'].value):
         prefix = "c{0}_".format(i)
         amp = pars[prefix+'amp'].value
         xo = pars[prefix+'xo'].value
@@ -274,19 +275,11 @@ def errors(source, model, wcshelper):
     pix_errs = [err_xo,err_yo,err_sx,err_sy,err_theta]
 
     # check for inf/nan errors -> these sources have poor fits.
-    if not all([np.isfinite(a) for a in pix_errs]):
+    if not all([ a is not None and np.isfinite(a) for a in pix_errs]):
         source.flags |= flags.FITERR
         source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
         source.err_ra = source.err_dec = source.err_int_flux = -1
         return source
-
-    if any([a is None for a in pix_errs]):
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
-        source.err_ra = source.err_dec = source.err_int_flux = -1
-        logging.warn(" src ({0},{1}) has None for errors".format(source.island,source.source))
-        logging.warn(" flags {0}".format(source.flags))
-        return source
-
 
     # position errors
     if model[prefix + 'xo'].vary and model[prefix + 'yo'].vary:
@@ -340,7 +333,7 @@ def ntwodgaussian_lmfit(params):
     """
     def rfunc(x, y):
         result=None
-        for i in range(params.components):
+        for i in range(params['components'].value):
             prefix = "c{0}_".format(i)
             # I hope this doesn't kill our run time
             amp = np.nan_to_num(params[prefix+'amp'].value)
@@ -380,9 +373,9 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
             return (model - data[mask]).dot(B)
 
     if dojac:
-        result = lmfit.minimize(residual, params, kws={'x':mask[0],'y':mask[1],'B':B,'errs':errs}, Dfun = jacobian)
+        result = lmfit.minimize(residual, params, kws={'x':mask[0], 'y':mask[1], 'B':B, 'errs':errs}, Dfun = jacobian)
     else:
-        result = lmfit.minimize(residual, params, kws={'x':mask[0],'y':mask[1],'B':B,'errs':errs})
+        result = lmfit.minimize(residual, params, kws={'x':mask[0], 'y':mask[1], 'B':B, 'errs':errs})
 
     # Remake the residual so that it is once again (model - data)
     if B is not None:
@@ -411,7 +404,7 @@ def covar_errors(params, data, errs, B, C=None):
         except np.linalg.linalg.LinAlgError, e:
             onesigma = [-2]*len(mask[0])
 
-    for i in xrange(params.components):
+    for i in xrange(params['components'].value):
         prefix = "c{0}_".format(i)
         j=0
         for p in ['amp','xo','yo','sx','sy','theta']:
@@ -468,7 +461,7 @@ def test_jacobian():
     params.add('c0_sx', value=2*smoothing, min=0.8*smoothing)
     params.add('c0_sy', value=smoothing, min=0.8*smoothing)
     params.add('c0_theta',value=45)#, min=-2*np.pi, max=2*np.pi)
-    params.components=1
+    params.add('components', value=1, vary=False)
 
     def rmlabels(ax):
         ax.set_xticks([])

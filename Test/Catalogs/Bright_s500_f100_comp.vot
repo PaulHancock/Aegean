@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Produced with astropy.io.votable version 0.4.1
+     http://www.astropy.org/ -->
+<VOTABLE version="1.2" xmlns="http://www.ivoa.net/xml/VOTable/v1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.ivoa.net/xml/VOTable/v1.2">
+ <DESCRIPTION>
+  {'DATE': '2015-11-23 06:07:59', 'PROGRAM': 'AegeanTools.catalogs',
+  'PROGVER': '0.1-(2015-06-05)'}
+ </DESCRIPTION>
+ <RESOURCE type="results">
+  <TABLE>
+   <FIELD ID="island" datatype="long" name="island"/>
+   <FIELD ID="source" datatype="long" name="source"/>
+   <FIELD ID="background" datatype="double" name="background"/>
+   <FIELD ID="local_rms" datatype="double" name="local_rms"/>
+   <FIELD ID="ra_str" arraysize="11" datatype="char" name="ra_str"/>
+   <FIELD ID="dec_str" arraysize="12" datatype="char" name="dec_str"/>
+   <FIELD ID="ra" datatype="double" name="ra"/>
+   <FIELD ID="err_ra" datatype="double" name="err_ra"/>
+   <FIELD ID="dec" datatype="double" name="dec"/>
+   <FIELD ID="err_dec" datatype="double" name="err_dec"/>
+   <FIELD ID="peak_flux" datatype="double" name="peak_flux"/>
+   <FIELD ID="err_peak_flux" datatype="double" name="err_peak_flux"/>
+   <FIELD ID="int_flux" datatype="double" name="int_flux"/>
+   <FIELD ID="err_int_flux" datatype="double" name="err_int_flux"/>
+   <FIELD ID="a" datatype="double" name="a"/>
+   <FIELD ID="err_a" datatype="double" name="err_a"/>
+   <FIELD ID="b" datatype="double" name="b"/>
+   <FIELD ID="err_b" datatype="double" name="err_b"/>
+   <FIELD ID="pa" datatype="double" name="pa"/>
+   <FIELD ID="err_pa" datatype="double" name="err_pa"/>
+   <FIELD ID="flags" datatype="long" name="flags"/>
+   <FIELD ID="residual_mean" datatype="double" name="residual_mean"/>
+   <FIELD ID="residual_std" datatype="double" name="residual_std"/>
+   <FIELD ID="uuid" arraysize="36" datatype="char" name="uuid"/>
+   <FIELD ID="psf_a" datatype="double" name="psf_a"/>
+   <FIELD ID="psf_b" datatype="double" name="psf_b"/>
+   <FIELD ID="psf_pa" datatype="double" name="psf_pa"/>
+   <DATA>
+    <TABLEDATA>
+     <TR>
+      <TD>1</TD>
+      <TD>0</TD>
+      <TD>-0.010092447511851788</TD>
+      <TD>0.047821842133998871</TD>
+      <TD>19:01:41.97</TD>
+      <TD>-65:54:28.75</TD>
+      <TD>285.42489309822895</TD>
+      <TD>1.5770337655196422e-05</TD>
+      <TD>-65.907985893767034</TD>
+      <TD>1.863289483594599e-05</TD>
+      <TD>500.11796489218597</TD>
+      <TD>0.015688654007680616</TD>
+      <TD>13694.404893357429</TD>
+      <TD>0.51328491824635836</TD>
+      <TD>4927.0422866520512</TD>
+      <TD>0.075879704423971267</TD>
+      <TD>4521.247825929715</TD>
+      <TD>0.061262648087936612</TD>
+      <TD>-0.36649749252222819</TD>
+      <TD>0.17219537037185262</TD>
+      <TD>0</TD>
+      <TD>0.0047487622380693439</TD>
+      <TD>0.098844250653046944</TD>
+      <TD>94f77c95-9012-4091-a126-d7ae9ed8454f</TD>
+      <TD>863.99997711192009</TD>
+      <TD>863.99997711192009</TD>
+      <TD>0</TD>
+     </TR>
+    </TABLEDATA>
+   </DATA>
+  </TABLE>
+ </RESOURCE>
+</VOTABLE>

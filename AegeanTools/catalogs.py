@@ -22,6 +22,7 @@ from models import OutputSource, IslandSource, SimpleSource, classify_catalog
 # input/output table formats
 import astropy
 from astropy.table.table import Table
+from astropy.table import Column
 from astropy.io import ascii
 from astropy.io import fits
 
@@ -116,6 +117,7 @@ def update_meta_data(meta=None):
     if not 'PROGRAM' in meta:
         meta['PROGRAM'] = "AegeanTools.catalogs"
         meta['PROGVER'] = "{0}-({1})".format(__version__,__date__)
+    return meta
 
 
 
@@ -129,7 +131,7 @@ def save_catalog(filename, catalog, meta=None):
     """
     ascii_table_formats = {'csv': 'csv', 'tab': 'tab', 'tex': 'latex', 'html': 'html'}
     #.ann and .reg are handled by me
-    update_meta_data(meta)
+    meta = update_meta_data(meta)
     extension = os.path.splitext(filename)[1][1:].lower()
     if extension in ['ann', 'reg']:
         writeAnn(filename, catalog, extension)
@@ -186,6 +188,23 @@ def load_catalog(filename):
     return catalog
 
 
+def aegean2cat(filename):
+    """
+
+    @param filename:
+    @return:
+    """
+    from models import OutputSource
+    # this will break if I change the number of properties that are reported.
+    colnames = ['src_isle']  + OutputSource.names[2:-3]
+    t = ascii.read(filename,delimiter='\s', names = colnames)
+    source = Column(name='source', data= np.array([ int(a.split(',')[1][:-1]) for a in t['src_isle']]))
+    isle =  Column(name='island', data=np.array([ int(a.split(',')[0][1:]) for a in t['src_isle']]))
+    t.add_column(isle, 0)
+    t.add_column(source, 1)
+
+    return t
+
 def load_table(filename):
     """
 
@@ -203,9 +222,13 @@ def load_table(filename):
         log.info("Reading file {0}".format(filename))
         t = Table.read(filename)
     else:
-        log.error("Table format not recognized or supported")
-        log.error("{0} [{1}]".format(filename,fmt))
-        t= None
+        if open(filename).readline().startswith(('#Aegean')):
+            log.info('Detected Aegean format, reading file {0}'.format(filename))
+            t = aegean2cat(filename)
+        else:
+            log.error("Table format not recognized or supported")
+            log.error("{0} [{1}]".format(filename,fmt))
+            sys.exit(0)
     return t
 
 
@@ -216,15 +239,14 @@ def write_table(table, filename):
             os.remove(filename)
         table.write(filename)
         log.info("Wrote {0}".format(filename))
-        return
     except Exception, e:
         if "Format could not be identified" not in e.message:
             raise e
-    finally:
-        fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
-        # TODO: figure out the format of files that are not autodetermined
-        log.critical("Cannot auto-determine format for {0}".format(fmt))
-        sys.exit(1)
+        else:
+            fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
+            # TODO: figure out the format of files that are not autodetermined
+            log.critical("Cannot auto-determine format for {0}".format(fmt))
+            sys.exit(1)
     return
 
 
@@ -466,7 +488,7 @@ def writeAnn(filename, catalog, fmt):
             out = open(new_file, 'w')
             print >> out, "#Aegean version {0}-({1})".format(__version__,__date__)
             print >> out, "fk5"
-            formatter = 'ellipse {0} {1} {2}d {3}d {4:+07.3f}d # text="{5}"'
+            formatter = 'ellipse {0} {1} {2:.9f}d {3:.9f}d {4:+07.3f}d # text="{5}"'
             #DS9 has some strange ideas about position angle
             pas = [a - 90 for a in pas]
 
