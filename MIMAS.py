@@ -58,13 +58,46 @@ def galactic2fk5(l, b):
     return a.fk5.ra.radian, a.fk5.dec.radian
 
 
-def maskfile(regionfile, infile, outfile):
+def mask_plane(data, wcs, region, negate=False):
+    """
+    Mask a 2d image (data) such that pixels within 'region' are set to nan.
+    :param data: 2d numpy.array
+    :param wcs: a WCS object
+    :param region: a MIMAS region
+    :param negate: If True then pixels *outside* the region are set to nan.
+    :return: the masked data (which is modified in place anyway)
+    """
+    # create an array but don't set the values (they are random)
+    indexes = np.empty((data.shape[0]*data.shape[1], 2), dtype=int)
+    # since I know exactly what the index array needs to look like i can construct
+    # it faster than list comprehension would allow
+    # we do this only once and then recycle it
+    idx = np.array([(j, 0) for j in xrange(data.shape[1])])
+    j = data.shape[1]
+    for i in xrange(data.shape[0]):
+        idx[:, 1] = i
+        indexes[i*j:(i+1)*j] = idx
+
+    # put ALL the pixles into our vectorized functions and minimise our overheads
+    ra, dec = wcs.wcs_pix2world(indexes, 1).transpose()
+    bigmask = region.sky_within(ra, dec, degin=True)
+    if not negate:
+        bigmask = np.bitwise_not(bigmask)
+    # rework our 1d list into a 2d array
+    bigmask = bigmask.reshape(data.shape)
+    # and apply the mask
+    data[bigmask] = np.nan
+    return data
+
+
+def maskfile(regionfile, infile, outfile, negate=False):
     """
     Created a masked version of file, using region.
     This does not change the shape or size of the image, it just sets some pixels to be null/nan
     :param regionfile: A Region that describes the area of interest
     :param infile: The name of the fits file to mask.
     :param outfile: The masked file to be written
+    :param negate: Keep pixles that are outside the supplied region
     :return: None
     """
     # Check that the input file is accessible and then open it
@@ -82,25 +115,12 @@ def maskfile(regionfile, infile, outfile):
     else:
         data = im[0].data
 
-    # create an array but don't set the values (they are random)
-    indexes = np.empty((data.shape[0]*data.shape[1], 2), dtype=int)
-    # since I know exactly what the index array needs to look like i can construct
-    # it faster than list comprehension would allow
-    # we do this only once and then recycle it
-    idx = np.array([(j, 0) for j in xrange(data.shape[1])])
-    j = data.shape[1]
-    for i in xrange(data.shape[0]):
-        idx[:, 1] = i
-        indexes[i*j:(i+1)*j] = idx
-
-    # put ALL the pixles into our vectorized functions and minimised our overheads
-    ra, dec = wcs.wcs_pix2world(indexes, 1).transpose()
-    bigmask = np.bitwise_not(region.sky_within(ra, dec, degin=True))
-    # rework our 1d list into a 2d array
-    bigmask = bigmask.reshape(data.shape)
-    # and apply the mask
-    data[bigmask] = np.nan
-
+    print data.shape
+    if len(data.shape) == 3:
+        for plane in range(data.shape[0]):
+            mask_plane(data[plane], wcs, region, negate)
+    else:
+        mask_plane(data, wcs, region, negate)
     im[0].data = data
     im.writeto(outfile, clobber=True)
     logging.info("Wrote {0}".format(outfile))
@@ -356,6 +376,8 @@ if __name__ == "__main__":
     group3.add_argument('--mask', dest='mask', action='store',
                         type=str, metavar=('region.mim', 'file.fits', 'masked.fits'), nargs=3, default=[],
                         help='use region.mim to mask file.fits and write masekd.fits')
+    group3.add_argument('--negate', dest='negate', action='store_true', default=False,
+                        help='If True then mask pixels inside this region instead of outside.')
     group3.add_argument('--fitsmask', dest='fits_mask', action='store',
                         type=str, metavar=('mask.fits', 'file.fits','masked_file.fits'), nargs=3, default=[],
                         help='Use a fits file as a mask for another fits file. ' +
@@ -398,7 +420,7 @@ if __name__ == "__main__":
 
     if len(results.mask) > 0:
         m, i, o = results.mask
-        maskfile(m, i, o)
+        maskfile(m, i, o, results.negate)
         sys.exit()
 
     if results.mim2img:
