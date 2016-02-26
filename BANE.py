@@ -151,7 +151,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         new = np.ravel(new)
         new = sigmaclip(new, 3, 3)
         # If we are left with (or started with) no data, then just move on
-        if len(new)<1:
+        if len(new) < 1:
             continue
 
         if dobkg:
@@ -171,6 +171,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         ifunc = LinearNDInterpolator(rms_points, rms_values)
         # force 32 bit floats
         interpolated_rms = np.array(ifunc((gx, gy)), dtype=np.float32)
+        del ifunc
     else:
         interpolated_rms = np.empty((len(gx), len(gy)), dtype=np.float32)*np.nan
     with irms.get_lock():
@@ -187,6 +188,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
             logging.debug("Interpolating bkg")
             ifunc = LinearNDInterpolator(bkg_points, bkg_values)
             interpolated_bkg = np.array(ifunc((gx, gy)), dtype=np.float32)
+            del ifunc
         else:
             interpolated_bkg = np.empty((len(gx), len(gy)), dtype=np.float32)*np.nan
         with ibkg.get_lock():
@@ -198,7 +200,6 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         logging.debug(" .. done writing bkg")
     logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin, xmax, ymin, ymax,
                                                            strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-    del ifunc
     return
 
 
