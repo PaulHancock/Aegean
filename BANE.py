@@ -40,12 +40,18 @@ def sigmaclip(arr, lo, hi, reps = 3):
     :return: clipped array
     """
     clipped = arr[np.isfinite(arr)]
+
+    if len(clipped) < 1:
+        return clipped
+
     std = np.std(clipped)
     mean = np.mean(clipped)
     for i in xrange(reps):
         clipped = clipped[np.where(clipped > mean-std*lo)]
         clipped = clipped[np.where(clipped < mean+std*hi)]
         pstd = std
+        if len(clipped) < 1:
+            break
         std = np.std(clipped)
         mean = np.mean(clipped)
         if 2*abs(pstd-std)/(pstd+std) < 0.2:
@@ -163,7 +169,6 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         rms_values.append(rms)
 
     ymin, ymax, xmin, xmax = region
-
     gx, gy = np.mgrid[xmin:xmax, ymin:ymax]
     # If the bkg/rms calculation above didn't yield any points, then our interpolated values are all nans
     if len(rms_points) > 1:
