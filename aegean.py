@@ -274,10 +274,10 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         try:
             if isnegative:
                 amp = np.nanmin(summit)
-                xpeak, ypeak = np.unravel_index(np.nanargmin(summit),summit.shape)
+                xpeak, ypeak = np.unravel_index(np.nanargmin(summit), summit.shape)
             else:
                 amp = np.nanmax(summit)
-                xpeak, ypeak = np.unravel_index(np.nanargmax(summit),summit.shape)
+                xpeak, ypeak = np.unravel_index(np.nanargmax(summit), summit.shape)
         except ValueError, e:
             if "All-NaN" in e.message:
                 log.warn("Summit of nan's detected - this shouldn't happen")
@@ -294,9 +294,9 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         # Summits are allowed to include pixels that are between the outer and inner clip
         # This means that sometimes we get a summit that has all it's pixels below the inner clip
         # So we test for that here.
-        snr = np.nanmax(abs(data[xmin:xmax+1,ymin:ymax+1] / rmsimg[xmin:xmax+1,ymin:ymax+1]))
+        snr = np.nanmax(abs(data[xmin:xmax+1, ymin:ymax+1] / rmsimg[xmin:xmax+1, ymin:ymax+1]))
         if snr < innerclip:
-            log.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
+            log.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr, innerclip))
             continue
 
 
@@ -312,7 +312,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
 
 
-        pixbeam = global_data.psfhelper.get_pixbeam_pixel(yo+offsets[0],xo+offsets[1])
+        pixbeam = global_data.psfhelper.get_pixbeam_pixel(yo+offsets[0], xo+offsets[1])
         if pixbeam is None:
             log.debug(" Summit has invalid WCS/Beam - Skipping.".format(i))
             continue
@@ -321,16 +321,17 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         xo_lim = 0.5*np.hypot(pixbeam.a, pixbeam.b)
         yo_lim = xo_lim
 
-        yo_min, yo_max = max(ymin, yo - yo_lim), min(ymax, yo + yo_lim)
-        if yo_min == yo_max:  # if we have a 1d summit then allow the position to vary by +/-0.5pix
-            yo_min, yo_max = yo_min - 0.5, yo_max + 0.5
+        yo_min, yo_max = yo - yo_lim, yo + yo_lim
+        #if yo_min == yo_max:  # if we have a 1d summit then allow the position to vary by +/-0.5pix
+        #    yo_min, yo_max = yo_min - 0.5, yo_max + 0.5
 
-        xo_min, xo_max = max(xmin, xo - xo_lim), min(xmax, xo + xo_lim)
-        if xo_min == xo_max:  # if we have a 1d summit then allow the position to vary by +/-0.5pix
-            xo_min, xo_max = xo_min - 0.5, xo_max + 0.5
+        xo_min, xo_max = xo - xo_lim, xo + xo_lim
+        #if xo_min == xo_max:  # if we have a 1d summit then allow the position to vary by +/-0.5pix
+        #    xo_min, xo_max = xo_min - 0.5, xo_max + 0.5
 
-        xsize = xmax - xmin + 1
-        ysize = ymax - ymin + 1
+        # the size of the island
+        xsize = data.shape[0]
+        ysize = data.shape[1]
 
         # initial shape is the psf
         sx = pixbeam.a * FWHM2CC
@@ -666,16 +667,15 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
     global_data.dcurve = None
 
     if do_curve:
+        log.info("Calculating curvature")
         # calculate curvature but store it as -1,0,+1
-        cimg = curvature(global_data.data_pix)
-        if csigma is None:
-            log.info("Calculating curvature csigma")
-            _, csigma = estimate_bkg_rms(cimg)
         dcurve = np.zeros(global_data.data_pix.shape, dtype=np.int8)
-        dcurve[np.where(cimg <= -abs(csigma))] = -1
-        dcurve[np.where(cimg >= abs(csigma))] = 1
-        del cimg
-
+        peaks = scipy.ndimage.filters.maximum_filter(global_data.data_pix, size=3)
+        troughs = scipy.ndimage.filters.minimum_filter(global_data.data_pix, size=3)
+        pmask = np.where(global_data.data_pix == peaks)
+        tmask = np.where(global_data.data_pix == troughs)
+        dcurve[pmask] = -1
+        dcurve[tmask] = 1
         global_data.dcurve = dcurve
 
     # if either of rms or bkg images are not supplied then calculate them both
