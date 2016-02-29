@@ -188,7 +188,6 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     logging.debug(" .. done writing rms")
 
     if dobkg:
-        gx, gy = np.mgrid[xmin:xmax, ymin:ymax]
         if len(bkg_points)>1:
             logging.debug("Interpolating bkg")
             ifunc = LinearNDInterpolator(bkg_points, bkg_values)
@@ -393,17 +392,21 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 
     if box_size is None:
         # default to 6x the step size so we have ~ 30beams
-        box_size = (step_size[0]*6,step_size[1]*6)
+        box_size = (step_size[0]*6, step_size[1]*6)
 
     if compressed:
         if not step_size[0] == step_size[1]:
-            step_size = (min(step_size),min(step_size))
+            step_size = (min(step_size), min(step_size))
             logging.info("Changing grid to be {0} so we can compress the output".format(step_size))
 
     logging.info("using grid_size {0}, box_size {1}".format(step_size,box_size))
     logging.info("on data shape {0}".format(shape))
     bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape)
     logging.info("done")
+
+    # force float 32s to avoid bloated files
+    bkg = np.array(bkg, dtype=np.float32)
+    rms = np.array(rms, dtype=np.float32)
 
     if twopass:
         # TODO: check what this does for our memory usage
@@ -417,15 +420,14 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         temp_name = tempfile.name
         del data, header, tempfile, rms
         logging.info("running second pass to get a better rms")
-        _, rms = filter_mc_sharemem(temp_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, dobkg=False)
+        junk, rms = filter_mc_sharemem(temp_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, dobkg=False)
+        del junk
+        rms = np.array(rms, dtype=np.float32)
         os.remove(temp_name)
 
     bkg_out = '_'.join([os.path.expanduser(out_base), 'bkg.fits'])
     rms_out = '_'.join([os.path.expanduser(out_base), 'rms.fits'])
 
-    # force float 32s to avoid bloated files
-    bkg = np.array(bkg, dtype=np.float32)
-    rms = np.array(rms, dtype=np.float32)
 
     # load the file since we are now going to fiddle with it
     header = fits.getheader(im_name)
