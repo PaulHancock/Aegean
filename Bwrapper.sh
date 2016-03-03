@@ -10,5 +10,5 @@ cmd="python -c \"from astropy.io import fits; import numpy as np; f=fits.open('$
 eval ${cmd}
 
 BANE.py ${tempfile}_sub.fits --out ${2%%.fits} --onepass ${3}
-
+mv ${tempfile}_bkg.fits ${2%%.fits}_bkg.fits
 rm ${tempfile}*
