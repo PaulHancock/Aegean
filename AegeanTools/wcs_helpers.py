@@ -427,8 +427,11 @@ class PSFHelper(WCSHelper):
         :return:
         """
         psf_sky = self.get_psf_sky(ra, dec)
+        # copy the PA from the fits header
+        # TODO: figure out how to do this properly when the WCS are rotated wrt x/y
         psf_pix = self.wcshelper.sky2pix_vec([ra,dec], psf_sky[0], 0)[2],\
-                  self.wcshelper.sky2pix_vec([ra,dec], psf_sky[1], 90)[2]
+                  self.wcshelper.sky2pix_vec([ra,dec], psf_sky[1], 90)[2],\
+                  psf_sky[2]
         return psf_pix
 
     def get_pixbeam_pixel(self, x, y):
@@ -444,14 +447,16 @@ class PSFHelper(WCSHelper):
         :return:
         """
         beam = self.wcshelper.get_pixbeam(ra, dec)
+        # If there is no psf image then just use the fits header (plus lat scaling) from the wcshelper
         if self.data is None:
             return beam
-        psf = self.get_psf_pix(ra,dec)
+        # get the beam from the psf image data
+        psf = self.get_psf_pix(ra, dec)
         if None in psf:
             log.warn("PSF requested, returned Null")
             return None
         if np.isfinite(psf[0]):
-            beam = Beam(psf[0], psf[1], beam.pa)
+            beam = Beam(psf[0], psf[1], psf[2])
         return beam
 
     def get_beam(self, ra, dec):

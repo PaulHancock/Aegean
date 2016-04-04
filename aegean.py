@@ -485,10 +485,10 @@ def result_to_components(result, model, island_data, isflags):
         # calculate integrated flux
         source.int_flux = source.peak_flux * sx * sy * CC2FHWM ** 2 * np.pi
         # scale Jy/beam -> Jy using the area of the beam
-        source.int_flux /= global_data.wcshelper.get_beamarea_pix(source.ra, source.dec)
+        source.int_flux /= global_data.psfhelper.get_beamarea_pix(source.ra, source.dec)
 
         # Calculate errors for params that were fit (as well as int_flux)
-        errors(source, model, global_data.wcshelper)
+        errors(source, model, global_data.psfhelper)
 
         source.flags = src_flags
         # add psf info
@@ -1322,13 +1322,18 @@ def fit_island(island_data):
     # global data
     dcurve = global_data.dcurve
     rmsimg = global_data.rmsimg
-    beam = global_data.beam
+    #beam = global_data.beam
 
     # island data
     isle_num = island_data.isle_num
     idata = island_data.i
     innerclip, outerclip, max_summits = island_data.scalars
     xmin, xmax, ymin, ymax = island_data.offsets
+
+    # get the beam parameters at the center of this island
+    midra, middec = global_data.wcshelper.pix2sky([0.5*(xmax+xmin), 0.5*(ymax+ymin)])
+    beam = global_data.psfhelper.get_psf_pix(midra, middec) #beam(midra, middec)
+    del middec, midra
 
     icurve = dcurve[xmin:xmax, ymin:ymax]
     rms = rmsimg[xmin:xmax, ymin:ymax]
@@ -1454,9 +1459,9 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
 
     rmsimg = global_data.rmsimg
     data = global_data.data_pix
-    beam = global_data.beam
 
-    log.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a * 3600, beam.b * 3600, beam.pa))
+    log.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(
+                                             global_data.beam.a * 3600, global_data.beam.b * 3600, global_data.beam.pa))
     log.info("seedclip={0}".format(innerclip))
     log.info("floodclip={0}".format(outerclip))
 
@@ -1567,7 +1572,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
                  do_curve=False, beam=beam, lat=lat, psf=imgpsf)
 
-    beam = global_data.beam
+    #beam = global_data.beam
     far = 10*beam.a  # degrees
     # load the table and convert to an input source list
     input_table = load_table(catfile)
