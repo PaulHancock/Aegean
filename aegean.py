@@ -1322,7 +1322,6 @@ def fit_island(island_data):
     # global data
     dcurve = global_data.dcurve
     rmsimg = global_data.rmsimg
-    #beam = global_data.beam
 
     # island data
     isle_num = island_data.isle_num
@@ -1743,6 +1742,7 @@ def force_measure_flux(radec):
     :param radec: the locations at which to measure fluxes
     :return: [(flux,err),...] corresponding to each ra/dec
     """
+    # TODO: allow for a psf image to be used to make this consistent with the priorized fitting
     from AegeanTools.fitting import ntwodgaussian_mpfit
     catalog = []
 
