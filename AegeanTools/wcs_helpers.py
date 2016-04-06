@@ -213,6 +213,23 @@ class WCSHelper(object):
         ra,dec = self.pix2sky([x,y])
         return self.get_pixbeam(ra,dec)
 
+    def get_beam(self, ra, dec):
+        """
+        Determine the beam at the given location
+        The major axis of the beam is scaled by latitude if the lat is known.
+        :param ra: Sky coord
+        :param dec: Sky coord
+        :return: Beam(a,b,pa)
+        """
+        # check to see if we need to scale the major axis based on the declination
+        if self.lat is None:
+            factor = 1
+        else:
+            # this works if the pa is zero. For non-zero pa it's a little more difficult
+            factor = np.cos(np.radians(dec-self.lat))
+        return Beam(self.beam.a/factor, self.beam.b, self.beam.pa)
+
+
     def get_pixbeam(self, ra, dec):
         """
         Use global_data to get beam (sky scale), and img.pixscale.
@@ -224,13 +241,8 @@ class WCSHelper(object):
             ra,dec = self.pix2sky(self.refpix)
         pos = [ra,dec]
 
-        # check to see if we need to scale the major axis based on the declination
-        if self.lat is None:
-            factor = 1
-        else:
-            # this works if the pa is zero. For non-zero pa it's a little more difficult
-            factor = np.cos(np.radians(dec-self.lat))
-        _, _, major, minor, theta = self.sky2pix_ellipse(pos, self.beam.a/factor,self.beam.b,self.beam.pa)
+        beam = self.get_beam(ra,dec)
+        _, _, major, minor, theta = self.sky2pix_ellipse(pos, beam.a, beam.b, beam.pa)
 
         if major<minor:
             major,minor = minor,major
@@ -408,11 +420,20 @@ class PSFHelper(WCSHelper):
 
     def get_psf_sky(self, ra, dec):
         """
+        Determine the local psf (a,b,pa) at a given sky location.
+        The beam is in sky coords.
         :param ra:
         :param dec:
-        :return:
+        :return: (a,b,pa) in degrees
         """
-        x, y = self.sky2pix([ra, dec])
+
+        # If we don't have a psf map then we just fall back to using the beam
+        # from the fits header (including ZA scaling)
+        if self.data is None:
+            beam = self.wcshelper.get_beam(ra,dec)
+            return beam.a, beam.b, beam.pa
+        
+        x, y = self.sky2pix([ra, dec])                
         # We leave the interpolation in the hands of whoever is making these images
         # clamping the x,y coords at the image boundaries just makes sense
         x = int(np.clip(x, 0, self.data.shape[1]-1))
@@ -422,9 +443,11 @@ class PSFHelper(WCSHelper):
 
     def get_psf_pix(self, ra, dec):
         """
+        Determine the local psf (a,b,pa) at a given sky location.
+        The beam is in pixel coords.
         :param ra:
         :param dec:
-        :return:
+        :return: (a,b,) in pix,pix,degrees
         """
         psf_sky = self.get_psf_sky(ra, dec)
         # copy the PA from the fits header
@@ -435,16 +458,21 @@ class PSFHelper(WCSHelper):
         return psf_pix
 
     def get_pixbeam_pixel(self, x, y):
-
+        """
+        Get the beam shape at the location specified by pixel coords.
+        :param x: pixel coord
+        :param y: pixel coord
+        :return: Beam(a,b,pa)
+        """
         ra, dec = self.wcshelper.pix2sky([x, y])
         return self.get_pixbeam(ra, dec)
 
     def get_pixbeam(self, ra, dec):
         """
-        Get the beam shape at this location.
-        :param ra:
-        :param dec:
-        :return:
+        Get the beam at this location.
+        :param ra: Sky coord
+        :param dec: Sky coord
+        :return: Beam(a,b,pa)
         """
         beam = self.wcshelper.get_pixbeam(ra, dec)
         # If there is no psf image then just use the fits header (plus lat scaling) from the wcshelper
