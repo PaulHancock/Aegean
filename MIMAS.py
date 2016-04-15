@@ -44,6 +44,7 @@ class Dummy():
         self.include_polygons = []
         self.exclude_polygons = []
         self.maxdepth = maxdepth
+        self.galactic = False
         return
 
 
