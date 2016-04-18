@@ -260,7 +260,7 @@ def errors(source, model, wcshelper):
     # copy the errors from the model
     prefix = "c{0}_".format(source.source)
     err_amp = model[prefix+'amp'].stderr
-    xo,yo = model[prefix+'xo'].value, model[prefix+'yo'].value
+    xo, yo = model[prefix+'xo'].value, model[prefix+'yo'].value
     err_xo = model[prefix+'xo'].stderr
     err_yo = model[prefix+'yo'].stderr
 
@@ -275,20 +275,36 @@ def errors(source, model, wcshelper):
     pix_errs = [err_xo,err_yo,err_sx,err_sy,err_theta]
 
     # check for inf/nan errors -> these sources have poor fits.
-    if not all([ a is not None and np.isfinite(a) for a in pix_errs]):
+    if not all([a is not None and np.isfinite(a) for a in pix_errs]):
         source.flags |= flags.FITERR
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
+        source.err_ra = source.err_dec = source.err_int_flux = -1
+        return source
+
+    ref = wcshelper.pix2sky([xo, yo])
+    # check to see if the reference position has a valid WCS coordinate
+    # It is possible for this to fail, even if the ra/dec conversion works elsewhere
+    if not all(np.isfinite(ref)):
+        source.flags |= flags.WCSERR
         source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
         source.err_ra = source.err_dec = source.err_int_flux = -1
         return source
 
     # position errors
     if model[prefix + 'xo'].vary and model[prefix + 'yo'].vary:
-        ref = wcshelper.pix2sky([xo,yo])
-        offset = wcshelper.pix2sky([xo+err_xo,yo+err_yo])
+        offset = wcshelper.pix2sky([xo+err_xo, yo+err_yo])
         source.err_ra = gcd(ref[0], ref[1], offset[0], ref[1])
         source.err_dec = gcd(ref[0], ref[1], ref[0], offset[1])
     else:
         source.err_ra = source.err_dec = -1
+
+    if model[prefix+'theta'].vary:
+        # pa error
+        off1 = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta)),yo+sy*np.sin(np.radians(theta))])
+        off2 = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta+err_theta)),yo+sy*np.sin(np.radians(theta+err_theta))])
+        source.err_pa = abs(bear(ref[0], ref[1], off1[0], off1[1]) - bear(ref[0], ref[1], off2[0], off2[1]))
+    else:
+        source.err_pa = -1
 
     if model[prefix + 'sx'].vary and model[prefix + 'sy'].vary:
         # major axis error
@@ -304,24 +320,12 @@ def errors(source, model, wcshelper):
         source.err_a = source.err_b = -1
 
 
-    if model[prefix+'theta'].vary:
-        # pa error
-        ref = wcshelper.pix2sky([xo,yo])
-        off1 = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta)),yo+sy*np.sin(np.radians(theta))])
-        off2 = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta+err_theta)),yo+sy*np.sin(np.radians(theta+err_theta))])
-        source.err_pa = abs(bear(ref[0], ref[1], off1[0], off1[1]) - bear(ref[0], ref[1], off2[0], off2[1]))
-    else:
-        source.err_pa = -1
-
     sqerr = 0
     sqerr += (source.err_peak_flux/source.peak_flux)**2 if source.err_peak_flux >0 else 0
     sqerr += (source.err_a/source.a)**2 if source.err_a > 0 else 0
     sqerr += (source.err_b/source.b)**2 if source.err_b > 0 else 0
     source.err_int_flux = source.int_flux*np.sqrt(sqerr)
 
-    # logging.info("src ({0},{1})".format(source.island,source.source))
-    # logging.info(" pixel errs {0}".format([err_xo, err_yo, err_sx, err_sy, err_theta]))
-    # logging.info(" sky   errs {0}".format([source.err_ra, source.err_dec, source.err_a, source.err_b, source.err_pa]))
     return source
 
 
