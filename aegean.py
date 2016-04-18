@@ -73,8 +73,8 @@ import multiprocessing
 __author__ = 'Paul Hancock'
 
 # Aegean version [Updated via script]
-__version__ = 'v1.9.7-12-g6aa155a'
-__date__ = '2016-04-06'
+__version__ = 'v1.9.7-15-ga661eab'
+__date__ = '2016-04-18'
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -1228,11 +1228,11 @@ def refit_islands(group, stage, outerclip, istart=0):
 
         mx, my = np.where(np.isfinite(idata))
         non_nan_pix = len(mx)
-
+        total_pix = len(allx.ravel())
         log.debug("island extracted:")
         log.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin, xmax, ymin, ymax))
         log.debug(" max = {0}".format(np.nanmax(idata)))
-        log.debug(" total {0}, masked {1}, not masked {2}".format(len(allx), len(allx)-non_nan_pix, non_nan_pix))
+        log.debug(" total {0}, masked {1}, not masked {2}".format(total_pix, total_pix-non_nan_pix, non_nan_pix))
 
         # Check to see that each component has some data within the central 3x3 pixels of it's location
         # If not then we don't fit that component
@@ -1571,8 +1571,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
                  do_curve=False, beam=beam, lat=lat, psf=imgpsf)
 
-    #beam = global_data.beam
-    far = 10*beam.a  # degrees
+    far = 10*global_data.beam.a  # degrees
     # load the table and convert to an input source list
     input_table = load_table(catfile)
     input_sources = np.array(table_to_source_list(input_table))
