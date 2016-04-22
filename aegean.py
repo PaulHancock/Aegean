@@ -338,7 +338,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         sy = pixbeam.b * FWHM2CC
 
         # lmfit does silly things if we start with these two parameters being equal
-        sx = max(sx,sy*1.01)
+        sx = max(sx, sy*1.01)
 
         # constraints are based on the shape of the island
         sx_min, sx_max = sx * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * FWHM2CC, sx * 1.1)
@@ -488,7 +488,7 @@ def result_to_components(result, model, island_data, isflags):
         source.int_flux /= global_data.psfhelper.get_beamarea_pix(source.ra, source.dec)
 
         # Calculate errors for params that were fit (as well as int_flux)
-        errors(source, model, global_data.psfhelper)
+        errors(source, model, global_data.wcshelper)
 
         source.flags = src_flags
         # add psf info
