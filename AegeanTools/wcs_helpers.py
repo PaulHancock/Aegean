@@ -210,8 +210,8 @@ class WCSHelper(object):
         :param y:
         :return:
         """
-        ra,dec = self.pix2sky([x,y])
-        return self.get_pixbeam(ra,dec)
+        ra, dec = self.pix2sky([x, y])
+        return self.get_pixbeam(ra, dec)
 
     def get_beam(self, ra, dec):
         """
@@ -229,29 +229,28 @@ class WCSHelper(object):
             factor = np.cos(np.radians(dec-self.lat))
         return Beam(self.beam.a/factor, self.beam.b, self.beam.pa)
 
-
     def get_pixbeam(self, ra, dec):
         """
         Use global_data to get beam (sky scale), and img.pixscale.
-        Calculate a beam in pixel scale, pa is always zero
+        Calculate a beam in pixel scale
         :return: A beam in pixel scale
         """
 
         if ra is None:
-            ra,dec = self.pix2sky(self.refpix)
-        pos = [ra,dec]
+            ra, dec = self.pix2sky(self.refpix)
+        pos = [ra, dec]
 
-        beam = self.get_beam(ra,dec)
+        beam = self.get_beam(ra, dec)
         _, _, major, minor, theta = self.sky2pix_ellipse(pos, beam.a, beam.b, beam.pa)
 
-        if major<minor:
-            major,minor = minor,major
-            theta -=90
+        if major < minor:
+            major, minor = minor, major
+            theta -= 90
             if theta < -180:
                 theta += 180
         if not np.isfinite(theta):
             theta = 0
-        if not all(np.isfinite([major,minor,theta])):
+        if not all(np.isfinite([major, minor, theta])):
             beam = None
         else:
             beam = Beam(major, minor, theta)
@@ -264,7 +263,7 @@ class WCSHelper(object):
         :param dec:
         :return:
         """
-        barea = abs(self.beam.a * self.beam.b * np.pi) # in deg**2 at reference coords
+        barea = abs(self.beam.a * self.beam.b * np.pi)  # in deg**2 at reference coords
         if self.lat is not None:
             barea /= np.cos(np.radians(dec-self.lat))
         return barea
@@ -277,7 +276,7 @@ class WCSHelper(object):
         :param dec:
         :return:
         """
-        parea = abs(self.pixscale[0] * self.pixscale[1]) # in deg**2 at reference coords
+        parea = abs(self.pixscale[0] * self.pixscale[1])  # in deg**2 at reference coords
         barea = self.get_beamarea_deg2(ra, dec)
         return barea/parea
 
@@ -301,28 +300,27 @@ class WCSHelperTest(object):
     A test class for WCSHelper
     """
     def __init__(self):
-        #self.helper = WCSHelper.from_file('Test/Images/1904-66_SIN.fits')
+        # self.helper = WCSHelper.from_file('Test/Images/1904-66_SIN.fits')
         self.helper = WCSHelper.from_file('Test/Week2_small.fits')
-        #self.test_vector_round_trip()
+        # self.test_vector_round_trip()
         self.test_ellipse_round_trip()
-        #self.test_defect()
+        # self.test_defect()
 
     def tes_vector_round_trip(self):
         print "Testing vector round trip... ",
-        initial = [1,45] #r,theta = 1,45 (degrees)
+        initial = [1, 45]  #r,theta = 1,45 (degrees)
         ref = self.helper.refpix
-        ra,dec,dist,ang = self.helper.pix2sky_vec(ref, *initial)
-        x,y,r,theta = self.helper.sky2pix_vec([ra,dec], dist, ang)
-        print "Start: x {0}, y {1}, r {2}, theta {3}".format(ref[0],ref[1],*initial)
-        print "sky: ra {0}, dec {1}, dist {2}, ang {3}".format(ra,dec,dist,ang)
-        print "Final: x {0}, y {1}, r {2}, theta {3}".format(x,y,r,theta)
-        if abs(r-initial[0])<1e-9 and abs(theta-initial[1])<1e-9:
+        ra, dec, dist, ang = self.helper.pix2sky_vec(ref, *initial)
+        x, y, r, theta = self.helper.sky2pix_vec([ra, dec], dist, ang)
+        print "Start: x {0}, y {1}, r {2}, theta {3}".format(ref[0], ref[1], *initial)
+        print "sky: ra {0}, dec {1}, dist {2}, ang {3}".format(ra, dec, dist, ang)
+        print "Final: x {0}, y {1}, r {2}, theta {3}".format(x, y, r, theta)
+        if abs(r-initial[0]) < 1e-9 and abs(theta-initial[1]) < 1e-9:
             print "Pass"
             return True
         else:
             print "Fail"
             return False
-
 
     def test_ellipse_round_trip(self):
         """
@@ -332,21 +330,17 @@ class WCSHelperTest(object):
         a = 2*self.helper.beam.a
         b = self.helper.beam.b
         pa = self.helper.beam.pa+45
-        ralist = range(-60,181,5)
-        declist = range(-85,86,5)
-        ras, decs = np.meshgrid(ralist,declist)
+        ralist = range(-60, 181, 5)
+        declist = range(-85, 86, 5)
+        ras, decs = np.meshgrid(ralist, declist)
         # fmt = "RA: {0:5.2f} DEC: {1:5.2f} a: {2:5.2f} b: {3:5.2f} pa: {4:5.2f}"
-        bgrid = np.empty(ras.shape[0]*ras.shape[1],dtype=np.float)
-        for i,(ra, dec) in enumerate(zip(ras.ravel(),decs.ravel())):
-            if ra<0:
-                ra+=360
-            initial = (ra,dec,a,b,pa)
-            x,y,sx,sy,theta = self.helper.sky2pix_ellipse([ra,dec],a,b,pa)
-            final = self.helper.pix2sky_ellipse([x,y],sx,sy,theta)
+        bgrid = np.empty(ras.shape[0]*ras.shape[1], dtype=np.float)
+        for i, (ra, dec) in enumerate(zip(ras.ravel(), decs.ravel())):
+            if ra < 0:
+                ra += 360
+            x, y, sx, sy, theta = self.helper.sky2pix_ellipse([ra, dec], a, b, pa)
+            final = self.helper.pix2sky_ellipse([x, y], sx, sy, theta)
             bgrid[i] = final[3]
-            # print '-'
-            # print fmt.format(*initial),"->"
-            # print fmt.format(*final)
         bgrid = np.log(bgrid.reshape(ras.shape)/b)
 
         from matplotlib import pyplot
@@ -464,6 +458,8 @@ class PSFHelper(WCSHelper):
         :param y: pixel coord
         :return: Beam(a,b,pa)
         """
+        # overriding the WCSHelper function of the same name means that we now calculate the
+        # psf at the coordinates of the x/y pixel in the image WCS, rather than the psfimage WCS
         ra, dec = self.wcshelper.pix2sky([x, y])
         return self.get_pixbeam(ra, dec)
 
