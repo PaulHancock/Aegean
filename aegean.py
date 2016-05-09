@@ -436,7 +436,6 @@ def result_to_components(result, model, island_data, isflags):
         amp = model[prefix+'amp'].value
         src_flags |= model[prefix+'flags'].value
 
-
         # these are goodness of fit statistics for the entire island.
         source.residual_mean = residual[0]
         source.residual_std = residual[1]
@@ -450,6 +449,9 @@ def result_to_components(result, model, island_data, isflags):
         # (pyfits->fits conversion = luck)
         x_pix = xo + xmin + 1
         y_pix = yo + ymin + 1
+        # update the source xo/yo so the error calculations can be done correctly
+        model[prefix+'xo'].value = x_pix
+        model[prefix+'yo'].value = y_pix
 
         # ------ extract source parameters ------
 
@@ -1241,7 +1243,7 @@ def refit_islands(group, stage, outerclip, istart=0):
             # figure out a box around the center of this
             cx, cy = params[prefix+'xo'].value, params[prefix+'yo'].value  # central pixel coords
             log.debug(" comp {0}".format(i))
-            log.debug("  cx,cy {0} {1}".format(cx ,cy))
+            log.debug("  x0, y0 {0} {1}".format(cx ,cy))
             xmx, xmn = np.clip(cx+2, 0, idata.shape[0]), np.clip(cx-1, 0, idata.shape[0])
             ymx, ymn = np.clip(cy+2, 0, idata.shape[1]), np.clip(cy-1, 0, idata.shape[1])
             square = idata[xmn:xmx, ymn:ymx]
@@ -1287,7 +1289,6 @@ def refit_islands(group, stage, outerclip, istart=0):
             result, _ = do_lmfit(idata, params, B=B)
             model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
 
-
         # convert the results to a source object
         offsets = (xmin, xmax, ymin, ymax)
         # TODO allow for island fluxes in the refitting.
@@ -1298,11 +1299,12 @@ def refit_islands(group, stage, outerclip, istart=0):
         for ns, s in zip(new_src, included_sources):
             ns.uuid = s.uuid
             # if the position wasn't fit then copy the errors from the input catalog
-            if stage<2:
+            if stage < 2:
                 ns.err_ra = s.err_ra
                 ns.err_dec = s.err_dec
+                ns.flags |= flags.FIXED2PSF
             # if the shape wasn't fit then copy the errors from the input catalog
-            if stage <3:
+            if stage < 3:
                 ns.err_a = s.err_a
                 ns.err_b = s.err_b
                 ns.err_pa = s.err_pa
@@ -1331,7 +1333,7 @@ def fit_island(island_data):
 
     # get the beam parameters at the center of this island
     midra, middec = global_data.wcshelper.pix2sky([0.5*(xmax+xmin), 0.5*(ymax+ymin)])
-    beam = global_data.psfhelper.get_psf_pix(midra, middec) #beam(midra, middec)
+    beam = global_data.psfhelper.get_psf_pix(midra, middec)
     del middec, midra
 
     icurve = dcurve[xmin:xmax, ymin:ymax]
@@ -1347,11 +1349,11 @@ def fit_island(island_data):
     log.debug("Island ({0})".format(isle_num))
 
     params = estimate_lmfit_parinfo(idata, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
-                               max_summits=max_summits)
+                                    max_summits=max_summits)
 
     # islands at the edge of a region of nans
     # result in no components
-    if params is None or params['components'].value <1:
+    if params is None or params['components'].value < 1:
         return []
 
     log.debug("Rms is {0}".format(np.shape(rms)))
@@ -1373,7 +1375,7 @@ def fit_island(island_data):
         fac = 1/np.sqrt(2)
         C = Cmatrix(mx, my, pixbeam.a*FWHM2CC*fac, pixbeam.b*FWHM2CC*fac, pixbeam.pa)
         B = Bmatrix(C)
-        ## For testing the fitting without the inverse co-variance matrix, set these to None
+        # For testing the fitting without the inverse co-variance matrix, set these to None
         # B = None
         # C = None
         log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*FWHM2CC, pixbeam.b*FWHM2CC, pixbeam.pa))
