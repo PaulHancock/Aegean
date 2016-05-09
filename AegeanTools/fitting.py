@@ -272,7 +272,7 @@ def errors(source, model, wcshelper):
     err_theta = model[prefix+'theta'].stderr
 
     source.err_peak_flux = err_amp
-    pix_errs = [err_xo,err_yo,err_sx,err_sy,err_theta]
+    pix_errs = [err_xo, err_yo, err_sx, err_sy, err_theta]
 
     # check for inf/nan errors -> these sources have poor fits.
     if not all([a is not None and np.isfinite(a) for a in pix_errs]):
@@ -300,25 +300,24 @@ def errors(source, model, wcshelper):
 
     if model[prefix+'theta'].vary:
         # pa error
-        off1 = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta)),yo+sy*np.sin(np.radians(theta))])
-        off2 = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta+err_theta)),yo+sy*np.sin(np.radians(theta+err_theta))])
+        off1 = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta)), yo+sy*np.sin(np.radians(theta))])
+        off2 = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta+err_theta)), yo+sy*np.sin(np.radians(theta+err_theta))])
         source.err_pa = abs(bear(ref[0], ref[1], off1[0], off1[1]) - bear(ref[0], ref[1], off2[0], off2[1]))
     else:
         source.err_pa = -1
 
     if model[prefix + 'sx'].vary and model[prefix + 'sy'].vary:
         # major axis error
-        ref = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta)),yo+sy*np.sin(np.radians(theta))])
-        offset = wcshelper.pix2sky([xo+(sx+err_sx)*np.cos(np.radians(theta)),yo+sy*np.sin(np.radians(theta))])
+        ref = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta)), yo+sy*np.sin(np.radians(theta))])
+        offset = wcshelper.pix2sky([xo+(sx+err_sx)*np.cos(np.radians(theta)), yo+sy*np.sin(np.radians(theta))])
         source.err_a = gcd(ref[0],ref[1],offset[0],offset[1]) * 3600
 
         # minor axis error
-        ref = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta+90)),yo+sy*np.sin(np.radians(theta+90))])
-        offset = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta+90)),yo+(sy+err_sy)*np.sin(np.radians(theta+90))])
+        ref = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta+90)), yo+sy*np.sin(np.radians(theta+90))])
+        offset = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta+90)), yo+(sy+err_sy)*np.sin(np.radians(theta+90))])
         source.err_b = gcd(ref[0], ref[1], offset[0], offset[1]) * 3600
     else:
         source.err_a = source.err_b = -1
-
 
     sqerr = 0
     sqerr += (source.err_peak_flux/source.peak_flux)**2 if source.err_peak_flux >0 else 0
