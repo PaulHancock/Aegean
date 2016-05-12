@@ -384,7 +384,11 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         params.add(prefix+'sx', value=sx, min=sx_min, max=sx_max, vary=psf_vary)
         params.add(prefix+'sy', value=sy, min=sy_min, max=sy_max, vary=psf_vary)
         params.add(prefix+'theta', value=theta, vary=psf_vary)
-        params.add(prefix+'flags',value=summit_flag, vary=False)
+        params.add(prefix+'flags', value=summit_flag, vary=False)
+
+        # starting at zero allows the maj/min axes to be fit better.
+        if params[prefix+'theta'].vary:
+            params[prefix+'theta'].value = 0
 
         i += 1
     if debug_on:
@@ -450,9 +454,9 @@ def result_to_components(result, model, island_data, isflags):
         x_pix = xo + xmin + 1
         y_pix = yo + ymin + 1
         # update the source xo/yo so the error calculations can be done correctly
-        model[prefix+'xo'].value = x_pix
-        model[prefix+'yo'].value = y_pix
-
+        # Note that you have to update the max or the value you set will be clipped at the max allowed value
+        model[prefix+'xo'].set(value=x_pix, max=np.inf)
+        model[prefix+'yo'].set(value=y_pix, max=np.inf)
         # ------ extract source parameters ------
 
         # fluxes
@@ -711,6 +715,7 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
 
     return
 
+
 # image manipulation
 def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
     """
@@ -737,9 +742,8 @@ def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
     xcen = int(img_x / 2)
     ycen = int(img_y / 2)
 
-    #calculate a local beam from the center of the data
-    #pixbeam = global_data.wcshelper.get_pixbeam()
-    pixbeam = global_data.psfhelper.get_pixbeam_pixel(xcen,ycen)
+    # calculate a local beam from the center of the data
+    pixbeam = global_data.psfhelper.get_pixbeam_pixel(xcen, ycen)
     if pixbeam is None:
         log.error("Cannot calculate the beam shape at the image center")
         sys.exit(1)
@@ -757,11 +761,11 @@ def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
     log.debug("beam: {0}".format(beam))
     log.debug("mesh width (pix) x,y: {0},{1}".format(width_x, width_y))
 
-    #box centered at image center then tilling outwards
-    xstart = (xcen - width_x / 2) % width_x  #the starting point of the first "full" box
+    # box centered at image center then tilling outwards
+    xstart = (xcen - width_x / 2) % width_x  # the starting point of the first "full" box
     ystart = (ycen - width_y / 2) % width_y
 
-    xend = img_x - (img_x - xstart) % width_x  #the end point of the last "full" box
+    xend = img_x - (img_x - xstart) % width_x  # the end point of the last "full" box
     yend = img_y - (img_y - ystart) % width_y
 
     xmins = [0]
@@ -780,7 +784,7 @@ def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
     ymaxs.extend(range(ystart + width_y, yend + 1, width_y))
     ymaxs.append(img_y)
 
-    #if the image is smaller than our ideal mesh size, just use the whole image instead
+    # if the image is smaller than our ideal mesh size, just use the whole image instead
     if width_x >= img_x:
         xmins = [0]
         xmaxs = [img_x]
@@ -844,7 +848,7 @@ def make_bkg_rms_from_global(mesh_size=20, forced_rms=None, cores=None):
     xstart = (xcen - width_x / 2) % width_x  # the starting point of the first "full" box
     ystart = (ycen - width_y / 2) % width_y
 
-    xend = img_x - (img_x - xstart) % width_x  #the end point of the last "full" box
+    xend = img_x - (img_x - xstart) % width_x  # the end point of the last "full" box
     yend = img_y - (img_y - ystart) % width_y
 
     xmins = [0]
