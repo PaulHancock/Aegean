@@ -310,7 +310,7 @@ def errors(source, model, wcshelper):
         # major axis error
         ref = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta)), yo+sy*np.sin(np.radians(theta))])
         offset = wcshelper.pix2sky([xo+(sx+err_sx)*np.cos(np.radians(theta)), yo+sy*np.sin(np.radians(theta))])
-        source.err_a = gcd(ref[0],ref[1],offset[0],offset[1]) * 3600
+        source.err_a = gcd(ref[0], ref[1], offset[0], offset[1]) * 3600
 
         # minor axis error
         ref = wcshelper.pix2sky([xo+sx*np.cos(np.radians(theta+90)), yo+sy*np.sin(np.radians(theta+90))])
@@ -409,11 +409,11 @@ def covar_errors(params, data, errs, B, C=None):
 
     for i in xrange(params['components'].value):
         prefix = "c{0}_".format(i)
-        j=0
-        for p in ['amp','xo','yo','sx','sy','theta']:
+        j = 0
+        for p in ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']:
             if params[prefix+p].vary:
                 params[prefix+p].stderr = onesigma[j]
-                j+=1
+                j += 1
 
     return params
 
