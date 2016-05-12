@@ -444,11 +444,10 @@ class PSFHelper(WCSHelper):
         :return: (a,b,) in pix,pix,degrees
         """
         psf_sky = self.get_psf_sky(ra, dec)
-        # copy the PA from the fits header
-        # TODO: figure out how to do this properly when the WCS are rotated wrt x/y
-        psf_pix = self.wcshelper.sky2pix_vec([ra,dec], psf_sky[0], 0)[2],\
-                  self.wcshelper.sky2pix_vec([ra,dec], psf_sky[1], 90)[2],\
-                  psf_sky[2]
+        psf_pix = self.wcshelper.sky2pix_ellipse([ra, dec], psf_sky[0], psf_sky[1], psf_sky[2])[2:]
+        # psf_pix = self.wcshelper.sky2pix_vec([ra, dec], psf_sky[0], 0)[2],\
+        #           self.wcshelper.sky2pix_vec([ra, dec], psf_sky[1], 90)[2],\
+        #           psf_sky[2]
         return psf_pix
 
     def get_pixbeam_pixel(self, x, y):
