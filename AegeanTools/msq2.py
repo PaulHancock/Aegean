@@ -166,30 +166,25 @@ class MarchingSquares():
         # scan around the perimeter filling 'up' from each pixel
         # stopping when we reach the other boundary
         for p in perimeter:
-            print 'start',p,
             # if we are on the edge of the data then there is nothing to fill
             if p[0] >= self.data.shape[0]:
-                print 'map edge [0]'
                 continue
-            # if we are on the upper side of an island, don't blank
-            if self.data[p[0], p[1] + 1] == 0:
-                print 'stop (blank)'
+            # if this pixel is blank then don't fill
+            if self.data[p] == 0:
                 continue
+
             # blank this pixel
             self.data[p] = 0
 
+            # blank until we reach the other perimeter
             for i in xrange(p[1]+1, self.data.shape[1]):
                 q = p[0], i
-                # fill everything
-                self.data[q] = 0
-                print q,
-                # stop when we reach the opposite border
+                # stop when we reach another part of the perimeter
                 if q in perimeter:
-                    print 'hit perim!'
                     break
-            else:
-                print 'map edge [1]'
-        print 'done'
+                # fill everything in between, even inclusions
+                self.data[q] = 0
+
         return
 
     def doMarchAll(self):
@@ -203,19 +198,15 @@ class MarchingSquares():
         # and then blanking the island
         perimeters = []
         p = self.findStartPoint()
-        i = 0
         while p is not None:
-            i += 1
             x, y = p
             perim = self.walkPerimeter(x, y)
             perimeters.append(perim)
             self._blankWithin(perim)
             p = self.findStartPoint()
-            if i > 1:
-                break
-                
+
         # restore the data 
-        #self.data = data_copy
+        self.data = data_copy
         return perimeters
                 
 
