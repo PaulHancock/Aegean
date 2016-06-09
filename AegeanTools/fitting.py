@@ -36,7 +36,13 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     :param theta: position angle (radians) CCW from x-axis
     :return: Gaussian function evaluated at x,y locations
     """
-    sint, cost = math.sin(np.radians(theta)), math.cos(np.radians(theta))
+    try:
+        sint, cost = math.sin(np.radians(theta)), math.cos(np.radians(theta))
+    except ValueError, e:
+        if 'math domain error' in e.args:
+            sint, cost = np.nan, np.nan
+        else:
+            raise
     xxo = x-xo
     yyo = y-yo
     exp = (xxo*cost + yyo*sint)**2 / sx**2 \
@@ -396,7 +402,7 @@ def covar_errors(params, data, errs, B, C=None):
             J = jacobian(params, mask[0], mask[1], errs=errs)
             covar = np.transpose(J).dot(inv(C)).dot(J)
             onesigma = np.sqrt(np.diag(inv(covar)))
-        except np.linalg.linalg.LinAlgError, e:
+        except (np.linalg.linalg.LinAlgError, ValueError), e:
             C = None
 
     if C is None:
@@ -404,7 +410,7 @@ def covar_errors(params, data, errs, B, C=None):
             J = jacobian(params, mask[0], mask[1], B=B, errs=errs)
             covar = np.transpose(J).dot(J)
             onesigma = np.sqrt(np.diag(inv(covar)))
-        except np.linalg.linalg.LinAlgError, e:
+        except (np.linalg.linalg.LinAlgError, ValueError), e:
             onesigma = [-2]*len(mask[0])
 
     for i in xrange(params['components'].value):
