@@ -167,7 +167,7 @@ class MarchingSquares():
         # stopping when we reach the other boundary
         for p in perimeter:
             # if we are on the edge of the data then there is nothing to fill
-            if p[0] >= self.data.shape[0]:
+            if p[0] >= self.data.shape[0] or p[1] >= self.data.shape[1]:
                 continue
             # if this pixel is blank then don't fill
             if self.data[p] == 0:
