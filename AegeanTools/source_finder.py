@@ -1263,9 +1263,9 @@ class SourceFinder(object):
                 else:
                     raise e
 
-        if outfile:
-            print >> outfile, header.format("{0}-({1})".format(__version__,__date__), filename)
-            print >> outfile, OutputSource.header
+        # if outfile:
+        #     print >> outfile, header.format("{0}-({1})".format(__version__,__date__), filename)
+        #     print >> outfile, OutputSource.header
         island_group = []
         group_size = 20
         for i, xmin, xmax, ymin, ymax in self._gen_flood_wrap(data, rmsimg, innerclip, outerclip, domask=True):
