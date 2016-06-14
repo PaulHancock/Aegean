@@ -20,9 +20,11 @@ setup(
 #    license = "BSD",
     keywords = "example documentation tutorial",
     url = "http://packages.python.org/an_example_pypi_project",
-#    packages=['an_example_pypi_project', 'tests'],
-    long_description=read('README'),
+    long_description=read('README.md'),
     packages = ['aegean'],
-    install_requires=['numpy>=1.10', 'scipy>=0.16','astropy>=1.0']
+    install_requires=['numpy>=1.10',
+                      'scipy>=0.16',
+                      'astropy>=1.0',
+                      'lmfit>=0.9.2'],
     scripts=['scripts/aegean','scripts/BANE','scripts/SR6','scripts/AeRes','scripts/MIMAS']
 )
