@@ -426,6 +426,7 @@ class SourceFinder(object):
         is_flag = isflags
 
         sources = []
+        j = 0
         for j in range(model['components'].value):
             src_flags = is_flag
             source = OutputSource()
@@ -489,8 +490,6 @@ class SourceFinder(object):
                 source.ra += 360
             source.ra_str = dec2hms(source.ra)
             source.dec_str = dec2dms(source.dec)
-
-
 
             # calculate integrated flux
             source.int_flux = source.peak_flux * sx * sy * CC2FHWM ** 2 * np.pi
@@ -604,7 +603,7 @@ class SourceFinder(object):
     # Setting up 'global' data and calculating bkg/rms
     ##
     def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, cores=1,
-                     csigma=None, do_curve=True, mask=None, lat=None, psf=None):
+                     do_curve=True, mask=None, lat=None, psf=None):
         """
         Populate the global_data object by loading or calculating the various components
 
@@ -616,7 +615,6 @@ class SourceFinder(object):
         :param verb: write extra lines to INFO level log
         :param rms: a float that represents a constant rms level for the entire image
         :param cores: number of cores to use if different from what is autodetected
-        :param csigma: float value that represents the 1sigma value for the curvature map (don't use please)
         :param do_curve: if True a curvature map will be created, default=True
         :param mask: filename or Region object
         :param lat: latitude of the observing telescope (declination of zenith)
@@ -1185,9 +1183,9 @@ class SourceFinder(object):
             sources.extend(res)
         return sources
 
-    def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, max_summits=None, csigma=None,
-                              innerclip=5, outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None,
-                              doislandflux=False, nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None):
+    def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, max_summits=None, innerclip=5,
+                              outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
+                              nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None):
         """
         Run the Aegean source finder.
 
@@ -1196,7 +1194,6 @@ class SourceFinder(object):
         :param outfile: file for printing catalog (NOT a table, just a text file of my own design)
         :param rms: use this rms for the entire image (will also assume that background is 0)
         :param max_summits: fit up to this many components to each island (extras are included but not fit)
-        :param csigma: use this as the clipping limit for the curvature map (not really used/tested)
         :param innerclip: the seeding clip, in sigmas, for seeding islands of pixels
         :param outerclip: the flood clip in sigmas, used for flooding islands
         :param cores: number of CPU cores to use. None means all cores.
@@ -1216,15 +1213,13 @@ class SourceFinder(object):
         :param imgpsf: filename or HDUList for a psf image.
         """
 
-        log = self.log
-
         # Tell numpy to be quiet
         np.seterr(invalid='ignore')
         if cores is not None:
             assert (cores >= 1), "cores must be one or more"
 
         self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, cores=cores,
-                          csigma=csigma, verb=True, mask=mask, lat=lat, psf=imgpsf)
+                          verb=True, mask=mask, lat=lat, psf=imgpsf)
         global_data = self.global_data
         rmsimg = global_data.rmsimg
         data = global_data.data_pix
@@ -1404,7 +1399,7 @@ class SourceFinder(object):
                 self.log.info("Using {0} subprocesses".format(cores))
             try:
                 queue = pprocess.Queue(limit=cores, reuse=1)
-                fit_parallel = queue.manage(pprocess.MakeReusable(refit_islands))
+                fit_parallel = queue.manage(pprocess.MakeReusable(self._refit_islands))
             except AttributeError, e:
                 if 'poll' in e.message:
                     self.log.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
