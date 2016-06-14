@@ -6,27 +6,26 @@ The Aegean source finding program.
 # standard imports
 import sys
 import os
-import re
 import numpy as np
 import math
 import copy
+import logging
+import logging.config
+import lmfit
 
-# TODO: Not all of these modules are needed for every instance of Aegean.
-# see if there is a way to only import the things that I need.
-# this should increase load speed, and reduce complaints from modules that are not being used.
-
-# scipy things
 import scipy
-#from scipy import ndimage as ndi
 from scipy.special import erf
 from scipy.ndimage import label, find_objects
 
-# fitting
-import lmfit
+# AegeanTools
 from fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit
-
-# the glory of astropy
-import astropy
+from wcs_helpers import WCSHelper, PSFHelper
+from fits_image import FitsImage
+from msq2 import MarchingSquares
+from angle_tools import dec2hms, dec2dms, gcd, bear
+from catalogs import load_table, table_to_source_list
+from models import OutputSource, IslandSource, island_itergen
+import flags
 
 # need Region in the name space in order to be able to unpickle it
 try:
@@ -38,21 +37,6 @@ try:
         import pickle
 except ImportError:
     region_available = False
-
-# logging import and setupOB
-import logging
-import logging.config
-
-
-# external and support programs
-from wcs_helpers import WCSHelper, PSFHelper
-from fits_image import FitsImage, Beam
-from msq2 import MarchingSquares
-from angle_tools import dec2hms, dec2dms, gcd, bear, translate
-from catalogs import show_formats, check_table_formats, load_table, \
-                     load_catalog, table_to_source_list, save_catalog
-from models import OutputSource, IslandSource, SimpleSource, classify_catalog, island_itergen
-import flags
 
 # multiple cores support
 import pprocess
