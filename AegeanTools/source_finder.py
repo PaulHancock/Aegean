@@ -694,11 +694,11 @@ class SourceFinder(object):
         if bkgin:
             if verb:
                 self.log.info("Loading background data from file {0}".format(bkgin))
-            self.global_data.bkgimg = load_aux_image(img, bkgin)
+            self.global_data.bkgimg = self._load_aux_image(img, bkgin)
         if rmsin:
             if verb:
                 self.log.info("Loading rms data from file {0}".format(rmsin))
-            self.global_data.rmsimg = load_aux_image(img, rmsin)
+            self.global_data.rmsimg = self._load_aux_image(img, rmsin)
 
         # subtract the background image from the data image and save
         if verb and debug:
