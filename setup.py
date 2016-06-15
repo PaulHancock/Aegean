@@ -21,7 +21,7 @@ setup(
     keywords = "example documentation tutorial",
     url = "http://packages.python.org/an_example_pypi_project",
     long_description=read('README.md'),
-    packages = ['aegean'],
+    packages = ['AegeanTools'],
     install_requires=['numpy>=1.10',
                       'scipy>=0.16',
                       'astropy>=1.0',
