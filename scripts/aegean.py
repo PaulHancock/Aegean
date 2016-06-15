@@ -429,7 +429,7 @@ if __name__ == "__main__":
     log.setLevel(logging_level)
     log.info("This is Aegean {0}-({1})".format(__version__,__date__))
 
-    from AegeanTools.source_finder import SourceFinder
+    from AegeanTools.source_finder import SourceFinder, check_cores
     # source finding object
     sf = SourceFinder(log=log)
 
@@ -485,21 +485,7 @@ if __name__ == "__main__":
         options.cores = multiprocessing.cpu_count()
         log.info("Found {0} cores".format(options.cores))
     if options.cores > 1:
-        try:
-            queue = pprocess.Queue(limit=options.cores, reuse=1)
-            temp = queue.manage(pprocess.MakeReusable(fit_islands))
-        except AttributeError, e:
-            if 'poll' in e.message:
-                log.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
-                options.cores = 1
-                queue = None
-                temp = None
-            else:
-                log.error("Your system can't seem to make a queue, try using --cores=1")
-                raise e
-        finally:
-            del queue, temp
-
+        options.cores = check_cores(options.cores)
     log.info("Using {0} cores".format(options.cores))
 
     hdu_index = options.hdu_index
