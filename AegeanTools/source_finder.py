@@ -1234,23 +1234,8 @@ class SourceFinder(object):
         if cores == 1:  # single-threaded, no parallel processing
             queue = []
         else:
-            # This check is also made during start up when running aegean from the command line
-            # However I reproduce it here so that we don't fall over when aegean is being imported
-            # into other codes (eg the VAST pipeline)
-            if cores is None:
-                cores = multiprocessing.cpu_count()
-                self.log.info("Found {0} cores".format(cores))
-            self.log.info("Using {0} subprocesses".format(cores))
-            try:
-                queue = pprocess.Queue(limit=cores, reuse=1)
-                fit_parallel = queue.manage(pprocess.MakeReusable(self._fit_islands))
-            except AttributeError, e:
-                if 'poll' in e.message:
-                    self.log.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
-                    cores = 1
-                    queue = []
-                else:
-                    raise e
+            queue = pprocess.Queue(limit=cores, reuse=1)
+            fit_parallel = queue.manage(pprocess.MakeReusable(self._fit_islands))
 
         # if outfile:
         #     print >> outfile, header.format("{0}-({1})".format(__version__,__date__), filename)
@@ -1389,27 +1374,10 @@ class SourceFinder(object):
         if cores == 1:  # single-threaded, no parallel processing
             queue = []
         else:
-            # This check is also made during start up when running aegean from the command line
-            # However I reproduce it here so that we don't fall over when aegean is being imported
-            # into other codes (eg the VAST pipeline)
-            if cores is None:
-                cores = multiprocessing.cpu_count()
-                self.log.info("Found {0} cores".format(cores))
-            else:
-                self.log.info("Using {0} subprocesses".format(cores))
-            try:
-                queue = pprocess.Queue(limit=cores, reuse=1)
-                fit_parallel = queue.manage(pprocess.MakeReusable(self._refit_islands))
-            except AttributeError, e:
-                if 'poll' in e.message:
-                    self.log.warn("Your O/S doesn't support select.poll(): Reverting to cores=1")
-                    cores = 1
-                    queue = []
-                else:
-                    raise e
+            queue = pprocess.Queue(limit=cores, reuse=1)
+            fit_parallel = queue.manage(pprocess.MakeReusable(self._refit_islands))
 
         sources = []
-
         island_group = []
         group_size = 20
 
