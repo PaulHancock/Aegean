@@ -23,7 +23,7 @@ setup(
     description=(""),
     # license = "BSD",
     keywords="example documentation tutorial",
-    url="http://packages.python.org/an_example_pypi_project",
+    url="https://github.com/PaulHancock/Aegean",
     long_description=read('README.md'),
     packages=['AegeanTools'],
     install_requires=['numpy>=1.10',
