@@ -38,66 +38,6 @@ header = """#Aegean version {0}
 # on dataset: {1}"""
 
 
-def save_background_files(image_filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, rms=None, cores=1,
-                          outbase=None):
-    """
-    Generate and save the background and RMS maps as FITS files.
-    They are saved in the current directly as aegean-background.fits and aegean-rms.fits.
-
-    :param image_filename: filename or HDUList of image
-    :param hdu_index: if fits file has more than one hdu, it can be specified here
-    :param bkgin: a background image filename or HDUList
-    :param rmsin: an rms image filename or HDUList
-    :param beam: beam parameters to override those given in fits header
-    :param rms: forced rms value
-    :param cores: cores to use
-    :param outbase: basename for output files
-    :return:
-    """
-    global global_data
-
-    log.info("Saving background / RMS maps")
-    # load image, and load/create background/rms images
-    load_globals(image_filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms,
-                 cores=cores, do_curve=True)
-    img = global_data.img
-    bkgimg, rmsimg = global_data.bkgimg, global_data.rmsimg
-    curve = np.array(global_data.dcurve, dtype=np.float32)
-    # mask these arrays have the same mask the same as the data
-    mask = np.where(np.isnan(global_data.data_pix))
-    bkgimg[mask] = np.NaN
-    rmsimg[mask] = np.NaN
-    curve[mask] = np.NaN
-
-    # Generate the new FITS files by copying the existing HDU and assigning new data.
-    # This gives the new files the same WCS projection and other header fields.
-    new_hdu = img.hdu
-    # Set the ORIGIN to indicate Aegean made this file
-    new_hdu.header["ORIGIN"] = "Aegean {0}-({1})".format(__version__, __date__)
-    for c in ['CRPIX3', 'CRPIX4', 'CDELT3', 'CDELT4', 'CRVAL3', 'CRVAL4', 'CTYPE3', 'CTYPE4']:
-        if c in new_hdu.header:
-            del new_hdu.header[c]
-
-    if outbase is None:
-        outbase, _ = os.path.splitext(os.path.basename(image_filename))
-    noise_out = outbase + '_rms.fits'
-    background_out = outbase + '_bkg.fits'
-    curve_out = outbase + '_crv.fits'
-
-    new_hdu.data = bkgimg
-    new_hdu.writeto(background_out, clobber=True)
-    log.info("Wrote {0}".format(background_out))
-
-    new_hdu.data = rmsimg
-    new_hdu.writeto(noise_out, clobber=True)
-    log.info("Wrote {0}".format(noise_out))
-
-    new_hdu.data = curve
-    new_hdu.writeto(curve_out, clobber=True)
-    log.info("Wrote {0}".format(curve_out))
-    return
-
-
 if __name__ == "__main__":
     usage = "usage: %prog [options] FileName.fits"
     parser = OptionParser(usage=usage)
@@ -272,11 +212,11 @@ if __name__ == "__main__":
     else:
         lat = None
 
-    # Generate and save the background FITS files
+    # Generate and save the background FITS files with the Aegean default calculator
     if options.save:
-        raise NotImplementedError("check back later")
-        # save_background_files(filename, hdu_index=hdu_index, cores=options.cores, beam=options.beam,
-        # outbase=options.outbase)
+        sf. save_background_files(filename, hdu_index=hdu_index, cores=options.cores, beam=options.beam,
+                                  outbase=options.outbase)
+        sys.exit(0)
 
     # auto-load background, noise, psf and region files
     if options.autoload:
