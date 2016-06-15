@@ -1540,6 +1540,25 @@ def scope2lat(telescope):
         return None
 
 
+def check_cores(cores):
+    """
+    Determine how many cores we are able to use.
+    Return 1 if we are not able to make a queue via pprocess.
+    :param cores: the number of cores requested by the user
+    :return: number of cores available
+    """
+    cores = min(multiprocessing.cpu_count(), cores)
+    try:
+        queue = pprocess.Queue(limit=cores, reuse=1)
+    except:
+        cores = 1
+    else:
+        try:
+            temp = queue.manage(pprocess.MakeReusable(fix_shape))
+        except:
+            cores = 1
+    return cores
+
 if __name__ == "__main__":
     # configure logging
     logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
