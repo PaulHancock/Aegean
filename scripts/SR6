@@ -45,18 +45,18 @@ if __name__ == "__main__":
     group1.add_argument('-m', dest='maskfile',action='store',
                         default=None, type=str, metavar='MaskFile',
                         help="File to use for masking pixels.")
+    group2 = parser.add_argument_group("Other options")
     # TODO: move these to be in a different group. (The same as help).
-    group1.add_argument('--debug', dest='debug', action='store_true',
+    group2.add_argument('--debug', dest='debug', action='store_true',
                         default=False,
                         help='Debug output')
-    group1.add_argument('--version', action='version', version='%(prog)s '+__version__+"-({0})".format(__date__))
+    group2.add_argument('--version', action='version', version='%(prog)s '+__version__+"-({0})".format(__date__))
 
     results = parser.parse_args()
 
     logging_level = logging.DEBUG if results.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is SR6 {0}-({1})".format(__version__,__date__))
-
 
     if not os.path.exists(results.infile):
         logging.error("{0} does not exist".format(results.infile))
