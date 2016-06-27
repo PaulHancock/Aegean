@@ -64,9 +64,7 @@ if __name__ == "__main__":
                       help="A .fits file that represents the background level, created from Aegean with --save " +
                            "or BANE. [default: none]")
     parser.add_option('--psf', dest='imgpsf', default=None,
-                      help="A .fits file that represents the size (degrees) of a blurring disk. " +
-                           "This disk is convolved with the BMAJ/BMIN listed in the FITS header and " +
-                           "the result becomes the local PSF.")
+                      help="A .fits file that represents the local PSF. ")
 
     parser.add_option('--autoload', dest='autoload', action="store_true", default=False,
                       help="Automatically look for background, noise, region, and psf files "+
