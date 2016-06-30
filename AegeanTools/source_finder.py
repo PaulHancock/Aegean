@@ -758,6 +758,23 @@ class SourceFinder(object):
         self.log.info("Wrote {0}".format(curve_out))
         return
 
+    def save_image(self, outname):
+        """
+        Save the image data.
+        This is probably only useful if the image data has been blanked.
+        :param outname: Name for the output file
+        :return:
+        """
+        hdu = self.global_data.img.hdu
+        hdu[0].data = self.global_data.img.data
+        hdu.header["ORIGIN"] = "Aegean {0}-({1})".format(__version__, __date__)
+        # delete some axes that we aren't going to need
+        for c in ['CRPIX3', 'CRPIX4', 'CDELT3', 'CDELT4', 'CRVAL3', 'CRVAL4', 'CTYPE3', 'CTYPE4']:
+            if c in hdu.header:
+                del hdu.header[c]
+        hdu.writeto(outname, clobber=True)
+        return
+
     def _make_bkg_rms(self, mesh_size=20, forced_rms=None, cores=None):
         """
         Calculate an rms image and a bkg image
