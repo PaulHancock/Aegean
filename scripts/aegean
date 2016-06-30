@@ -92,7 +92,7 @@ if __name__ == "__main__":
     parser.add_option('--negative', dest='negative', action="store_true", default=False,
                       help="Report sources with negative fluxes. [default: false]")
     parser.add_option('--blankout', dest='blank', action="store_true", default=False,
-                      help="Create a blanked output image.")
+                      help="Create a blanked output image. [Only works if cores=1].")
 
     parser.add_option('--region', dest='region', default=None,
                       help="Use this regions file to restrict source finding in this image.")
@@ -214,7 +214,7 @@ if __name__ == "__main__":
 
     # Generate and save the background FITS files with the Aegean default calculator
     if options.save:
-        sf. save_background_files(filename, hdu_index=hdu_index, cores=options.cores, beam=options.beam,
+        sf.save_background_files(filename, hdu_index=hdu_index, cores=options.cores, beam=options.beam,
                                   outbase=options.outbase)
         sys.exit(0)
 
