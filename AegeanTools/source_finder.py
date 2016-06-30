@@ -73,6 +73,7 @@ class GlobalFittingData(object):
         self.region = None
         self.wcshelper = None
         self.psfhelper = None
+        self.blank = False
         return
 
 
@@ -513,6 +514,14 @@ class SourceFinder(object):
             sources.append(source)
             self.log.debug(source)
 
+        if global_data.blank:
+            outerclip = island_data.scalars[1]
+            kappa_sigma = np.where(abs(idata) - outerclip * rms > 0, idata, np.NaN)
+            kappa_sigma[:,0] += xmin
+            kappa_sigma[:,1] += ymin
+            global_data.img.data[kappa_sigma] = np.nan
+
+
         # calculate the integrated island flux if required
         if island_data.doislandflux:
             _, outerclip, _ = island_data.scalars
@@ -698,6 +707,8 @@ class SourceFinder(object):
         if verb and debug:
             self.log.debug("Data max is {0}".format(img.get_pixels()[np.isfinite(img.get_pixels())].max()))
 
+        # set blanking to yes by default (for now)
+        self.global_data.blank = True
         return
 
     def save_background_files(self, image_filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, rms=None, cores=1,
