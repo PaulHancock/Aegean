@@ -91,6 +91,8 @@ if __name__ == "__main__":
                       help="Don't report sources with positive fluxes. [default: false]")
     parser.add_option('--negative', dest='negative', action="store_true", default=False,
                       help="Report sources with negative fluxes. [default: false]")
+    parser.add_option('--blankout', dest='blank', action="store_true", default=False,
+                      help="Create a blanked output image.")
 
     parser.add_option('--region', dest='region', default=None,
                       help="Use this regions file to restrict source finding in this image.")
@@ -217,8 +219,8 @@ if __name__ == "__main__":
         sys.exit(0)
 
     # auto-load background, noise, psf and region files
+    basename = os.path.splitext(filename)[0]
     if options.autoload:
-        basename = os.path.splitext(filename)[0]
         if os.path.exists(basename + '_bkg.fits'):
             options.backgroundimg = basename + '_bkg.fits'
             log.info("Found background {0}".format(options.backgroundimg))
@@ -271,19 +273,6 @@ if __name__ == "__main__":
     # do forced measurements using catfile
     if options.measure and options.priorized == 0:
         raise NotImplementedError("forced measurements are not supported")
-        # if options.input is None:
-        # log.error("Must specify input catalog when --measure is selected")
-        #     sys.exit(1)
-        # if not os.path.exists(options.input):
-        #     log.error("{0} not found".format(options.input))
-        #     sys.exit(1)
-        # log.info("Measuring fluxes of input catalog.")
-        # measurements = measure_catalog_fluxes(filename, catfile=options.input, hdu_index=options.hdu_index,
-        #                                       outfile=options.outfile, bkgin=options.backgroundimg,
-        #                                       rmsin=options.noiseimg, beam=options.beam, lat=lat)
-        # if len(measurements) == 0:
-        #     log.info("No measurements made")
-        # sources.extend(measurements)
 
     if options.priorized > 0:
         if options.ratio is not None:
@@ -321,7 +310,10 @@ if __name__ == "__main__":
                                          bkgin=options.backgroundimg, beam=options.beam,
                                          doislandflux=options.doislandflux,
                                          nonegative=not options.negative, nopositive=options.nopositive,
-                                         mask=options.region, lat=lat, imgpsf=options.imgpsf)
+                                         mask=options.region, lat=lat, imgpsf=options.imgpsf, blank=options.blank)
+        if options.blank:
+            outname = basename+'_blank.fits'
+            sf.save_image(outname)
         if len(found) == 0:
             log.info("No sources found in image")
 
