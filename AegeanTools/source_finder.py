@@ -516,10 +516,10 @@ class SourceFinder(object):
 
         if global_data.blank:
             outerclip = island_data.scalars[1]
-            kappa_sigma = np.where(abs(idata) - outerclip * rms > 0, idata, np.NaN)
-            kappa_sigma[:,0] += xmin
-            kappa_sigma[:,1] += ymin
-            global_data.img.data[kappa_sigma] = np.nan
+            idx, idy = np.where(abs(idata) - outerclip * rms > 0)
+            idx += xmin
+            idy += ymin
+            self.global_data.img._pixels[[idx, idy]] = np.nan
 
 
         # calculate the integrated island flux if required
@@ -612,7 +612,7 @@ class SourceFinder(object):
     # Setting up 'global' data and calculating bkg/rms
     ##
     def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, cores=1,
-                     do_curve=True, mask=None, lat=None, psf=None):
+                     do_curve=True, mask=None, lat=None, psf=None, blank=False):
         """
         Populate the global_data object by loading or calculating the various components
 
@@ -707,8 +707,7 @@ class SourceFinder(object):
         if verb and debug:
             self.log.debug("Data max is {0}".format(img.get_pixels()[np.isfinite(img.get_pixels())].max()))
 
-        # set blanking to yes by default (for now)
-        self.global_data.blank = True
+        self.global_data.blank = blank
         return
 
     def save_background_files(self, image_filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, rms=None, cores=1,
@@ -777,13 +776,14 @@ class SourceFinder(object):
         :return:
         """
         hdu = self.global_data.img.hdu
-        hdu[0].data = self.global_data.img.data
+        hdu.data = self.global_data.img._pixels
         hdu.header["ORIGIN"] = "Aegean {0}-({1})".format(__version__, __date__)
         # delete some axes that we aren't going to need
         for c in ['CRPIX3', 'CRPIX4', 'CDELT3', 'CDELT4', 'CRVAL3', 'CRVAL4', 'CTYPE3', 'CTYPE4']:
             if c in hdu.header:
                 del hdu.header[c]
         hdu.writeto(outname, clobber=True)
+        self.log.info("Wrote {0}".format(outname))
         return
 
     def _make_bkg_rms(self, mesh_size=20, forced_rms=None, cores=None):
@@ -1271,7 +1271,7 @@ class SourceFinder(object):
 
     def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, max_summits=None, innerclip=5,
                               outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
-                              nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None):
+                              nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None, blank=False):
         """
         Run the Aegean source finder.
 
@@ -1305,7 +1305,7 @@ class SourceFinder(object):
             assert (cores >= 1), "cores must be one or more"
 
         self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, cores=cores,
-                          verb=True, mask=mask, lat=lat, psf=imgpsf)
+                          verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank)
         global_data = self.global_data
         rmsimg = global_data.rmsimg
         data = global_data.data_pix
