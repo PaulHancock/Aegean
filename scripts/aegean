@@ -292,7 +292,7 @@ if __name__ == "__main__":
         log.info("Stage = {0}".format(options.priorized))
         if options.doislandflux:
             log.warn("--island requested but not yet supported for priorized fitting")
-        sf.priorized_fit_islands(filename, catfile=options.input, hdu_index=options.hdu_index,
+        sf.priorized_fit_islands(filename, catalogue=options.input, hdu_index=options.hdu_index,
                                  rms=options.rms,
                                  outfile=options.outfile, bkgin=options.backgroundimg,
                                  rmsin=options.noiseimg, beam=options.beam, lat=lat, imgpsf=options.imgpsf,

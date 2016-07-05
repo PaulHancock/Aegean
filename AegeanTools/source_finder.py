@@ -1364,7 +1364,7 @@ class SourceFinder(object):
         self.sources.extend(sources)
         return sources
 
-    def priorized_fit_islands(self, filename, catfile, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1,
+    def priorized_fit_islands(self, filename, catalogue, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1,
                               rms=None, beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=1.0, outerclip=3,
                               doregroup=True):
         """
@@ -1377,7 +1377,7 @@ class SourceFinder(object):
         Multiple cores can be specified, and will be used.
 
         :param filename: image file or hdu
-        :param catfile: catalog file name
+        :param catalogue: catalogue file name, or an np.array of OutputSource objects
         :param hdu_index:
         :param outfile: output file for ascii output (not tables)
         :param bkgin: background image name
@@ -1403,8 +1403,11 @@ class SourceFinder(object):
         global_data = self.global_data
         far = 10 * global_data.beam.a  # degrees
         # load the table and convert to an input source list
-        input_table = load_table(catfile)
-        input_sources = np.array(table_to_source_list(input_table))
+        if isinstance(catalogue, (str, unicode)):
+            input_table = load_table(catalogue)
+            input_sources = np.array(table_to_source_list(input_table))
+        else:
+            input_sources = catalogue
         src_mask = np.ones(len(input_sources), dtype=bool)
 
         # the input sources are the initial conditions for our fits.
