@@ -27,7 +27,7 @@ try:
 except ImportError:
     region_available = False
 
-from AegeanTools.source_finder import scope2lat
+from AegeanTools.source_finder import scope2lat, get_aux_files
 from AegeanTools.fits_image import Beam
 from AegeanTools.catalogs import show_formats, check_table_formats, save_catalog
 import multiprocessing
@@ -221,17 +221,18 @@ if __name__ == "__main__":
     # auto-load background, noise, psf and region files
     basename = os.path.splitext(filename)[0]
     if options.autoload:
-        if os.path.exists(basename + '_bkg.fits'):
-            options.backgroundimg = basename + '_bkg.fits'
+        files = get_aux_files(filename)
+        if files['bkg'] and not options.backgroundimg:
+            options.backgroundimg = files['bkg']
             log.info("Found background {0}".format(options.backgroundimg))
-        if os.path.exists(basename + "_rms.fits"):
-            options.noiseimg = basename + '_rms.fits'
+        if files['rms'] and not options.noiseimg:
+            options.noiseimg = files['rms']
             log.info("Found noise {0}".format(options.noiseimg))
-        if os.path.exists(basename + ".mim"):
-            options.region = basename + ".mim"
+        if files['mask'] and not options.region:
+            options.region = files['mask']
             log.info("Found region {0}".format(options.region))
-        if os.path.exists(basename + "_psf.fits"):
-            options.imgpsf = basename + "_psf.fits"
+        if files['psf'] and not options.imgpsf:
+            options.imgpsf = files['psf']
             log.info("Found psf {0}".format(options.imgpsf))
 
     # check that the aux input files exist
@@ -253,7 +254,7 @@ if __name__ == "__main__":
             log.error("Region file {0} not found")
             sys.exit(1)
         if not region_available:
-            log.error("Could not import AegeanTools/Region.py")
+            log.error("Could not import AegeanTools/regions.py")
             log.error("(you probably need to install HealPy)")
             sys.exit(1)
 
