@@ -1407,8 +1407,14 @@ class SourceFinder(object):
             input_table = load_table(catalogue)
             input_sources = np.array(table_to_source_list(input_table))
         else:
-            input_sources = catalogue
+            input_sources = np.array(catalogue)
+
+        if len(input_sources) < 1:
+            self.log.debug("No input sources for priorized fitting")
+            return []
+
         src_mask = np.ones(len(input_sources), dtype=bool)
+
 
         # the input sources are the initial conditions for our fits.
         # Expand each source size if needed.
