@@ -94,7 +94,8 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
     """
     Regroup the islands of a catalog according to their normalised distance
     return a list of island groups, sources have their (island,source) parameters relabeled
-    :param catalog: A list of sources sorted by declination
+    :param catalog: A list of objects with the following properties[units]:
+                    ra[deg],dec[deg], a[arcsec],b[arcsec],pa[deg], peak_flux[any]
     :param eps: maximum normalised distance within which sources are considered to be grouped
     :param far: (degrees) sources that are further than this distance appart will not be grouped, and will not be tested
     :param dist: a function that calculates the distance between two sources must accept two SimpleSource objects.
@@ -108,9 +109,15 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
             srccat = catalog
             _ = catalog[0].ra
             _ = catalog[0].dec
+            _ = catalog[0].a
+            _ = catalog[0].b
+            _ = catalog[0].pa
+            _ = catalog[0].peak_flux
 
         except AttributeError:
-            log.error("catalog is as list of something that has no ra/dec attributes")
+            log.error("catalog is not understood.")
+            log.error("catalog: Should be a list of objects with the following properties[units]:\n" +
+                      "ra[deg],dec[deg], a[arcsec],b[arcsec],pa[deg], peak_flux[any]")
             sys.exit(1)
 
     log.info("Regrouping islands within catalog")
