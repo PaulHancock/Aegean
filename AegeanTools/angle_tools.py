@@ -74,7 +74,9 @@ def gcd(ra1, dec1, ra2, dec2):
     Great circle distance as calculated by the haversine formula
     ra/dec in degrees
     returns:
-    sep in degrees"""
+    sep in degrees
+    """
+    # TODO:  Vincenty formula see - https://en.wikipedia.org/wiki/Great-circle_distance
     dlon = ra2 - ra1
     dlat = dec2 - dec1
     a = np.sin(np.radians(dlat) / 2) ** 2
