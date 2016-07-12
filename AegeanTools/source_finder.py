@@ -1492,7 +1492,7 @@ class SourceFinder(object):
             if cores > 1:
                 fit_parallel(island_group, stage, outerclip, istart=i)
             else:
-                res = self.refit_islands(island_group, stage, outerclip, istart=i)
+                res = self._refit_islands(island_group, stage, outerclip, istart=i)
                 queue.append(res)
 
         # now unpack the fitting results in to a list of sources
