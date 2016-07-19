@@ -40,12 +40,18 @@ def sigmaclip(arr, lo, hi, reps = 3):
     :return: clipped array
     """
     clipped = arr[np.isfinite(arr)]
+
+    if len(clipped) < 1:
+        return clipped
+
     std = np.std(clipped)
     mean = np.mean(clipped)
     for i in xrange(reps):
         clipped = clipped[np.where(clipped > mean-std*lo)]
         clipped = clipped[np.where(clipped < mean+std*hi)]
         pstd = std
+        if len(clipped) < 1:
+            break
         std = np.std(clipped)
         mean = np.mean(clipped)
         if 2*abs(pstd-std)/(pstd+std) < 0.2:
@@ -151,7 +157,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         new = np.ravel(new)
         new = sigmaclip(new, 3, 3)
         # If we are left with (or started with) no data, then just move on
-        if len(new)<1:
+        if len(new) < 1:
             continue
 
         if dobkg:
@@ -163,7 +169,6 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         rms_values.append(rms)
 
     ymin, ymax, xmin, xmax = region
-
     gx, gy = np.mgrid[xmin:xmax, ymin:ymax]
     # If the bkg/rms calculation above didn't yield any points, then our interpolated values are all nans
     if len(rms_points) > 1:
@@ -171,6 +176,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         ifunc = LinearNDInterpolator(rms_points, rms_values)
         # force 32 bit floats
         interpolated_rms = np.array(ifunc((gx, gy)), dtype=np.float32)
+        del ifunc
     else:
         interpolated_rms = np.empty((len(gx), len(gy)), dtype=np.float32)*np.nan
     with irms.get_lock():
@@ -182,11 +188,11 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     logging.debug(" .. done writing rms")
 
     if dobkg:
-        gx, gy = np.mgrid[xmin:xmax, ymin:ymax]
         if len(bkg_points)>1:
             logging.debug("Interpolating bkg")
             ifunc = LinearNDInterpolator(bkg_points, bkg_values)
             interpolated_bkg = np.array(ifunc((gx, gy)), dtype=np.float32)
+            del ifunc
         else:
             interpolated_bkg = np.empty((len(gx), len(gy)), dtype=np.float32)*np.nan
         with ibkg.get_lock():
@@ -198,7 +204,6 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         logging.debug(" .. done writing bkg")
     logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin, xmax, ymin, ymax,
                                                            strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-    del ifunc
     return
 
 
@@ -387,17 +392,21 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 
     if box_size is None:
         # default to 6x the step size so we have ~ 30beams
-        box_size = (step_size[0]*6,step_size[1]*6)
+        box_size = (step_size[0]*6, step_size[1]*6)
 
     if compressed:
         if not step_size[0] == step_size[1]:
-            step_size = (min(step_size),min(step_size))
+            step_size = (min(step_size), min(step_size))
             logging.info("Changing grid to be {0} so we can compress the output".format(step_size))
 
     logging.info("using grid_size {0}, box_size {1}".format(step_size,box_size))
     logging.info("on data shape {0}".format(shape))
     bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape)
     logging.info("done")
+
+    # force float 32s to avoid bloated files
+    bkg = np.array(bkg, dtype=np.float32)
+    rms = np.array(rms, dtype=np.float32)
 
     if twopass:
         # TODO: check what this does for our memory usage
@@ -411,15 +420,14 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         temp_name = tempfile.name
         del data, header, tempfile, rms
         logging.info("running second pass to get a better rms")
-        _, rms = filter_mc_sharemem(temp_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, dobkg=False)
+        junk, rms = filter_mc_sharemem(temp_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, dobkg=False)
+        del junk
+        rms = np.array(rms, dtype=np.float32)
         os.remove(temp_name)
 
     bkg_out = '_'.join([os.path.expanduser(out_base), 'bkg.fits'])
     rms_out = '_'.join([os.path.expanduser(out_base), 'rms.fits'])
 
-    # force float 32s to avoid bloated files
-    bkg = np.array(bkg, dtype=np.float32)
-    rms = np.array(rms, dtype=np.float32)
 
     # load the file since we are now going to fiddle with it
     header = fits.getheader(im_name)

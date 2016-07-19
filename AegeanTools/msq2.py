@@ -8,6 +8,7 @@ by Paul Hancock
 May 2014
 """
 
+from copy import copy
 import logging
 import numpy as np
 
@@ -29,6 +30,18 @@ class MarchingSquares():
         self.xsize, self.ysize = data.shape
         self.perimeter = self.doMarch()
         return
+
+    def dir2str(self,d):
+        if d == self.UP:
+            return "U"
+        elif d == self.DOWN:
+            return "D"
+        elif d == self.LEFT:
+            return "L"
+        elif d== self.RIGHT:
+            return "R"
+        else:
+            return "x"
 
     def findStartPoint(self):
         """
@@ -133,26 +146,69 @@ class MarchingSquares():
             #if i>max_tries:
             #	break
             #i+=1
-
         return points
 
     def doMarch(self):
         """
         March about and trace the outline of our object
         """
+        x, y = self.findStartPoint()
+        perimeter = self.walkPerimeter(x, y)
+        return perimeter
 
-        perimeter = []
+    def _blankWithin(self, perimeter):
+        """
+        Blank all the pixels within the given perimeter.
+        :param perimeter:
+        :return None:
+        """
+        # Method:
+        # scan around the perimeter filling 'up' from each pixel
+        # stopping when we reach the other boundary
+        for p in perimeter:
+            # if we are on the edge of the data then there is nothing to fill
+            if p[0] >= self.data.shape[0] or p[1] >= self.data.shape[1]:
+                continue
+            # if this pixel is blank then don't fill
+            if self.data[p] == 0:
+                continue
+
+            # blank this pixel
+            self.data[p] = 0
+
+            # blank until we reach the other perimeter
+            for i in xrange(p[1]+1, self.data.shape[1]):
+                q = p[0], i
+                # stop when we reach another part of the perimeter
+                if q in perimeter:
+                    break
+                # fill everything in between, even inclusions
+                self.data[q] = 0
+
+        return
+
+    def doMarchAll(self):
+        """
+        Recursive march in the case that we have a fragmented shape
+        """
+        # copy the data since we are going to be modifying it
+        data_copy = copy(self.data)
+        
+        # iterate through finding an island, creating a perimeter,
+        # and then blanking the island
+        perimeters = []
         p = self.findStartPoint()
         while p is not None:
-            x, y = self.findStartPoint()
+            x, y = p
             perim = self.walkPerimeter(x, y)
-            perimeter.extend(perim)
-            p = None
-            # For fragmented islands [Doesn't work]
-            # x,y = zip(*[p for p in perim if p[0]<self.xsize and p[1] < self.ysize])
-            # self.data[x,y] = 0
-            # p = self.findStartPoint()
-        return perimeter
+            perimeters.append(perim)
+            self._blankWithin(perim)
+            p = self.findStartPoint()
+
+        # restore the data 
+        self.data = data_copy
+        return perimeters
+                
 
 
 if __name__ == '__main__':

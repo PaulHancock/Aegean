@@ -73,9 +73,8 @@ import multiprocessing
 __author__ = 'Paul Hancock'
 
 # Aegean version [Updated via script]
-__version__ = 'v1.9.7-0-g053427d-master'
-__date__ = '2016-02-15'
-
+__version__ = 'v1.9.7-31-ga1312df'
+__date__ = '2016-06-09'
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -275,10 +274,10 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         try:
             if isnegative:
                 amp = np.nanmin(summit)
-                xpeak, ypeak = np.unravel_index(np.nanargmin(summit),summit.shape)
+                xpeak, ypeak = np.unravel_index(np.nanargmin(summit), summit.shape)
             else:
                 amp = np.nanmax(summit)
-                xpeak, ypeak = np.unravel_index(np.nanargmax(summit),summit.shape)
+                xpeak, ypeak = np.unravel_index(np.nanargmax(summit), summit.shape)
         except ValueError, e:
             if "All-NaN" in e.message:
                 log.warn("Summit of nan's detected - this shouldn't happen")
@@ -295,9 +294,9 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         # Summits are allowed to include pixels that are between the outer and inner clip
         # This means that sometimes we get a summit that has all it's pixels below the inner clip
         # So we test for that here.
-        snr = np.nanmax(abs(data[xmin:xmax+1,ymin:ymax+1] / rmsimg[xmin:xmax+1,ymin:ymax+1]))
+        snr = np.nanmax(abs(data[xmin:xmax+1, ymin:ymax+1] / rmsimg[xmin:xmax+1, ymin:ymax+1]))
         if snr < innerclip:
-            log.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr,innerclip))
+            log.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr, innerclip))
             continue
 
 
@@ -313,7 +312,7 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
             log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
 
 
-        pixbeam = global_data.psfhelper.get_pixbeam_pixel(yo+offsets[0],xo+offsets[1])
+        pixbeam = global_data.psfhelper.get_pixbeam_pixel(yo+offsets[0], xo+offsets[1])
         if pixbeam is None:
             log.debug(" Summit has invalid WCS/Beam - Skipping.".format(i))
             continue
@@ -322,23 +321,24 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         xo_lim = 0.5*np.hypot(pixbeam.a, pixbeam.b)
         yo_lim = xo_lim
 
-        yo_min, yo_max = max(ymin, yo - yo_lim), min(ymax, yo + yo_lim)
-        if yo_min == yo_max:  # if we have a 1d summit then allow the position to vary by +/-0.5pix
-            yo_min, yo_max = yo_min - 0.5, yo_max + 0.5
+        yo_min, yo_max = yo - yo_lim, yo + yo_lim
+        #if yo_min == yo_max:  # if we have a 1d summit then allow the position to vary by +/-0.5pix
+        #    yo_min, yo_max = yo_min - 0.5, yo_max + 0.5
 
-        xo_min, xo_max = max(xmin, xo - xo_lim), min(xmax, xo + xo_lim)
-        if xo_min == xo_max:  # if we have a 1d summit then allow the position to vary by +/-0.5pix
-            xo_min, xo_max = xo_min - 0.5, xo_max + 0.5
+        xo_min, xo_max = xo - xo_lim, xo + xo_lim
+        #if xo_min == xo_max:  # if we have a 1d summit then allow the position to vary by +/-0.5pix
+        #    xo_min, xo_max = xo_min - 0.5, xo_max + 0.5
 
-        xsize = xmax - xmin + 1
-        ysize = ymax - ymin + 1
+        # the size of the island
+        xsize = data.shape[0]
+        ysize = data.shape[1]
 
         # initial shape is the psf
         sx = pixbeam.a * FWHM2CC
         sy = pixbeam.b * FWHM2CC
 
         # lmfit does silly things if we start with these two parameters being equal
-        sx = max(sx,sy*1.01)
+        sx = max(sx, sy*1.01)
 
         # constraints are based on the shape of the island
         sx_min, sx_max = sx * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * FWHM2CC, sx * 1.1)
@@ -384,7 +384,11 @@ def estimate_lmfit_parinfo(data, rmsimg, curve, beam, innerclip, outerclip=None,
         params.add(prefix+'sx', value=sx, min=sx_min, max=sx_max, vary=psf_vary)
         params.add(prefix+'sy', value=sy, min=sy_min, max=sy_max, vary=psf_vary)
         params.add(prefix+'theta', value=theta, vary=psf_vary)
-        params.add(prefix+'flags',value=summit_flag, vary=False)
+        params.add(prefix+'flags', value=summit_flag, vary=False)
+
+        # starting at zero allows the maj/min axes to be fit better.
+        if params[prefix+'theta'].vary:
+            params[prefix+'theta'].value = 0
 
         i += 1
     if debug_on:
@@ -436,7 +440,6 @@ def result_to_components(result, model, island_data, isflags):
         amp = model[prefix+'amp'].value
         src_flags |= model[prefix+'flags'].value
 
-
         # these are goodness of fit statistics for the entire island.
         source.residual_mean = residual[0]
         source.residual_std = residual[1]
@@ -450,7 +453,10 @@ def result_to_components(result, model, island_data, isflags):
         # (pyfits->fits conversion = luck)
         x_pix = xo + xmin + 1
         y_pix = yo + ymin + 1
-
+        # update the source xo/yo so the error calculations can be done correctly
+        # Note that you have to update the max or the value you set will be clipped at the max allowed value
+        model[prefix+'xo'].set(value=x_pix, max=np.inf)
+        model[prefix+'yo'].set(value=y_pix, max=np.inf)
         # ------ extract source parameters ------
 
         # fluxes
@@ -485,7 +491,7 @@ def result_to_components(result, model, island_data, isflags):
         # calculate integrated flux
         source.int_flux = source.peak_flux * sx * sy * CC2FHWM ** 2 * np.pi
         # scale Jy/beam -> Jy using the area of the beam
-        source.int_flux /= global_data.wcshelper.get_beamarea_pix(source.ra, source.dec)
+        source.int_flux /= global_data.psfhelper.get_beamarea_pix(source.ra, source.dec)
 
         # Calculate errors for params that were fit (as well as int_flux)
         errors(source, model, global_data.wcshelper)
@@ -667,16 +673,15 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
     global_data.dcurve = None
 
     if do_curve:
+        log.info("Calculating curvature")
         # calculate curvature but store it as -1,0,+1
-        cimg = curvature(global_data.data_pix)
-        if csigma is None:
-            log.info("Calculating curvature csigma")
-            _, csigma = estimate_bkg_rms(cimg)
         dcurve = np.zeros(global_data.data_pix.shape, dtype=np.int8)
-        dcurve[np.where(cimg <= -abs(csigma))] = -1
-        dcurve[np.where(cimg >= abs(csigma))] = 1
-        del cimg
-
+        peaks = scipy.ndimage.filters.maximum_filter(global_data.data_pix, size=3)
+        troughs = scipy.ndimage.filters.minimum_filter(global_data.data_pix, size=3)
+        pmask = np.where(global_data.data_pix == peaks)
+        tmask = np.where(global_data.data_pix == troughs)
+        dcurve[pmask] = -1
+        dcurve[tmask] = 1
         global_data.dcurve = dcurve
 
     # if either of rms or bkg images are not supplied then calculate them both
@@ -710,6 +715,7 @@ def load_globals(filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=
 
     return
 
+
 # image manipulation
 def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
     """
@@ -736,9 +742,8 @@ def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
     xcen = int(img_x / 2)
     ycen = int(img_y / 2)
 
-    #calculate a local beam from the center of the data
-    #pixbeam = global_data.wcshelper.get_pixbeam()
-    pixbeam = global_data.psfhelper.get_pixbeam_pixel(xcen,ycen)
+    # calculate a local beam from the center of the data
+    pixbeam = global_data.psfhelper.get_pixbeam_pixel(xcen, ycen)
     if pixbeam is None:
         log.error("Cannot calculate the beam shape at the image center")
         sys.exit(1)
@@ -756,11 +761,11 @@ def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
     log.debug("beam: {0}".format(beam))
     log.debug("mesh width (pix) x,y: {0},{1}".format(width_x, width_y))
 
-    #box centered at image center then tilling outwards
-    xstart = (xcen - width_x / 2) % width_x  #the starting point of the first "full" box
+    # box centered at image center then tilling outwards
+    xstart = (xcen - width_x / 2) % width_x  # the starting point of the first "full" box
     ystart = (ycen - width_y / 2) % width_y
 
-    xend = img_x - (img_x - xstart) % width_x  #the end point of the last "full" box
+    xend = img_x - (img_x - xstart) % width_x  # the end point of the last "full" box
     yend = img_y - (img_y - ystart) % width_y
 
     xmins = [0]
@@ -779,7 +784,7 @@ def make_bkg_rms_image(data, beam, mesh_size=20, forced_rms=None):
     ymaxs.extend(range(ystart + width_y, yend + 1, width_y))
     ymaxs.append(img_y)
 
-    #if the image is smaller than our ideal mesh size, just use the whole image instead
+    # if the image is smaller than our ideal mesh size, just use the whole image instead
     if width_x >= img_x:
         xmins = [0]
         xmaxs = [img_x]
@@ -843,7 +848,7 @@ def make_bkg_rms_from_global(mesh_size=20, forced_rms=None, cores=None):
     xstart = (xcen - width_x / 2) % width_x  # the starting point of the first "full" box
     ystart = (ycen - width_y / 2) % width_y
 
-    xend = img_x - (img_x - xstart) % width_x  #the end point of the last "full" box
+    xend = img_x - (img_x - xstart) % width_x  # the end point of the last "full" box
     yend = img_y - (img_y - ystart) % width_y
 
     xmins = [0]
@@ -1229,11 +1234,11 @@ def refit_islands(group, stage, outerclip, istart=0):
 
         mx, my = np.where(np.isfinite(idata))
         non_nan_pix = len(mx)
-
+        total_pix = len(allx.ravel())
         log.debug("island extracted:")
         log.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin, xmax, ymin, ymax))
         log.debug(" max = {0}".format(np.nanmax(idata)))
-        log.debug(" total {0}, masked {1}, not masked {2}".format(len(allx), len(allx)-non_nan_pix, non_nan_pix))
+        log.debug(" total {0}, masked {1}, not masked {2}".format(total_pix, total_pix-non_nan_pix, non_nan_pix))
 
         # Check to see that each component has some data within the central 3x3 pixels of it's location
         # If not then we don't fit that component
@@ -1242,7 +1247,7 @@ def refit_islands(group, stage, outerclip, istart=0):
             # figure out a box around the center of this
             cx, cy = params[prefix+'xo'].value, params[prefix+'yo'].value  # central pixel coords
             log.debug(" comp {0}".format(i))
-            log.debug("  cx,cy {0} {1}".format(cx ,cy))
+            log.debug("  x0, y0 {0} {1}".format(cx ,cy))
             xmx, xmn = np.clip(cx+2, 0, idata.shape[0]), np.clip(cx-1, 0, idata.shape[0])
             ymx, ymn = np.clip(cy+2, 0, idata.shape[1]), np.clip(cy-1, 0, idata.shape[1])
             square = idata[xmn:xmx, ymn:ymx]
@@ -1288,7 +1293,6 @@ def refit_islands(group, stage, outerclip, istart=0):
             result, _ = do_lmfit(idata, params, B=B)
             model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
 
-
         # convert the results to a source object
         offsets = (xmin, xmax, ymin, ymax)
         # TODO allow for island fluxes in the refitting.
@@ -1299,11 +1303,12 @@ def refit_islands(group, stage, outerclip, istart=0):
         for ns, s in zip(new_src, included_sources):
             ns.uuid = s.uuid
             # if the position wasn't fit then copy the errors from the input catalog
-            if stage<2:
+            if stage < 2:
                 ns.err_ra = s.err_ra
                 ns.err_dec = s.err_dec
+                ns.flags |= flags.FIXED2PSF
             # if the shape wasn't fit then copy the errors from the input catalog
-            if stage <3:
+            if stage < 3:
                 ns.err_a = s.err_a
                 ns.err_b = s.err_b
                 ns.err_pa = s.err_pa
@@ -1323,13 +1328,17 @@ def fit_island(island_data):
     # global data
     dcurve = global_data.dcurve
     rmsimg = global_data.rmsimg
-    beam = global_data.beam
 
     # island data
     isle_num = island_data.isle_num
     idata = island_data.i
     innerclip, outerclip, max_summits = island_data.scalars
     xmin, xmax, ymin, ymax = island_data.offsets
+
+    # get the beam parameters at the center of this island
+    midra, middec = global_data.wcshelper.pix2sky([0.5*(xmax+xmin), 0.5*(ymax+ymin)])
+    beam = global_data.psfhelper.get_psf_pix(midra, middec)
+    del middec, midra
 
     icurve = dcurve[xmin:xmax, ymin:ymax]
     rms = rmsimg[xmin:xmax, ymin:ymax]
@@ -1344,11 +1353,11 @@ def fit_island(island_data):
     log.debug("Island ({0})".format(isle_num))
 
     params = estimate_lmfit_parinfo(idata, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
-                               max_summits=max_summits)
+                                    max_summits=max_summits)
 
     # islands at the edge of a region of nans
     # result in no components
-    if params is None or params['components'].value <1:
+    if params is None or params['components'].value < 1:
         return []
 
     log.debug("Rms is {0}".format(np.shape(rms)))
@@ -1370,7 +1379,7 @@ def fit_island(island_data):
         fac = 1/np.sqrt(2)
         C = Cmatrix(mx, my, pixbeam.a*FWHM2CC*fac, pixbeam.b*FWHM2CC*fac, pixbeam.pa)
         B = Bmatrix(C)
-        ## For testing the fitting without the inverse co-variance matrix, set these to None
+        # For testing the fitting without the inverse co-variance matrix, set these to None
         # B = None
         # C = None
         log.debug("C({0},{1},{2},{3},{4})".format(len(mx),len(my),pixbeam.a*FWHM2CC, pixbeam.b*FWHM2CC, pixbeam.pa))
@@ -1455,9 +1464,9 @@ def find_sources_in_image(filename, hdu_index=0, outfile=None, rms=None, max_sum
 
     rmsimg = global_data.rmsimg
     data = global_data.data_pix
-    beam = global_data.beam
 
-    log.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(beam.a * 3600, beam.b * 3600, beam.pa))
+    log.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(
+                                             global_data.beam.a * 3600, global_data.beam.b * 3600, global_data.beam.pa))
     log.info("seedclip={0}".format(innerclip))
     log.info("floodclip={0}".format(outerclip))
 
@@ -1568,8 +1577,7 @@ def priorized_fit_islands(filename, catfile, hdu_index=0, outfile=None, bkgin=No
     load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
                  do_curve=False, beam=beam, lat=lat, psf=imgpsf)
 
-    beam = global_data.beam
-    far = 10*beam.a  # degrees
+    far = 10*global_data.beam.a  # degrees
     # load the table and convert to an input source list
     input_table = load_table(catfile)
     input_sources = np.array(table_to_source_list(input_table))
@@ -1739,6 +1747,7 @@ def force_measure_flux(radec):
     :param radec: the locations at which to measure fluxes
     :return: [(flux,err),...] corresponding to each ra/dec
     """
+    # TODO: allow for a psf image to be used to make this consistent with the priorized fitting
     from AegeanTools.fitting import ntwodgaussian_mpfit
     catalog = []
 
