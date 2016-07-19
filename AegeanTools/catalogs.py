@@ -268,7 +268,11 @@ def table_to_source_list(table, src_type=OutputSource):
         for param in src_type.names:
             if param in table.colnames:
                 # copy the value to our object
-                setattr(src,param,row[param])
+                val = row[param]
+                # hack around float32's broken-ness
+                if type(val) == np.float32:
+                    val = np.float64(val)
+                setattr(src, param, val)
         # save this object to our list of sources
         source_list.append(src)
     return source_list

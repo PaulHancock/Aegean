@@ -273,3 +273,41 @@ def classify_catalog(catalog):
         elif isinstance(source, SimpleSource):
             simples.append(source)
     return components, islands, simples
+
+
+def island_itergen(catalog):
+    """
+    Iterate over a catalog of sources, and return an island worth of sources at a time.
+    Yields a list of components, one island at a time
+
+    :param catalog: A list of objects which have island/source attributes
+    :return:
+    """
+    # reverse sort so that we can pop the last elements and get an increasing island number
+    catalog = sorted(catalog)
+    catalog.reverse()
+    group = []
+
+    # using pop and keeping track of the list length ourselves is faster than
+    # constantly asking for len(catalog)
+    src = catalog.pop()
+    c_len = len(catalog)
+    isle_num = src.island
+    while c_len >= 0:
+        if src.island == isle_num:
+            group.append(src)
+            c_len -= 1
+            if c_len <0:
+                # we have just added the last item from the catalog
+                # and there are no more to pop
+                yield group
+            else:
+                src = catalog.pop()
+        else:
+            isle_num += 1
+            # maybe there are no sources in this island so skip it
+            if group == []:
+                continue
+            yield group
+            group = []
+    return

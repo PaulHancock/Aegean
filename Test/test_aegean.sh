@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#! /bin/bash
 
 echo "
 Test script for Aegean.
@@ -40,9 +40,6 @@ tst "python aegean.py Test/Images/1904-66_SIN.fits --noise=aux_rms.fits --backgr
 # create an output table in various formats
 tst "python aegean.py Test/Images/1904-66_SIN.fits --out=out.cat --table=table.xml,table.vot,table.csv,table.tex,table.tab"
 
-# do forced measurements with this catalog
-tst "python aegean.py Test/Images/1904-66_SIN.fits --measure --input=out.cat --table=kvis.ann"
-
 # do priorized measurements with an input catalog
 tst "python aegean.py Test/Images/1904-66_SIN.fits --input table_comp.vot --priorized 1 --table table_prior.vot"
 tst "python aegean.py Test/Images/1904-66_SIN.fits --input table_comp.vot --priorized 1 --table table_prior.vot --ratio 0.9"
@@ -60,19 +57,18 @@ tst "python aegean.py Test/Images/1904-66_SIN.fits --island --out=out.cat"
 # test some hdu options
 tst "python aegean.py Test/Images/MultiHDU.fits --hdu=1 --out=out.cat"
 
-# measure and find at the same time with islands
-tst "python aegean.py Test/Images/1904-66_SIN.fits --measure --input=out.cat --find --island --table=out.db"
-
 # test WCS problem handling
 tst "python aegean.py Test/Images/WCS_edge.fits"
-
-# Test on an image that has a very large island in it. Ideally should finish within 30s.
-echo "This next test will probably fail because Aegean is slow for large islands."
-tst "timeout -sHUP 30s python aegean.py --autoload Test/Images/Bright.fits"
 
 echo "to clean up:"
 echo "rm 1904-66_SIN_{bkg,rms}.fits aux_{bkg,rms,crv}.fits out{_comp,_isle}.vot"
 echo "rm out.{cat,db} table_comp.{xml,vot,csv,tex,tab} kvis_simp.ann ds9{_comp,_isle}.reg my.db"
 echo "rm table_proir_comp.vot"
+
+# Test on an image that has a very large island in it. Ideally should finish within 30s.
+echo "This next test will probably fail because Aegean is slow for large islands."
+tst "timeout -sHUP 30s python aegean.py --autoload Test/Images/Bright.fits"
+
+
 
 
