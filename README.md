@@ -8,3 +8,9 @@ Programs included:
 * SR6.py - A tool for shrinking and growing fits files, such as those created with BANE.py --compress. Shrinking is done by decimation, growing is done by linear interpolation.
 
 ^ - by "your" I mean "my"
+
+=====
+Status:
+
+[![Code Issues](https://www.quantifiedcode.com/api/v1/project/b0ca0f0d05e943888383528378c1a3e6/badge.svg)](https://www.quantifiedcode.com/app/project/b0ca0f0d05e943888383528378c1a3e6)
+
