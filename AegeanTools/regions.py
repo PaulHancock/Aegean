@@ -9,7 +9,12 @@ import astropy.units as u
 from astropy.io import fits
 
 
-class Region():
+class Region(object):
+    """
+    A Region object represents a footprint on the sky. This is done in a way similar to a MOC.
+    The region is stored as a list of healpix pixels, allowing for binary set-like operations.
+    """
+
     def __init__(self, maxdepth=11):
         self.maxdepth = maxdepth
         self.pixeldict = dict((i, set()) for i in xrange(1, maxdepth+1))

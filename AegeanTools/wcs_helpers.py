@@ -22,6 +22,13 @@ log = logging.getLogger('Aegean')
 
 
 class WCSHelper(object):
+    """
+    A wrapper around astropy.wcs that provides extra functionality.
+    Functionality hides the c/fortran indexing troubles, as well as providing:
+    - sky2pix/pix2sky functions for vectors and ellipses.
+    - functions for calculating the beam in sky/pixel coords
+    - the ability to change the beam according to dec-lat
+    """
 
     @classmethod
     def from_header(cls, header, beam=None, lat=None):
@@ -389,6 +396,8 @@ class WCSHelperTest(object):
 class PSFHelper(WCSHelper):
     """
     A class that will store information about the PSF, which is assumed to be direction dependent.
+    PSFHelper contains a WCSHelper within, providing an extra layer of functionality including:
+    - the ability to load psf/beam information from a fits file
     """
 
     # This __init__ overwrites that of the parent class without calling 'super'.

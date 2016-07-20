@@ -77,6 +77,10 @@ def get_beam(header):
 
 
 class FitsImage():
+    """
+    An object that handles the loading and manipulation of a fits file,
+    """
+
     def __init__(self, filename=None, hdu_index=0, beam=None):
         """
         filename: the name of the fits image file or an instance of astropy.io.fits.HDUList
