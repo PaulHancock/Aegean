@@ -2,7 +2,7 @@
 import bisect
 import math
 import numpy as np
-from blist import *
+from blist import blist
 
 
 class RunningPercentiles():
@@ -27,7 +27,6 @@ class RunningPercentiles():
         self.percentiles = plist
         return
 
-    #@profile
     def add(self, dlist):
         """
         Add a list of elements to our collection, keeping it in order.
@@ -53,7 +52,6 @@ class RunningPercentiles():
         self.slist.sort()
         return
 
-    #@profile
     def sub(self, dlist):
         """
         Remove a list of elements from our collection.
