@@ -12,7 +12,7 @@ def read(fname):
 
 
 def get_version():
-    return "1.9.7-58-g02454c8"
+    return "v2.0b-46-g24246a4-(master)"
 
 
 setup(
