@@ -9,8 +9,16 @@ Programs included:
 
 ^ - by "your" I mean "my"
 
+Istalling
 =====
-Status:
+You can install via pip using `pip install git+https://github.com/PaulHancock/Aegean.git`
 
-[![Code Issues](https://www.quantifiedcode.com/api/v1/project/b0ca0f0d05e943888383528378c1a3e6/badge.svg)](https://www.quantifiedcode.com/app/project/b0ca0f0d05e943888383528378c1a3e6)
+Or you can clone or download the repository and then use `python setup.py install`
+
+
+
+
+Status
+=====
+[Quantified Code](https://www.quantifiedcode.com/) rating [![Code Issues](https://www.quantifiedcode.com/api/v1/project/b0ca0f0d05e943888383528378c1a3e6/badge.svg)](https://www.quantifiedcode.com/app/project/b0ca0f0d05e943888383528378c1a3e6)
 
