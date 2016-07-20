@@ -126,7 +126,7 @@ def expand(datafile, outfile=None, method='linear'):
     header = hdulist[0].header
     data = hdulist[0].data
     # Check for the required key words, only expand if they exist
-    if not all([a in header for a in ['BN_CFAC', 'BN_NPX1', 'BN_NPX2', 'BN_RPX1', 'BN_RPX2']]):
+    if not all(a in header for a in ['BN_CFAC', 'BN_NPX1', 'BN_NPX2', 'BN_RPX1', 'BN_RPX2']):
         return hdulist
 
     factor = header['BN_CFAC']

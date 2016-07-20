@@ -281,7 +281,7 @@ def errors(source, model, wcshelper):
     pix_errs = [err_xo, err_yo, err_sx, err_sy, err_theta]
 
     # check for inf/nan errors -> these sources have poor fits.
-    if not all([a is not None and np.isfinite(a) for a in pix_errs]):
+    if not all(a is not None and np.isfinite(a) for a in pix_errs):
         source.flags |= flags.FITERR
         source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
         source.err_ra = source.err_dec = source.err_int_flux = -1

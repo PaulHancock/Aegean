@@ -25,16 +25,16 @@ def get_pixinfo(header):
     :return: pixarea, pixscale
     """
     # this is correct at the center of the image for all images, and everywhere for conformal projections
-    if all([a in header for a in ["CDELT1", "CDELT2"]]):
+    if all(a in header for a in ["CDELT1", "CDELT2"]):
         pixarea = abs(header["CDELT1"]*header["CDELT2"])
         pixscale = (header["CDELT1"], header["CDELT2"])
-    elif all([a in header for a in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]]):
+    elif all(a in header for a in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]):
         pixarea = abs(header["CD1_1"]*header["CD2_2"]
                     - header["CD1_2"]*header["CD2_1"])
         pixscale = (header["CD1_1"], header["CD2_2"])
         if not (header["CD1_2"] == 0 and header["CD2_1"] == 0):
             log.warn("Pixels don't appear to be square -> pixscale is wrong")
-    elif all([a in header for a in ["CD1_1", "CD2_2"]]):
+    elif all(a in header for a in ["CD1_1", "CD2_2"]):
         pixarea = abs(header["CD1_1"]*header["CD2_2"])
         pixscale = (header["CD1_1"], header["CD2_2"])
     else:
