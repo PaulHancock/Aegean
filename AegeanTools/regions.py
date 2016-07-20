@@ -25,7 +25,7 @@ class Region():
         :param ra_cen: ra or list of ras for circle centers
         :param dec_cen: dec or list of decs for circle centers
         :param radius: radius or list of radii for circles
-        :param depth: The depth at which we wish to represent the circle (forced to be <=maxdepth
+        :param depth: The depth at which we wish to represent the circle (forced to be <=maxdepth)
         :return: None
         """
         if depth is None or depth > self.maxdepth:
@@ -85,8 +85,8 @@ class Region():
         """
         Represent this region as pixels at maxdepth only
         """
-        # only do the calculations if the demoted list doesn't exist
-        if self.demoted != []:
+        # only do the calculations if the demoted list is empty
+        if len(self.demoted) == 0 :
             pd = self.pixeldict
             for d in xrange(1, self.maxdepth):
                 for p in pd[d]:
@@ -121,7 +121,7 @@ class Region():
         """
         Test whether a sky position is within this region
         :param ra: RA in radians
-        :param dec: Dec in decimal radians
+        :param dec: Dec in radians
         :param degin: True if the input parameters are in degrees instead of radians
         :return: True if RA/Dec is within this region
         """
@@ -238,21 +238,26 @@ class Region():
             pd.extend(map(fn, self.pixeldict[d]))
         return sorted(pd)
 
-    @classmethod
-    def radec2sky(cls, ra, dec):
+    @staticmethod
+    def radec2sky(ra, dec):
         """
-
-        :param ra:
-        :param dec:
-        :return: sky object
+        Convert [ra], [dec] to [(ra[0], dec[0]),....]
+        and also  ra,dec to [(ra,dec)] if ra/dec are not iterable
+        :param ra: float or list of floats
+        :param dec: float or list of floats
+        :return: list of (ra,dec) tuples
         """
-        sky = np.empty((len(ra), 2), dtype=type(ra[0]))
-        sky[:, 0] = ra
-        sky[:, 1] = dec
+        try:
+            sky = zip(ra,dec)
+            #sky = np.empty((len(ra), 2), dtype=type(ra[0]))
+            #sky[:, 0] = ra
+            #sky[:, 1] = dec
+        except TypeError:
+            sky= [(ra,dec)]
         return sky
 
-    @classmethod
-    def sky2ang(cls, sky):
+    @staticmethod
+    def sky2ang(sky):
         """
         Convert ra,dec coordinates to theta,phi coordinates
         ra -> phi
@@ -305,13 +310,13 @@ class Region():
 def test_radec2sky():
     ra, dec = (15, -45)
     sky = Region.radec2sky(ra, dec)
-    assert sky == [[ra, dec]], "radec2sky broken on non-list input"
+    assert sky == [(ra, dec)], "radec2sky broken on non-list input"
     ra = [0, 10]
     dec = [-45, 45]
     sky = Region.radec2sky(ra, dec)
     answer = np.array([(ra[0], dec[0]), (ra[1], dec[1])])
     assert np.all(sky == answer), 'radec2sky broken on list input'
-
+    print 'test_radec2sky PASSED'
 
 def test_sky2ang_symmetric():
     sky = np.radians(np.array([[15, -45]]))
@@ -320,7 +325,7 @@ def test_sky2ang_symmetric():
     sky2 = Region.sky2ang(tp)
     sky2 = np.array([[sky2[0][1], sky2[0][0]]])
     assert np.all(abs(sky-sky2) < 1e-9), "sky2ang failed to be symmetric"
-    return
+    print 'test_sky2ang_symmetric PASSED'
 
 
 def test_sky2ang_corners():
@@ -328,21 +333,21 @@ def test_sky2ang_corners():
     theta_phi = Region.sky2ang(corners)
     answers = np.array([[np.pi/2, 0], [np.pi, 2*np.pi]])
     assert np.all(theta_phi - answers < 1e-9), 'sky2ang corner cases failed'
-
+    print 'test_sky2ang_corners PASSED'
 
 def test_sky2vec_corners():
     sky = np.radians([[0, 0], [90, 90], [45, -90]])
     answers = np.array([[1, 0, 0], [0, 0, 1], [0, 0, -1]])
     vec = Region.sky2vec(sky)
     assert np.all(vec - answers<1e-9), 'sky2vec corner cases failed'
-
+    print 'test_sky2vec_corners PASSED'
 
 def test_vec2sky_corners():
     vectors = np.array([[1, 0, 0], [0, 0, 1], [0, 0, -1]])
     skycoords = Region.vec2sky(vectors, degrees=True)
     answers = np.array([[0, 0], [0, 90], [0, -90]] )
     assert np.all(skycoords == answers), 'vec2sky fails on corners'
-
+    print 'test_vec2sky_corners PASSED'
 
 def test_sky2vec2sky():
     ra, dec = np.radians(np.array((0, -45)))
@@ -352,7 +357,7 @@ def test_sky2vec2sky():
     assert np.all(np.array(sky2) - np.array(sky) == 0), "sky2vec2sky failed"
     vec2 = Region.sky2vec(sky2)
     assert np.all(np.array(vec) - np.array(vec2) == 0), 'vec2sky2vec failed'
-
+    print 'test_sky2vec2sky PASSED'
 
 def test_add_circles_list_scalar():
     ra_list = np.radians([13.5, 13.5])
@@ -372,7 +377,7 @@ def test_add_circles_list_scalar():
         if len(region1.pixeldict[i].difference(region2.pixeldict[i])) > 0:
             test = False
     assert test, 'add_circles gives different results for lists and scalars'
-
+    print 'test_add_circles_list_scalar PASSED'
 
 def test_renorm_demote_symmetric():
     ra = 13.5
@@ -391,9 +396,10 @@ def test_renorm_demote_symmetric():
         if len(end_dict[i].difference(start_dict[i])) > 0:
             test = False
     assert test, 'renorm and demote are not symmetric'
-
+    print 'test_renorm_demote_symmetric PASSED'
 
 def test_sky_within():
+    print 'test_sky_within',
     ra = np.radians([13.5, 15])
     dec = np.radians([-45, -40])
     radius = np.radians([0.1, 0.1])
@@ -402,7 +408,7 @@ def test_sky_within():
     assert np.all(region.sky_within(ra[0], dec[0])), "Failed on position at center of region"
     assert np.all(region.sky_within(ra, dec)), "Failed on list of positions"
     assert not np.any(region.sky_within(ra[0]+5*radius[0], dec[0])), "Failed on position outside of region"
-
+    print 'PASSED'
 
 def test_pickle():
     ra = 66.38908
@@ -417,6 +423,7 @@ def test_pickle():
     pickle.dump(region,open('out.mim', 'w'))
     region2 = pickle.load(open('out.mim'))
     assert region.pixeldict == region2.pixeldict, 'pickle/unpickle does not give same region'
+    print 'test_pickle PASSED'
     return
 
 
@@ -427,7 +434,7 @@ def test_reg():
     region = Region(maxdepth=9)
     region.add_circles(ra, dec, radius)
     region.write_reg('test.reg')
-
+    print 'test_reg PASSED'
 
 def test_poly():
     ra = [50, 50, 70, 70]
@@ -436,26 +443,29 @@ def test_poly():
     positions = zip(np.radians(ra), np.radians(dec))
     region.add_poly(positions)
     region.write_reg('test.reg')
-
+    print 'test_poly PASSED'
 
 def test_write_fits():
     a = Region()
     a.add_circles(12, 0, 0.1)
     a.write_fits('test_MOC.fits')
+    print 'write_fits PASSED'
     return
 
 
 if __name__ == "__main__":
-    # test_vec2sky_corners()
-    # test_reg()
-    # test_radec2sky()
-    # test_sky2ang_symmetric()
-    # test_sky2ang_corners()
-    # test_sky2vec2sky()
-    # test_poly()
-    # test_renorm_demote_symmetric()
-    # test_add_circles_list_scalar()
-    # test_sky_within()
-    # test_pickle()
-    # test_sky2vec_corners()
+    print 'Running tests....'
+    test_vec2sky_corners()
+    test_reg()
+    test_radec2sky()
+    test_sky2ang_symmetric()
+    test_sky2ang_corners()
+    test_sky2vec2sky()
+    test_poly()
+    test_renorm_demote_symmetric()
+    test_add_circles_list_scalar()
+    test_sky_within()
+    test_pickle()
+    test_sky2vec_corners()
     test_write_fits()
+    print "all tests PASSED"
