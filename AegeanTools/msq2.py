@@ -101,7 +101,7 @@ class MarchingSquares():
         """
         Determine whether the pixel x,y is nonzero
         """
-        if x < 0 or y < 0 or x >= self.xsize or y >= self.ysize:
+        if not( 0 < x <= self.xsize) or not( 0 < y <= self.ysize):
             return False
         if self.data[x, y] == 0:
             return False
