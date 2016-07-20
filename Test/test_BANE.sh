@@ -29,23 +29,23 @@ return ${code}
 echo "Testing BANE"
 rm out.log err.log
 
-tst "python BANE.py Test/Images/1904-66_SIN.fits --out aux"
+tst "BANE Test/Images/1904-66_SIN.fits --out aux"
 
-tst "python BANE.py Test/Images/1904-66_SIN.fits --out aux --compress"
+tst "BANE Test/Images/1904-66_SIN.fits --out aux --compress"
 
-tst "python BANE.py Test/Images/1904-66_SIN.fits --out aux --grid 12 10 --compress"
+tst "BANE Test/Images/1904-66_SIN.fits --out aux --grid 12 10 --compress"
 
-tst "python BANE.py Test/Images/1904-66_SIN.fits --out aux --cores 1"
+tst "BANE Test/Images/1904-66_SIN.fits --out aux --cores 1"
 
-tst "python BANE.py Test/Images/1904-66_SIN.fits --out aux --onepass"
+tst "BANE Test/Images/1904-66_SIN.fits --out aux --onepass"
 
-tst "python BANE.py Test/Images/1904-66_SIN.fits --out aux --nomask"
+tst "BANE Test/Images/1904-66_SIN.fits --out aux --nomask"
 
-tst "python BANE.py Test/Images/1904-66_SIN.fits --out aux --noclobber" 1
+tst "BANE Test/Images/1904-66_SIN.fits --out aux --noclobber" 1
 
-tst "python BANE.py Test/Images/1904-66_SIN.fits --out aux --grid 12 10 --compress"
+tst "BANE Test/Images/1904-66_SIN.fits --out aux --grid 12 10 --compress"
 
-tst "python BANE.py Test/Images/MultiHDU.fits --out aux"
+tst "BANE Test/Images/MultiHDU.fits --out aux"
 
 echo "to clean up:"
 echo "rm aux_{bkg,rms}.fits"
