@@ -5,9 +5,8 @@ Module for reading at writing catalogs
 """
 
 __author__ = "Paul Hancock"
-# TODO: get this info passed from aegean for metadata
-__version__ = "0.1"
-__date__ = "2015-06-05"
+__version__ = "1.0"
+__date__ = "2016-07-26"
 
 # Standard imports
 import sys
@@ -17,7 +16,7 @@ import re
 from time import gmtime, strftime
 
 # Other AegeanTools
-from models import OutputSource, IslandSource, SimpleSource, classify_catalog
+from models import OutputSource, classify_catalog
 
 # input/output table formats
 import astropy
@@ -30,12 +29,14 @@ from astropy.io import fits
 try:
     from astropy.io.votable import from_table, parse_single_table
     from astropy.io.votable import writeto as writetoVO
+
     votables_supported = True
 except ImportError:
     votables_supported = False
 
 try:
     import h5py
+
     hdf5_supported = True
 except ImportError:
     hdf5_supported = False
@@ -44,16 +45,18 @@ import sqlite3
 
 # join the Aegean logger
 import logging
+
 log = logging.getLogger('Aegean')
 
-#writing table formats
+
+# writing table formats
 def check_table_formats(files):
     cont = True
     formats = get_table_formats()
     for t in files.split(','):
         name, ext = os.path.splitext(t)
         ext = ext[1:].lower()
-        if not ext in formats:
+        if ext not in formats:
             cont = False
             log.warn("Format not supported for {0} ({1})".format(t, ext))
     if not cont:
@@ -67,19 +70,19 @@ def show_formats():
     Print a list of table formats that are supported and the extensions that they are assumed to have
     :return:
     """
-    fmts={
-        "ann":"Kvis annotation",
-        "reg":"DS9 regions file",
-        "fits":"FITS Binary Table",
-        "hdf5":"HDF-5 format",
-        "csv":"Comma separated values",
-        "tab":"tabe separated values",
-        "tex":"LaTeX table format",
-        "html":"HTML table",
-        "vot":"VO-Table",
-        "xml":"VO-Table",
-        "db":"Sqlite3 database",
-        "sqlite":"Sqlite3 database"}
+    fmts = {
+        "ann": "Kvis annotation",
+        "reg": "DS9 regions file",
+        "fits": "FITS Binary Table",
+        "hdf5": "HDF-5 format",
+        "csv": "Comma separated values",
+        "tab": "tabe separated values",
+        "tex": "LaTeX table format",
+        "html": "HTML table",
+        "vot": "VO-Table",
+        "xml": "VO-Table",
+        "db": "Sqlite3 database",
+        "sqlite": "Sqlite3 database"}
     supported = get_table_formats()
     print "Extension |     Description       | Supported?"
     for k in sorted(fmts.keys()):
@@ -112,13 +115,12 @@ def get_table_formats():
 def update_meta_data(meta=None):
     if meta is None:
         meta = {}
-    if not 'DATE' in meta:
+    if 'DATE' not in meta:
         meta['DATE'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-    if not 'PROGRAM' in meta:
+    if 'PROGRAM' not in meta:
         meta['PROGRAM'] = "AegeanTools.catalogs"
-        meta['PROGVER'] = "{0}-({1})".format(__version__,__date__)
+        meta['PROGVER'] = "{0}-({1})".format(__version__, __date__)
     return meta
-
 
 
 def save_catalog(filename, catalog, meta=None):
@@ -137,8 +139,8 @@ def save_catalog(filename, catalog, meta=None):
         writeAnn(filename, catalog, extension)
     elif extension in ['db', 'sqlite']:
         writeDB(filename, catalog, meta)
-    elif extension in ['hdf5','fits', 'vo', 'vot', 'xml']:
-        write_catalog(filename,catalog, extension, meta)
+    elif extension in ['hdf5', 'fits', 'vo', 'vot', 'xml']:
+        write_catalog(filename, catalog, extension, meta)
     elif extension in ascii_table_formats.keys():
         write_catalog(filename, catalog, fmt=ascii_table_formats[extension], meta=meta)
     else:
@@ -196,14 +198,15 @@ def aegean2cat(filename):
     """
     from models import OutputSource
     # this will break if I change the number of properties that are reported.
-    colnames = ['src_isle']  + OutputSource.names[2:-3]
-    t = ascii.read(filename,delimiter='\s', names = colnames)
-    source = Column(name='source', data= np.array([ int(a.split(',')[1][:-1]) for a in t['src_isle']]))
-    isle =  Column(name='island', data=np.array([ int(a.split(',')[0][1:]) for a in t['src_isle']]))
+    colnames = ['src_isle'] + OutputSource.names[2:-3]
+    t = ascii.read(filename, delimiter='\s', names=colnames)
+    source = Column(name='source', data=np.array([int(a.split(',')[1][:-1]) for a in t['src_isle']]))
+    isle = Column(name='island', data=np.array([int(a.split(',')[0][1:]) for a in t['src_isle']]))
     t.add_column(isle, 0)
     t.add_column(source, 1)
 
     return t
+
 
 def load_table(filename):
     """
@@ -218,7 +221,7 @@ def load_table(filename):
     if fmt in ['csv', 'tab', 'tex'] and fmt in supported:
         log.info("Reading file {0}".format(filename))
         t = ascii.read(filename)
-    elif fmt in ['vo', 'vot', 'xml', 'fits','hdf5'] and fmt in supported:
+    elif fmt in ['vo', 'vot', 'xml', 'fits', 'hdf5'] and fmt in supported:
         log.info("Reading file {0}".format(filename))
         t = Table.read(filename)
     else:
@@ -227,13 +230,12 @@ def load_table(filename):
             t = aegean2cat(filename)
         else:
             log.error("Table format not recognized or supported")
-            log.error("{0} [{1}]".format(filename,fmt))
+            log.error("{0} [{1}]".format(filename, fmt))
             sys.exit(0)
     return t
 
 
 def write_table(table, filename):
-
     try:
         if os.path.exists(filename):
             os.remove(filename)
@@ -280,6 +282,11 @@ def table_to_source_list(table, src_type=OutputSource):
 
 def write_catalog(filename, catalog, fmt=None, meta=None):
     """
+    Write a catalog (list of sourcees) to a file with format determined by extension
+    :param filename: output file name
+    :param catalog: a list of sources
+    :param fmt: the format to use (defualt is to guess from extension)
+    :param meta: metadata to be used for formats like fits/votable
     """
     if meta is None:
         meta = {}
@@ -290,7 +297,7 @@ def write_catalog(filename, catalog, fmt=None, meta=None):
         tab_dict = {}
         for name in catalog[0].names:
             tab_dict[name] = [getattr(c, name, None) for c in catalog]
-        t = Table(tab_dict,meta=meta)
+        t = Table(tab_dict, meta=meta)
         # re-order the columns
         t = t[[n for n in catalog[0].names]]
         if fmt is not None:
@@ -300,9 +307,9 @@ def write_catalog(filename, catalog, fmt=None, meta=None):
                 vot.description = repr(meta)
                 writetoVO(vot, filename)
             elif fmt in ['hdf5']:
-                t.write(filename,path='data',overwrite=True)
+                t.write(filename, path='data', overwrite=True)
             elif fmt in ['fits']:
-                writeFITSTable(filename,t)
+                writeFITSTable(filename, t)
             else:
                 ascii.write(t, filename, fmt)
         else:
@@ -327,13 +334,14 @@ def write_catalog(filename, catalog, fmt=None, meta=None):
     return
 
 
-def writeFITSTable(filename,table):
+def writeFITSTable(filename, table):
     """
 
     :param filename:
     :param table:
     :return:
     """
+
     def FITSTableType(val):
         """
         Return the FITSTable type corresponding to each named parameter in obj
@@ -358,7 +366,7 @@ def writeFITSTable(filename,table):
     cols = fits.ColDefs(cols)
     tbhdu = fits.BinTableHDU.from_columns(cols)
     for k in table.meta:
-        tbhdu.header['HISTORY'] = ':'.join((k,table.meta[k]))
+        tbhdu.header['HISTORY'] = ':'.join((k, table.meta[k]))
     tbhdu.writeto(filename, clobber=True)
 
 
@@ -379,7 +387,7 @@ def writeIslandContours(filename, catalog, fmt):
     """
     out = open(filename, 'w')
     print >> out, "#Aegean island contours"
-    print >> out, "#Aegean version {0}-({1})".format(__version__,__date__)
+    print >> out, "#Aegean version {0}-({1})".format(__version__, __date__)
     if fmt == 'reg':
         line_fmt = 'image;line({0},{1},{2},{3})'
         text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
@@ -400,12 +408,12 @@ def writeIslandContours(filename, catalog, fmt):
         if np.nan in [c.ra, c.dec]:
             print >> out, '#',
         # some islands may not have anchors because they don't have any contours
-        if len(c.max_angular_size_anchors)==4:
+        if len(c.max_angular_size_anchors) == 4:
             print >> out, text_fmt.format(c.ra, c.dec, c.island)
             print >> out, mas_fmt.format(*[a + 0.5 for a in c.max_angular_size_anchors])
         for p1, p2 in c.pix_mask:
             # DS9 uses 1-based instead of 0-based indexing
-            print >> out, x_fmt.format(p1+1,p2+1)
+            print >> out, x_fmt.format(p1 + 1, p2 + 1)
 
     out.close()
     return
@@ -422,7 +430,7 @@ def writeIslandBoxes(filename, catalog, fmt):
     out = open(filename, 'w')
 
     print >> out, "#Aegean Islands"
-    print >> out, "#Aegean version {0}-({1})".format(__version__,__date__)
+    print >> out, "#Aegean version {0}-({1})".format(__version__, __date__)
     if fmt == 'reg':
         print >> out, "IMAGE"
         box_fmt = 'box({0},{1},{2},{3}) #{4}'
@@ -482,7 +490,7 @@ def writeAnn(filename, catalog, fmt):
         if fmt == 'ann':
             new_file = re.sub('.ann$', '_{0}.ann'.format(suffix), filename)
             out = open(new_file, 'w')
-            print >> out, "#Aegean version {0}-({1})".format(__version__,__date__)
+            print >> out, "#Aegean version {0}-({1})".format(__version__, __date__)
             print >> out, 'PA SKY'
             print >> out, 'FONT hershey12'
             print >> out, 'COORD W'
@@ -490,7 +498,7 @@ def writeAnn(filename, catalog, fmt):
         elif fmt == 'reg':
             new_file = re.sub('.reg$', '_{0}.reg'.format(suffix), filename)
             out = open(new_file, 'w')
-            print >> out, "#Aegean version {0}-({1})".format(__version__,__date__)
+            print >> out, "#Aegean version {0}-({1})".format(__version__, __date__)
             print >> out, "fk5"
             formatter = 'ellipse {0} {1} {2:.9f}d {3:.9f}d {4:+07.3f}d # text="{5}"'
             #DS9 has some strange ideas about position angle
@@ -526,6 +534,7 @@ def writeDB(filename, catalog, meta=None):
     filename - output filename
     catalog - a catalog of sources to populated the database with
     """
+
     def sqlTypes(obj, names):
         """
         Return the sql type corresponding to each named parameter in obj
@@ -568,7 +577,7 @@ def writeDB(filename, catalog, meta=None):
     # metadata add some meta data
     db.execute("CREATE TABLE meta (key VARCHAR, val VARCHAR)")
     for k in meta:
-        db.execute("INSERT INTO meta (key, val) VALUES (?,?)",(k,meta[k]))
+        db.execute("INSERT INTO meta (key, val) VALUES (?,?)", (k, meta[k]))
     conn.commit()
     log.info(db.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall())
     conn.close()
