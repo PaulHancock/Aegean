@@ -21,6 +21,7 @@ import astropy.units as u
 from astropy.io import fits as pyfits
 from astropy.wcs import wcs as pywcs
 from AegeanTools.regions import Region
+from AegeanTools.catalogs import load_table, write_table
 
 __version__ = 'v1.2'
 __date__ = '2015-10-20'
@@ -91,7 +92,7 @@ def mask_plane(data, wcs, region, negate=False):
     return data
 
 
-def maskfile(regionfile, infile, outfile, negate=False):
+def mask_file(regionfile, infile, outfile, negate=False):
     """
     Created a masked version of file, using region.
     This does not change the shape or size of the image, it just sets some pixels to be null/nan
@@ -125,6 +126,46 @@ def maskfile(regionfile, infile, outfile, negate=False):
     im[0].data = data
     im.writeto(outfile, clobber=True)
     logging.info("Wrote {0}".format(outfile))
+    return
+
+
+def mask_table(region, table, negate=False, racol='ra', deccol='dec'):
+    """
+    Apply a given mask (region) to the table, removing all the rows with ra/dec inside the region
+    If negate=False then remove the rows with ra/dec outside the region.
+    :param region: an AegeanTools.regions.Region
+    :param table: input table
+    :param negate: reverse the masking
+    :param racol: the name of the column containing the ra coordinates - default 'ra'
+    :param deccol: the name of the column containing the dec coordinates - default 'dec'
+    :return: filtered table
+    """
+    inside = region.sky_within(table[racol], table[deccol], degin=True)
+    if not negate:
+        mask = np.bitwise_not(inside)
+    else:
+        mask = inside
+    return table[mask]
+
+
+def mask_catalog(regionfile, infile, outfile, negate=False, racol='ra', deccol='dec'):
+    """
+    Apply a region file as a mask to a catalog, removing all the rows with ra/dec inside the region
+    If negate=False then remove the rows with ra/dec outside the region.
+    :param regionfile: name of a .mim file
+    :param infile: an catalogue that can be read by AegeanTools.catalogs.load_table
+    :param outfile: output filename
+    :param negate: reverse the masking
+    :param racol: the name of the column containing the ra coordinates - default 'ra'
+    :param deccol: the name of the column containing the dec coordinates - default 'dec'
+    :return:
+    """
+    logging.info("Loading region from {0}".format(regionfile))
+    region = pickle.load(open(regionfile, 'r'))
+    logging.info("Loading catalog from {0}".format(infile))
+    table = load_table(infile)
+    masked_table = mask_table(region, table, negate=negate, racol=racol, deccol=deccol)
+    write_table(masked_table, outfile)
     return
 
 
@@ -373,16 +414,24 @@ if __name__ == "__main__":
     group2.add_argument('--mim2fits',dest='mim2fits', action='append',
                         type=str, metavar=('region.mim', 'region_MOC.fits'), nargs=2,
                         help="Convert a .mim file into a MOC.fits file", default=[])
-    group3 = parser.add_argument_group("Masking fits files")
-    group3.add_argument('--mask', dest='mask', action='store',
+    group3 = parser.add_argument_group("Masking files with regions")
+    group3.add_argument('--maskcat', dest='mask_cat', action='store',
+                        type=str, metavar=('region.mim', 'INCAT', 'OUTCAT'), nargs=3, default=[],
+                        help='use region.mim as a mask on INCAT, writing OUTCAT')
+    group3.add_argument('--maskimage', dest='mask_image', action='store',
                         type=str, metavar=('region.mim', 'file.fits', 'masked.fits'), nargs=3, default=[],
-                        help='use region.mim to mask file.fits and write masekd.fits')
-    group3.add_argument('--negate', dest='negate', action='store_true', default=False,
-                        help='If True then mask pixels inside this region instead of outside.')
+                        help='use region.mim to mask the image file.fits and write masekd.fits')
     group3.add_argument('--fitsmask', dest='fits_mask', action='store',
-                        type=str, metavar=('mask.fits', 'file.fits','masked_file.fits'), nargs=3, default=[],
+                        type=str, metavar=('mask.fits', 'file.fits', 'masked_file.fits'), nargs=3, default=[],
                         help='Use a fits file as a mask for another fits file. ' +
                              'Values of blank/nan/zero are considered to be mask=True.')
+    group3.add_argument('--negate', dest='negate', action='store_true', default=False,
+                        help='By default all masks will exclude data that are within the given region. ' +
+                             'Use --negate to exclude data that is outside of the region instead.')
+    group3.add_argument('--colnames', dest='radec_colnames', action='store',
+                        type=str, metavar=('RA_name', 'DEC_name'),  nargs=2, default=('ra', 'dec'),
+                        help='The name of the columns which contain the RA/DEC data. Default=(ra,dec).')
+
     group4 = parser.add_argument_group('Extra options')
     # extras
     group4.add_argument('--fitsimage', dest='mim2img', action='store_true',
@@ -419,9 +468,15 @@ if __name__ == "__main__":
             mim2fits(i, o)
         sys.exit()
 
-    if len(results.mask) > 0:
-        m, i, o = results.mask
-        maskfile(m, i, o, results.negate)
+    if len(results.mask_image) > 0:
+        m, i, o = results.mask_image
+        mask_file(m, i, o, results.negate)
+        sys.exit()
+
+    if len(results.mask_cat) > 0:
+        m, i, o = results.mask_cat
+        racol, deccol = results.radec_colnames
+        mask_catalog(m, i, o, results.negate, racol, deccol)
         sys.exit()
 
     if results.mim2img:
