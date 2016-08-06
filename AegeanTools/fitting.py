@@ -196,7 +196,7 @@ def CRB_errs(jac, C, B=None):
     return errs
 
 
-def condon_errors(source, thetaN=None):
+def condon_errors(source, theta_n):
     """
     Calculate the parameter errors for a fitted source
     using the description of Condon'97
@@ -217,12 +217,9 @@ def condon_errors(source, thetaN=None):
     major = source.a/3600 # degrees
     minor = source.b/3600 # degrees
     phi = np.radians(source.pa)
-    if thetaN is None:
-        log.critical(" you need to supply thetaN")
-        thetaN = np.sqrt(get_beamarea_deg2(source.ra,source.dec)/np.pi)
-    smoothing = major*minor / (thetaN**2)
-    factor1 = (1 + (major / thetaN))
-    factor2 = (1 + (minor / thetaN))
+    smoothing = major*minor / (theta_n**2)
+    factor1 = (1 + (major / theta_n))
+    factor2 = (1 + (minor / theta_n))
     snr = source.peak_flux/source.local_rms
     # calculation of rho2 depends on the parameter being used so we lambda this into a function
     rho2 = lambda x: smoothing/4 *factor1**alphas[x][0] * factor2**alphas[x][1] *snr**2
@@ -245,7 +242,7 @@ def condon_errors(source, thetaN=None):
 
     # integrated flux error
     err2 = (source.err_peak_flux/source.peak_flux)**2
-    err2 += (thetaN**2/(major*minor)) *( (source.err_a/source.a)**2 + (source.err_b/source.b)**2)
+    err2 += (theta_n**2/(major*minor)) *( (source.err_a/source.a)**2 + (source.err_b/source.b)**2)
     source.err_int_flux =source.int_flux * np.sqrt(err2)
     return
 
