@@ -100,6 +100,10 @@ class RunningPercentiles():
         return vals
 
 def test_running_percentiles():
+    """
+    Test for RunningPercentiles class, with a super basic list input
+    :return:
+    """
     import numpy as np
 
     a = np.arange(11)

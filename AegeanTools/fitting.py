@@ -54,33 +54,32 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
 def Cmatrix(x,y,sx,sy,theta):
     """
     Construct a correlation matrix corresponding to the data.
+    The matrix assumes a gaussian correlation function.
     :param x:
     :param y:
-    :param sx:
-    :param sy:
-    :param theta:
+    :param sx: \sigma_x for pix beam
+    :param sy: \sigma_y for pix beam
+    :param theta: \theta for pix beam
     :return:
     """
-    f = lambda i,j: elliptical_gaussian(x,y,1,i,j,sx,sy,theta)
-    C = np.vstack( [ f(i,j) for i,j in zip(x,y)] )
+    C = np.vstack( [ elliptical_gaussian(x,y,1,i,j,sx,sy,theta) for i,j in zip(x,y)] )
     return C
 
 
 def Bmatrix(C):
     """
     Calculate a matrix which is effectively the square root of the correlation matrix C
-    :param C:
+    :param C: A covariance matrix
     :return: A matrix B such the B.dot(B') = inv(C)
     """
     # this version of finding the square root of the inverse matrix
-    # suggested by Cath,
+    # suggested by Cath Trott
     L,Q = eigh(C)
     if not all(L>0):
         log.warn("At least one eigenvalue is negative, this may cause problems!")
         log.warn("Forcing eigenvalues to be positive...")
         log.debug("L = {0}".format(L))
         L = np.abs(L)
-        #sys.exit(1)
     S = np.diag(1/np.sqrt(L))
     B = Q.dot(S)
     return B
@@ -88,10 +87,12 @@ def Bmatrix(C):
 
 def emp_jacobian(pars, x, y, errs=None, B=None):
     """
-    An empirical calculation of the jacobian
-    :param pars:
-    :param x:
-    :param y:
+    An empirical calculation of the Jacobian
+    Will work for a model that contains multiple Gaussians, and for which
+    some components are not being fit (don't vary).
+    :param pars: lmfit.Model
+    :param x: x-values over which the model is evaluated
+    :param y: y-values over which the model is evaluated
     :return:
     """
     eps=1e-5
@@ -116,6 +117,17 @@ def emp_jacobian(pars, x, y, errs=None, B=None):
 
 
 def jacobian(pars, x, y, errs=None, B=None):
+    """
+    Analytical calculation of the Jacobian for an elliptical gaussian
+    Will work for a model that contains multiple Gaussians, and for which
+    some components are not being fit (don't vary).
+    :param pars: lmfit.Model
+    :param x: x-values over which the model is evaluated
+    :param y: y-values over which the model is evaluated
+    :param errs: a vector of 1\sigma errors (optional)
+    :param B: a B-matrix (optional) see B_matrix
+    :return:
+    """
 
     matrix = []
 
@@ -390,6 +402,16 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
 
 
 def covar_errors(params, data, errs, B, C=None):
+    """
+    Take a set of parameters that were fit with lmfit, and replace the errors
+    with the 1\sigma errors calculated using the covariance matrix.
+    :param params: lmfit.Model
+    :param data: data over which the model was fit
+    :param errs: a matrix of 1\sigma errors
+    :param B: B matrix (see Bmatrix)
+    :param C: C matrix (optional, will obviate the need for Bmatrix)
+    :return:
+    """
 
     mask = np.where(np.isfinite(data))
 
@@ -450,7 +472,11 @@ def ntwodgaussian_mpfit(inpars):
     return rfunc
 
 
-def test_jacobian():
+def plot_jacobian():
+    """
+    Plot the Jacobian for a test model
+    :return:
+    """
     nx = 15
     ny = 12
     x,y = np.where(np.ones((nx,ny))==1)
@@ -494,4 +520,4 @@ def test_jacobian():
 
 
 if __name__ == "__main__":
-    test_jacobian()
+    plot_jacobian()

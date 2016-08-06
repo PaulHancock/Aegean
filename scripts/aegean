@@ -261,7 +261,10 @@ if __name__ == "__main__":
     # check that the output table formats are supported (if given)
     # BEFORE any cpu intensive work is done
     if options.tables is not None:
-        check_table_formats(options.tables)
+        if not check_table_formats(options.tables):
+            log.critical("One or more output table formats are not supported: Exiting")
+            sys.exit(1)
+
 
     # if an outputfile was specified open it for writing, otherwise use stdout
     if not options.outfile:

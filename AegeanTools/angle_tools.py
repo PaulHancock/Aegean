@@ -42,6 +42,11 @@ def dec2dec(dec):
 
 
 def dec2dms(x):
+    """
+    Convert decimal degrees into a sexagessimal DD:MM:SS.SS string
+    :param x:
+    :return:
+    """
     if not np.isfinite(x):
         return 'XX:XX:XX.XX'
     if x < 0:
@@ -56,6 +61,11 @@ def dec2dms(x):
 
 
 def dec2hms(x):
+    """
+    Convert decimal degrees into a sexagessimal HH:MM:SS.SS string
+    :param x:
+    :return:
+    """
     if not np.isfinite(x):
         return 'XX:XX:XX.XX'
     x /= 15.0

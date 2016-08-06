@@ -19,6 +19,13 @@ __date__ = '2015-11-23'
 
 
 def compare(c1, c2):
+    """
+    Given two catalogues (as tables) determine wheter the two catalogs are in agreement.
+    Will print PASS/FAIL for comparisons between: flux, position, and shape.
+    :param c1: first catalogue
+    :param c2: second catalogue
+    :return:
+    """
 
     print "# Matching ...",
     s1 = SkyCoord(c1['ra'], c1['dec'], unit=(u.degree, u.degree))

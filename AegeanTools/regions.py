@@ -209,10 +209,9 @@ class Region(object):
 
     def write_fits(self, filename, moctool=''):
         """
-
-        :param self:
-        :param filename:
-        :return:
+        Write a fits file representing the MOC of this region.
+        :param filename: Output filename
+        :return: None
         """
         datafile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'MOC.fits')
         hdulist = fits.open(datafile)
@@ -234,13 +233,13 @@ class Region(object):
 
     def _uniq(self):
         """
-
-        :return:
+        Create a list of all the pixels that cover this region.
+        This list contains overlapping pixels of different orders.
+        :return: A list of HealPix pixel numbers.
         """
         pd = []
         for d in xrange(1, self.maxdepth):
-            fn = lambda x: int(4**(d+1) + x)
-            pd.extend(map(fn, self.pixeldict[d]))
+            pd.extend(map(lambda x: int(4**(d+1) + x), self.pixeldict[d]))
         return sorted(pd)
 
     @staticmethod
@@ -313,6 +312,7 @@ class Region(object):
 
 
 def test_radec2sky():
+    """Test function: Region.radec2sky"""
     ra, dec = (15, -45)
     sky = Region.radec2sky(ra, dec)
     assert sky == [(ra, dec)], "radec2sky broken on non-list input"
@@ -324,6 +324,7 @@ def test_radec2sky():
     print 'test_radec2sky PASSED'
 
 def test_sky2ang_symmetric():
+    """Test that function Region.sky2ang is symmetric"""
     sky = np.radians(np.array([[15, -45]]))
     tp = Region.sky2ang(sky)
     tp = np.array([[tp[0][1], tp[0][0]]])
@@ -334,6 +335,7 @@ def test_sky2ang_symmetric():
 
 
 def test_sky2ang_corners():
+    """Test that function Region.sky2ang works at 0/0 and the south pole"""
     corners = np.radians([[0, 0], [360, -90]])
     theta_phi = Region.sky2ang(corners)
     answers = np.array([[np.pi/2, 0], [np.pi, 2*np.pi]])
@@ -341,6 +343,7 @@ def test_sky2ang_corners():
     print 'test_sky2ang_corners PASSED'
 
 def test_sky2vec_corners():
+    """Test that function Region.sky2vec works at some tricky locations"""
     sky = np.radians([[0, 0], [90, 90], [45, -90]])
     answers = np.array([[1, 0, 0], [0, 0, 1], [0, 0, -1]])
     vec = Region.sky2vec(sky)
@@ -348,6 +351,7 @@ def test_sky2vec_corners():
     print 'test_sky2vec_corners PASSED'
 
 def test_vec2sky_corners():
+    """Test that function Region.vec2sky works at some tricky locations"""
     vectors = np.array([[1, 0, 0], [0, 0, 1], [0, 0, -1]])
     skycoords = Region.vec2sky(vectors, degrees=True)
     answers = np.array([[0, 0], [0, 90], [0, -90]] )
@@ -355,6 +359,7 @@ def test_vec2sky_corners():
     print 'test_vec2sky_corners PASSED'
 
 def test_sky2vec2sky():
+    """Test that function Region.vec2sky and Region.sky2vec are mutual inverses"""
     ra, dec = np.radians(np.array((0, -45)))
     sky = Region.radec2sky(ra, dec)
     vec = Region.sky2vec(sky)
@@ -365,6 +370,7 @@ def test_sky2vec2sky():
     print 'test_sky2vec2sky PASSED'
 
 def test_add_circles_list_scalar():
+    """Test that Region.add_circles works for vector inputs"""
     ra_list = np.radians([13.5, 13.5])
     dec_list = np.radians([-90, -90])
     radius_list = np.radians([0.1, 0.01])
@@ -385,6 +391,7 @@ def test_add_circles_list_scalar():
     print 'test_add_circles_list_scalar PASSED'
 
 def test_renorm_demote_symmetric():
+    """Test that Region._renorm and Region._demote are mutual inverses"""
     ra = 13.5
     dec = -90
     radius = 0.1
@@ -404,6 +411,7 @@ def test_renorm_demote_symmetric():
     print 'test_renorm_demote_symmetric PASSED'
 
 def test_sky_within():
+    """Test the Ragion.sky_within method"""
     print 'test_sky_within',
     ra = np.radians([13.5, 15])
     dec = np.radians([-45, -40])
@@ -416,6 +424,7 @@ def test_sky_within():
     print 'PASSED'
 
 def test_pickle():
+    """ Test that the Region class can be pickled and loaded without loss """
     ra = 66.38908
     dec = -26.72466
     radius = 22
@@ -433,6 +442,10 @@ def test_pickle():
 
 
 def test_reg():
+    """
+    Test that .reg files can be written without crashing
+    (Not a test that the .reg files are valid)
+    """
     ra = np.radians([285])
     dec = np.radians([-66])
     radius = np.radians([3])
@@ -442,6 +455,9 @@ def test_reg():
     print 'test_reg PASSED'
 
 def test_poly():
+    """
+    Test that polygon regions can be added
+    """
     ra = [50, 50, 70, 70]
     dec = [-20, -25, -25, -20]
     region = Region(maxdepth=9)
@@ -451,6 +467,7 @@ def test_poly():
     print 'test_poly PASSED'
 
 def test_write_fits():
+    """ Test that MOC files can be written in fits format """
     a = Region()
     a.add_circles(12, 0, 0.1)
     a.write_fits('test_MOC.fits')

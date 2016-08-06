@@ -309,11 +309,15 @@ class WCSHelperTest(object):
     def __init__(self):
         # self.helper = WCSHelper.from_file('Test/Images/1904-66_SIN.fits')
         self.helper = WCSHelper.from_file('Test/Week2_small.fits')
-        # self.test_vector_round_trip()
+        self.test_vector_round_trip()
         self.test_ellipse_round_trip()
-        # self.test_defect()
+        self.test_defect()
 
-    def tes_vector_round_trip(self):
+    def test_vector_round_trip(self):
+        """
+        Converting a vector from pixel to sky coords and back again should give the
+        original vector (within some tolerance).
+        """
         print "Testing vector round trip... ",
         initial = [1, 45]  #r,theta = 1,45 (degrees)
         ref = self.helper.refpix
@@ -331,6 +335,8 @@ class WCSHelperTest(object):
 
     def test_ellipse_round_trip(self):
         """
+        Converting an ellipse from pixel to sky coords and back again should give the
+        original ellipse (within some tolerance).
         """
         print "Testing ellipse round trip"
         # raref, decref = self.helper.pix2sky(self.helper.refpix)
@@ -360,6 +366,8 @@ class WCSHelperTest(object):
 
     def test_defect(self):
         """
+        Make a plot showing the defect that occurs when converting major/minor axes
+        from sky->pix coordinates
         """
         print "Testing defect"
         # raref, decref = self.helper.pix2sky(self.helper.refpix)

@@ -51,6 +51,12 @@ log = logging.getLogger('Aegean')
 
 # writing table formats
 def check_table_formats(files):
+    """
+    Determine whether the supplied table filenames are supported formats.
+    The format is determined from the extension.
+    :param files: A comma-separated string of filenames (no spaces)
+    :return:
+    """
     cont = True
     formats = get_table_formats()
     for t in files.split(','):
@@ -61,8 +67,7 @@ def check_table_formats(files):
             log.warn("Format not supported for {0} ({1})".format(t, ext))
     if not cont:
         log.error("Invalid table format specified.")
-        sys.exit()
-    return
+    return cont
 
 
 def show_formats():
@@ -113,6 +118,12 @@ def get_table_formats():
 
 
 def update_meta_data(meta=None):
+    """
+    Update the metadata to include the DATE, PROGRAM, and PROGVER keys
+    if they do not already exist.
+    :param meta:
+    :return:
+    """
     if meta is None:
         meta = {}
     if 'DATE' not in meta:
@@ -527,6 +538,17 @@ def writeAnn(filename, catalog, fmt):
     return
 
 
+def nulls(x):
+    """
+    convert values of -1 into None
+    :param x: assumed to be float but w/e
+    :return: x or None
+    """
+    if x == -1:
+        return None
+    else:
+        return x
+
 def writeDB(filename, catalog, meta=None):
     """
     Output an sqlite3 database containing one table for each source type
@@ -570,8 +592,6 @@ def writeDB(filename, catalog, meta=None):
         stmnt = ','.join(["{0} {1}".format(a, b) for a, b in zip(col_names, col_types)])
         db.execute('CREATE TABLE {0} ({1})'.format(tn, stmnt))
         stmnt = 'INSERT INTO {0} ({1}) VALUES ({2})'.format(tn, ','.join(col_names), ','.join(['?' for i in col_names]))
-        # convert values of -1 into None
-        nulls = lambda x: [x, None][x == -1]
         db.executemany(stmnt, [map(nulls, r.as_list()) for r in t])
         log.info("Created table {0}".format(tn))
     # metadata add some meta data
