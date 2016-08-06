@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 """
-Implementation of a marching square algorithm.
+Implementation of a marching squares algorithm.
 With reference to http://devblog.phillipspiess.com/2010/02/23/better-know-an-algorithm-1-marching-squares/
 but written in python
 by Paul Hancock
@@ -28,7 +28,7 @@ class MarchingSquares():
         self.next = self.NOWHERE
         self.data = np.nan_to_num(data)
         self.xsize, self.ysize = data.shape
-        self.perimeter = self.doMarch()
+        self.perimeter = self.do_march()
         return
 
     def dir2str(self,d):
@@ -43,7 +43,7 @@ class MarchingSquares():
         else:
             return "x"
 
-    def findStartPoint(self):
+    def find_start_point(self):
         """
         Find the first location in our array that is not empty
         """
@@ -109,7 +109,7 @@ class MarchingSquares():
             return False
         return True
 
-    def walkPerimeter(self, startx, starty):
+    def walk_perimeter(self, startx, starty):
         """
         """
         # checks
@@ -148,15 +148,15 @@ class MarchingSquares():
             #i+=1
         return points
 
-    def doMarch(self):
+    def do_march(self):
         """
         March about and trace the outline of our object
         """
-        x, y = self.findStartPoint()
-        perimeter = self.walkPerimeter(x, y)
+        x, y = self.find_start_point()
+        perimeter = self.walk_perimeter(x, y)
         return perimeter
 
-    def _blankWithin(self, perimeter):
+    def _blank_within(self, perimeter):
         """
         Blank all the pixels within the given perimeter.
         :param perimeter:
@@ -187,7 +187,7 @@ class MarchingSquares():
 
         return
 
-    def doMarchAll(self):
+    def do_march_all(self):
         """
         Recursive march in the case that we have a fragmented shape
         """
@@ -197,13 +197,13 @@ class MarchingSquares():
         # iterate through finding an island, creating a perimeter,
         # and then blanking the island
         perimeters = []
-        p = self.findStartPoint()
+        p = self.find_start_point()
         while p is not None:
             x, y = p
-            perim = self.walkPerimeter(x, y)
+            perim = self.walk_perimeter(x, y)
             perimeters.append(perim)
-            self._blankWithin(perim)
-            p = self.findStartPoint()
+            self._blank_within(perim)
+            p = self.find_start_point()
 
         # restore the data 
         self.data = data_copy
