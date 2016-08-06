@@ -57,21 +57,21 @@ class MarchingSquares():
         """
         Move from the current location to the next
         """
-        upLeft = self.solid(x - 1, y - 1)
-        upRight = self.solid(x, y - 1)
-        downLeft = self.solid(x - 1, y)
-        downRight = self.solid(x, y)
+        up_left = self.solid(x - 1, y - 1)
+        up_right = self.solid(x, y - 1)
+        down_left = self.solid(x - 1, y)
+        down_right = self.solid(x, y)
 
         state = 0
         self.prev = self.next
         # which cells are filled?
-        if upLeft:
+        if up_left:
             state |= 1
-        if upRight:
+        if up_right:
             state |= 2
-        if downLeft:
+        if down_left:
             state |= 4
-        if downRight:
+        if down_right:
             state |= 8
 
         #what is the next step?
@@ -227,6 +227,6 @@ if __name__ == '__main__':
     for p in msq.perimeter:
         try:
             residual[p] = 2
-        except:
+        except IndexError:
             pass
     print residual
