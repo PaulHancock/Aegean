@@ -53,7 +53,7 @@ def compress(datafile, factor, outfile=None):
     hdulist = load_file_or_hdu(datafile)
 
     header = hdulist[0].header
-    data = hdulist[0].data
+    data = np.squeeze(hdulist[0].data)
     cx, cy = data.shape[0], data.shape[1]
 
     nx = cx / factor
