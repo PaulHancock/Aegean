@@ -1,4 +1,5 @@
 import os
+import sys
 from setuptools import setup
 
 # Utility function to read the README file.
@@ -15,6 +16,16 @@ def get_version():
     return "v2.0b-46-g24246a4-(master)"
 
 
+reqs = ['numpy>=1.10',
+        'scipy>=0.16',
+        'astropy>=1.0',
+        'pprocess>=0.5']
+
+if sys.version_info < (2,7):
+    reqs.append('lmfit==0.9.1')
+else:
+    reqs.append('lmfit>=0.9.2')
+
 setup(
     name="AegeanTools",
     version=get_version(),
@@ -26,10 +37,6 @@ setup(
     url="https://github.com/PaulHancock/Aegean",
     long_description=read('README.md'),
     packages=['AegeanTools'],
-    install_requires=['numpy>=1.10',
-                      'scipy>=0.16',
-                      'astropy>=1.0',
-                      'lmfit==0.9.2',
-                      'pprocess>=0.5'],
+    install_requires= reqs,
     scripts=['scripts/aegean', 'scripts/BANE', 'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS']
 )
