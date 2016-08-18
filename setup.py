@@ -29,7 +29,7 @@ setup(
     install_requires=['numpy>=1.10',
                       'scipy>=0.16',
                       'astropy>=1.0',
-                      'lmfit>=0.9.2',
+                      'lmfit==0.9.2',
                       'pprocess>=0.5'],
     scripts=['scripts/aegean', 'scripts/BANE', 'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS']
 )
