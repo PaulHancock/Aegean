@@ -99,7 +99,7 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
     :param eps: maximum normalised distance within which sources are considered to be grouped
     :param far: (degrees) sources that are further than this distance appart will not be grouped, and will not be tested
     :param dist: a function that calculates the distance between two sources must accept two SimpleSource objects.
-    :return: groups of sources
+    :return: groups of sources as a dict {id:[src, ...], ...}
     """
     if isinstance(catalog, str):
         table = load_table(catalog)
