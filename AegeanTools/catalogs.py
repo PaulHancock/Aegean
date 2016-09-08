@@ -398,14 +398,13 @@ def writeIslandContours(filename, catalog, fmt):
     """
     out = open(filename, 'w')
     print >> out, "#Aegean island contours"
-    print >> out, "#Aegean version {0}-({1})".format(__version__, __date__)
-    if fmt == 'reg':
-        line_fmt = 'image;line({0},{1},{2},{3})'
-        text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
-        mas_fmt = 'image; line({1},{0},{3},{2}) #color = yellow'
-        x_fmt = 'image; point({1},{0}) # point=x'
-    if fmt == 'ann':
-        log.warn("Kvis not yet supported")
+    print >> out, "#AegeanTools.catalogs version {0}-({1})".format(__version__, __date__)
+    line_fmt = 'image;line({0},{1},{2},{3})'
+    text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
+    mas_fmt = 'image; line({1},{0},{3},{2}) #color = yellow'
+    x_fmt = 'image; point({1},{0}) # point=x'
+    if fmt != 'reg':
+        log.warn("Format {0} not yet supported".format(fmt))
         log.warn("not writing anything")
         return
     for c in catalog:
@@ -425,7 +424,6 @@ def writeIslandContours(filename, catalog, fmt):
         for p1, p2 in c.pix_mask:
             # DS9 uses 1-based instead of 0-based indexing
             print >> out, x_fmt.format(p1 + 1, p2 + 1)
-
     out.close()
     return
 
@@ -449,6 +447,7 @@ def writeIslandBoxes(filename, catalog, fmt):
         print >> out, "COORD P"
         box_fmt = 'box P {0} {1} {2} {3} #{4}'
     else:
+        log.warning("Format not supported for island boxes{0}".format(fmt))
         return  #fmt not supported
     for c in catalog:
         #x/y swap for pyfits/numpy translation
