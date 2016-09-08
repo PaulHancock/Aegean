@@ -38,6 +38,27 @@ header = """#Aegean version {0}
 # on dataset: {1}"""
 
 
+def check_projection(filename, options):
+    """
+    If the user has supplied --telescope when not required issue a warning
+    If the user has not supplied --telescope when it is required issue a critical warning
+    This depends on the projection of the image and if a psf map has been supplied:
+    If ZEA then --telescope is required
+    If SIN or a psf map has been supplied then --telescope is not required
+    :param options: options from the option parser
+    :return:
+    """
+    header = astropy.io.fits.getheader(filename)
+    if "ZEA" in header['CTYPE1']:
+        if options.telescope is None and options.imgpsf is None:
+            logging.warning("For projection ZEA it is advised that you supply either")
+            logging.warning("--telescope or --psf")
+    if "SIN" in header['CTYPE1']:
+        if options.telescope is not None:
+            logging.warning("For projection SIN --telescope is not required. Ignoring.")
+            options.telescope = None
+    return
+
 if __name__ == "__main__":
     usage = "usage: %prog [options] FileName.fits"
     parser = OptionParser(usage=usage)
@@ -160,6 +181,9 @@ if __name__ == "__main__":
     if not os.path.exists(filename):
         log.error("{0} not found".format(filename))
         sys.exit(1)
+
+    # check to see if the user has supplied --telescope/--psf when required
+    check_projection(filename, options)
 
     # tell numpy to shut up about "invalid values encountered"
     # Its just NaN's and I don't need to hear about it once per core
