@@ -109,9 +109,9 @@ def make_residual(fitsfile, catalog, rfile, mfile=None, add=False):
     model = make_model(source_list, data.shape, wcshelper)
 
     if add:
-        residual = data - model
-    else:
         residual = data + model
+    else:
+        residual = data - model
 
     hdulist[0].data = residual
     hdulist.writeto(rfile, clobber=True)
@@ -134,7 +134,7 @@ if __name__ == "__main__":
                       help="Output residual fits file.")
     parser.add_option('-m', "--model", dest='mfile', default=None,
                       help="Output model file [optional].")
-    parser.add_option('--add', dest='add', default=False,
+    parser.add_option('--add', dest='add', default=False, action='store_true',
                       help="Add components instead of subtracting them.")
     parser.add_option('--debug', dest='debug', action='store_true', default=False,
                       help="Debug mode.")
