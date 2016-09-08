@@ -1353,6 +1353,12 @@ class SourceFinder(object):
         if len(island_group) > 0:
             fit_parallel(island_group)
 
+
+        # Write the output to the output file
+        if outfile:
+            print >> outfile, header.format("{0}-({1})".format(__version__, __date__), filename)
+            print >> outfile, OutputSource.header
+
         sources = []
         for srcs in queue:
             if srcs:  # ignore empty lists
@@ -1361,6 +1367,7 @@ class SourceFinder(object):
                     if (src.peak_flux > 0 and nopositive) or (src.peak_flux < 0 and nonegative):
                         continue
                     sources.append(src)
+                    print >> outfile, str(src)
         self.sources.extend(sources)
         return sources
 
@@ -1501,7 +1508,7 @@ class SourceFinder(object):
 
         sources = sorted(sources)
 
-        # Write the output to the output file (note that None -> stdout)
+        # Write the output to the output file
         if outfile:
             print >> outfile, header.format("{0}-({1})".format(__version__, __date__), filename)
             print >> outfile, OutputSource.header
