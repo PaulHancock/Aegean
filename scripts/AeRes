@@ -3,8 +3,8 @@
  Tool for making residual images with Aegean tables as input
 """
 __author__ = 'Paul Hancock'
-__version__ = 'v0.2'
-__date__ = '2016-05-13'
+__version__ = 'v0.2.5'
+__date__ = '2016-09-08'
 
 from AegeanTools import catalogs, wcs_helpers, fitting
 from astropy.io import fits
@@ -89,13 +89,14 @@ def make_model(sources, shape, wcshelper):
     return m
 
 
-def make_residual(fitsfile, catalog, rfile, mfile=None):
+def make_residual(fitsfile, catalog, rfile, mfile=None, add=False):
     """
 
     @param fitsfile: Input fits image filename
     @param catalog: Input catalog filename of a type supported by Aegean
     @param rfile: Residual image filename
     @param mfile: model image filename
+    @param add: add the model instead of subtracting it
     @return:
     """
     source_list = load_sources(catalog)
@@ -107,7 +108,10 @@ def make_residual(fitsfile, catalog, rfile, mfile=None):
 
     model = make_model(source_list, data.shape, wcshelper)
 
-    residual = data - model
+    if add:
+        residual = data - model
+    else:
+        residual = data + model
 
     hdulist[0].data = residual
     hdulist.writeto(rfile, clobber=True)
@@ -130,6 +134,8 @@ if __name__ == "__main__":
                       help="Output residual fits file.")
     parser.add_option('-m', "--model", dest='mfile', default=None,
                       help="Output model file [optional].")
+    parser.add_option('--add', dest='add', default=False,
+                      help="Add components instead of subtracting them.")
     parser.add_option('--debug', dest='debug', action='store_true', default=False,
                       help="Debug mode.")
 
@@ -152,5 +158,6 @@ if __name__ == "__main__":
     logging.info("Using {0} and {1} to make {2}".format(options.fitsfile, options.catalog, options.rfile))
     if options.mfile is not None:
         logging.info(" and writing model to {0}".format(options.mfile))
-    make_residual(options.fitsfile, options.catalog, options.rfile, mfile=options.mfile)
+    make_residual(options.fitsfile, options.catalog, options.rfile,
+                  mfile=options.mfile, add=options.add)
     sys.exit(0)
