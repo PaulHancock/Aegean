@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding=utf-8
 
-# Author    :   Guo Shaoguang
+# Author    :   Shaoguang Guo && Yang Lu
 # Email     :   sgguo@shao.ac.cn
 # Institute :   Shanghai Astronomical Observatory
 
