@@ -2,9 +2,9 @@
 Created on 18/07/2011
 
 @author: jay
+Modified by: Paul Hancock 2012 onwards
 """
 
-import astropy.io.fits as pyfits
 import numpy
 import astropy.wcs as pywcs
 import scipy.stats
