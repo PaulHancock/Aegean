@@ -91,13 +91,13 @@ class Region(object):
         Represent this region as pixels at maxdepth only
         """
         # only do the calculations if the demoted list is empty
-        if len(self.demoted) == 0 :
+        if len(self.demoted) == 0:
             pd = self.pixeldict
             for d in xrange(1, self.maxdepth):
                 for p in pd[d]:
                     pd[d+1].update(set((4*p, 4*p+1, 4*p+2, 4*p+3)))
                 pd[d] = set()  # clear the pixels from this level
-            self.demoted = list(pd[d+1])
+            self.demoted = pd[d+1]
         return
 
     def _renorm(self):
@@ -105,7 +105,7 @@ class Region(object):
         Remake the pixel dictionary, merging groups of pixels at level N into a single pixel
         at level N-1
         """
-        self.demoted = []
+        self.demoted = set()
         # convert all to lowest level
         self._demote_all()
         # now promote as needed
@@ -119,6 +119,7 @@ class Region(object):
                         self.pixeldict[d].difference_update(nset)
                         # add a new pixel to the next level up
                         self.pixeldict[d-1].add(p/4)
+        self.demoted = set()
         return
 
     #@profile
@@ -179,7 +180,7 @@ class Region(object):
         # TODO: Allow this to be done for regions with different depths.
         assert self.maxdepth == other.maxdepth, "Regions must have the same maxdepth"
         self._demote_all()
-        opd = other.get_demoted()
+        opd = set(other.get_demoted())
         self.pixeldict[self.maxdepth].difference_update(opd)
         self._renorm()
         return
@@ -323,6 +324,7 @@ def test_radec2sky():
     assert np.all(sky == answer), 'radec2sky broken on list input'
     print 'test_radec2sky PASSED'
 
+
 def test_sky2ang_symmetric():
     """Test that function Region.sky2ang is symmetric"""
     sky = np.radians(np.array([[15, -45]]))
@@ -342,6 +344,7 @@ def test_sky2ang_corners():
     assert np.all(theta_phi - answers < 1e-9), 'sky2ang corner cases failed'
     print 'test_sky2ang_corners PASSED'
 
+
 def test_sky2vec_corners():
     """Test that function Region.sky2vec works at some tricky locations"""
     sky = np.radians([[0, 0], [90, 90], [45, -90]])
@@ -350,6 +353,7 @@ def test_sky2vec_corners():
     assert np.all(vec - answers<1e-9), 'sky2vec corner cases failed'
     print 'test_sky2vec_corners PASSED'
 
+
 def test_vec2sky_corners():
     """Test that function Region.vec2sky works at some tricky locations"""
     vectors = np.array([[1, 0, 0], [0, 0, 1], [0, 0, -1]])
@@ -357,6 +361,7 @@ def test_vec2sky_corners():
     answers = np.array([[0, 0], [0, 90], [0, -90]] )
     assert np.all(skycoords == answers), 'vec2sky fails on corners'
     print 'test_vec2sky_corners PASSED'
+
 
 def test_sky2vec2sky():
     """Test that function Region.vec2sky and Region.sky2vec are mutual inverses"""
@@ -368,6 +373,7 @@ def test_sky2vec2sky():
     vec2 = Region.sky2vec(sky2)
     assert np.all(np.array(vec) - np.array(vec2) == 0), 'vec2sky2vec failed'
     print 'test_sky2vec2sky PASSED'
+
 
 def test_add_circles_list_scalar():
     """Test that Region.add_circles works for vector inputs"""
@@ -390,6 +396,7 @@ def test_add_circles_list_scalar():
     assert test, 'add_circles gives different results for lists and scalars'
     print 'test_add_circles_list_scalar PASSED'
 
+
 def test_renorm_demote_symmetric():
     """Test that Region._renorm and Region._demote are mutual inverses"""
     ra = 13.5
@@ -410,6 +417,7 @@ def test_renorm_demote_symmetric():
     assert test, 'renorm and demote are not symmetric'
     print 'test_renorm_demote_symmetric PASSED'
 
+
 def test_sky_within():
     """Test the Ragion.sky_within method"""
     print 'test_sky_within',
@@ -422,6 +430,7 @@ def test_sky_within():
     assert np.all(region.sky_within(ra, dec)), "Failed on list of positions"
     assert not np.any(region.sky_within(ra[0]+5*radius[0], dec[0])), "Failed on position outside of region"
     print 'PASSED'
+
 
 def test_pickle():
     """ Test that the Region class can be pickled and loaded without loss """
@@ -454,6 +463,7 @@ def test_reg():
     region.write_reg('test.reg')
     print 'test_reg PASSED'
 
+
 def test_poly():
     """
     Test that polygon regions can be added
@@ -466,6 +476,7 @@ def test_poly():
     region.write_reg('test.reg')
     print 'test_poly PASSED'
 
+
 def test_write_fits():
     """ Test that MOC files can be written in fits format """
     a = Region()
@@ -473,6 +484,39 @@ def test_write_fits():
     a.write_fits('test_MOC.fits')
     print 'write_fits PASSED'
     return
+
+
+def test_without():
+    a = Region(maxdepth=7)
+    a.add_circles(0, np.radians(-90), np.radians(1))
+    area = a.get_area()
+    b = Region(maxdepth=7)
+    b.add_circles(0, np.radians(-90), np.radians(0.5))
+    a.without(b)
+    if a.get_area() <= area - b.get_area():
+        print "test_without PASSED"
+    else:
+        print a.get_area(), b.get_area(), area
+        raise Exception("test_without FAILED")
+    pass
+
+
+def test_demote():
+    a = Region(maxdepth=8)
+    a.add_circles(0, np.radians(-90), np.radians(1))
+    ipd = a.pixeldict.copy()
+    a._demote_all()
+    for i, j in zip(ipd, a.pixeldict):
+        if ipd[i] != a.pixeldict[j]:
+            break
+    else:
+        raise Exception("test_demote FAILED")
+    print "test_demote PASSED"
+    return
+
+
+def test_intersection():
+    pass
 
 
 if __name__ == "__main__":
@@ -490,4 +534,6 @@ if __name__ == "__main__":
     test_pickle()
     test_sky2vec_corners()
     test_write_fits()
+    test_demote()
+    test_without()
     print "all tests PASSED"
