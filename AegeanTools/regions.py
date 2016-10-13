@@ -18,11 +18,11 @@ class Region(object):
     def __init__(self, maxdepth=11):
         self.maxdepth = maxdepth
         self.pixeldict = dict((i, set()) for i in xrange(1, maxdepth+1))
-        self.demoted = []
+        self.demoted = set()
         return
 
     def __repr__(self):
-        return "Region of with maximum depth {0}, and total area {1:5.2g}deg^2".format(self.maxdepth, self.get_area())
+        return "Region with maximum depth {0}, and total area {1:5.2g} deg^2".format(self.maxdepth, self.get_area())
 
     def add_circles(self, ra_cen, dec_cen, radius, depth=None):
         """
