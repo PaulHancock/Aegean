@@ -61,6 +61,8 @@ if __name__ == "__main__":
     group2.add_argument('--mim2fits',dest='mim2fits', action='append',
                         type=str, metavar=('region.mim', 'region_MOC.fits'), nargs=2,
                         help="Convert a .mim file into a MOC.fits file", default=[])
+    group2.add_argument('--area', dest='area', action='store', default=None,
+                        help="Report the area of a given region", metavar=("region.mim"))
     group3 = parser.add_argument_group("Masking files with regions")
     group3.add_argument('--maskcat', dest='mask_cat', action='store',
                         type=str, metavar=('region.mim', 'INCAT', 'OUTCAT'), nargs=3, default=[],
@@ -115,6 +117,11 @@ if __name__ == "__main__":
     if len(results.mim2fits) > 0:
         for i, o in results.mim2fits:
             MIMAS.mim2fits(i, o)
+        sys.exit()
+
+    if results.area is not None:
+        region = MIMAS.pickle.load(open(results.area))
+        print "{0} represents an area of {1} deg^2".format(results.area, region.get_area())
         sys.exit()
 
     if len(results.mask_image) > 0:
