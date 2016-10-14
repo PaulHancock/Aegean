@@ -37,7 +37,7 @@ if __name__ == "__main__":
                         default=[], type=float, metavar=('ra', 'dec', 'radius'), nargs=3,
                         help='add a circle to this region (decimal degrees)')
     group1.add_argument('-c', dest='exclude_circles', action='append',
-                        default=[],type=float, metavar=('ra', 'dec', 'radius'), nargs=3,
+                        default=[], type=float, metavar=('ra', 'dec', 'radius'), nargs=3,
                         help='exclude the given circles from a region')
 
     # add/remove polygons
@@ -58,11 +58,13 @@ if __name__ == "__main__":
     group2.add_argument('--reg2mim', dest='reg2mim', action='append',
                         type=str, metavar=('region.reg', 'region.mim'), nargs=2,
                         help="Converta a .reg file into a .mim file", default=[])
-    group2.add_argument('--mim2fits',dest='mim2fits', action='append',
+    group2.add_argument('--mim2fits', dest='mim2fits', action='append',
                         type=str, metavar=('region.mim', 'region_MOC.fits'), nargs=2,
                         help="Convert a .mim file into a MOC.fits file", default=[])
+    group2.add_argument('--intersect', '+i', dest='intersect', action='append', type=str, default=[],
+                        metavar=('region.mim',), help="Write out the intersection of the given regions.")
     group2.add_argument('--area', dest='area', action='store', default=None,
-                        help="Report the area of a given region", metavar=("region.mim"))
+                        help="Report the area of a given region", metavar=("region.mim",))
     group3 = parser.add_argument_group("Masking files with regions")
     group3.add_argument('--maskcat', dest='mask_cat', action='store',
                         type=str, metavar=('region.mim', 'INCAT', 'OUTCAT'), nargs=3, default=[],
@@ -122,6 +124,15 @@ if __name__ == "__main__":
     if results.area is not None:
         region = MIMAS.pickle.load(open(results.area))
         print "{0} represents an area of {1} deg^2".format(results.area, region.get_area())
+        sys.exit()
+
+    if len(results.intersect) > 0:
+        if len(results.intersect) == 1:
+            print "intersections requires at least two regions"
+            sys.exit(1)
+        else:
+            region = MIMAS.intersect_regions(results.intersect)
+            MIMAS.save_region(region, results.outfile)
         sys.exit()
 
     if len(results.mask_image) > 0:

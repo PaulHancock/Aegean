@@ -185,6 +185,21 @@ class Region(object):
         self._renorm()
         return
 
+    def intersect(self, other):
+        """
+        intersect this region with another
+        :param other: a region
+        :return: None
+        """
+        # work only on the lowest level
+        # TODO: Allow this to be done for regions with different depths.
+        assert self.maxdepth == other.maxdepth, "Regions must have the same maxdepth"
+        self._demote_all()
+        opd = set(other.get_demoted())
+        self.pixeldict[self.maxdepth].intersection_update(opd)
+        self._renorm()
+        return
+
     def write_reg(self, filename):
         """
         Write a ds9 region file that represents this region as a set of diamonds.

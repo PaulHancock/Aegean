@@ -22,8 +22,8 @@ from astropy.wcs import wcs as pywcs
 from regions import Region
 from catalogs import load_table, write_table
 
-__version__ = 'v1.2.4'
-__date__ = '2016-09-01'
+__version__ = 'v1.2.5'
+__date__ = '2016-10-14'
 
 # seems like this fails sometimes
 try:
@@ -337,6 +337,22 @@ def combine_regions(container):
             region.without(r2)
 
     return region
+
+
+def intersect_regions(flist):
+    """
+    Perform the intersection of all the regions in the given list.
+    :param flist: list of region filenames
+    :return: a region
+    """
+    if len(flist) < 2:
+        raise Exception("Require at least two regions to perform intersection")
+    a = pickle.load(open(flist[0]))
+    for b in [pickle.load(open(f)) for f in flist[1:]]:
+        a.intersect(b)
+    return a
+
+
 
 
 def save_region(region, filename):
