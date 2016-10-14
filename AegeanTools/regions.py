@@ -516,6 +516,19 @@ def test_without():
     pass
 
 
+def test_intersect():
+    a = Region(maxdepth=7)
+    a.add_circles(0, np.radians(-90), np.radians(1))
+    b = Region(maxdepth=7)
+    b.add_circles(0, np.radians(-90), np.radians(0.5))
+    a.intersect(b)
+    if a.get_area() == b.get_area():
+        print "test_intersect PASSED"
+    else:
+        raise Exception("test_intersect FAILED")
+    pass
+
+
 def test_demote():
     a = Region(maxdepth=8)
     a.add_circles(0, np.radians(-90), np.radians(1))
@@ -551,4 +564,5 @@ if __name__ == "__main__":
     test_write_fits()
     test_demote()
     test_without()
+    test_intersect()
     print "all tests PASSED"
