@@ -200,6 +200,21 @@ class Region(object):
         self._renorm()
         return
 
+    def symmetric_difference(self, other):
+        """
+
+        :param other:
+        :return:
+        """
+        # work only on the lowest level
+        # TODO: Allow this to be done for regions with different depths.
+        assert self.maxdepth == other.maxdepth, "Regions must have the same maxdepth"
+        self._demote_all()
+        opd = set(other.get_demoted())
+        self.pixeldict[self.maxdepth].symmetric_difference_update(opd)
+        self._renorm()
+        return
+
     def write_reg(self, filename):
         """
         Write a ds9 region file that represents this region as a set of diamonds.
@@ -481,7 +496,7 @@ def test_reg():
 
 def test_poly():
     """
-    Test that polygon regions can be added
+    Test that polygon regions can be added and written to .reg files
     """
     ra = [50, 50, 70, 70]
     dec = [-20, -25, -25, -20]
@@ -502,6 +517,9 @@ def test_write_fits():
 
 
 def test_without():
+    """
+    Test the Region.without gives expected results"
+    """
     a = Region(maxdepth=7)
     a.add_circles(0, np.radians(-90), np.radians(1))
     area = a.get_area()
@@ -517,6 +535,9 @@ def test_without():
 
 
 def test_intersect():
+    """
+    Test the Region.intersect gives expected results"
+    """
     a = Region(maxdepth=7)
     a.add_circles(0, np.radians(-90), np.radians(1))
     b = Region(maxdepth=7)
@@ -526,10 +547,13 @@ def test_intersect():
         print "test_intersect PASSED"
     else:
         raise Exception("test_intersect FAILED")
-    pass
+    return
 
 
 def test_demote():
+    """
+    Test the Region._demote_all() doesn't mess up the pixel dict"
+    """
     a = Region(maxdepth=8)
     a.add_circles(0, np.radians(-90), np.radians(1))
     ipd = a.pixeldict.copy()
@@ -543,8 +567,21 @@ def test_demote():
     return
 
 
-def test_intersection():
-    pass
+def test_symmetric_difference():
+    """
+    Test the Region.symmetric_difference() gives expected results"
+    """
+    a = Region(maxdepth=7)
+    a.add_circles(0, np.radians(-90), np.radians(1))
+    area = a.get_area()
+    b = Region(maxdepth=7)
+    b.add_circles(0, np.radians(-90), np.radians(0.5))
+    a.symmetric_difference(b)
+    if a.get_area() == area - b.get_area():
+        print "test_symmetric_difference PASSED"
+    else:
+        raise Exception("test_symmetric_difference FAILED")
+    return
 
 
 if __name__ == "__main__":
@@ -565,4 +602,5 @@ if __name__ == "__main__":
     test_demote()
     test_without()
     test_intersect()
+    test_symmetric_difference()
     print "all tests PASSED"
