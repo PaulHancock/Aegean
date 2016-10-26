@@ -1367,7 +1367,8 @@ class SourceFinder(object):
                     if (src.peak_flux > 0 and nopositive) or (src.peak_flux < 0 and nonegative):
                         continue
                     sources.append(src)
-                    print >> outfile, str(src)
+                    if outfile:
+                        print >> outfile, str(src)
         self.sources.extend(sources)
         return sources
 
