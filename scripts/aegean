@@ -71,7 +71,7 @@ if __name__ == "__main__":
     parser.add_option("--hdu", dest="hdu_index", type="int", default=0,
                       help="HDU index (0-based) for cubes with multiple images in extensions. [default: 0]")
     parser.add_option("--out", dest='outfile', default=None,
-                      help="Destination of Aegean catalog output. [default: stdout]")
+                      help="Destination of Aegean catalog output. [default: No output]")
     parser.add_option("--table", dest='tables', default=None,
                       help="Additional table outputs, format inferred from extension. [default: none]")
     parser.add_option("--tformats", dest='table_formats', action="store_true", default=False,
@@ -290,10 +290,8 @@ if __name__ == "__main__":
             sys.exit(1)
 
 
-    # if an outputfile was specified open it for writing, otherwise use stdout
-    if not options.outfile:
-        options.outfile = sys.stdout
-    else:
+    # if an outputfile was specified open it for writing
+    if options.outfile:
         options.outfile = open(options.outfile, 'w')
 
     sources = []
