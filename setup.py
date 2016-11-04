@@ -1,7 +1,7 @@
 import os
 import sys
 from setuptools import setup
-import distutils
+
 # Utility function to read the README file.
 # Used for the long_description.  It's nice, because now 1) we have a top level
 # README file and 2) it's easier to type in the README file than to put a raw
@@ -26,7 +26,6 @@ if sys.version_info < (2,7):
 else:
     reqs.append('lmfit>=0.9.2')
 
-data_dir=distutils.sysconfig_get_python_lib()+"/AegeanTools/data"
 data_dir = 'AegeanTools/data'
 
 setup(
