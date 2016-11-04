@@ -1,7 +1,7 @@
 import os
 import sys
 from setuptools import setup
-
+import distutils
 # Utility function to read the README file.
 # Used for the long_description.  It's nice, because now 1) we have a top level
 # README file and 2) it's easier to type in the README file than to put a raw
@@ -13,7 +13,7 @@ def read(fname):
 
 
 def get_version():
-    return "v2.0b-46-g24246a4-(master)"
+    return "v2.0b-100-g31fcb4b"
 
 
 reqs = ['numpy>=1.10',
@@ -25,6 +25,9 @@ if sys.version_info < (2,7):
     reqs.append('lmfit==0.9.1')
 else:
     reqs.append('lmfit>=0.9.2')
+
+data_dir=distutils.sysconfig_get_python_lib()+"/AegeanTools/data"
+data_dir = 'AegeanTools/data'
 
 setup(
     name="AegeanTools",
@@ -38,5 +41,6 @@ setup(
     long_description=read('README.md'),
     packages=['AegeanTools'],
     install_requires= reqs,
-    scripts=['scripts/aegean', 'scripts/BANE', 'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS']
+    scripts=['scripts/aegean', 'scripts/BANE', 'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS'],
+    data_files = [ ('AegeanTools', [os.path.join(data_dir,'MOC.fits')]) ]
 )
