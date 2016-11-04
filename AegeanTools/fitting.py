@@ -206,6 +206,7 @@ def jacobian(pars, x, y):
 
     return np.array(matrix)
 
+
 def hessian(pars, x, y):
     """
     Create a hessian matrix corresponding to the source model 'pars'
@@ -896,9 +897,9 @@ def test_hessian_shape():
     return True
 
 
-def test_jcaobian_shape():
+def test_jacobian_shape():
     """
-    Test to see if the jcaobian matrix if of the right shape
+    Test to see if the jacobian matrix if of the right shape
     This includes a single source model with only 4 variable params
     :return: True if the test passes
     """
@@ -937,4 +938,4 @@ def test_jcaobian_shape():
 
 if __name__ == "__main__":
     test_hessian_shape()
-    test_jcaobian_shape()
+    test_jacobian_shape()
