@@ -10,6 +10,7 @@ import copy
 import math
 import numpy as np
 from scipy.linalg import eigh, inv, pinv
+from scipy.signal import correlate2d
 import lmfit
 from angle_tools import gcd, bear, translate
 
@@ -116,7 +117,34 @@ def emp_jacobian(pars, x, y, errs=None, B=None):
     return matrix
 
 
-def jacobian(pars, x, y, errs=None, B=None):
+def lmfit_jacobian(pars, x, y, errs=None, B=None):
+    """
+    Wrapper around :jacobian: that gives the output in a format
+    that is required for lmfit.
+    :param pars: lmfit.Model
+    :param x: x-values over which the model is evaluated
+    :param y: y-values over which the model is evaluated
+    :param errs: a vector of 1\sigma errors (optional)
+    :param B: a B-matrix (optional) see B_matrix
+    :return:
+    """
+    # calculate in the normal way
+    matrix = jacobian(pars, x, y)
+    # now munge this to be as expected for lmfit
+    matrix = np.vstack(matrix)
+
+    if errs is not None:
+        matrix /= errs
+        # matrix = matrix.dot(errs)
+
+    if B is not None:
+        matrix = matrix.dot(B)
+
+    matrix = np.transpose(matrix)
+    return matrix
+
+
+def jacobian(pars, x, y):
     """
     Analytical calculation of the Jacobian for an elliptical gaussian
     Will work for a model that contains multiple Gaussians, and for which
@@ -124,8 +152,6 @@ def jacobian(pars, x, y, errs=None, B=None):
     :param pars: lmfit.Model
     :param x: x-values over which the model is evaluated
     :param y: y-values over which the model is evaluated
-    :param errs: a vector of 1\sigma errors (optional)
-    :param B: a B-matrix (optional) see B_matrix
     :return:
     """
 
@@ -178,18 +204,7 @@ def jacobian(pars, x, y, errs=None, B=None):
             dmdtheta = model * (sx ** 2 - sy ** 2) * (xsin + ycos) * (xcos + ysin) / sx ** 2 / sy ** 2
             matrix.append(dmdtheta)
 
-    matrix = np.vstack(matrix)
-
-    if errs is not None:
-        matrix /= errs
-        # matrix = matrix.dot(errs)
-
-    if B is not None:
-        matrix = matrix.dot(B)
-
-    matrix = np.transpose(matrix)
-    return matrix
-
+    return np.array(matrix)
 
 def hessian(pars, x, y):
     """
@@ -469,6 +484,44 @@ def hessian(pars, x, y):
 
     return np.array(hmat)
 
+
+def RB_bias(data, pars, x, y, ita=None):
+    """
+    Calculate the expected bias on each of the parameters in the model pars.
+    Only parameters that are allowed to vary will have a bias.
+    :param data: data that was fit
+    :param pars: lmfit.Parameters() of the fitted model
+    :param x: indices into data
+    :param y: indices into data
+    :param ita: the (normalized) noise correlation function
+    :return:
+    """
+    nparams = np.sum([pars[k].vary for k in pars.keys() if k != 'components'])
+    j = np.array(np.vsplit(lmfit_jacobian(pars, x, y).T, nparams))
+    h = hessian(pars, x, y)
+    Hij = np.einsum('ilk,jlk', j, j)
+    Dij = np.linalg.inv(Hij)
+    Bijk = np.einsum('ilm,jklm', j, h)
+    Eilkm = np.einsum('il,km', Dij, Dij)
+
+    Cimn_1 =    -1 * np.einsum('krj,ir,km,jn', Bijk, Dij, Dij, Dij)
+    Cimn_2 = -1./2 * np.einsum('rkj,ir,km,jn', Bijk, Dij, Dij, Dij)
+    Cimn = Cimn_1 + Cimn_2
+
+    N = data - ntwodgaussian_lmfit(pars)(x, y)
+    # Pi = np.einsum('pjk,jk', j, N)
+    # Qij = np.einsum('pijk,jk', h, N)
+
+    if ita is None:
+        ita = correlate2d(N, N, mode='same')/data.size
+    Vij = np.einsum('ipm,jqm,pq', j, j, ita)
+    Uijk = np.einsum('ipm,jkqm,pq', j, h, ita)
+
+    bias_1 = np.einsum('imn, mn', Cimn, Vij)
+    bias_2 = np.einsum('ilkm, mlk', Eilkm, Uijk)
+    bias = bias_1 + bias_2
+    return bias
+
 def CRB_errs(jac, C, B=None):
     """
     Calculate minimum errors given by the Cramer-Rao bound
@@ -674,7 +727,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
             return (model - data[mask]).dot(B)
 
     if dojac:
-        result = lmfit.minimize(residual, params, kws={'x': mask[0], 'y': mask[1], 'B': B, 'errs': errs}, Dfun=jacobian)
+        result = lmfit.minimize(residual, params, kws={'x': mask[0], 'y': mask[1], 'B': B, 'errs': errs}, Dfun=lmfit_jacobian)
     else:
         result = lmfit.minimize(residual, params, kws={'x': mask[0], 'y': mask[1], 'B': B, 'errs': errs})
 
@@ -701,7 +754,7 @@ def covar_errors(params, data, errs, B, C=None):
     # calculate the proper parameter errors and copy them across.
     if C is not None:
         try:
-            J = jacobian(params, mask[0], mask[1], errs=errs)
+            J = lmfit_jacobian(params, mask[0], mask[1], errs=errs)
             covar = np.transpose(J).dot(inv(C)).dot(J)
             onesigma = np.sqrt(np.diag(inv(covar)))
         except (np.linalg.linalg.LinAlgError, ValueError), e:
@@ -709,7 +762,7 @@ def covar_errors(params, data, errs, B, C=None):
 
     if C is None:
         try:
-            J = jacobian(params, mask[0], mask[1], B=B, errs=errs)
+            J = lmfit_jacobian(params, mask[0], mask[1], B=B, errs=errs)
             covar = np.transpose(J).dot(J)
             onesigma = np.sqrt(np.diag(inv(covar)))
         except (np.linalg.linalg.LinAlgError, ValueError), e:
@@ -790,7 +843,7 @@ def plot_jacobian():
     cmap.set_bad('y', 1.)
     #kwargs = {'interpolation':'nearest','cmap':cmap,'vmin':-0.1,'vmax':1, 'origin':'lower'}
     kwargs = {'interpolation': 'nearest', 'cmap': cmap, 'origin': 'lower'}
-    for i, jac in enumerate([emp_jacobian, jacobian]):
+    for i, jac in enumerate([emp_jacobian, lmfit_jacobian]):
         fig = pyplot.figure(i + 1, figsize=(4, 6))
         jdata = jac(params, x, y)
         fig.suptitle(str(jac))
@@ -842,5 +895,46 @@ def test_hessian_shape():
     print "test_hessian_shape PASSED"
     return True
 
+
+def test_jcaobian_shape():
+    """
+    Test to see if the jcaobian matrix if of the right shape
+    This includes a single source model with only 4 variable params
+    :return: True if the test passes
+    """
+    model = lmfit.Parameters()
+    model.add('c0_amp', 1, vary=True)
+    model.add('c0_xo', 5, vary=True)
+    model.add('c0_yo', 5, vary=True)
+    model.add('c0_sx', 2.001, vary=False)
+    model.add('c0_sy', 2, vary=False)
+    model.add('c0_theta', 0, vary=False)
+    model.add('components', 1, vary=False)
+    nvar = 3
+    x, y = np.indices((10, 10))
+    Jij = jacobian(model, x, y)
+    if Jij.shape != (nvar, 10, 10):
+        print "test_jacobian_shape FAILED"
+        print "found {0}, expected {1}".format(Jij.shape, (nvar, 10, 10))
+        return False
+
+    model.add('c1_amp', 1, vary=True)
+    model.add('c1_xo', 5, vary=True)
+    model.add('c1_yo', 5, vary=True)
+    model.add('c1_sx', 2.001, vary=True)
+    model.add('c1_sy', 2, vary=True)
+    model.add('c1_theta', 0, vary=True)
+    nvar = 9
+    model['components'].value = 2
+    Jij = jacobian(model, x, y)
+    if Jij.shape != (nvar, 10, 10):
+        print "test_jacobian_shape FAILED"
+        print "found {0}, expected {1}".format(Jij.shape, (nvar, 10, 10))
+        return False
+
+    print "test_jacobian_shape PASSED"
+    return True
+
 if __name__ == "__main__":
     test_hessian_shape()
+    test_jcaobian_shape()
