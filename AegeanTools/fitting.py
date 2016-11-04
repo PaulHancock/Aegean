@@ -191,6 +191,284 @@ def jacobian(pars, x, y, errs=None, B=None):
     return matrix
 
 
+def hessian(pars, x, y):
+    """
+    Create a hessian matrix corresponding to the source model 'pars'
+    Only parameters that vary will contribute to the hessian.
+    Thus there will be a total of nvar x nvar entries, each of which is a
+    len(x) x len(y) array.
+    :param pars: lmfit.Parameters() object
+    :param x: indices
+    :param y: indices
+    :return: np.array of shape (nvar, nvar, len(x), len(y))
+    """
+    j = 0  # keeping track of the number of variable parameters
+    # total number of variable parameters
+    ntvar = np.sum([pars[k].vary for k in pars.keys() if k != 'components'])
+    # construct an empty matrix of the correct size
+    hmat = np.zeros((ntvar, ntvar, len(x), len(y)))
+    npvar = 0
+
+    for i in xrange(pars['components'].value):
+        prefix = "c{0}_".format(i)
+        amp = pars[prefix + 'amp'].value
+        xo = pars[prefix + 'xo'].value
+        yo = pars[prefix + 'yo'].value
+        sx = pars[prefix + 'sx'].value
+        sy = pars[prefix + 'sy'].value
+        theta = pars[prefix + 'theta'].value
+
+        amp_var = pars[prefix + 'amp'].vary
+        xo_var = pars[prefix + 'xo'].vary
+        yo_var = pars[prefix + 'yo'].vary
+        sx_var = pars[prefix + 'sx'].vary
+        sy_var = pars[prefix + 'sy'].vary
+        theta_var = pars[prefix + 'theta'].vary
+
+        # precomputed for speed
+        model = elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta)
+        sint = np.sin(np.radians(theta))
+        sin2t = np.sin(np.radians(2*theta))
+        cost = np.cos(np.radians(theta))
+        cos2t = np.cos(np.radians(2*theta))
+        sx2 = sx**2
+        sy2 = sy**2
+        xxo = x-xo
+        yyo = y-yo
+        xcos, ycos = xxo*cost, yyo*cost
+        xsin, ysin = xxo*sint, yyo*sint
+
+        if amp_var:
+            k = npvar  # second round of keeping track of variable params
+            # H(amp,amp)/G =  0
+            hmat[j][k] = 0
+            k += 1
+
+            if xo_var:
+                # H(amp,xo)/G =  1.0*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t))/(amp*sx**2*sy**2)
+                hmat[j][k] = (xsin + ycos)*sint/sy2 + (xcos + ysin)*cost/sx2
+                hmat[j][k] *= model
+                k += 1
+
+            if yo_var:
+                # H(amp,yo)/G =  1.0*(-sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*cos(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*sin(t))/(amp*sx**2*sy**2)
+                hmat[j][k] = (xcos + ysin)*sint/sx2 - (xsin - ycos)*cost/sy2
+                hmat[j][k] *= model/amp
+                k += 1
+
+            if sx_var:
+                # H(amp,sx)/G =  1.0*((x - xo)*cos(t) + (y - yo)*sin(t))**2/(amp*sx**3)
+                hmat[j][k] = (xcos + ysin)**2
+                hmat[j][k] *= model/(amp*sx**3)
+                k += 1
+
+            if sy_var:
+                # H(amp,sy) =  1.0*((x - xo)*sin(t) + (-y + yo)*cos(t))**2/(amp*sy**3)
+                hmat[j][k] = (xsin - ycos)**2
+                hmat[j][k] *= model/(amp*sy**3)
+                k += 1
+
+            if theta_var:
+                # H(amp,t) =  (-1.0*sx**2 + sy**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))*((x - xo)*cos(t) + (y - yo)*sin(t))/(amp*sx**2*sy**2)
+                hmat[j][k] = (xsin - ycos)*(xcos + ysin)
+                hmat[j][k] *= sy2-sx2
+                hmat[j][k] *= model/(amp*sx2*sy2)
+                # k += 1
+            j += 1
+
+        if xo_var:
+            k = npvar
+            if amp_var:
+                # H(xo,amp)/G = H(amp,xo)
+                hmat[j][k] = hmat[k][j]
+                k += 1
+
+            # if xo_var:
+            # H(xo,xo)/G =  1.0*(-sx**2*sy**2*(sx**2*sin(t)**2 + sy**2*cos(t)**2) + (sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t))**2)/(sx**4*sy**4)
+            hmat[j][k] = (sx2*(xsin - ysin)*sint + sy2*(xcos + ysin)*cost)**2 / (sx2**2*sy2**2)
+            hmat[j][k] -= sint**2/sy2 + cost**2/sx2
+            hmat[j][k] *= model
+            k += 1
+
+            if yo_var:
+                # H(xo,yo)/G =  1.0*(sx**2*sy**2*(sx**2 - sy**2)*sin(2*t)/2 - (sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t))*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*cos(t) - sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*sin(t)))/(sx**4*sy**4)
+                hmat[j][k] = sx2*sy2*(sx2 - sy2)*sin2t/2
+                hmat[j][k] -= (sx2*(xsin - ycos)*sint + sy2*(xcos + ysin)*cost)*(sx2*(xsin -ycos)*cost - sy2*(xcos + ysin)*sint)
+                hmat[j][k] *= model / (sx**4*sy**4)
+                k += 1
+
+            if sx_var:
+                # H(xo,sx) =  ((x - xo)*cos(t) + (y - yo)*sin(t))*(-2.0*sx**2*sy**2*cos(t) + 1.0*((x - xo)*cos(t) + (y - yo)*sin(t))*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t)))/(sx**5*sy**2)
+                hmat[j][k] = (xcos + ysin)
+                hmat[j][k] *= -2*sx2*sy2*cost + (xcos + ysin)*(sx2*(xsin - ycos)*sint + sy2*(xcos + ysin)*cost)
+                hmat[j][k] *= model / (sx**5*sy2)
+                k += 1
+
+            if sy_var:
+                # H(xo,sy) =  ((x - xo)*sin(t) + (-y + yo)*cos(t))*(-2.0*sx**2*sy**2*sin(t) + 1.0*((x - xo)*sin(t) + (-y + yo)*cos(t))*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t)))/(sx2*sy**5)
+                hmat[j][k] = (xsin - ycos)
+                hmat[j][k] *= -2*sx2*sy2*sint + (xsin - ycos)*(sx2*(xsin - ycos)*sint + sy2*(xcos + ysin)*cost)
+                hmat[j][k] *= model/(sx2*sy**5)
+                k += 1
+
+            if theta_var:
+                # H(xo,t) =  1.0*(sx**2*sy**2*(sx**2 - sy**2)*(x*sin(2*t) - xo*sin(2*t) - y*cos(2*t) + yo*cos(2*t)) + (-sx**2 + 1.0*sy**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))*((x - xo)*cos(t) + (y - yo)*sin(t))*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t)))/(sx**4*sy**4)
+                hmat[j][k] = (sy2-sx2)*(xsin -ycos)*(xcos + ysin)
+                hmat[j][k] *= sx2*(xsin -ysin)*sint + sy2*(xcos + ysin)*cost
+                hmat[j][k] += sx2*sy2*(sx2 - sy2)*(x*sin2t - xo*sin2t - y*cos2t + yo*cos2t)
+                hmat[j][k] *= model/(sx**4*sy**4)
+                # k += 1
+            j += 1
+
+        if yo_var:
+            k = npvar
+            if amp_var:
+                # H(yo,amp)/G = H(amp,yo)
+                hmat[j][k] = hmat[0][2]
+                k += 1
+
+            if xo_var:
+                # H(yo,xo)/G = H(xo,yo)/G
+                hmat[j][k] =hmat[1][2]
+                k += 1
+
+            # if yo_var:
+            # H(yo,yo)/G = 1.0*(-sx**2*sy**2*(sx**2*cos(t)**2 + sy**2*sin(t)**2) + (sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*cos(t) - sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*sin(t))**2)/(sx**4*sy**4)
+            hmat[j][k] = (sx2*(xsin - ycos)*cost - sy2*(xcos + ysin)*sint)**2 / (sx2**2*sy2**2)
+            hmat[j][k] -= cost**2/sy2 + sint**2/sx2
+            hmat[j][k] *= model
+            k += 1
+
+            if sx_var:
+                # H(yo,sx)/G =  -((x - xo)*cos(t) + (y - yo)*sin(t))*(2.0*sx**2*sy**2*sin(t) + 1.0*((x - xo)*cos(t) + (y - yo)*sin(t))*(sx**2*((x - xo)*sin(t) - (y - yo)*cos(t))*cos(t) - sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*sin(t)))/(sx**5*sy**2)
+                hmat[j][k] = -1*(xcos + ysin)
+                hmat[j][k] *= 2*sx2*sy2*sint + (xcos + ysin)*(sx2*(xsin - ycos)*cost - sy2*(xcos + ysin)*sint)
+                hmat[j][k] *= model/(sx**5*sy2)
+                k += 1
+
+            if sy_var:
+                # H(yo,sy)/G =  ((x - xo)*sin(t) + (-y + yo)*cos(t))*(2.0*sx**2*sy**2*cos(t) - 1.0*((x - xo)*sin(t) + (-y + yo)*cos(t))*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*cos(t) - sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*sin(t)))/(sx**2*sy**5)
+                hmat[j][k] = (xsin -ycos)
+                hmat[j][k] *= 2*sx2*sy2*cost - (xsin - ycos)*(sx2*(xsin - ycos)*cost - sy2*(xcos + ysin)*sint)
+                hmat[j][k] *= model/(sx2*sy**5)
+                k += 1
+
+            if theta_var:
+                # H(yo,t)/G =  1.0*(sx**2*sy**2*(sx**2*(-x*cos(2*t) + xo*cos(2*t) - y*sin(2*t) + yo*sin(2*t)) + sy**2*(x*cos(2*t) - xo*cos(2*t) + y*sin(2*t) - yo*sin(2*t))) + (1.0*sx**2 - sy**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))*((x - xo)*cos(t) + (y - yo)*sin(t))*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*cos(t) - sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*sin(t)))/(sx**4*sy**4)
+                hmat[j][k] = (sx2 - sy2)*(xsin - ycos)*(xcos + ysin)
+                hmat[j][k] *= (sx2*(xsin - ycos)*cost - sy2*(xcos + ysin)*sint)
+                hmat[j][k] += sx2*sy2*(sx2-sy2)*(-x*cos2t + xo*cos2t - y*sin2t + yo*sin2t)
+                hmat[j][k] *= model/(sx**4*sy**4)
+                # k += 1
+            j += 1
+
+        if sx_var:
+            k = npvar
+            if amp_var:
+                # H(sx,amp)/G = H(amp,sx)/G
+                hmat[j][k] = hmat[k][j]
+                k += 1
+
+            if xo_var:
+                # H(sx,xo)/G = H(xo,sx)/G
+                hmat[j][k] = hmat[k][j]
+                k += 1
+
+            if yo_var:
+                # H(sx,yo)/G = H(yo/sx)/G
+                hmat[j][k] = hmat[k][j]
+                k += 1
+
+            # if sx_var:
+            # H(sx,sx)/G =  (-3.0*sx**2 + 1.0*((x - xo)*cos(t) + (y - yo)*sin(t))**2)*((x - xo)*cos(t) + (y - yo)*sin(t))**2/sx**6
+            hmat[j][k] = -3*sx2 + (xcos + ysin)**2
+            hmat[j][k] *= (xcos + ysin)**2
+            hmat[j][k] *= model/sx**6
+            k += 1
+
+            if sy_var:
+                # H(sx,sy)/G =  1.0*((x - xo)*sin(t) + (-y + yo)*cos(t))**2*((x - xo)*cos(t) + (y - yo)*sin(t))**2/(sx**3*sy**3)
+                hmat[j][k] = (xsin -ycos )**2*(xcos + ysin)**2
+                hmat[j][k] *= model/(sx**3*sy**3)
+                k += 1
+
+            if theta_var:
+                # H(sx,t)/G =  (-2.0*sx**2*sy**2 + 1.0*(-sx**2 + sy**2)*((x - xo)*cos(t) + (y - yo)*sin(t))**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))*((x - xo)*cos(t) + (y - yo)*sin(t))/(sx**5*sy**2)
+                hmat[j][k] = -2*sx2*sy2 + (sy2 - sx2)*(xcos + ysin)**2
+                hmat[j][k] *= (xsin -ycos)*(xcos + ysin)
+                hmat[j][k] *= model/(sx**5*sy**2)
+                # k += 1
+            j += 1
+
+        if sy_var:
+            k = npvar
+            if amp_var:
+                # H(sy,amp)/G = H(amp,sy)/G
+                hmat[j][k] = hmat[k][j]
+                k += 1
+            if xo_var:
+                # H(sy,xo)/G = H(xo,sy)/G
+                hmat[j][k] = hmat[k][j]
+                k += 1
+            if yo_var:
+                # H(sy,yo)/G = H(yo/sy)/G
+                hmat[j][k] = hmat[k][j]
+                k += 1
+            if sx_var:
+                # H(sy,sx)/G = H(sx,sy)/G
+                hmat[j][k] = hmat[k][j]
+
+            # if sy_var:
+            # H(sy,sy)/G =  (-3.0*sy**2 + 1.0*((x - xo)*sin(t) + (-y + yo)*cos(t))**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))**2/sy**6
+            hmat[j][k] = -3*sy2 + (xsin - ycos)**2
+            hmat[j][k] *= (xsin - ycos)**2
+            hmat[j][k] *= model/sy**6
+            k += 1
+
+            if theta_var:
+                # H(sy,t)/G =  (2.0*sx**2*sy**2 + 1.0*(-sx**2 + sy**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))*((x - xo)*cos(t) + (y - yo)*sin(t))/(sx**2*sy**5)
+                hmat[j][k] = 2*sx2*sy2 + (sy2 - sx2)*(xsin - ycos)**2
+                hmat[j][k] *= (xsin - ycos)*(xcos + ysin)
+                hmat[j][k] *= model/(sx**2*sy**5)
+                # k += 1
+            j += 1
+
+        if theta_var:
+            k = npvar
+            if amp_var:
+                # H(t,amp)/G = H(amp,t)/G
+                hmat[j][k] = hmat[k][j]
+                k += 1
+            if xo_var:
+                # H(t,xo)/G = H(xo,t)/G
+                hmat[j][k] = hmat[k][j]
+                k += 1
+            if yo_var:
+                # H(t,yo)/G = H(yo/t)/G
+                hmat[j][k] = hmat[k][j]
+                k += 1
+            if sx_var:
+                # H(t,sx)/G = H(sx,t)/G
+                hmat[j][k] = hmat[k][j]
+                k += 1
+            if sy_var:
+                # H(t,sy)/G = H(sy,t)/G
+                hmat[j][k] = hmat[k][j]
+                k += 1
+            # if theta_var:
+            # H(t,t)/G =  (sx**2*sy**2*(sx**2*(((x - xo)*sin(t) + (-y + yo)*cos(t))**2 - 1.0*((x - xo)*cos(t) + (y - yo)*sin(t))**2) + sy**2*(-1.0*((x - xo)*sin(t) + (-y + yo)*cos(t))**2 + ((x - xo)*cos(t) + (y - yo)*sin(t))**2)) + (sx**2 - 1.0*sy**2)**2*((x - xo)*sin(t) + (-y + yo)*cos(t))**2*((x - xo)*cos(t) + (y - yo)*sin(t))**2)/(sx**4*sy**4)
+            hmat[j][k] = sx2*sy2
+            hmat[j][k] *= sx2*((xsin - ycos)**2 - (xcos + ysin)**2) + sy2*((xcos + ysin)**2 - (xsin - ycos)**2)
+            hmat[j][k] += (sx2 - sy2)**2*(xsin - ycos)**2*(xcos + ysin)**2
+            hmat[j][k] *= model/(sx**4*sy**4)
+            # j += 1
+
+        # save the number of variables for the next iteration
+        # as we need to start our indexing at this number
+        npvar = k
+
+    return np.array(hmat)
+
 def CRB_errs(jac, C, B=None):
     """
     Calculate minimum errors given by the Cramer-Rao bound
@@ -525,5 +803,44 @@ def plot_jacobian():
     pyplot.show()
 
 
+def test_hessian_shape():
+    """
+    Test to see if the hessian matrix if of the right shape
+    This includes a single source model with only 4 variable params
+    :return: True if the test passes
+    """
+    model = lmfit.Parameters()
+    model.add('c0_amp', 1, vary=True)
+    model.add('c0_xo', 5, vary=True)
+    model.add('c0_yo', 5, vary=True)
+    model.add('c0_sx', 2.001, vary=False)
+    model.add('c0_sy', 2, vary=False)
+    model.add('c0_theta', 0, vary=False)
+    model.add('components', 1, vary=False)
+    nvar = 3
+    x, y = np.indices((10, 10))
+    Hij = hessian(model, x, y)
+    if Hij.shape != (nvar, nvar, 10, 10):
+        print "test_hessian_shape FAILED"
+        print "found {0}, expected {1}".format(Hij.shape, (nvar, nvar, 10, 10))
+        return False
+
+    model.add('c1_amp', 1, vary=True)
+    model.add('c1_xo', 5, vary=True)
+    model.add('c1_yo', 5, vary=True)
+    model.add('c1_sx', 2.001, vary=True)
+    model.add('c1_sy', 2, vary=True)
+    model.add('c1_theta', 0, vary=True)
+    nvar = 9
+    model['components'].value = 2
+    Hij = hessian(model, x, y)
+    if Hij.shape != (nvar, nvar, 10, 10):
+        print "test_hessian_shape FAILED"
+        print "found {0}, expected {1}".format(Hij.shape, (nvar, nvar, 10, 10))
+        return False
+
+    print "test_hessian_shape PASSED"
+    return True
+
 if __name__ == "__main__":
-    plot_jacobian()
+    test_hessian_shape()
