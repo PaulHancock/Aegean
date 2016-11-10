@@ -13,7 +13,7 @@ def read(fname):
 
 
 def get_version():
-    return "v2.0b-100-g31fcb4b"
+    return "v2.0b-111-ga68e18c"
 
 
 reqs = ['numpy>=1.10',
@@ -21,7 +21,7 @@ reqs = ['numpy>=1.10',
         'astropy>=1.0',
         'pprocess>=0.5']
 
-if sys.version_info < (2,7):
+if sys.version_info < (2, 7):
     reqs.append('lmfit==0.9.1')
 else:
     reqs.append('lmfit>=0.9.2')
@@ -39,7 +39,7 @@ setup(
     url="https://github.com/PaulHancock/Aegean",
     long_description=read('README.md'),
     packages=['AegeanTools'],
-    install_requires= reqs,
+    install_requires=reqs,
     scripts=['scripts/aegean', 'scripts/BANE', 'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS'],
-    data_files = [ ('AegeanTools', [os.path.join(data_dir,'MOC.fits')]) ]
+    data_files=[('AegeanTools', [os.path.join(data_dir, 'MOC.fits')]) ]
 )
