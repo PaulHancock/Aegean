@@ -86,64 +86,6 @@ def Bmatrix(C):
     return B
 
 
-def emp_jacobian(pars, x, y, errs=None, B=None):
-    """
-    An empirical calculation of the Jacobian
-    Will work for a model that contains multiple Gaussians, and for which
-    some components are not being fit (don't vary).
-    :param pars: lmfit.Model
-    :param x: x-values over which the model is evaluated
-    :param y: y-values over which the model is evaluated
-    :return:
-    """
-    eps = 1e-5
-    matrix = []
-    model = ntwodgaussian_lmfit(pars)(x, y)
-    for i in xrange(pars['components'].value):
-        prefix = "c{0}_".format(i)
-        for p in ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']:
-            if pars[prefix + p].vary:
-                pars[prefix + p].value += eps
-                dmdp = ntwodgaussian_lmfit(pars)(x, y) - model
-                matrix.append(dmdp / eps)
-                pars[prefix + p].value -= eps
-    matrix = np.array(matrix)
-    if errs is not None:
-        matrix /= errs
-
-    if B is not None:
-        matrix = matrix.dot(B)
-    matrix = np.transpose(matrix)
-    return matrix
-
-
-def lmfit_jacobian(pars, x, y, errs=None, B=None):
-    """
-    Wrapper around :jacobian: that gives the output in a format
-    that is required for lmfit.
-    :param pars: lmfit.Model
-    :param x: x-values over which the model is evaluated
-    :param y: y-values over which the model is evaluated
-    :param errs: a vector of 1\sigma errors (optional)
-    :param B: a B-matrix (optional) see B_matrix
-    :return:
-    """
-    # calculate in the normal way
-    matrix = jacobian(pars, x, y)
-    # now munge this to be as expected for lmfit
-    matrix = np.vstack(matrix)
-
-    if errs is not None:
-        matrix /= errs
-        # matrix = matrix.dot(errs)
-
-    if B is not None:
-        matrix = matrix.dot(B)
-
-    matrix = np.transpose(matrix)
-    return matrix
-
-
 def jacobian(pars, x, y):
     """
     Analytical calculation of the Jacobian for an elliptical gaussian
@@ -205,6 +147,62 @@ def jacobian(pars, x, y):
             matrix.append(dmdtheta)
 
     return np.array(matrix)
+
+
+def emp_jacobian(pars, x, y):
+    """
+    An empirical calculation of the Jacobian
+    Will work for a model that contains multiple Gaussians, and for which
+    some components are not being fit (don't vary).
+    :param pars: lmfit.Model
+    :param x: x-values over which the model is evaluated
+    :param y: y-values over which the model is evaluated
+    :return:
+    """
+    eps = 1e-5
+    matrix = []
+    model = ntwodgaussian_lmfit(pars)(x, y)
+    for i in xrange(pars['components'].value):
+        prefix = "c{0}_".format(i)
+        for p in ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']:
+            if pars[prefix + p].vary:
+                pars[prefix + p].value += eps
+                dmdp = ntwodgaussian_lmfit(pars)(x, y) - model
+                matrix.append(dmdp / eps)
+                pars[prefix + p].value -= eps
+    matrix = np.array(matrix)
+    return matrix
+
+
+def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
+    """
+    Wrapper around :jacobian: that gives the output in a format
+    that is required for lmfit.
+    :param pars: lmfit.Model
+    :param x: x-values over which the model is evaluated
+    :param y: y-values over which the model is evaluated
+    :param errs: a vector of 1\sigma errors (optional)
+    :param B: a B-matrix (optional) see B_matrix
+    :param emp: True = use empirical Jacobian
+    :return:
+    """
+    if emp:
+        matrix = emp_jacobian(pars, x, y, errs, B)
+    else:
+        # calculate in the normal way
+        matrix = jacobian(pars, x, y)
+    # now munge this to be as expected for lmfit
+    matrix = np.vstack(matrix)
+
+    if errs is not None:
+        matrix /= errs
+        # matrix = matrix.dot(errs)
+
+    if B is not None:
+        matrix = matrix.dot(B)
+
+    matrix = np.transpose(matrix)
+    return matrix
 
 
 def hessian(pars, x, y):
@@ -406,7 +404,7 @@ def hessian(pars, x, y):
 
             if sy_var:
                 # H(sx,sy)/G =  1.0*((x - xo)*sin(t) + (-y + yo)*cos(t))**2*((x - xo)*cos(t) + (y - yo)*sin(t))**2/(sx**3*sy**3)
-                hmat[j][k] = (xsin -ycos )**2*(xcos + ysin)**2
+                hmat[j][k] = (xsin - ycos)**2 * (xcos + ysin)**2
                 hmat[j][k] *= model/(sx**3*sy**3)
                 k += 1
 
@@ -435,6 +433,7 @@ def hessian(pars, x, y):
             if sx_var:
                 # H(sy,sx)/G = H(sx,sy)/G
                 hmat[j][k] = hmat[k][j]
+                k += 1
 
             # if sy_var:
             # H(sy,sy)/G =  (-3.0*sy**2 + 1.0*((x - xo)*sin(t) + (-y + yo)*cos(t))**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))**2/sy**6
@@ -484,8 +483,31 @@ def hessian(pars, x, y):
         # save the number of variables for the next iteration
         # as we need to start our indexing at this number
         npvar = k
-
     return np.array(hmat)
+
+
+def emp_hessian(pars, x, y):
+    """
+    Calculate the hessian matrix empirically.
+    Relies on :emp_jacobian: for the first order derivatives
+    :param pars:
+    :param x:
+    :param y:
+    :return:
+    """
+    eps = 1e-5
+    matrix = []
+    for i in xrange(pars['components']):
+        model = emp_jacobian(pars, x, y)
+        prefix = "c{0}_".format(i)
+        for p in ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']:
+            if pars[prefix+p].vary:
+                pars[prefix+p].value += eps
+                dm2didj = emp_jacobian(pars, x, y) - model
+                matrix.append(dm2didj/eps)
+                pars[prefix+p].value -= eps
+    matrix = np.array(matrix)
+    return matrix
 
 
 def RB_bias(data, pars, x, y, ita=None):
@@ -524,6 +546,7 @@ def RB_bias(data, pars, x, y, ita=None):
     bias_2 = np.einsum('ilkm, mlk', Eilkm, Uijk)
     bias = bias_1 + bias_2
     return bias
+
 
 def CRB_errs(jac, C, B=None):
     """
@@ -899,6 +922,65 @@ def test_hessian_shape():
     return True
 
 
+def clx(ax):
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+
+def test_hessian_plots():
+    """
+    Plot the empirical and analytical hessian to check for agreement.
+    :return: None
+    """
+    from matplotlib import pyplot
+    model = lmfit.Parameters()
+    model.add('c0_amp', 1, vary=True)
+    model.add('c0_xo', 20, vary=True)
+    model.add('c0_yo', 20, vary=True)
+    model.add('c0_sx', 5, vary=True)
+    model.add('c0_sy', 4, vary=True)
+    model.add('c0_theta', 37, vary=True)
+    model.add('components', 1, vary=False)
+    x, y = np.indices((40, 40))
+    #Empirical Hessian
+    kwargs = {"interpolation": "nearest", 'aspect': 1, 'vmin': -1, 'vmax': 1}
+    fig, ax = pyplot.subplots(6, 6, squeeze=True, sharex=True, sharey=True, figsize=(5, 6))
+    Hemp = emp_hessian(model, x, y)
+    vars = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
+    print Hemp.shape
+    for i, row in enumerate(ax):
+        for j, ax in enumerate(row):
+            im = Hemp[i, j, :, :]
+            # im[np.where(abs(im) < 1e-5)] = 0
+            # print vars[i],vars[j], np.amax(im)
+            im /= np.amax(im)
+            ax.imshow(im, **kwargs)
+            if j == 0:
+                ax.set_ylabel(vars[i])
+            if i == 5:
+                ax.set_xlabel(vars[j])
+            clx(ax)
+    fig.suptitle('Empirical Hessian')
+
+    #Analytical Hessian
+    fig, ax = pyplot.subplots(6, 6, squeeze=True, sharex=True, sharey=True, figsize=(5, 6))
+    Hana = hessian(model, x, y)
+    for i, row in enumerate(ax):
+        for j, ax in enumerate(row):
+            im = Hana[i, j, :, :]
+            # im[np.where(abs(im) < 1e-5)] = 0
+            # print vars[i],vars[j], np.amax(im)
+            im /= np.amax(im)
+            ax.imshow(im, **kwargs)
+            if j == 0:
+                ax.set_ylabel(vars[i])
+            if i == 5:
+                ax.set_xlabel(vars[j])
+            clx(ax)
+    fig.suptitle('Analytical Hessian')
+
+    pyplot.show()
+
 def test_jacobian_shape():
     """
     Test to see if the jacobian matrix if of the right shape
@@ -939,5 +1021,8 @@ def test_jacobian_shape():
     return True
 
 if __name__ == "__main__":
-    test_hessian_shape()
-    test_jacobian_shape()
+    # test_hessian_shape()
+    test_hessian_plots()
+    # test_jacobian_shape()
+    # test_jacobian_plots()
+
