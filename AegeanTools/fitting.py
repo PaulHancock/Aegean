@@ -1020,9 +1020,53 @@ def test_jacobian_shape():
     print "test_jacobian_shape PASSED"
     return True
 
+
+def test_jacobian_plot():
+    """
+
+    :return:
+    """
+    from matplotlib import pyplot
+    model = lmfit.Parameters()
+    model.add('c0_amp', 1, vary=True)
+    model.add('c0_xo', 20, vary=True)
+    model.add('c0_yo', 20, vary=True)
+    model.add('c0_sx', 5, vary=True)
+    model.add('c0_sy', 4, vary=True)
+    model.add('c0_theta', 37, vary=True)
+    model.add('components', 1, vary=False)
+    x, y = np.indices((40, 40))
+
+    kwargs = {"interpolation": "nearest", 'aspect': 1, 'vmin': -1, 'vmax': 1}
+    vars = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
+
+    fig, ax = pyplot.subplots(6, 3, sharex=True, sharey=True, figsize=(3, 6))
+
+    Jemp = emp_jacobian(model, x, y)
+    Jana = jacobian(model, x, y)
+
+    for i, row in enumerate(ax):
+        im1 = Jemp[i, :, :]
+        im1 /= np.amax(im1)
+        im2 = Jana[i, :, :]
+        im2 /= np.amax(im2)
+        row[0].imshow(im1, **kwargs)
+        row[0].set_ylabel(vars[i])
+        row[1].imshow(im2, **kwargs)
+        row[2].imshow(im1-im2, **kwargs)
+        clx(row[0])
+        clx(row[1])
+    ax[0][0].set_title("Emp")
+    ax[0][1].set_title("Ana")
+    ax[0][2].set_title("Diff")
+    fig.suptitle('Jacobian Comparison')
+    pyplot.show()
+    return
+
+
 if __name__ == "__main__":
     # test_hessian_shape()
-    test_hessian_plots()
+    # test_hessian_plots()
     # test_jacobian_shape()
-    # test_jacobian_plots()
+    test_jacobian_plot()
 
