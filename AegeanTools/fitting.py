@@ -201,7 +201,7 @@ def jacobian(pars, x, y):
             matrix.append(dmdsy)
 
         if pars[prefix + 'theta'].vary:
-            dmdtheta = model * (sx ** 2 - sy ** 2) * (xsin + ycos) * (xcos + ysin) / sx ** 2 / sy ** 2
+            dmdtheta = model * (sy ** 2 - sx ** 2) * (xsin - ycos) * (xcos + ysin) / sx ** 2 / sy ** 2
             matrix.append(dmdtheta)
 
     return np.array(matrix)
