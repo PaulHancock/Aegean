@@ -923,8 +923,14 @@ def test_hessian_shape():
 
 
 def clx(ax):
+    """
+    Remove the x/y ticks from a given axis
+    :param ax:
+    :return: None
+    """
     ax.set_xticks([])
     ax.set_yticks([])
+    return
 
 
 def test_hessian_plots():
@@ -942,7 +948,7 @@ def test_hessian_plots():
     model.add('c0_theta', 37, vary=True)
     model.add('components', 1, vary=False)
     x, y = np.indices((40, 40))
-    #Empirical Hessian
+    # Empirical Hessian
     kwargs = {"interpolation": "nearest", 'aspect': 1, 'vmin': -1, 'vmax': 1}
     fig, ax = pyplot.subplots(6, 6, squeeze=True, sharex=True, sharey=True, figsize=(5, 6))
     Hemp = emp_hessian(model, x, y)
@@ -961,7 +967,7 @@ def test_hessian_plots():
             clx(ax)
     fig.suptitle('Empirical Hessian')
 
-    #Analytical Hessian
+    # Analytical Hessian
     fig, ax = pyplot.subplots(6, 6, squeeze=True, sharex=True, sharey=True, figsize=(5, 6))
     Hana = hessian(model, x, y)
     for i, row in enumerate(ax):
@@ -978,7 +984,7 @@ def test_hessian_plots():
             clx(ax)
     fig.suptitle('Analytical Hessian')
 
-    #Difference
+    # Difference
     fig, ax = pyplot.subplots(6, 6, squeeze=True, sharex=True, sharey=True, figsize=(5, 6))
     Hana = hessian(model, x, y)
     for i, row in enumerate(ax):
@@ -996,9 +1002,10 @@ def test_hessian_plots():
     fig.suptitle('Difference')
     pyplot.show()
 
+
 def test_jacobian_shape():
     """
-    Test to see if the jacobian matrix if of the right shape
+    Test to see if the Jacobian matrix if of the right shape
     This includes a single source model with only 4 variable params
     :return: True if the test passes
     """
@@ -1080,8 +1087,8 @@ def test_jacobian_plot():
 
 
 if __name__ == "__main__":
-    # test_hessian_shape()
-    test_hessian_plots()
-    # test_jacobian_shape()
+    test_hessian_shape()
+    # test_hessian_plots()
+    test_jacobian_shape()
     # test_jacobian_plot()
 
