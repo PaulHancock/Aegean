@@ -262,13 +262,13 @@ def hessian(pars, x, y):
 
             if xo_var:
                 # H(amp,xo)/G =  1.0*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t))/(amp*sx**2*sy**2)
-                hmat[j][k] = (xsin + ycos)*sint/sy2 + (xcos + ysin)*cost/sx2
+                hmat[j][k] = (xsin - ycos)*sint/sy2 + (xcos + ysin)*cost/sx2
                 hmat[j][k] *= model
                 k += 1
 
             if yo_var:
                 # H(amp,yo)/G =  1.0*(-sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*cos(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*sin(t))/(amp*sx**2*sy**2)
-                hmat[j][k] = (xcos + ysin)*sint/sx2 - (xsin - ycos)*cost/sy2
+                hmat[j][k] = -(xsin - ycos)*cost/sy2 + (xcos + ysin)*sint/sx2 
                 hmat[j][k] *= model/amp
                 k += 1
 
@@ -301,9 +301,9 @@ def hessian(pars, x, y):
 
             # if xo_var:
             # H(xo,xo)/G =  1.0*(-sx**2*sy**2*(sx**2*sin(t)**2 + sy**2*cos(t)**2) + (sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t))**2)/(sx**4*sy**4)
-            hmat[j][k] = (sx2*(xsin - ysin)*sint + sy2*(xcos + ysin)*cost)**2 / (sx2**2*sy2**2)
-            hmat[j][k] -= sint**2/sy2 + cost**2/sx2
-            hmat[j][k] *= model
+            hmat[j][k] = -sx2*sx2*(sx2*sint**2 + sy2*cost**2)
+            hmat[j][k] += (sx2*(xsin - ycos)*sint + sy2*(xcos + ysin)*cost)**2
+            hmat[j][k] *= model/ (sx2**2*sy2**2)
             k += 1
 
             if yo_var:
@@ -329,9 +329,11 @@ def hessian(pars, x, y):
 
             if theta_var:
                 # H(xo,t) =  1.0*(sx**2*sy**2*(sx**2 - sy**2)*(x*sin(2*t) - xo*sin(2*t) - y*cos(2*t) + yo*cos(2*t)) + (-sx**2 + 1.0*sy**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))*((x - xo)*cos(t) + (y - yo)*sin(t))*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t)))/(sx**4*sy**4)
-                hmat[j][k] = (sy2-sx2)*(xsin -ycos)*(xcos + ysin)
-                hmat[j][k] *= sx2*(xsin -ysin)*sint + sy2*(xcos + ysin)*cost
-                hmat[j][k] += sx2*sy2*(sx2 - sy2)*(x*sin2t - xo*sin2t - y*cos2t + yo*cos2t)
+                # second part
+                hmat[j][k] = (sy2-sx2)*(xsin - ycos)*(xcos + ysin)
+                hmat[j][k] *= sx2*(xsin -ycos)*sint + sy2*(xcos + ysin)*cost
+                # first part
+                hmat[j][k] += sx2*sy2*(sx2 - sy2)*(xxo*sin2t -yyo*cos2t)
                 hmat[j][k] *= model/(sx**4*sy**4)
                 # k += 1
             j += 1
