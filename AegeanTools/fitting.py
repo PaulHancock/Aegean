@@ -299,7 +299,7 @@ def hessian(pars, x, y):
 
             # if xo_var:
             # H(xo,xo)/G =  1.0*(-sx**2*sy**2*(sx**2*sin(t)**2 + sy**2*cos(t)**2) + (sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t))**2)/(sx**4*sy**4)
-            hmat[j][k] = -sx2*sx2*(sx2*sint**2 + sy2*cost**2)
+            hmat[j][k] = -sx2*sy2*(sx2*sint**2 + sy2*cost**2)
             hmat[j][k] += (sx2*(xsin - ycos)*sint + sy2*(xcos + ysin)*cost)**2
             hmat[j][k] *= model/ (sx2**2*sy2**2)
             k += 1
