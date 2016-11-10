@@ -947,7 +947,6 @@ def test_hessian_plots():
     fig, ax = pyplot.subplots(6, 6, squeeze=True, sharex=True, sharey=True, figsize=(5, 6))
     Hemp = emp_hessian(model, x, y)
     vars = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
-    print Hemp.shape
     for i, row in enumerate(ax):
         for j, ax in enumerate(row):
             im = Hemp[i, j, :, :]
@@ -979,6 +978,22 @@ def test_hessian_plots():
             clx(ax)
     fig.suptitle('Analytical Hessian')
 
+    #Difference
+    fig, ax = pyplot.subplots(6, 6, squeeze=True, sharex=True, sharey=True, figsize=(5, 6))
+    Hana = hessian(model, x, y)
+    for i, row in enumerate(ax):
+        for j, ax in enumerate(row):
+            im1 = Hana[i, j, :, :]
+            im1 /= np.amax(im1)
+            im2 = Hemp[i, j, :, :]
+            im2 /= np.amax(im2)
+            ax.imshow(im1-im2, **kwargs)
+            if j == 0:
+                ax.set_ylabel(vars[i])
+            if i == 5:
+                ax.set_xlabel(vars[j])
+            clx(ax)
+    fig.suptitle('Difference')
     pyplot.show()
 
 def test_jacobian_shape():
@@ -1066,7 +1081,7 @@ def test_jacobian_plot():
 
 if __name__ == "__main__":
     # test_hessian_shape()
-    # test_hessian_plots()
+    test_hessian_plots()
     # test_jacobian_shape()
-    test_jacobian_plot()
+    # test_jacobian_plot()
 
