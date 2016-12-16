@@ -30,3 +30,5 @@ Status
 =====
 [Quantified Code](https://www.quantifiedcode.com/) rating [![Code Issues](https://www.quantifiedcode.com/api/v1/project/b0ca0f0d05e943888383528378c1a3e6/badge.svg)](https://www.quantifiedcode.com/app/project/b0ca0f0d05e943888383528378c1a3e6)
 
+[![astropy](http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat)](http://www.astropy.org/)
+
