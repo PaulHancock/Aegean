@@ -11,7 +11,9 @@ Programs included:
 
 Istalling
 =====
-You can install via pip using `pip install git+https://github.com/PaulHancock/Aegean.git`
+You can install via pip using 
+`pip install git+https://github.com/PaulHancock/Aegean.git` (latest)
+`pip install AegeanTools` (stable)
 
 Or you can clone or download the repository and then use `python setup.py install`
 
