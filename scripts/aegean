@@ -86,10 +86,10 @@ if __name__ == "__main__":
                            "or BANE. [default: none]")
     parser.add_option('--psf', dest='imgpsf', default=None,
                       help="A .fits file that represents the local PSF. ")
-
     parser.add_option('--autoload', dest='autoload', action="store_true", default=False,
                       help="Automatically look for background, noise, region, and psf files "+
                            "using the input filename as a hint. [default: don't do this]")
+
     parser.add_option("--maxsummits", dest='max_summits', type='float', default=None,
                       help="If more than *maxsummits* summits are detected in an island, no fitting is done, " +
                            "only estimation. [default: no limit]")
@@ -104,8 +104,10 @@ if __name__ == "__main__":
                       help='The name of the telescope used to collect data. [MWA|VLA|ATCA|LOFAR]')
     parser.add_option('--lat', dest='lat', type=float, default=None,
                       help='The latitude of the telescope used to collect data.')
+
     parser.add_option('--versions', dest='file_versions', action="store_true", default=False,
                       help='Show the file versions of relevant modules. [default: false]')
+
     parser.add_option('--island', dest='doislandflux', action="store_true", default=False,
                       help='Also calculate the island flux in addition to the individual components. [default: false]')
     parser.add_option('--nopositive', dest='nopositive', action="store_true", default=False,
@@ -114,9 +116,10 @@ if __name__ == "__main__":
                       help="Report sources with negative fluxes. [default: false]")
     parser.add_option('--blankout', dest='blank', action="store_true", default=False,
                       help="Create a blanked output image. [Only works if cores=1].")
-
     parser.add_option('--region', dest='region', default=None,
                       help="Use this regions file to restrict source finding in this image.")
+    parser.add_option('--nocov', dest='docov', action="store_false", default=True,
+                      help="Use the covariance of the data in the fitting proccess. [Default = True]")
 
     parser.add_option('--save', dest='save', action="store_true", default=False,
                       help='Enable the saving of the background and noise images. Sets --find to false. ' +
@@ -124,6 +127,7 @@ if __name__ == "__main__":
     parser.add_option('--outbase', dest='outbase', default=None,
                       help='If --save is True, then this specifies the base name of the background and noise images. ' +
                            '[default: inferred from input image]')
+
     parser.add_option('--measure', dest='measure', action='store_true', default=False,
                       help='Enable forced measurement mode. Requires an input source list via --input. ' +
                            'Sets --find to false. [default: false]')
@@ -326,7 +330,7 @@ if __name__ == "__main__":
                                  rmsin=options.noiseimg, beam=options.beam, lat=lat, imgpsf=options.imgpsf,
                                  catpsf=options.catpsf,
                                  stage=options.priorized, ratio=options.ratio, outerclip=options.outerclip,
-                                 cores=options.cores, doregroup=options.regroup)
+                                 cores=options.cores, doregroup=options.regroup, docov=options.docov)
 
     if options.find:
         log.info("Finding sources.")
@@ -338,7 +342,8 @@ if __name__ == "__main__":
                                          bkgin=options.backgroundimg, beam=options.beam,
                                          doislandflux=options.doislandflux,
                                          nonegative=not options.negative, nopositive=options.nopositive,
-                                         mask=options.region, lat=lat, imgpsf=options.imgpsf, blank=options.blank)
+                                         mask=options.region, lat=lat, imgpsf=options.imgpsf, blank=options.blank,
+                                         docov=options.docov)
         if options.blank:
             outname = basename+'_blank.fits'
             sf.save_image(outname)

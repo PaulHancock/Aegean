@@ -303,7 +303,6 @@ class SourceFinder(object):
                 self.log.debug("Summit has SNR {0} < innerclip {1}: skipping".format(snr, innerclip))
                 continue
 
-
             # allow amp to be 5% or (innerclip) sigma higher
             # TODO: the 5% should depend on the beam sampling
             # note: when innerclip is 400 this becomes rather stupid
@@ -521,7 +520,6 @@ class SourceFinder(object):
             idy += ymin
             self.global_data.img._pixels[[idx, idy]] = np.nan
 
-
         # calculate the integrated island flux if required
         if island_data.doislandflux:
             _, outerclip, _ = island_data.scalars
@@ -612,7 +610,7 @@ class SourceFinder(object):
     # Setting up 'global' data and calculating bkg/rms
     ##
     def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, cores=1,
-                     do_curve=True, mask=None, lat=None, psf=None, blank=False):
+                     do_curve=True, mask=None, lat=None, psf=None, blank=False, docov=True):
         """
         Populate the global_data object by loading or calculating the various components
 
@@ -628,6 +626,8 @@ class SourceFinder(object):
         :param mask: filename or Region object
         :param lat: latitude of the observing telescope (declination of zenith)
         :param psf: filename or HDUList of a psf image
+        :param blank: True = blank output image where islands are found
+        :param docov: True = use covariance matrix in fitting
         :return: None
         """
         # don't reload already loaded data
@@ -708,6 +708,7 @@ class SourceFinder(object):
             self.log.debug("Data max is {0}".format(img.get_pixels()[np.isfinite(img.get_pixels())].max()))
 
         self.global_data.blank = blank
+        self.global_data.docov = docov
         return
 
     def save_background_files(self, image_filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, rms=None, cores=1,
@@ -935,13 +936,13 @@ class SourceFinder(object):
     ##
     # Fitting and refitting
     ##
-    def _refit_islands(self, group, stage, outerclip, istart=0):
+    def _refit_islands(self, group, stage, outerclip=None, istart=0):
         """
         Do island refitting (priorized fitting) on a group of islands.
 
         :param group: A list of islands group=[ [(0,0),(0,1)],[(1,0)] ...]
         :param stage: refit stage
-        :param outerclip: outerclip for floodfill. outerclip<0 means no clipping
+        :param outerclip: ignored, placed holder for future development
         :param istart: the starting island number
         :return: a list of sources (including islands)
         """
@@ -981,7 +982,7 @@ class SourceFinder(object):
                 if not 0 <= x < shape[0] or not 0 <= y < shape[1] or \
                         not np.isfinite(data[x, y]) or \
                         not np.isfinite(rmsimg[x, y]) or \
-                                pixbeam is None:
+                        pixbeam is None:
                     self.log.debug("Source ({0},{1}) not within usable region: skipping".format(src.island, src.source))
                     continue
                 else:
@@ -1140,8 +1141,11 @@ class SourceFinder(object):
                     else:
                         self.log.critical("Cannot determine pixel beam")
                 fac = 1 / np.sqrt(2)
-                C = Cmatrix(mx, my, pixbeam.a * FWHM2CC * fac, pixbeam.b * FWHM2CC * fac, pixbeam.pa)
-                B = Bmatrix(C)
+                if self.global_data.docov:
+                    C = Cmatrix(mx, my, pixbeam.a * FWHM2CC * fac, pixbeam.b * FWHM2CC * fac, pixbeam.pa)
+                    B = Bmatrix(C)
+                else:
+                    C = B = None
                 errs = np.nanmax(rmsimg[xmin:xmax, ymin:ymax])
                 result, _ = do_lmfit(idata, params, B=B)
                 model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
@@ -1229,11 +1233,11 @@ class SourceFinder(object):
         else:
             # Model is the fitted parameters
             fac = 1 / np.sqrt(2)
-            C = Cmatrix(mx, my, pixbeam.a * FWHM2CC * fac, pixbeam.b * FWHM2CC * fac, pixbeam.pa)
-            B = Bmatrix(C)
-            # For testing the fitting without the inverse co-variance matrix, set these to None
-            # B = None
-            # C = None
+            if self.global_data.docov:
+                C = Cmatrix(mx, my, pixbeam.a * FWHM2CC * fac, pixbeam.b * FWHM2CC * fac, pixbeam.pa)
+                B = Bmatrix(C)
+            else:
+                C = B = None
             self.log.debug(
                 "C({0},{1},{2},{3},{4})".format(len(mx), len(my), pixbeam.a * FWHM2CC, pixbeam.b * FWHM2CC, pixbeam.pa))
             errs = np.nanmax(rms)
@@ -1271,7 +1275,8 @@ class SourceFinder(object):
 
     def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, max_summits=None, innerclip=5,
                               outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
-                              nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None, blank=False):
+                              nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None, blank=False,
+                              docov=True):
         """
         Run the Aegean source finder.
 
@@ -1297,6 +1302,8 @@ class SourceFinder(object):
                      Islands outside of this region will be ignored.
         :param lat: The latitude of the telescope (or declination of zenith)
         :param imgpsf: filename or HDUList for a psf image.
+        :param blank: Cause the output image to be blanked where islands are found.
+        :param docov: True = include covariance matrix in the fitting process. (default=True)
         """
 
         # Tell numpy to be quiet
@@ -1305,7 +1312,7 @@ class SourceFinder(object):
             assert (cores >= 1), "cores must be one or more"
 
         self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, cores=cores,
-                          verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank)
+                          verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank, docov=docov)
         global_data = self.global_data
         rmsimg = global_data.rmsimg
         data = global_data.data_pix
@@ -1323,9 +1330,6 @@ class SourceFinder(object):
             queue = pprocess.Queue(limit=cores, reuse=1)
             fit_parallel = queue.manage(pprocess.MakeReusable(self._fit_islands))
 
-        # if outfile:
-        #     print >> outfile, header.format("{0}-({1})".format(__version__,__date__), filename)
-        #     print >> outfile, OutputSource.header
         island_group = []
         group_size = 20
         for i, xmin, xmax, ymin, ymax in self._gen_flood_wrap(data, rmsimg, innerclip, outerclip, domask=True):
@@ -1353,7 +1357,6 @@ class SourceFinder(object):
         if len(island_group) > 0:
             fit_parallel(island_group)
 
-
         # Write the output to the output file
         if outfile:
             print >> outfile, header.format("{0}-({1})".format(__version__, __date__), filename)
@@ -1374,7 +1377,7 @@ class SourceFinder(object):
 
     def priorized_fit_islands(self, filename, catalogue, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1,
                               rms=None, beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=1.0, outerclip=3,
-                              doregroup=True):
+                              doregroup=True, docov=True):
         """
         Take an input catalog, and image, and optional background/noise images
         fit the flux and ra/dec for each of the given sources, keeping the morphology fixed
@@ -1406,7 +1409,7 @@ class SourceFinder(object):
         from AegeanTools.cluster import regroup
 
         self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
-                          do_curve=False, beam=beam, lat=lat, psf=imgpsf)
+                          do_curve=False, beam=beam, lat=lat, psf=imgpsf, docov=docov)
 
         global_data = self.global_data
         far = 10 * global_data.beam.a  # degrees
@@ -1422,7 +1425,6 @@ class SourceFinder(object):
             return []
 
         src_mask = np.ones(len(input_sources), dtype=bool)
-
 
         # the input sources are the initial conditions for our fits.
         # Expand each source size if needed.
