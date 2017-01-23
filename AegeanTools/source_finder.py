@@ -1102,8 +1102,10 @@ class SourceFinder(object):
                 cx, cy = params[prefix + 'xo'].value, params[prefix + 'yo'].value  # central pixel coords
                 self.log.debug(" comp {0}".format(i))
                 self.log.debug("  x0, y0 {0} {1}".format(cx, cy))
-                xmx, xmn = np.clip(cx + 2, 0, idata.shape[0]), np.clip(cx - 1, 0, idata.shape[0])
-                ymx, ymn = np.clip(cy + 2, 0, idata.shape[1]), np.clip(cy - 1, 0, idata.shape[1])
+                xmx = int(round(np.clip(cx + 2, 0, idata.shape[0])))
+                xmn = int(round(np.clip(cx - 1, 0, idata.shape[0])))
+                ymx = int(round(np.clip(cy + 2, 0, idata.shape[1])))
+                ymn = int(round(np.clip(cy - 1, 0, idata.shape[1])))
                 square = idata[xmn:xmx, ymn:ymx]
                 # if there are no not-nan pixels in this region then don't vary any parameters
                 if not np.any(np.isfinite(square)):
