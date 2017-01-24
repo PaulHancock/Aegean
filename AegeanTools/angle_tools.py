@@ -101,11 +101,13 @@ def bear(ra1, dec1, ra2, dec2):
     bearing is East of North [0,360)
     position angle is East of North (-180,180]
     """
-    dlon = ra2 - ra1
-    # dlat = dec2 - dec1
-    y = np.sin(np.radians(dlon)) * np.cos(np.radians(dec2))
-    x = np.cos(np.radians(dec1)) * np.sin(np.radians(dec2))
-    x -= np.sin(np.radians(dec1)) * np.cos(np.radians(dec2)) * np.cos(np.radians(dlon))
+    # dlon = ra2 - ra1
+    rdec1 = np.radians(dec1)
+    rdec2 = np.radians(dec2)
+    rdlon = np.radians(ra2-ra1)
+    y = np.sin(rdlon) * np.cos(rdec2)
+    x = np.cos(rdec1) * np.sin(rdec2)
+    x -= np.sin(rdec1) * np.cos(rdec2) * np.cos(rdlon)
     return np.degrees(np.arctan2(y, x))
 
 
