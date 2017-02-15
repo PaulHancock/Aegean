@@ -418,6 +418,8 @@ class PSFHelper(WCSHelper):
             log.info("Loading PSF data from {0}".format(psffile))
             header = fits.getheader(psffile)
             data = fits.getdata(psffile)
+            # the psf image has to have three dimensions
+            # and they need to be ra/dec/beam
             if len(data.shape) != 3:
                 log.critical("PSF file needs to have 3 dimensions, only {0} found".format(len(data.shape)))
                 raise Exception("Invalid PSF file {0}".format(psffile))
