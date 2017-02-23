@@ -572,6 +572,7 @@ def condon_errors(source, theta_n):
     All parameters are assigned errors, assuming that all params were fit.
     If some params were held fixed then these errors are overestimated.
     :param source: Source for which errors need to be calculated
+    :param theta_n: The angular size of an image pixel
     :return: The same source but with errors assigned.
     """
 
