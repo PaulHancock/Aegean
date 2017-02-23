@@ -30,6 +30,7 @@ except ImportError:
 from AegeanTools.source_finder import scope2lat, get_aux_files
 from AegeanTools.fits_image import Beam
 from AegeanTools.catalogs import show_formats, check_table_formats, save_catalog
+from AegeanTools import fitting
 import multiprocessing
 
 from AegeanTools import __version__, __date__
@@ -119,7 +120,9 @@ if __name__ == "__main__":
     parser.add_option('--region', dest='region', default=None,
                       help="Use this regions file to restrict source finding in this image.")
     parser.add_option('--nocov', dest='docov', action="store_false", default=True,
-                      help="Use the covariance of the data in the fitting proccess. [Default = True]")
+                      help="Don't use the covariance of the data in the fitting proccess. [Default = False]")
+    parser.add_option('--condon', dest='condon', action="store_true", default=False,
+                      help="replace errors with those suggested by Condon'97. [Default = False]")
 
     parser.add_option('--save', dest='save', action="store_true", default=False,
                       help='Enable the saving of the background and noise images. Sets --find to false. ' +
@@ -351,6 +354,18 @@ if __name__ == "__main__":
             log.info("No sources found in image")
 
     sources = sf.sources
+    # if --condon is set then we replace all the errors with those described by Condon'97
+    if options.condon:
+        # theta_N is the FWHM of the smoothing kernel (the noise correlation)
+        # which in this case is the same as the synthesized beam FWHM
+        if options.beam:
+            theta_n = np.hypot(options.beam[0], options.beam[1])
+        else:
+            hdu = sf.global_data.img.get_hdu_header()
+            theta_n = np.hypot(hdu['BMAJ'], hdu['BMIN'])
+        for s in sources:
+            fitting.condon_errors(s, theta_n)
+
     log.info("found {0} sources total".format(len(sources)))
     if len(sources) > 0 and options.tables:
         meta = {"PROGRAM": "Aegean",
