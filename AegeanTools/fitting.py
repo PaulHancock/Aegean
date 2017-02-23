@@ -586,7 +586,7 @@ def condon_errors(source, theta_n):
 
     major = source.a / 3600  # degrees
     minor = source.b / 3600  # degrees
-    phi = np.radians(source.pa)
+    phi = np.radians(source.pa)  # radians
     smoothing = major * minor / (theta_n ** 2)
     factor1 = (1 + (major / theta_n))
     factor2 = (1 + (minor / theta_n))
@@ -600,8 +600,8 @@ def condon_errors(source, theta_n):
 
     err_xo2 = 2. / rho2('xo') * major ** 2 / (8 * np.log(2))  # Condon'97 eq 21
     err_yo2 = 2. / rho2('yo') * minor ** 2 / (8 * np.log(2))
-    source.err_ra = np.hypot(err_xo2 * np.sin(phi)**2, err_yo2 * np.cos(phi)**2)
-    source.err_dec = np.hypot(err_xo2 * np.cos(phi)**2, err_yo2 * np.sin(phi)**2)
+    source.err_ra = np.sqrt(err_xo2 * np.sin(phi)**2 + err_yo2 * np.cos(phi)**2)
+    source.err_dec = np.sqrt(err_xo2 * np.cos(phi)**2 + err_yo2 * np.sin(phi)**2)
 
     # if major/minor are very similar then we should not be able to figure out what pa is.
     if abs((major / minor) ** 2 + (minor / major) ** 2 - 2) < 0.01:
