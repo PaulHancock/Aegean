@@ -100,7 +100,8 @@ def make_residual(fitsfile, catalog, rfile, mfile=None, add=False):
     @return:
     """
     source_list = load_sources(catalog)
-    hdulist = fits.open(fitsfile)
+    # force two axes so that we dump redundant stokes/freq axes if they are present.
+    hdulist = fits.open(fitsfile, naxis=2)
     data = hdulist[0].data
     header = hdulist[0].header
 
