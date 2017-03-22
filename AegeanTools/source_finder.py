@@ -1248,6 +1248,7 @@ class SourceFinder(object):
                 is_flag |= flags.FITERR
             # get the real (sky) parameter errors
             model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
+            model.covar = result.covar
 
             if not result.success:
                 is_flag |= flags.FITERR
