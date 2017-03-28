@@ -13,7 +13,7 @@ def read(fname):
 
 
 def get_version():
-    return "v2.0b.111"
+    return "v2.0b.129"
 
 
 reqs = ['numpy>=1.10',
