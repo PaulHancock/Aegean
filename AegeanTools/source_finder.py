@@ -164,20 +164,22 @@ class SourceFinder(object):
         if n == 0:
             self.log.debug("There are no pixels above the clipping limit")
             return
-
+        self.log.debug("{1} Found {0} islands total above flood limit".format(n, data.shape))
         # Yield values as before, though they are not sorted by flux
         for i in range(n):
             xmin, xmax = f[i][0].start, f[i][0].stop
             ymin, ymax = f[i][1].start, f[i][1].stop
             if np.any(snr[xmin:xmax, ymin:ymax] > innerclip):  # obey inner clip constraint
+                #self.log.info("{1} Island {0} is above the inner clip limit".format(i, data.shape))
                 data_box = copy.copy(data[xmin:xmax, ymin:ymax])  # copy so that we don't blank the master data
                 data_box[np.where(
                     snr[xmin:xmax, ymin:ymax] < outerclip)] = np.nan  # blank pixels that are outside the outerclip
                 data_box[np.where(l[xmin:xmax, ymin:ymax] != i + 1)] = np.nan  # blank out other summits
                 # check if there are any pixels left unmasked
                 if not np.any(np.isfinite(data_box)):
+                    #self.log.info("{1} Island {0} has no non-masked pixels".format(i,data.shape))
                     continue
-                if domask and self.global_data.region is not None:
+                if domask and (self.global_data.region is not None):
                     y, x = np.where(snr[xmin:xmax, ymin:ymax] >= outerclip)
                     # convert indices of this sub region to indices in the greater image
                     yx = zip(y + ymin, x + xmin)
@@ -187,6 +189,7 @@ class SourceFinder(object):
                     if not np.any(mask):
                         continue
                     self.log.debug("Mask {0}".format(mask))
+                #self.log.info("{1} Island {0} will be fit".format(i, data.shape))
                 yield data_box, xmin, xmax, ymin, ymax
 
     ##
@@ -1344,8 +1347,10 @@ class SourceFinder(object):
         island_group = []
         group_size = 20
         for i, xmin, xmax, ymin, ymax in self._gen_flood_wrap(data, rmsimg, innerclip, outerclip, domask=True):
-            if len(i) <= 1:
-                # empty islands have length 1
+            # ignore empty islands
+            # This should now be impossible to trigger
+            if np.size(i) < 1:
+                self.log.warn("Empty island detected, this should be imposisble.")
                 continue
             isle_num += 1
             scalars = (innerclip, outerclip, max_summits)
