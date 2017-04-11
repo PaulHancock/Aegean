@@ -153,7 +153,7 @@ class SourceFinder(object):
         if outerclip is None:
             outerclip = innerclip
 
-        # compute SNR image
+        # compute SNR image (data has already been background subtracted)
         snr = abs(data) / rmsimg
         # mask of pixles that are above the outerclip
         a = snr >= outerclip
@@ -755,6 +755,7 @@ class SourceFinder(object):
         noise_out = outbase + '_rms.fits'
         background_out = outbase + '_bkg.fits'
         curve_out = outbase + '_crv.fits'
+        snr_out = outbase + '_snr.fits'
 
         new_hdu.data = bkgimg
         new_hdu.writeto(background_out, clobber=True)
@@ -767,6 +768,10 @@ class SourceFinder(object):
         new_hdu.data = curve
         new_hdu.writeto(curve_out, clobber=True)
         self.log.info("Wrote {0}".format(curve_out))
+
+        new_hdu.data = self.global_data.data_pix / rmsimg
+        new_hdu.writeto(snr_out, clobber=True)
+        self.log.info("Wrote {0}".format(snr_out))
         return
 
     def save_image(self, outname):
@@ -1322,6 +1327,9 @@ class SourceFinder(object):
 
         self.log.info("beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(
             global_data.beam.a * 3600, global_data.beam.b * 3600, global_data.beam.pa))
+        # stop people from doing silly things.
+        if outerclip > innerclip:
+            outerclip = innerclip
         self.log.info("seedclip={0}".format(innerclip))
         self.log.info("floodclip={0}".format(outerclip))
 
