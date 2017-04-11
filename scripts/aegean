@@ -243,12 +243,6 @@ if __name__ == "__main__":
     else:
         lat = None
 
-    # Generate and save the background FITS files with the Aegean default calculator
-    if options.save:
-        sf.save_background_files(filename, hdu_index=hdu_index, cores=options.cores, beam=options.beam,
-                                  outbase=options.outbase)
-        sys.exit(0)
-
     # auto-load background, noise, psf and region files
     basename = os.path.splitext(filename)[0]
     if options.autoload:
@@ -288,6 +282,12 @@ if __name__ == "__main__":
             log.error("Could not import AegeanTools/regions.py")
             log.error("(you probably need to install HealPy)")
             sys.exit(1)
+
+    # Generate and save the background FITS files with the Aegean default calculator
+    if options.save:
+        sf.save_background_files(filename, hdu_index=hdu_index, cores=options.cores, beam=options.beam,
+                                  outbase=options.outbase, bkgin=options.backgroundimg, rmsin=options.noiseimg)
+        sys.exit(0)
 
     # check that the output table formats are supported (if given)
     # BEFORE any cpu intensive work is done
