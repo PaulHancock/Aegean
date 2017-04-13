@@ -220,7 +220,7 @@ def hessian(pars, x, y):
     # total number of variable parameters
     ntvar = np.sum([pars[k].vary for k in pars.keys() if k != 'components'])
     # construct an empty matrix of the correct size
-    hmat = np.zeros((ntvar, ntvar, len(x), len(y)))
+    hmat = np.zeros((ntvar, ntvar, x.shape[0], x.shape[1]))
     npvar = 0
 
     for i in xrange(pars['components'].value):
@@ -533,14 +533,16 @@ def nan_acf(noise):
     return corr / np.nanmax(corr)
 
 
-def make_ita(noise):
+def make_ita(noise, acf=None):
     """
     Create the matrix ita of the noise where the noise may be a masked array
     where ita(x,y) is the correlation between pixel pairs that have the same separation as x and y.
     :param noise: A possibly masked 2d array
-    :return: the ACF
+    :param acf: the autocorrelation matrix. (None = calculate from data)
+    :return: ita
     """
-    corr = nan_acf(noise)
+    if acf is None:
+        acf = nan_acf(noise)
     # s should be the number of non-masked pixels
     s = np.count_nonzero(np.isfinite(noise))
     # the indices of the non-masked pixels
@@ -551,23 +553,26 @@ def make_ita(noise):
         for j, (x2, y2) in enumerate(zip(xm, ym)):
             k = abs(x1-x2)
             l = abs(y1-y2)
-            ita[i, j] = corr[k, l]
+            ita[i, j] = acf[k, l]
     return ita
 
 
-def RB_bias(data, pars, x, y, ita=None):
+def RB_bias(data, pars, ita=None, acf=None):
     """
     Calculate the expected bias on each of the parameters in the model pars.
     Only parameters that are allowed to vary will have a bias.
     :param data: data that was fit
     :param pars: lmfit.Parameters() of the fitted model
-    :param x: indices into data
-    :param y: indices into data
-    :param ita: the (normalized) noise correlation function
+    :param ita: the ita matrix
+    :param acf: the (normalized) noise correlation function
     :return:
     """
+    log.info("data {0}".format(data.shape))
     nparams = np.sum([pars[k].vary for k in pars.keys() if k != 'components'])
+    # masked pixels
     xm, ym = np.where(np.isfinite(data))
+    # all pixels
+    x, y = np.indices(data.shape)
     # Create the jacobian as an AxN array accounting for the masked pixels
     j = np.array(np.vsplit(lmfit_jacobian(pars, xm, ym).T, nparams)).reshape(nparams, -1)
 
@@ -583,14 +588,19 @@ def RB_bias(data, pars, x, y, ita=None):
     Cimn_2 = -1./2 * np.einsum('rkj,ir,km,jn', Bijk, Dij, Dij, Dij)
     Cimn = Cimn_1 + Cimn_2
 
-    # N is the noise (data-model)
-    N = data - ntwodgaussian_lmfit(pars)(x, y)
     if ita is None:
-        ita = make_ita(N)
-    # now mask/ravel the noise
-    N = N[np.isfinite(N)].ravel()
+        # N is the noise (data-model)
+        N = data - ntwodgaussian_lmfit(pars)(x, y)
+        ita = make_ita(N, acf=acf)
+        log.info('acf.shape {0}'.format(acf.shape))
+        log.info('acf[0] {0}'.format(acf[0]))
+        log.info('ita.shape {0}'.format(ita.shape))
+        log.info('ita[0] {0}'.format(ita[0]))
 
     # Included for completeness but not required
+
+    # now mask/ravel the noise
+    # N = N[np.isfinite(N)].ravel()
     # Pi = np.einsum('ip,p', j, N)
     # Qij = np.einsum('ijp,p', h, N)
 
@@ -600,7 +610,27 @@ def RB_bias(data, pars, x, y, ita=None):
     bias_1 = np.einsum('imn, mn', Cimn, Vij)
     bias_2 = np.einsum('ilkm, mlk', Eilkm, Uijk)
     bias = bias_1 + bias_2
+    log.info('bias {0}'.format(bias))
     return bias
+
+
+def bias_correct(params, data, acf=None):
+    """
+    Apply a bias correction to the given fit parameters
+    :param params:
+    :param data:
+    :param C:
+    :return:
+    """
+    bias = RB_bias(data, params, acf=acf)
+    i = 0
+    for p in params:
+        if 'theta' in p:
+            continue
+        if params[p].vary:
+            params[p].value -= bias[i]
+            i += 1
+    return
 
 
 def CRB_errs(jac, C, B=None):
