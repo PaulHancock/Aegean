@@ -18,7 +18,8 @@ from scipy.special import erf
 from scipy.ndimage import label, find_objects
 
 # AegeanTools
-from fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit
+from fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit, \
+                    bias_correct, elliptical_gaussian
 from wcs_helpers import WCSHelper, PSFHelper
 from fits_image import FitsImage
 from msq2 import MarchingSquares
@@ -712,6 +713,9 @@ class SourceFinder(object):
 
         self.global_data.blank = blank
         self.global_data.docov = docov
+
+        # Default to false until I can verify that this is working
+        self.global_data.dobias = False
         return
 
     def save_background_files(self, image_filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, rms=None, cores=1,
@@ -1257,6 +1261,10 @@ class SourceFinder(object):
             # get the real (sky) parameter errors
             model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
             model.covar = result.covar
+            if self.global_data.dobias and self.global_data.docov:
+                x, y = np.indices(idata.shape)
+                acf = elliptical_gaussian(x, y, 1, 0, 0, pixbeam.a * FWHM2CC * fac, pixbeam.b * FWHM2CC * fac, pixbeam.pa)
+                bias_correct(model, idata, acf=acf*errs**2)
 
             if not result.success:
                 is_flag |= flags.FITERR
