@@ -522,25 +522,33 @@ def RB_bias(data, pars, x, y, ita=None):
     :return:
     """
     nparams = np.sum([pars[k].vary for k in pars.keys() if k != 'components'])
-    j = np.array(np.vsplit(lmfit_jacobian(pars, x, y).T, nparams))
+    xm, ym = np.where(np.isfinite(data))
+    # Create the jacobian as an AxN array accounting for the masked pixels
+    j = np.array(np.vsplit(lmfit_jacobian(pars, xm, ym).T, nparams)).reshape(nparams, -1)
+
     h = hessian(pars, x, y)
-    Hij = np.einsum('ilk,jlk', j, j)
+    # mask the hessian to be AxAxN array
+    h = h[:,:,xm,ym]
+    Hij = np.einsum('ik,jk',j,j)
     Dij = np.linalg.inv(Hij)
-    Bijk = np.einsum('ilm,jklm', j, h)
+    Bijk = np.einsum('ip,jkp', j, h)
     Eilkm = np.einsum('il,km', Dij, Dij)
 
     Cimn_1 =    -1 * np.einsum('krj,ir,km,jn', Bijk, Dij, Dij, Dij)
     Cimn_2 = -1./2 * np.einsum('rkj,ir,km,jn', Bijk, Dij, Dij, Dij)
     Cimn = Cimn_1 + Cimn_2
 
+    # N is the noise (data-model)
     N = data - ntwodgaussian_lmfit(pars)(x, y)
-    # Pi = np.einsum('pjk,jk', j, N)
-    # Qij = np.einsum('pijk,jk', h, N)
+    N = N[np.isfinite(N)].ravel()
+
+    # Pi = np.einsum('ip,p', j, N)
+    # Qij = np.einsum('ijp,p', h, N)
 
     if ita is None:
-        ita = correlate2d(N, N, mode='same')/data.size
-    Vij = np.einsum('ipm,jqm,pq', j, j, ita)
-    Uijk = np.einsum('ipm,jkqm,pq', j, h, ita)
+        ita = np.identity(len(N))
+    Vij = np.einsum('ip,jq,pq', j, j, ita)
+    Uijk = np.einsum('ip,jkq,pq', j, h, ita)
 
     bias_1 = np.einsum('imn, mn', Cimn, Vij)
     bias_2 = np.einsum('ilkm, mlk', Eilkm, Uijk)
