@@ -510,6 +510,51 @@ def emp_hessian(pars, x, y):
     return matrix
 
 
+def nan_acf(noise):
+    """
+    Calculate the autocorrelation function of the noise
+    where the noise is a 2d array that may contain nans
+    :param noise:
+    :return:
+    """
+    corr = np.zeros(noise.shape)
+    ix,jx = noise.shape
+    for i in xrange(ix):
+        si_min = slice(i, None, None)
+        si_max = slice(None, ix-i, None)
+        for j in xrange(jx):
+            sj_min = slice(j, None, None)
+            sj_max = slice(None, jx-j, None)
+            if np.all(np.isnan(noise[si_min, sj_min])) or np.all(np.isnan(noise[si_max, sj_max])):
+                corr[i, j] = np.nan
+            else:
+                corr[i, j] = np.nansum(noise[si_min, sj_min] * noise[si_max, sj_max])
+    # return the normalised acf
+    return corr / np.nanmax(corr)
+
+
+def make_ita(noise):
+    """
+    Create the matrix ita of the noise where the noise may be a masked array
+    where ita(x,y) is the correlation between pixel pairs that have the same separation as x and y.
+    :param noise: A possibly masked 2d array
+    :return: the ACF
+    """
+    corr = nan_acf(noise)
+    # s should be the number of non-masked pixels
+    s = np.count_nonzero(np.isfinite(noise))
+    # the indices of the non-masked pixels
+    xm, ym = np.where(np.isfinite(noise))
+    ita = np.zeros((s, s))
+    # iterate over the pixels
+    for i, (x1, y1) in enumerate(zip(xm, ym)):
+        for j, (x2, y2) in enumerate(zip(xm, ym)):
+            k = abs(x1-x2)
+            l = abs(y1-y2)
+            ita[i, j] = corr[k, l]
+    return ita
+
+
 def RB_bias(data, pars, x, y, ita=None):
     """
     Calculate the expected bias on each of the parameters in the model pars.
@@ -528,8 +573,8 @@ def RB_bias(data, pars, x, y, ita=None):
 
     h = hessian(pars, x, y)
     # mask the hessian to be AxAxN array
-    h = h[:,:,xm,ym]
-    Hij = np.einsum('ik,jk',j,j)
+    h = h[:, :, xm, ym]
+    Hij = np.einsum('ik,jk', j, j)
     Dij = np.linalg.inv(Hij)
     Bijk = np.einsum('ip,jkp', j, h)
     Eilkm = np.einsum('il,km', Dij, Dij)
@@ -540,13 +585,15 @@ def RB_bias(data, pars, x, y, ita=None):
 
     # N is the noise (data-model)
     N = data - ntwodgaussian_lmfit(pars)(x, y)
+    if ita is None:
+        ita = make_ita(N)
+    # now mask/ravel the noise
     N = N[np.isfinite(N)].ravel()
 
+    # Included for completeness but not required
     # Pi = np.einsum('ip,p', j, N)
     # Qij = np.einsum('ijp,p', h, N)
 
-    if ita is None:
-        ita = np.identity(len(N))
     Vij = np.einsum('ip,jq,pq', j, j, ita)
     Uijk = np.einsum('ip,jkq,pq', j, h, ita)
 
