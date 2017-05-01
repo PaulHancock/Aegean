@@ -347,7 +347,8 @@ class SourceFinder(object):
             sx = max(sx, sy * 1.01)
 
             # constraints are based on the shape of the island
-            sx_min, sx_max = sx * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * FWHM2CC, sx * 1.1)
+            # sx,sy can become flipped so we set the min/max account for this
+            sx_min, sx_max = sy * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * FWHM2CC, sx * 1.1)
             sy_min, sy_max = sy * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * FWHM2CC, sx * 1.1)
 
             theta = pixbeam.pa  # Degrees
