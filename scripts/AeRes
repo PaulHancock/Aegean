@@ -28,7 +28,7 @@ def load_sources(filename):
     return catalog
 
 
-def make_model(sources, shape, wcshelper, mask=False, frac=0):
+def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
     """
 
     @param sources: a list of AegeanTools.models.SimpleSource objects
@@ -36,6 +36,7 @@ def make_model(sources, shape, wcshelper, mask=False, frac=0):
     @param wcshelper: an AegeanTools.wcs_helpers.WCSHelper object corresponding to the input image
     @param mask: If true then mask pixels instead of subtracting the sources
     @param frac: pixels that are brighter than frac*peak_flux for each source will be masked if mask=True
+    @param sigma: pixels that are brighter than rms*sigma be masked if mask=True
     @return:
     """
 
@@ -90,15 +91,19 @@ def make_model(sources, shape, wcshelper, mask=False, frac=0):
 
         # Mask the output image if requested
         if mask:
-            indices = np.where(model >= frac*src.peak_flux)
+            if frac is not None:
+                indices = np.where(model >= (frac*src.peak_flux))
+            else:
+                indices = np.where(model >= (sigma*src.local_rms))
             model[indices] = np.nan
+
         m[x, y] += model
         i_count += 1
     logging.info("modeled {0} sources".format(i_count))
     return m
 
 
-def make_residual(fitsfile, catalog, rfile, mfile=None, add=False, mask=False, frac=0):
+def make_residual(fitsfile, catalog, rfile, mfile=None, add=False, mask=False, frac=None, sigma=4):
     """
 
     @param fitsfile: Input fits image filename
@@ -119,7 +124,7 @@ def make_residual(fitsfile, catalog, rfile, mfile=None, add=False, mask=False, f
 
     wcshelper = wcs_helpers.WCSHelper.from_header(header)
 
-    model = make_model(source_list, data.shape, wcshelper, mask, frac)
+    model = make_model(source_list, data.shape, wcshelper, mask, frac, sigma)
 
     if add or mask:
         residual = data + model
@@ -151,7 +156,9 @@ if __name__ == "__main__":
                       help="Add components instead of subtracting them.")
     parser.add_option('--mask', dest='mask', default=False, action='store_true',
                       help="Instead of subtracting sources, just mask them")
-    parser.add_option('--frac', dest='frac', default=0.01,
+    parser.add_option('--sigma', dest='sigma', default=4, type='float',
+                      help='If masking, pixles above this SNR are masked (requires input catalogue to list rms)')
+    parser.add_option('--frac', dest='frac', default=None,
                       help='If masking, pixels above frac*peak_flux are masked for each source')
     parser.add_option('--debug', dest='debug', action='store_true', default=False,
                       help="Debug mode.")
@@ -161,7 +168,7 @@ if __name__ == "__main__":
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is AeRes {0}-({1})".format(__version__, __date__))
-
+    print options
     if options.catalog is None:
         logging.error("input catalog is required")
         sys.exit(1)
@@ -176,5 +183,5 @@ if __name__ == "__main__":
     if options.mfile is not None:
         logging.info(" and writing model to {0}".format(options.mfile))
     make_residual(options.fitsfile, options.catalog, options.rfile,
-                  mfile=options.mfile, add=options.add, mask=options.mask, frac=options.frac)
+                  mfile=options.mfile, add=options.add, mask=options.mask, frac=options.frac, sigma=options.sigma)
     sys.exit(0)
