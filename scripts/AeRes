@@ -4,7 +4,7 @@
 """
 __author__ = 'Paul Hancock'
 __version__ = 'v0.2.5'
-__date__ = '2016-09-08'
+__date__ = '2017-05-12'
 
 from AegeanTools import catalogs, wcs_helpers, fitting
 from astropy.io import fits
