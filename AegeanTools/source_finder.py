@@ -941,8 +941,8 @@ class SourceFinder(object):
         """
         auximg = FitsImage(auxfile, beam=self.global_data.beam).get_pixels()
         if auximg.shape != image.get_pixels().shape:
-            log.error("file {0} is not the same size as the image map".format(auxfile))
-            log.error("{0}= {1}, image = {2}".format(auxfile, auximg.shape, image.get_pixels().shape))
+            self.log.error("file {0} is not the same size as the image map".format(auxfile))
+            self.log.error("{0}= {1}, image = {2}".format(auxfile, auximg.shape, image.get_pixels().shape))
             sys.exit(1)
         return auximg
 
