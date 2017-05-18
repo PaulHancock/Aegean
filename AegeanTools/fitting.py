@@ -9,10 +9,9 @@ __author__ = "Paul Hancock"
 import copy
 import math
 import numpy as np
-from scipy.linalg import eigh, inv, pinv
-from scipy.signal import correlate2d
+from scipy.linalg import eigh, inv
 import lmfit
-from angle_tools import gcd, bear, translate
+from angle_tools import gcd, bear
 
 # Other AegeanTools
 # from models import OutputSource, IslandSource
