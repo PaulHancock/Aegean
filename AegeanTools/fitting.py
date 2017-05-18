@@ -76,11 +76,9 @@ def Bmatrix(C):
     # this version of finding the square root of the inverse matrix
     # suggested by Cath Trott
     L, Q = eigh(C)
-    if not all(L > 0):
-        log.warn("At least one eigenvalue is negative, this may cause problems!")
-        log.warn("Forcing eigenvalues to be positive...")
-        log.debug("L = {0}".format(L))
-        L = np.abs(L)
+    # force very small eigenvalues to have some minimum non-zero value
+    minL = 1e-9*L[-1]
+    L[L < minL] = minL
     S = np.diag(1 / np.sqrt(L))
     B = Q.dot(S)
     return B
