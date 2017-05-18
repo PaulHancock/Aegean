@@ -13,7 +13,8 @@ def read(fname):
 
 
 def get_version():
-    return "v2.0b.129"
+    import AegeanTools
+    return AegeanTools.__version__
 
 
 reqs = ['numpy>=1.10',
