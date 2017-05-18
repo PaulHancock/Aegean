@@ -731,12 +731,7 @@ def errors(source, model, wcshelper):
     source.err_peak_flux = err_amp
     pix_errs = [err_xo, err_yo, err_sx, err_sy, err_theta]
 
-    # check for inf/nan errors -> these sources have poor fits.
-    if not all(a is not None and np.isfinite(a) for a in pix_errs):
-        source.flags |= flags.FITERR
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
-        source.err_ra = source.err_dec = source.err_int_flux = -1
-        return source
+    log.debug("Pix errs: {0}".format(pix_errs))
 
     ref = wcshelper.pix2sky([xo, yo])
     # check to see if the reference position has a valid WCS coordinate
@@ -785,7 +780,10 @@ def errors(source, model, wcshelper):
     sqerr += (source.err_peak_flux / source.peak_flux) ** 2 if source.err_peak_flux > 0 else 0
     sqerr += (source.err_a / source.a) ** 2 if source.err_a > 0 else 0
     sqerr += (source.err_b / source.b) ** 2 if source.err_b > 0 else 0
-    source.err_int_flux = abs(source.int_flux * np.sqrt(sqerr))
+    if sqerr == 0:
+        source.err_int_flux = -1
+    else:
+        source.err_int_flux = abs(source.int_flux * np.sqrt(sqerr))
 
     return source
 
