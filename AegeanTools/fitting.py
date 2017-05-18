@@ -748,14 +748,15 @@ def errors(source, model, wcshelper):
         return source
 
     # position errors
-    if model[prefix + 'xo'].vary and model[prefix + 'yo'].vary:
+    if model[prefix + 'xo'].vary and model[prefix + 'yo'].vary \
+            and all(np.isfinite([err_xo, err_yo])):
         offset = wcshelper.pix2sky([xo + err_xo, yo + err_yo])
         source.err_ra = gcd(ref[0], ref[1], offset[0], ref[1])
         source.err_dec = gcd(ref[0], ref[1], ref[0], offset[1])
     else:
         source.err_ra = source.err_dec = -1
 
-    if model[prefix + 'theta'].vary:
+    if model[prefix + 'theta'].vary and np.isfinite(err_theta):
         # pa error
         off1 = wcshelper.pix2sky([xo + sx * np.cos(np.radians(theta)), yo + sy * np.sin(np.radians(theta))])
         off2 = wcshelper.pix2sky(
@@ -764,7 +765,8 @@ def errors(source, model, wcshelper):
     else:
         source.err_pa = -1
 
-    if model[prefix + 'sx'].vary and model[prefix + 'sy'].vary:
+    if model[prefix + 'sx'].vary and model[prefix + 'sy'].vary \
+            and all(np.isfinite([err_sx, err_sy])):
         # major axis error
         ref = wcshelper.pix2sky([xo + sx * np.cos(np.radians(theta)), yo + sy * np.sin(np.radians(theta))])
         offset = wcshelper.pix2sky(
