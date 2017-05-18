@@ -34,7 +34,7 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     :param amp: amplitude of Gaussian
     :param xo,yo: position of Gaussian
     :param major,minor: axes (sigmas)
-    :param theta: position angle (radians) CCW from x-axis
+    :param theta: position angle (degrees) CCW from x-axis
     :return: Gaussian function evaluated at x,y locations
     """
     try:
