@@ -73,6 +73,9 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
         xmin = max(np.floor(xmin), 0)
         xmax = min(np.ceil(xmax), shape[0])
 
+        if not np.all(np.isfinite([ymin, ymax, xmin, xmax])):
+            continue
+
         if logging.getLogger().isEnabledFor(logging.DEBUG):
             logging.debug("Source ({0},{1})".format(src.island, src.source))
             logging.debug(" xo, yo: {0} {1}".format(xo, yo))
@@ -80,6 +83,7 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
             logging.debug(" theta, phi: {0} {1}".format(theta, phi))
             logging.debug(" xoff, yoff: {0} {1}".format(xoff, yoff))
             logging.debug(" xmin, xmax, ymin, ymax: {0}:{1} {2}:{3}".format(xmin, xmax, ymin, ymax))
+            logging.debug(" flux, sx, sy: {0} {1} {2}".format(src.peak_flux, sx, sy))
 
         # positions for which we want to make the model
         x, y = np.mgrid[xmin:xmax, ymin:ymax]
@@ -157,7 +161,7 @@ if __name__ == "__main__":
     parser.add_option('--mask', dest='mask', default=False, action='store_true',
                       help="Instead of subtracting sources, just mask them")
     parser.add_option('--sigma', dest='sigma', default=4, type='float',
-                      help='If masking, pixles above this SNR are masked (requires input catalogue to list rms)')
+                      help='If masking, pixels above this SNR are masked (requires input catalogue to list rms)')
     parser.add_option('--frac', dest='frac', default=None,
                       help='If masking, pixels above frac*peak_flux are masked for each source')
     parser.add_option('--debug', dest='debug', action='store_true', default=False,
@@ -168,7 +172,6 @@ if __name__ == "__main__":
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is AeRes {0}-({1})".format(__version__, __date__))
-    print options
     if options.catalog is None:
         logging.error("input catalog is required")
         sys.exit(1)
