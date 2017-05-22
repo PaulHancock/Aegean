@@ -488,18 +488,15 @@ class PSFHelper(WCSHelper):
         :param dec: Sky coord
         :return: Beam(a,b,pa)
         """
-        beam = self.wcshelper.get_pixbeam(ra, dec)
         # If there is no psf image then just use the fits header (plus lat scaling) from the wcshelper
         if self.data is None:
-            return beam
+            return self.wcshelper.get_pixbeam(ra, dec)
         # get the beam from the psf image data
         psf = self.get_psf_pix(ra, dec)
-        if None in psf:
+        if not np.all(np.isfinite(psf)):
             log.warn("PSF requested, returned Null")
             return None
-        if np.isfinite(psf[0]):
-            beam = Beam(psf[0], psf[1], psf[2])
-        return beam
+        return Beam(psf[0], psf[1], psf[2])
 
     def get_beam(self, ra, dec):
         """
