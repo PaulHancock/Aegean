@@ -345,8 +345,8 @@ class WCSHelperTest(object):
         a = 2 * self.helper.beam.a
         b = self.helper.beam.b
         pa = self.helper.beam.pa + 45
-        ralist = range(-60, 181, 5)
-        declist = range(-85, 86, 5)
+        ralist = range(0, 360, 5)
+        declist = range(-89, 90, 5)
         ras, decs = np.meshgrid(ralist, declist)
         # fmt = "RA: {0:5.2f} DEC: {1:5.2f} a: {2:5.2f} b: {3:5.2f} pa: {4:5.2f}"
         bgrid = np.empty(ras.shape[0] * ras.shape[1], dtype=np.float)
@@ -355,16 +355,19 @@ class WCSHelperTest(object):
                 ra += 360
             x, y, sx, sy, theta = self.helper.sky2pix_ellipse([ra, dec], a, b, pa)
             final = self.helper.pix2sky_ellipse([x, y], sx, sy, theta)
-            bgrid[i] = final[3]
-        bgrid = np.log(bgrid.reshape(ras.shape) / b)
+            bgrid[i] = (a*b) / (final[2]*final[3])
+        bgrid = bgrid.reshape(ras.shape)
 
         from matplotlib import pyplot
 
         figure = pyplot.figure()
         ax = figure.add_subplot(111)
-        mappable = ax.imshow(bgrid, interpolation='nearest')
+        mappable = ax.imshow(bgrid, interpolation='nearest', extent=[ ralist[0], ralist[-1], declist[0], declist[-1]], origin='lower')
+        ax.set_xlabel('ra (deg)')
+        ax.set_ylabel('dec (deg')
         cax = pyplot.colorbar(mappable)
-        pyplot.show()
+        cax.set_label('Area change')
+        pyplot.savefig('test_round_trip.png')
 
 
     def test_defect(self):
@@ -380,7 +383,7 @@ class WCSHelperTest(object):
         ralist = range(-60, 181, 5)
         declist = range(-85, 86, 5)
         ras, decs = np.meshgrid(ralist, declist)
-        # fmt = "RA: {0:5.2f} DEC: {1:5.2f} a: {2:5.2f} b: {3:5.2f} pa: {4:5.2f}"
+        fmt = "RA: {0:5.2f} DEC: {1:5.2f} a: {2:5.2f} b: {3:5.2f} pa: {4:5.2f}"
         bgrid = np.empty(ras.shape[0] * ras.shape[1], dtype=np.float)
         for i, (ra, dec) in enumerate(zip(ras.ravel(), decs.ravel())):
             if ra < 0:
@@ -389,8 +392,10 @@ class WCSHelperTest(object):
             x, y, sx, theta = self.helper.sky2pix_vec([ra, dec], a, pa)
             _, _, sy, theta2 = self.helper.sky2pix_vec([ra, dec], b, pa + 90)
             # final = self.helper.pix2sky_ellipse([x,y],sx,sy,theta)
-            defect = theta - theta2 - 90
-            bgrid[i] = 1 / np.cos(np.radians(defect))
+            defect = (theta - (theta2 - 90)) % 360
+            if defect > 180:
+                defect -= 180
+            bgrid[i] = defect #1 / np.cos(np.radians(defect))
             # print '-'
             # print fmt.format(*initial),"->"
             # print fmt.format(*final)
@@ -400,9 +405,12 @@ class WCSHelperTest(object):
 
         figure = pyplot.figure()
         ax = figure.add_subplot(111)
-        mappable = ax.imshow(bgrid, interpolation='nearest')
+        mappable = ax.imshow(bgrid, interpolation='nearest', extent=[ ralist[0], ralist[-1], declist[0], declist[-1]], origin='lower')
+        ax.set_xlabel('ra (deg)')
+        ax.set_ylabel('dec (deg')
         cax = pyplot.colorbar(mappable)
-        pyplot.show()
+        cax.set_label('defect')
+        pyplot.savefig('test.png')
 
 
 class PSFHelper(WCSHelper):
