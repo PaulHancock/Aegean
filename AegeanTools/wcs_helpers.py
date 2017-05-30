@@ -18,6 +18,7 @@ from astropy.io import fits
 
 # join the Aegean logger
 import logging
+
 log = logging.getLogger('Aegean')
 
 
@@ -53,7 +54,7 @@ class WCSHelper(object):
             logging.critical("Cannot determine beam information")
 
         _, pixscale = get_pixinfo(header)
-        refpix = (header['CRPIX1'],header['CRPIX2'])
+        refpix = (header['CRPIX1'], header['CRPIX2'])
         return cls(wcs, beam, pixscale, refpix, lat)
 
     @classmethod
@@ -65,7 +66,7 @@ class WCSHelper(object):
         :return:
         """
         header = fits.getheader(filename)
-        return cls.from_header(header,beam)
+        return cls.from_header(header, beam)
 
     def __init__(self, wcs, beam, pixscale, refpix, lat=None):
         self.wcs = wcs
@@ -80,7 +81,7 @@ class WCSHelper(object):
         convert to pos=(ra,dec) coords
         """
         x, y = pixel
-        #wcs and pyfits have oposite ideas of x/y
+        # wcs and pyfits have oposite ideas of x/y
         return self.wcs.wcs_pix2world([[y, x]], 1)[0]
 
     def sky2pix(self, pos):
@@ -89,7 +90,7 @@ class WCSHelper(object):
         convert to pixel = (x,y) coords
         """
         pixel = self.wcs.wcs_world2pix([pos], 1)
-        #wcs and pyfits have oposite ideas of x/y
+        # wcs and pyfits have oposite ideas of x/y
         return [pixel[0][1], pixel[0][0]]
 
     def sky2pix_vec(self, pos, r, pa):
@@ -158,12 +159,12 @@ class WCSHelper(object):
         x, y = self.sky2pix(pos)
 
         x_off, y_off = self.sky2pix(translate(ra, dec, a, pa))
-        sx = np.hypot((x - x_off),(y - y_off))
+        sx = np.hypot((x - x_off), (y - y_off))
         theta = np.arctan2((y_off - y), (x_off - x))
 
-        x_off, y_off = self.sky2pix(translate(ra, dec, b, pa-90))
+        x_off, y_off = self.sky2pix(translate(ra, dec, b, pa - 90))
         sy = np.hypot((x - x_off), (y - y_off))
-        theta2 = np.arctan2((y_off - y), (x_off - x)) - np.pi/2
+        theta2 = np.arctan2((y_off - y), (x_off - x)) - np.pi / 2
 
         # The a/b vectors are perpendicular in sky space, but not always in pixel space
         # so we have to account for this by calculating the angle between the two vectors
@@ -197,8 +198,8 @@ class WCSHelper(object):
         major = gcd(ra, dec, ra2, dec2)
         pa = bear(ra, dec, ra2, dec2)
 
-        v_sy = [x + sy * np.cos(np.radians(theta-90)),
-                y + sy * np.sin(np.radians(theta-90))]
+        v_sy = [x + sy * np.cos(np.radians(theta - 90)),
+                y + sy * np.sin(np.radians(theta - 90))]
         ra2, dec2 = self.pix2sky(v_sy)
         minor = gcd(ra, dec, ra2, dec2)
         pa2 = bear(ra, dec, ra2, dec2) - 90
@@ -233,8 +234,8 @@ class WCSHelper(object):
             factor = 1
         else:
             # this works if the pa is zero. For non-zero pa it's a little more difficult
-            factor = np.cos(np.radians(dec-self.lat))
-        return Beam(self.beam.a/factor, self.beam.b, self.beam.pa)
+            factor = np.cos(np.radians(dec - self.lat))
+        return Beam(self.beam.a / factor, self.beam.b, self.beam.pa)
 
     def get_pixbeam(self, ra, dec):
         """
@@ -272,7 +273,7 @@ class WCSHelper(object):
         """
         barea = abs(self.beam.a * self.beam.b * np.pi)  # in deg**2 at reference coords
         if self.lat is not None:
-            barea /= np.cos(np.radians(dec-self.lat))
+            barea /= np.cos(np.radians(dec - self.lat))
         return barea
 
     def get_beamarea_pix(self, ra, dec):
@@ -285,7 +286,7 @@ class WCSHelper(object):
         """
         parea = abs(self.pixscale[0] * self.pixscale[1])  # in deg**2 at reference coords
         barea = self.get_beamarea_deg2(ra, dec)
-        return barea/parea
+        return barea / parea
 
     def sky_sep(self, pix1, pix2):
         """
@@ -306,9 +307,10 @@ class WCSHelperTest(object):
     """
     A test class for WCSHelper
     """
-    def __init__(self):
+
+    def __init__(self, fname):
         # self.helper = WCSHelper.from_file('Test/Images/1904-66_SIN.fits')
-        self.helper = WCSHelper.from_file('Test/Week2_small.fits')
+        self.helper = WCSHelper.from_file(fname)
         self.test_vector_round_trip()
         self.test_ellipse_round_trip()
         self.test_defect()
@@ -319,14 +321,14 @@ class WCSHelperTest(object):
         original vector (within some tolerance).
         """
         print "Testing vector round trip... ",
-        initial = [1, 45]  #r,theta = 1,45 (degrees)
+        initial = [1, 45]  # r,theta = 1,45 (degrees)
         ref = self.helper.refpix
         ra, dec, dist, ang = self.helper.pix2sky_vec(ref, *initial)
         x, y, r, theta = self.helper.sky2pix_vec([ra, dec], dist, ang)
         print "Start: x {0}, y {1}, r {2}, theta {3}".format(ref[0], ref[1], *initial)
         print "sky: ra {0}, dec {1}, dist {2}, ang {3}".format(ra, dec, dist, ang)
         print "Final: x {0}, y {1}, r {2}, theta {3}".format(x, y, r, theta)
-        if abs(r-initial[0]) < 1e-9 and abs(theta-initial[1]) < 1e-9:
+        if abs(r - initial[0]) < 1e-9 and abs(theta - initial[1]) < 1e-9:
             print "Pass"
             return True
         else:
@@ -340,23 +342,24 @@ class WCSHelperTest(object):
         """
         print "Testing ellipse round trip"
         # raref, decref = self.helper.pix2sky(self.helper.refpix)
-        a = 2*self.helper.beam.a
+        a = 2 * self.helper.beam.a
         b = self.helper.beam.b
-        pa = self.helper.beam.pa+45
+        pa = self.helper.beam.pa + 45
         ralist = range(-60, 181, 5)
         declist = range(-85, 86, 5)
         ras, decs = np.meshgrid(ralist, declist)
         # fmt = "RA: {0:5.2f} DEC: {1:5.2f} a: {2:5.2f} b: {3:5.2f} pa: {4:5.2f}"
-        bgrid = np.empty(ras.shape[0]*ras.shape[1], dtype=np.float)
+        bgrid = np.empty(ras.shape[0] * ras.shape[1], dtype=np.float)
         for i, (ra, dec) in enumerate(zip(ras.ravel(), decs.ravel())):
             if ra < 0:
                 ra += 360
             x, y, sx, sy, theta = self.helper.sky2pix_ellipse([ra, dec], a, b, pa)
             final = self.helper.pix2sky_ellipse([x, y], sx, sy, theta)
             bgrid[i] = final[3]
-        bgrid = np.log(bgrid.reshape(ras.shape)/b)
+        bgrid = np.log(bgrid.reshape(ras.shape) / b)
 
         from matplotlib import pyplot
+
         figure = pyplot.figure()
         ax = figure.add_subplot(111)
         mappable = ax.imshow(bgrid, interpolation='nearest')
@@ -371,29 +374,30 @@ class WCSHelperTest(object):
         """
         print "Testing defect"
         # raref, decref = self.helper.pix2sky(self.helper.refpix)
-        a = 2*self.helper.beam.a
+        a = 2 * self.helper.beam.a
         b = self.helper.beam.b
-        pa = self.helper.beam.pa+45
-        ralist = range(-60,181,5)
-        declist = range(-85,86,5)
-        ras, decs = np.meshgrid(ralist,declist)
+        pa = self.helper.beam.pa + 45
+        ralist = range(-60, 181, 5)
+        declist = range(-85, 86, 5)
+        ras, decs = np.meshgrid(ralist, declist)
         # fmt = "RA: {0:5.2f} DEC: {1:5.2f} a: {2:5.2f} b: {3:5.2f} pa: {4:5.2f}"
-        bgrid = np.empty(ras.shape[0]*ras.shape[1],dtype=np.float)
-        for i,(ra, dec) in enumerate(zip(ras.ravel(),decs.ravel())):
-            if ra<0:
-                ra+=360
-            initial = (ra,dec,a,b,pa)
-            x,y,sx,theta = self.helper.sky2pix_vec([ra,dec],a,pa)
-            _, _, sy, theta2 = self.helper.sky2pix_vec([ra,dec],b,pa+90)
-            #final = self.helper.pix2sky_ellipse([x,y],sx,sy,theta)
-            defect = theta-theta2-90
-            bgrid[i] = 1/np.cos(np.radians(defect))
+        bgrid = np.empty(ras.shape[0] * ras.shape[1], dtype=np.float)
+        for i, (ra, dec) in enumerate(zip(ras.ravel(), decs.ravel())):
+            if ra < 0:
+                ra += 360
+            # initial = (ra,dec,a,b,pa)
+            x, y, sx, theta = self.helper.sky2pix_vec([ra, dec], a, pa)
+            _, _, sy, theta2 = self.helper.sky2pix_vec([ra, dec], b, pa + 90)
+            # final = self.helper.pix2sky_ellipse([x,y],sx,sy,theta)
+            defect = theta - theta2 - 90
+            bgrid[i] = 1 / np.cos(np.radians(defect))
             # print '-'
             # print fmt.format(*initial),"->"
             # print fmt.format(*final)
         bgrid = bgrid.reshape(ras.shape)
 
         from matplotlib import pyplot
+
         figure = pyplot.figure()
         ax = figure.add_subplot(111)
         mappable = ax.imshow(bgrid, interpolation='nearest')
@@ -443,14 +447,14 @@ class PSFHelper(WCSHelper):
         # If we don't have a psf map then we just fall back to using the beam
         # from the fits header (including ZA scaling)
         if self.data is None:
-            beam = self.wcshelper.get_beam(ra,dec)
+            beam = self.wcshelper.get_beam(ra, dec)
             return beam.a, beam.b, beam.pa
-        
-        x, y = self.sky2pix([ra, dec])                
+
+        x, y = self.sky2pix([ra, dec])
         # We leave the interpolation in the hands of whoever is making these images
         # clamping the x,y coords at the image boundaries just makes sense
-        x = int(np.clip(x, 0, self.data.shape[1]-1))
-        y = int(np.clip(y, 0, self.data.shape[2]-1))
+        x = int(np.clip(x, 0, self.data.shape[1] - 1))
+        y = int(np.clip(y, 0, self.data.shape[2] - 1))
         psf_sky = self.data[:, x, y]
         return psf_sky
 
@@ -465,7 +469,7 @@ class PSFHelper(WCSHelper):
         psf_sky = self.get_psf_sky(ra, dec)
         psf_pix = self.wcshelper.sky2pix_ellipse([ra, dec], psf_sky[0], psf_sky[1], psf_sky[2])[2:]
         # psf_pix = self.wcshelper.sky2pix_vec([ra, dec], psf_sky[0], 0)[2],\
-        #           self.wcshelper.sky2pix_vec([ra, dec], psf_sky[1], 90)[2],\
+        # self.wcshelper.sky2pix_vec([ra, dec], psf_sky[1], 90)[2],\
         #           psf_sky[2]
         return psf_pix
 
@@ -513,7 +517,7 @@ class PSFHelper(WCSHelper):
         beam = self.get_pixbeam(ra, dec)
         if beam is None:
             return 0
-        return beam.a*beam.b*np.pi
+        return beam.a * beam.b * np.pi
 
     def get_beamarea_deg2(self, ra, dec):
         """
@@ -525,15 +529,23 @@ class PSFHelper(WCSHelper):
         beam = self.get_beam(ra, dec)
         if beam is None:
             return 0
-        return beam.a*beam.b*np.pi
+        return beam.a * beam.b * np.pi
 
 
 class PSFHelperTest(object):
     """
 
     """
+
     def __init__(self):
         psffile = "Test/Images/1904_66_SIN_psf.fits"
         wcsfile = "Test/Images/1904_66_SIN.fits"
         psfdata = fits.getdata(psffile)
-        self.helper = PSFHelper(psfdata,WCSHelper.from_file(wcsfile))
+        self.helper = PSFHelper(psfdata, WCSHelper.from_file(wcsfile))
+
+
+if __name__ == "__main__":
+    import sys
+
+    test_img = sys.argv[-1]
+    WCSHelperTest(test_img)
