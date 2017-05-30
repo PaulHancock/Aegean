@@ -157,6 +157,7 @@ if __name__ == "__main__":
     log.setLevel(logging_level)
     log.info("This is Aegean {0}-({1})".format(__version__, __date__))
 
+    import AegeanTools
     from AegeanTools.source_finder import SourceFinder, check_cores
     # source finding object
     sf = SourceFinder(log=log)
@@ -166,6 +167,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if options.file_versions:
+        log.info("AegeanTools {0} from {1}".format(AegeanTools.__version__, AegeanTools.__file__))
         log.info("Numpy {0} from {1} ".format(np.__version__, np.__file__))
         log.info("Scipy {0} from {1}".format(scipy.__version__, scipy.__file__))
         log.info("AstroPy {0} from {1}".format(astropy.__version__, astropy.__file__))
