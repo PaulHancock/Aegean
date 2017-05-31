@@ -2,5 +2,5 @@
 """ """
 
 __author__ = 'Paul Hancock'
-__version__ = '2.0b148'
-__date__ = '2017-05-18'
+__version__ = '2.0b158'
+__date__ = '2017-05-31'
