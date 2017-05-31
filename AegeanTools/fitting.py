@@ -686,7 +686,7 @@ def condon_errors(source, theta_n):
     source.err_dec = np.sqrt(err_xo2 * np.cos(phi)**2 + err_yo2 * np.sin(phi)**2)
 
     # if major/minor are very similar then we should not be able to figure out what pa is.
-    if abs((major / minor) ** 2 + (minor / major) ** 2 - 2) < 0.01:
+    if abs(2 * (major-minor) / (major+minor)) < 0.01:
         source.err_pa = -1
     else:
         source.err_pa = np.degrees(np.sqrt(4 / rho2('pa')) * (major * minor / (major ** 2 - minor ** 2)))
