@@ -666,8 +666,8 @@ def condon_errors(source, theta_n):
               'yo': (1. / 2, 5. / 2),
               'pa': (1. / 2, 5. / 2)}
 
-    major = source.a / 3600  # degrees
-    minor = source.b / 3600  # degrees
+    major = source.a / 3600.  # degrees
+    minor = source.b / 3600.  # degrees
     phi = np.radians(source.pa)  # radians
     smoothing = major * minor / (theta_n ** 2)
     factor1 = (1 + (major / theta_n))
@@ -677,23 +677,25 @@ def condon_errors(source, theta_n):
     rho2 = lambda x: smoothing / 4 * factor1 ** alphas[x][0] * factor2 ** alphas[x][1] * snr ** 2
 
     source.err_peak_flux = source.peak_flux * np.sqrt(2 / rho2('amp'))
-    source.err_a = major * np.sqrt(2 / rho2('major')) * 3600  # arcsec
-    source.err_b = minor * np.sqrt(2 / rho2('minor')) * 3600  # arcsec
+    source.err_a = major * np.sqrt(2 / rho2('major')) * 3600.  # arcsec
+    source.err_b = minor * np.sqrt(2 / rho2('minor')) * 3600.  # arcsec
 
     err_xo2 = 2. / rho2('xo') * major ** 2 / (8 * np.log(2))  # Condon'97 eq 21
     err_yo2 = 2. / rho2('yo') * minor ** 2 / (8 * np.log(2))
     source.err_ra = np.sqrt(err_xo2 * np.sin(phi)**2 + err_yo2 * np.cos(phi)**2)
     source.err_dec = np.sqrt(err_xo2 * np.cos(phi)**2 + err_yo2 * np.sin(phi)**2)
 
+    if (major == 0) or (minor == 0):
+        source.err_pa = -1
     # if major/minor are very similar then we should not be able to figure out what pa is.
-    if abs(2 * (major-minor) / (major+minor)) < 0.01:
+    elif abs(2 * (major-minor) / (major+minor)) < 0.01:
         source.err_pa = -1
     else:
         source.err_pa = np.degrees(np.sqrt(4 / rho2('pa')) * (major * minor / (major ** 2 - minor ** 2)))
 
     # integrated flux error
     err2 = (source.err_peak_flux / source.peak_flux) ** 2
-    err2 += (theta_n ** 2 / (major * minor)) * ( (source.err_a / source.a) ** 2 + (source.err_b / source.b) ** 2)
+    err2 += (theta_n ** 2 / (major * minor)) * ((source.err_a / source.a) ** 2 + (source.err_b / source.b) ** 2)
     source.err_int_flux = source.int_flux * np.sqrt(err2)
     return
 
