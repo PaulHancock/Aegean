@@ -378,7 +378,7 @@ class SourceFinder(object):
                 self.log.debug(" - flags {0}".format(flag))
                 self.log.debug(" - fit?  {0}".format(not maxxed))
 
-            # TODO: figure out how incorporate the circular constraint on xo/yo
+            # TODO: figure out how incorporate the circular constraint on sx/sy
             prefix = "c{0}_".format(i)
             params.add(prefix + 'amp', value=amp, min=amp_min, max=amp_max, vary=not maxxed)
             params.add(prefix + 'xo', value=xo, min=float(xo_min), max=float(xo_max), vary=not maxxed)
@@ -394,8 +394,8 @@ class SourceFinder(object):
             params.add(prefix + 'flags', value=summit_flag, vary=False)
 
             # starting at zero allows the maj/min axes to be fit better.
-            if params[prefix + 'theta'].vary:
-                params[prefix + 'theta'].value = 0
+            # if params[prefix + 'theta'].vary:
+            #     params[prefix + 'theta'].value = 0
 
             i += 1
         if debug_on:
@@ -1256,6 +1256,8 @@ class SourceFinder(object):
             self.log.debug(
                 "C({0},{1},{2},{3},{4})".format(len(mx), len(my), pixbeam.a * FWHM2CC, pixbeam.b * FWHM2CC, pixbeam.pa))
             errs = np.nanmax(rms)
+            self.log.debug("Initial params")
+            self.log.debug(params)
             result, _ = do_lmfit(idata, params, B=B)
             if not result.errorbars:
                 is_flag |= flags.FITERR
@@ -1270,6 +1272,7 @@ class SourceFinder(object):
             if not result.success:
                 is_flag |= flags.FITERR
 
+        self.log.debug("Final params")
         self.log.debug(model)
 
         # convert the fitting results to a list of sources [and islands]
