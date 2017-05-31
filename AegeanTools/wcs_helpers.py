@@ -345,8 +345,8 @@ class WCSHelperTest(object):
         a = 2 * self.helper.beam.a
         b = self.helper.beam.b
         pa = self.helper.beam.pa + 45
-        ralist = range(0, 360, 5)
-        declist = range(-89, 90, 5)
+        ralist = range(-180, 180, 5)
+        declist = range(-89, 30, 5)
         ras, decs = np.meshgrid(ralist, declist)
         # fmt = "RA: {0:5.2f} DEC: {1:5.2f} a: {2:5.2f} b: {3:5.2f} pa: {4:5.2f}"
         bgrid = np.empty(ras.shape[0] * ras.shape[1], dtype=np.float)
@@ -355,8 +355,9 @@ class WCSHelperTest(object):
                 ra += 360
             x, y, sx, sy, theta = self.helper.sky2pix_ellipse([ra, dec], a, b, pa)
             final = self.helper.pix2sky_ellipse([x, y], sx, sy, theta)
-            bgrid[i] = b / final[3]
+            bgrid[i] = theta % 360
         bgrid = bgrid.reshape(ras.shape)
+        #bgrid[bgrid > 10] = np.nan
 
         from matplotlib import pyplot
         from matplotlib.colors import ListedColormap
@@ -364,11 +365,12 @@ class WCSHelperTest(object):
         figure = pyplot.figure()
         ax = figure.add_subplot(111)
         mappable = ax.imshow(bgrid, interpolation='nearest', extent=[ ralist[0], ralist[-1], declist[0], declist[-1]],
-                             origin='lower', cmap=ListedColormap(sns.color_palette("hls", 18).as_hex()))
+                             origin='lower',
+                             cmap=ListedColormap(sns.color_palette("hls", 180).as_hex()))
         ax.set_xlabel('ra (deg)')
-        ax.set_ylabel('dec (deg')
+        ax.set_ylabel('dec (deg)')
         cax = pyplot.colorbar(mappable)
-        cax.set_label('b change')
+        #cax.set_label('a/b (pix)')
         pyplot.savefig('test_round_trip.png')
 
 
