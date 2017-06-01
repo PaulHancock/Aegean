@@ -647,7 +647,7 @@ def CRB_errs(jac, C, B=None):
     return errs
 
 
-def condon_errors(source, theta_n):
+def condon_errors(source, theta_n, psf=None):
     """
     Calculate the parameter errors for a fitted source
     using the description of Condon'97
@@ -669,6 +669,16 @@ def condon_errors(source, theta_n):
     major = source.a / 3600.  # degrees
     minor = source.b / 3600.  # degrees
     phi = np.radians(source.pa)  # radians
+    if psf is not None:
+        beam = psf.get_beam(source.ra, source.dec)
+        if beam is not None:
+            theta_n = np.hypot(beam.a, beam.b)
+            print beam, theta_n
+
+    if theta_n is None:
+        source.err_a = source.err_b = source.err_peak_flux = source.err_pa = source.err_int_flux = 0
+        return
+
     smoothing = major * minor / (theta_n ** 2)
     factor1 = (1 + (major / theta_n))
     factor2 = (1 + (minor / theta_n))

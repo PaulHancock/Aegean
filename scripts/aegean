@@ -362,11 +362,12 @@ if __name__ == "__main__":
         # which in this case is the same as the synthesized beam FWHM
         if options.beam:
             theta_n = np.hypot(options.beam[0], options.beam[1])
+            psf = None
         else:
-            hdu = sf.global_data.img.get_hdu_header()
-            theta_n = np.hypot(hdu['BMAJ'], hdu['BMIN'])
+            psf = sf.global_data.psfhelper
+            theta_n = None
         for s in sources:
-            fitting.condon_errors(s, theta_n)
+            fitting.condon_errors(s, theta_n=theta_n, psf=psf)
 
     log.info("found {0} sources total".format(len(sources)))
     if len(sources) > 0 and options.tables:
