@@ -106,6 +106,9 @@ if __name__ == "__main__":
     parser.add_option('--lat', dest='lat', type=float, default=None,
                       help='The latitude of the telescope used to collect data.')
 
+    parser.add_option('--slice', dest='slice', type=int, default=None,
+                      help='If the input data is a cube, then this slice will determine which slice will be processed by aegean')
+
     parser.add_option('--versions', dest='file_versions', action="store_true", default=False,
                       help='Show the file versions of relevant modules. [default: false]')
 
@@ -348,7 +351,7 @@ if __name__ == "__main__":
                                          doislandflux=options.doislandflux,
                                          nonegative=not options.negative, nopositive=options.nopositive,
                                          mask=options.region, lat=lat, imgpsf=options.imgpsf, blank=options.blank,
-                                         docov=options.docov)
+                                         docov=options.docov, slice=options.slice)
         if options.blank:
             outname = basename+'_blank.fits'
             sf.save_image(outname)
