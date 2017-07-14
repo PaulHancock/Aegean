@@ -1299,7 +1299,7 @@ class SourceFinder(object):
     def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, max_summits=None, innerclip=5,
                               outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
                               nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None, blank=False,
-                              docov=True):
+                              docov=True, slice=None):
         """
         Run the Aegean source finder.
 
@@ -1327,6 +1327,7 @@ class SourceFinder(object):
         :param imgpsf: filename or HDUList for a psf image.
         :param blank: Cause the output image to be blanked where islands are found.
         :param docov: True = include covariance matrix in the fitting process. (default=True)
+        :param slice: For image cubes, slice determines which slice is used.
         """
 
         # Tell numpy to be quiet
