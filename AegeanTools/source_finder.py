@@ -615,7 +615,7 @@ class SourceFinder(object):
     # Setting up 'global' data and calculating bkg/rms
     ##
     def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, cores=1,
-                     do_curve=True, mask=None, lat=None, psf=None, blank=False, docov=True):
+                     do_curve=True, mask=None, lat=None, psf=None, blank=False, docov=True, slice=slice):
         """
         Populate the global_data object by loading or calculating the various components
 
@@ -633,12 +633,13 @@ class SourceFinder(object):
         :param psf: filename or HDUList of a psf image
         :param blank: True = blank output image where islands are found
         :param docov: True = use covariance matrix in fitting
+        :param slice: For an image cube, which slice to use.
         :return: None
         """
         # don't reload already loaded data
         if self.global_data.img is not None:
             return
-        img = FitsImage(filename, hdu_index=hdu_index, beam=beam)
+        img = FitsImage(filename, hdu_index=hdu_index, beam=beam, slice=slice)
         beam = img.beam
 
         debug = logging.getLogger('Aegean').isEnabledFor(logging.DEBUG)
@@ -1299,7 +1300,7 @@ class SourceFinder(object):
     def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, max_summits=None, innerclip=5,
                               outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
                               nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None, blank=False,
-                              docov=True):
+                              docov=True, slice=None):
         """
         Run the Aegean source finder.
 
@@ -1327,6 +1328,7 @@ class SourceFinder(object):
         :param imgpsf: filename or HDUList for a psf image.
         :param blank: Cause the output image to be blanked where islands are found.
         :param docov: True = include covariance matrix in the fitting process. (default=True)
+        :param slice: For image cubes, slice determines which slice is used.
         """
 
         # Tell numpy to be quiet
@@ -1335,7 +1337,7 @@ class SourceFinder(object):
             assert (cores >= 1), "cores must be one or more"
 
         self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, cores=cores,
-                          verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank, docov=docov)
+                          verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank, docov=docov, slice=slice)
         global_data = self.global_data
         rmsimg = global_data.rmsimg
         data = global_data.data_pix

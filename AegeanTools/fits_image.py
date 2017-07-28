@@ -114,7 +114,7 @@ class FitsImage():
     An object that handles the loading and manipulation of a fits file,
     """
 
-    def __init__(self, filename=None, hdu_index=0, beam=None):
+    def __init__(self, filename=None, hdu_index=0, beam=None, slice=None):
         """
         filename: the name of the fits image file or an instance of astropy.io.fits.HDUList
         hdu_index = index of FITS HDU when extensions are used (0 is primary HDU)
@@ -157,6 +157,16 @@ class FitsImage():
             self.beam = beam
         self._rms = None
         self._pixels = numpy.squeeze(self.hdu.data)
+        # if we have a fits cube just use a single slice
+        if len(self._pixels.shape) == 3:
+            if slice is None:
+                log.critical("Image is a cube, but no slice is given")
+                sys.exit(1)
+            log.info("Image is a cube, using slice {0}".format(slice))
+            self._pixels = self._pixels[slice, :, :]
+        elif len(self._pixels.shape) > 3:
+            log.critical("Image has >3 axes.")
+            sys.exit(1)
         # convert +/- inf to nan
         self._pixels[numpy.where(numpy.isinf(self._pixels))] = numpy.nan
         # del self.hdu

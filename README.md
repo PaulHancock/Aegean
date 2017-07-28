@@ -9,7 +9,7 @@ Programs included:
 
 ^ - by "your" I mean "my"
 
-Istalling
+Installing
 =====
 You can install via pip using 
 `pip install git+https://github.com/PaulHancock/Aegean.git` (latest)
