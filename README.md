@@ -11,6 +11,8 @@ Programs included:
 
 Installing
 =====
+AegeanTools is guaranteed to work on python 2.7. Earlier versions will often work, but 3.0 is not (yet) supported.
+
 You can install via pip using 
 `pip install git+https://github.com/PaulHancock/Aegean.git` (latest)
 `pip install AegeanTools` (stable)
