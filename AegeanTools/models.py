@@ -20,8 +20,8 @@ class SimpleSource(object):
 
     formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.a:5.2f} {0.b:5.2f} {0.pa:6.1f} {0.flags:06b}"
     names = ['background', 'local_rms', 'ra', 'dec', 'peak_flux', 'err_peak_flux', 'flags', 'peak_pixel', 'a', 'b',
-             'pa','uuid']
-
+             'pa', 'uuid']
+    galactic = False
     def __init__(self):
         self.background = 0.0
         self.local_rms = 0.0
@@ -35,6 +35,8 @@ class SimpleSource(object):
         self.b = 0.0
         self.pa = 0.0
         self.uuid = str(uuid.uuid4())
+
+
 
     def sanitise(self):
         """
