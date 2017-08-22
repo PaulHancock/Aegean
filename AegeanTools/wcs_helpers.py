@@ -1,4 +1,6 @@
 #! /usr/bin/env python
+from __future__ import print_function
+
 """
 This module contains two classes that provide WCS functions that are not
 part of the WCS toolkit, as well as some wrappers around the provided tools

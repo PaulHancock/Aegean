@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+from __future__ import print_function
 
 """
 Provide fitting routines and helper fucntions to Aegean

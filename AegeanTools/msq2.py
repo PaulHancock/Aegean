@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+from __future__ import print_function
 
 """
 Implementation of a marching squares algorithm.

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 
 # Author    :   Shaoguang Guo && Yang Lu
 # Email     :   sgguo@shao.ac.cn
@@ -51,7 +52,7 @@ if __name__ == '__main__':
         parser.print_help()
         sys.exit()
 
-    print "Updating {0} -> {1}".format(results.infile, results.outfile)
+    print("Updating {0} -> {1}".format(results.infile, results.outfile))
 
     hdulist = load_file_or_hdu(results.infile)
     found = search_beam(hdulist)
@@ -59,8 +60,8 @@ if __name__ == '__main__':
     if found:
         fix_aips_header(hdulist[0].header)
         hdulist[0].header['HISTORY'] = "fix_beam.py by {0}".format(__institute__)
-        print 'Header has been updated'
+        print('Header has been updated')
         hdulist.writeto(results.outfile, clobber=True)
-        print "Wrote {0}".format(results.outfile)
+        print("Wrote {0}".format(results.outfile))
     else:
-        print 'Header has not been updated'
+        print('Header has not been updated')
