@@ -338,7 +338,8 @@ if __name__ == "__main__":
                                  rmsin=options.noiseimg, beam=options.beam, lat=lat, imgpsf=options.imgpsf,
                                  catpsf=options.catpsf,
                                  stage=options.priorized, ratio=options.ratio, outerclip=options.outerclip,
-                                 cores=options.cores, doregroup=options.regroup, docov=options.docov)
+                                 cores=options.cores, doregroup=options.regroup, docov=options.docov,
+                                 slice=options.slice)
 
     if options.find:
         log.info("Finding sources.")
