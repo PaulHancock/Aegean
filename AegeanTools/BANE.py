@@ -18,7 +18,7 @@ from tempfile import NamedTemporaryFile
 from time import gmtime, strftime
 
 # Aegean tools
-from fits_interp import compress
+from .fits_interp import compress
 
 __author__ = 'Paul Hancock'
 __version__ = 'v1.4.6'

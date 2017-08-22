@@ -20,8 +20,8 @@ from astropy.coordinates import Angle, SkyCoord
 import astropy.units as u
 from astropy.io import fits as pyfits
 from astropy.wcs import wcs as pywcs
-from regions import Region
-from catalogs import load_table, write_table
+from .regions import Region
+from .catalogs import load_table, write_table
 
 __version__ = 'v1.2.5'
 __date__ = '2016-10-14'

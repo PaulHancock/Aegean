@@ -14,8 +14,8 @@ import numpy as np
 import sys
 import math
 
-from angle_tools import gcd, bear
-from catalogs import load_table, table_to_source_list
+from .angle_tools import gcd, bear
+from .catalogs import load_table, table_to_source_list
 
 # join the Aegean logger
 import logging

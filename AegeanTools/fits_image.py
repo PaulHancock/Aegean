@@ -10,7 +10,7 @@ import astropy.wcs as pywcs
 import scipy.stats
 import logging
 import sys
-from fits_interp import expand
+from .fits_interp import expand
 
 # Join the Aegean logger
 log = logging.getLogger("Aegean")

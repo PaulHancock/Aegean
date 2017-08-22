@@ -10,8 +10,8 @@ __author__ = 'Paul Hancock'
 
 import numpy as np
 
-from angle_tools import gcd, bear, translate
-from fits_image import Beam, get_beam, get_pixinfo
+from .angle_tools import gcd, bear, translate
+from .fits_image import Beam, get_beam, get_pixinfo
 
 # the glory of astropy
 import astropy

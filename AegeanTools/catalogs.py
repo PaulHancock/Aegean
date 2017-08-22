@@ -17,7 +17,7 @@ import re
 from time import gmtime, strftime
 
 # Other AegeanTools
-from models import OutputSource, classify_catalog
+from .models import OutputSource, classify_catalog
 
 # input/output table formats
 import astropy
@@ -208,7 +208,7 @@ def aegean2cat(filename):
     @param filename:
     @return:
     """
-    from models import OutputSource
+    from .models import OutputSource
     # this will break if I change the number of properties that are reported.
     colnames = ['src_isle'] + OutputSource.names[2:-3]
     t = ascii.read(filename, delimiter='\s', names=colnames)

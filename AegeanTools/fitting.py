@@ -12,11 +12,11 @@ import math
 import numpy as np
 from scipy.linalg import eigh, inv
 import lmfit
-from angle_tools import gcd, bear
+from .angle_tools import gcd, bear
 
 # Other AegeanTools
 # from models import OutputSource, IslandSource
-import flags
+from . import flags
 
 # join the Aegean logger
 import logging

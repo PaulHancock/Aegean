@@ -20,20 +20,20 @@ from scipy.special import erf
 from scipy.ndimage import label, find_objects
 
 # AegeanTools
-from fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit, \
+from .fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit, \
                     bias_correct, elliptical_gaussian
-from wcs_helpers import WCSHelper, PSFHelper
-from fits_image import FitsImage, Beam
-from msq2 import MarchingSquares
-from angle_tools import dec2hms, dec2dms, gcd, bear
-from catalogs import load_table, table_to_source_list
-from models import SimpleSource, OutputSource, IslandSource, island_itergen
-import flags
+from .wcs_helpers import WCSHelper, PSFHelper
+from .fits_image import FitsImage, Beam
+from .msq2 import MarchingSquares
+from .angle_tools import dec2hms, dec2dms, gcd, bear
+from .catalogs import load_table, table_to_source_list
+from .models import SimpleSource, OutputSource, IslandSource, island_itergen
+from . import flags
 
 # need Region in the name space in order to be able to unpickle it
 # This can fail if healpy is not installed
 try:
-    from regions import Region
+    from .regions import Region
 
     region_available = True
     try:
@@ -47,7 +47,7 @@ except ImportError:
 import pprocess
 import multiprocessing
 
-from __init__ import __version__, __date__
+from .__init__ import __version__, __date__
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
