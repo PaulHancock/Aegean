@@ -18,7 +18,7 @@ class Region(object):
 
     def __init__(self, maxdepth=11):
         self.maxdepth = maxdepth
-        self.pixeldict = dict((i, set()) for i in xrange(1, maxdepth+1))
+        self.pixeldict = dict((i, set()) for i in range(1, maxdepth+1))
         self.demoted = set()
         return
 
@@ -76,7 +76,7 @@ class Region(object):
 
     def get_area(self, degrees=True):
         area = 0
-        for d in xrange(1, self.maxdepth+1):
+        for d in range(1, self.maxdepth+1):
             area += len(self.pixeldict[d])*hp.nside2pixarea(2**d, degrees=degrees)
         return area
 
@@ -94,7 +94,7 @@ class Region(object):
         # only do the calculations if the demoted list is empty
         if len(self.demoted) == 0:
             pd = self.pixeldict
-            for d in xrange(1, self.maxdepth):
+            for d in range(1, self.maxdepth):
                 for p in pd[d]:
                     pd[d+1].update(set((4*p, 4*p+1, 4*p+2, 4*p+3)))
                 pd[d] = set()  # clear the pixels from this level
@@ -110,7 +110,7 @@ class Region(object):
         # convert all to lowest level
         self._demote_all()
         # now promote as needed
-        for d in xrange(self.maxdepth, 2, -1):
+        for d in range(self.maxdepth, 2, -1):
             plist = self.pixeldict[d].copy()
             for p in plist:
                 if p % 4 == 0:
@@ -157,12 +157,12 @@ class Region(object):
         :param other: A Region
         """
         # merge the pixels that are common to both
-        for d in xrange(1, min(self.maxdepth, other.maxdepth)+1):
+        for d in range(1, min(self.maxdepth, other.maxdepth)+1):
             self.add_pixels(other.pixeldict[d], d)
 
         # if the other region is at higher resolution, then include a degraded version of the remaining pixels.
         if self.maxdepth < other.maxdepth:
-            for d in xrange(self.maxdepth+1, other.maxdepth+1):
+            for d in range(self.maxdepth+1, other.maxdepth+1):
                 for p in other.pixeldict[d]:
                     # promote this pixel to self.maxdepth
                     pp = p/4**(d-self.maxdepth)
@@ -223,7 +223,7 @@ class Region(object):
         :return: None
         """
         with open(filename, 'w') as out:
-            for d in xrange(1, self.maxdepth+1):
+            for d in range(1, self.maxdepth+1):
                 for p in self.pixeldict[d]:
                     line = "fk5; polygon("
                     # the following int() gets around some problems with np.int64 that exist prior to numpy v 1.8.1
@@ -270,7 +270,7 @@ class Region(object):
         :return: A list of HealPix pixel numbers.
         """
         pd = []
-        for d in xrange(1, self.maxdepth):
+        for d in range(1, self.maxdepth):
             pd.extend(map(lambda x: int(4**(d+1) + x), self.pixeldict[d]))
         return sorted(pd)
 
@@ -421,7 +421,7 @@ def test_add_circles_list_scalar():
     region2.add_circles(ra, dec, radius)
     region2._demote_all()
     test=True
-    for i in xrange(1, region1.maxdepth+1):
+    for i in range(1, region1.maxdepth+1):
         if len(region1.pixeldict[i].difference(region2.pixeldict[i])) > 0:
             test = False
     assert test, 'add_circles gives different results for lists and scalars'
@@ -442,7 +442,7 @@ def test_renorm_demote_symmetric():
     region._demote_all()
     end_dict = region.pixeldict.copy()
     test = True
-    for i in xrange(1, region.maxdepth+1):
+    for i in range(1, region.maxdepth+1):
         if len(end_dict[i].difference(start_dict[i])) > 0:
             test = False
     assert test, 'renorm and demote are not symmetric'

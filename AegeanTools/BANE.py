@@ -46,7 +46,7 @@ def sigmaclip(arr, lo, hi, reps=3):
 
     std = np.std(clipped)
     mean = np.mean(clipped)
-    for i in xrange(reps):
+    for i in range(reps):
         clipped = clipped[np.where(clipped > mean-std*lo)]
         clipped = clipped[np.where(clipped < mean+std*hi)]
         pstd = std
@@ -124,10 +124,10 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         x, y
         """
 
-        xvals = range(xmin, xmax, step_size[0])
+        xvals = list(range(xmin, xmax, step_size[0]))
         if xvals[-1] != xmax:
             xvals.append(xmax)
-        yvals = range(ymin, ymax, step_size[1])
+        yvals = list(range(ymin, ymax, step_size[1]))
         if yvals[-1] != ymax:
             yvals.append(ymax)
         # initial data
@@ -217,7 +217,7 @@ def gen_factors(m, permute=True):
     # convert to int if people have been naughty
     n=int(abs(m))
     # brute force the factors, one of which is always less than sqrt(n)
-    for i in xrange(1, int(n**0.5+1)):
+    for i in range(1, int(n**0.5+1)):
         if n % i == 0:
             yield i, n/i
             # yield the reverse pair if it is unique
@@ -309,17 +309,17 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
 
     # locations of the box edges
     xmins = [0]
-    xmins.extend(range(xstart, xend, width_x))
+    xmins.extend(list(range(xstart, xend, width_x)))
 
     xmaxs = [xstart]
-    xmaxs.extend(range(xstart+width_x, xend+1, width_x))
+    xmaxs.extend(list(range(xstart+width_x, xend+1, width_x)))
     xmaxs[-1] = img_x
 
     ymins = [0]
-    ymins.extend(range(ystart, yend, width_y))
+    ymins.extend(list(range(ystart, yend, width_y)))
 
     ymaxs = [ystart]
-    ymaxs.extend(range(ystart+width_y, yend+1, width_y))
+    ymaxs.extend(list(range(ystart+width_y, yend+1, width_y)))
     ymaxs[-1] = img_y
 
     args = []

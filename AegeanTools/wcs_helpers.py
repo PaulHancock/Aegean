@@ -347,8 +347,8 @@ class WCSHelperTest(object):
         a = 2 * self.helper.beam.a
         b = self.helper.beam.b
         pa = self.helper.beam.pa + 45
-        ralist = range(-180, 180, 5)
-        declist = range(-89, 30, 5)
+        ralist = list(range(-180, 180, 5))
+        declist = list(range(-89, 30, 5))
         ras, decs = np.meshgrid(ralist, declist)
         # fmt = "RA: {0:5.2f} DEC: {1:5.2f} a: {2:5.2f} b: {3:5.2f} pa: {4:5.2f}"
         bgrid = np.empty(ras.shape[0] * ras.shape[1], dtype=np.float)
@@ -386,8 +386,8 @@ class WCSHelperTest(object):
         a = 2 * self.helper.beam.a
         b = self.helper.beam.b
         pa = self.helper.beam.pa + 45
-        ralist = range(-60, 300, 5)
-        declist = range(-85, 86, 5)
+        ralist = list(range(-60, 300, 5))
+        declist = list(range(-85, 86, 5))
         ras, decs = np.meshgrid(ralist, declist)
         fmt = "RA: {0:5.2f} DEC: {1:5.2f} a: {2:5.2f} b: {3:5.2f} pa: {4:5.2f}"
         bgrid = np.empty(ras.shape[0] * ras.shape[1], dtype=np.float)

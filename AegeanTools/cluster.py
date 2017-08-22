@@ -73,8 +73,8 @@ def pairwise_ellpitical_binary(sources, eps, far=None):
         far = max(a.a/3600 for a in sources)
     l = len(sources)
     distances = np.ones((l, l), dtype=bool)
-    for i in xrange(l):
-        for j in xrange(i,l):
+    for i in range(l):
+        for j in range(i,l):
             if j<i:
                 continue
             if i == j:
@@ -140,7 +140,7 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
         done = False
         # when an islands largest (last) declination is smaller than decmin, we don't need to look at any more islands
         decmin = s1.dec - far
-        for g in xrange(last_group, -1, -1):
+        for g in range(last_group, -1, -1):
             if groups[g][-1].dec < decmin:
                 break
             rafar = far / np.cos(np.radians(s1.dec))

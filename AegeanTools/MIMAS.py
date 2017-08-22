@@ -74,9 +74,9 @@ def mask_plane(data, wcs, region, negate=False):
     # since I know exactly what the index array needs to look like i can construct
     # it faster than list comprehension would allow
     # we do this only once and then recycle it
-    idx = np.array([(j, 0) for j in xrange(data.shape[1])])
+    idx = np.array([(j, 0) for j in range(data.shape[1])])
     j = data.shape[1]
-    for i in xrange(data.shape[0]):
+    for i in range(data.shape[0]):
         idx[:, 1] = i
         indexes[i*j:(i+1)*j] = idx
 

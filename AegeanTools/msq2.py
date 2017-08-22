@@ -178,7 +178,7 @@ class MarchingSquares():
             self.data[p] = 0
 
             # blank until we reach the other perimeter
-            for i in xrange(p[1]+1, self.data.shape[1]):
+            for i in range(p[1]+1, self.data.shape[1]):
                 q = p[0], i
                 # stop when we reach another part of the perimeter
                 if q in perimeter:

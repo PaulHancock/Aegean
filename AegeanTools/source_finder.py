@@ -859,19 +859,19 @@ class SourceFinder(object):
         yend = img_y - (img_y - ystart) % width_y
 
         xmins = [0]
-        xmins.extend(range(xstart, xend, width_x))
+        xmins.extend(list(range(xstart, xend, width_x)))
         xmins.append(xend)
 
         xmaxs = [xstart]
-        xmaxs.extend(range(xstart + width_x, xend + 1, width_x))
+        xmaxs.extend(list(range(xstart + width_x, xend + 1, width_x)))
         xmaxs.append(img_x)
 
         ymins = [0]
-        ymins.extend(range(ystart, yend, width_y))
+        ymins.extend(list(range(ystart, yend, width_y)))
         ymins.append(yend)
 
         ymaxs = [ystart]
-        ymaxs.extend(range(ystart + width_y, yend + 1, width_y))
+        ymaxs.extend(list(range(ystart + width_y, yend + 1, width_y)))
         ymaxs.append(img_y)
 
         # if the image is smaller than our ideal mesh size, just use the whole image instead

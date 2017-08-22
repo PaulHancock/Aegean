@@ -97,7 +97,7 @@ def jacobian(pars, x, y):
 
     matrix = []
 
-    for i in xrange(pars['components'].value):
+    for i in range(pars['components'].value):
         prefix = "c{0}_".format(i)
         amp = pars[prefix + 'amp'].value
         xo = pars[prefix + 'xo'].value
@@ -160,7 +160,7 @@ def emp_jacobian(pars, x, y):
     eps = 1e-5
     matrix = []
     model = ntwodgaussian_lmfit(pars)(x, y)
-    for i in xrange(pars['components'].value):
+    for i in range(pars['components'].value):
         prefix = "c{0}_".format(i)
         for p in ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']:
             if pars[prefix + p].vary:
@@ -221,7 +221,7 @@ def hessian(pars, x, y):
     hmat = np.zeros((ntvar, ntvar, x.shape[0], x.shape[1]))
     npvar = 0
 
-    for i in xrange(pars['components'].value):
+    for i in range(pars['components'].value):
         prefix = "c{0}_".format(i)
         amp = pars[prefix + 'amp'].value
         xo = pars[prefix + 'xo'].value
@@ -495,7 +495,7 @@ def emp_hessian(pars, x, y):
     """
     eps = 1e-5
     matrix = []
-    for i in xrange(pars['components']):
+    for i in range(pars['components']):
         model = emp_jacobian(pars, x, y)
         prefix = "c{0}_".format(i)
         for p in ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']:
@@ -517,10 +517,10 @@ def nan_acf(noise):
     """
     corr = np.zeros(noise.shape)
     ix,jx = noise.shape
-    for i in xrange(ix):
+    for i in range(ix):
         si_min = slice(i, None, None)
         si_max = slice(None, ix-i, None)
-        for j in xrange(jx):
+        for j in range(jx):
             sj_min = slice(j, None, None)
             sj_max = slice(None, jx-j, None)
             if np.all(np.isnan(noise[si_min, sj_min])) or np.all(np.isnan(noise[si_max, sj_max])):
@@ -995,7 +995,7 @@ def covar_errors(params, data, errs, B, C=None):
         except (np.linalg.linalg.LinAlgError, ValueError) as e:
             onesigma = [-2] * len(mask[0])
 
-    for i in xrange(params['components'].value):
+    for i in range(params['components'].value):
         prefix = "c{0}_".format(i)
         j = 0
         for p in ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']:
