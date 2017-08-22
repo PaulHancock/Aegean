@@ -428,8 +428,9 @@ class SourceFinder(object):
         idata = island_data.i
         xmin, xmax, ymin, ymax = island_data.offsets
 
-        rms = global_data.rmsimg[xmin:xmax, ymin:ymax]
-        bkg = global_data.bkgimg[xmin:xmax, ymin:ymax]
+        box = slice(int(xmin), int(xmax)), slice(int(ymin), int(ymax))
+        rms = global_data.rmsimg[box]
+        bkg = global_data.bkgimg[box]
         residual = np.median(result.residual), np.std(result.residual)
         is_flag = isflags
 
@@ -1090,7 +1091,7 @@ class SourceFinder(object):
                 continue
 
             # this .copy() will stop us from modifying the parent region when we later apply our mask.
-            idata = data[xmin:xmax, ymin:ymax].copy()
+            idata = data[int(xmin):int(xmax), int(ymin):int(ymax)].copy()
             # now convert these back to indices within the idata region
             # island_mask = np.array([(x-xmin, y-ymin) for x, y in island_mask])
 
@@ -1170,7 +1171,7 @@ class SourceFinder(object):
                     B = Bmatrix(C)
                 else:
                     C = B = None
-                errs = np.nanmax(rmsimg[xmin:xmax, ymin:ymax])
+                errs = np.nanmax(rmsimg[int(xmin):int(xmax), int(ymin):int(ymax)])
                 result, _ = do_lmfit(idata, params, B=B)
                 model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
 
