@@ -1461,7 +1461,20 @@ class SourceFinder(object):
 
         # the input sources are the initial conditions for our fits.
         # Expand each source size if needed.
-        if catpsf is not None or has_psf:
+        if ratio is not None:
+            self.log.info("Using ratio of {0} to scale input source shapes".format(ratio))
+            far *= ratio
+            for i, src in enumerate(input_sources):
+                skybeam = global_data.psfhelper.get_beam(src.ra, src.dec)
+                if skybeam is None:
+                    src_mask[i] = False
+                    continue
+                src.a = np.sqrt(src.a ** 2 + (skybeam.a * 3600) ** 2 * (1 - 1 / ratio ** 2))
+                src.b = np.sqrt(src.b ** 2 + (skybeam.b * 3600) ** 2 * (1 - 1 / ratio ** 2))
+                # source with funky a/b are also rejected
+                if not np.all(np.isfinite((src.a, src.b))):
+                    src_mask[i] = False
+        elif catpsf is not None or has_psf:
             if catpsf is not None:
                 self.log.info("Using catalog PSF from {0}".format(catpsf))
                 psf_helper = PSFHelper(catpsf, None)  # might need to set the WCSHelper to be not None
@@ -1490,20 +1503,6 @@ class SourceFinder(object):
                     src.b = imbeam.b * 3600  # arcsec
                 else:
                     src.b = np.sqrt(src.b) * 3600  # arcsec
-
-        elif ratio is not None:
-            self.log.info("Using ratio of {0} to scale input source shapes".format(ratio))
-            far *= ratio
-            for i, src in enumerate(input_sources):
-                skybeam = global_data.psfhelper.get_beam(src.ra, src.dec)
-                if skybeam is None:
-                    src_mask[i] = False
-                    continue
-                src.a = np.sqrt(src.a ** 2 + (skybeam.a * 3600) ** 2 * (1 - 1 / ratio ** 2))
-                src.b = np.sqrt(src.b ** 2 + (skybeam.b * 3600) ** 2 * (1 - 1 / ratio ** 2))
-                # source with funky a/b are also rejected
-                if not np.all(np.isfinite((src.a, src.b))):
-                    src_mask[i] = False
         else:
             self.log.info("Not scaling input source sizes")
 
@@ -1560,7 +1559,8 @@ class SourceFinder(object):
         for source in sources:
             if type(source) == OutputSource:
                 components += 1
-                print >> outfile, str(source)
+                if outfile:
+                    print >> outfile, str(source)
 
         self.log.info("fit {0} components".format(components))
         self.sources.extend(sources)
