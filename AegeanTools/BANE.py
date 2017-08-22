@@ -46,7 +46,7 @@ def sigmaclip(arr, lo, hi, reps=3):
 
     std = np.std(clipped)
     mean = np.mean(clipped)
-    for i in range(reps):
+    for i in range(int(reps)):
         clipped = clipped[np.where(clipped > mean-std*lo)]
         clipped = clipped[np.where(clipped < mean+std*hi)]
         pstd = std
@@ -140,10 +140,10 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         calculate the boundaries of the box centered at x,y
         with size = box_size
         """
-        x_min = max(0, x-box_size[0]/2)
-        x_max = min(data.shape[0]-1, x+box_size[0]/2)
-        y_min = max(0, y-box_size[1]/2)
-        y_max = min(data.shape[1]-1, y+box_size[1]/2)
+        x_min = int(max(0, x-box_size[0]/2))
+        x_max = int(min(data.shape[0]-1, x+box_size[0]/2))
+        y_min = int(max(0, y-box_size[1]/2))
+        y_max = int(min(data.shape[1]-1, y+box_size[1]/2))
         return x_min, x_max, y_min, y_max
 
     bkg_points = []
@@ -497,8 +497,8 @@ def save_image(hdu, data, im_name):
         hdu.writeto(im_name, clobber=True)
     except hdu.verify.VerifyError as e:
         if "DATAMAX" in e.message or "DATAMIN" in e.message:
-            logging.warn(e.message)
-            logging.warn("I will fix this but it will cause some programs to break")
+            logging.warning(e.message)
+            logging.warning("I will fix this but it will cause some programs to break")
             hdu.writeto(im_name, clobber=True, output_verify="silentfix")
     logging.info("wrote {0}".format(im_name))
     return
