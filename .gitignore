@@ -4,3 +4,5 @@
 *.vot
 *.reg
 *.fits
+.idea
+AegeanTools.egg-info
