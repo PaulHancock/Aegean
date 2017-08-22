@@ -7,6 +7,7 @@ The Aegean source finding program.
 
 # standard imports
 import sys
+import six
 import os
 import numpy as np
 import math
@@ -1454,7 +1455,7 @@ class SourceFinder(object):
         global_data = self.global_data
         far = 10 * global_data.beam.a  # degrees
         # load the table and convert to an input source list
-        if isinstance(catalogue, (str, unicode)):
+        if isinstance(catalogue, six.string_types):
             input_table = load_table(catalogue)
             input_sources = np.array(table_to_source_list(input_table))
         else:

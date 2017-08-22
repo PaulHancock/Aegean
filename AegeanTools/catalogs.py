@@ -14,6 +14,7 @@ import sys
 import os
 import numpy as np
 import re
+import six
 from time import gmtime, strftime
 
 # Other AegeanTools
@@ -378,7 +379,7 @@ def writeFITSTable(filename, table):
             types = "J"
         elif isinstance(val, (float, np.float32)):  # float32 is bugged and claims not to be a float
             types = "E"
-        elif isinstance(val, (str, unicode)):
+        elif isinstance(val, six.string_types):
             types = "{0}A".format(len(val))
         else:
             log.warn("Column {0} is of unknown type {1}".format(val, type(val)))
@@ -584,7 +585,7 @@ def writeDB(filename, catalog, meta=None):
                 types.append("INT")
             elif isinstance(val, (float, np.float32)):  # float32 is bugged and claims not to be a float
                 types.append("FLOAT")
-            elif isinstance(val, (str, unicode)):
+            elif isinstance(val, six.string_types):
                 types.append("VARCHAR")
             else:
                 log.warn("Column {0} is of unknown type {1}".format(n, type(n)))
