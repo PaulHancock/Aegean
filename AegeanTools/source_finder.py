@@ -185,7 +185,7 @@ class SourceFinder(object):
                 if domask and (self.global_data.region is not None):
                     y, x = np.where(snr[xmin:xmax, ymin:ymax] >= outerclip)
                     # convert indices of this sub region to indices in the greater image
-                    yx = zip(y + ymin, x + xmin)
+                    yx = list(zip(y + ymin, x + xmin))
                     ra, dec = self.global_data.wcshelper.wcs.wcs_pix2world(yx, 1).transpose()
                     mask = self.global_data.region.sky_within(ra, dec, degin=True)
                     # if there are no un-masked pixels within the region then we skip this island.

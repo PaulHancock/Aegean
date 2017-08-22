@@ -213,7 +213,7 @@ if __name__ == "__main__":
     catalog = '1904_comp.vot'
     catalog = 'GLEAM_IDR1.fits'
     table = load_table(catalog)
-    positions = np.array(zip(table['ra'],table['dec']))
+    positions = np.array(list(zip(table['ra'],table['dec'])))
     srccat = list(table_to_source_list(table))
     # make the catalog stupid big for memory testing.
     #for i in xrange(5):

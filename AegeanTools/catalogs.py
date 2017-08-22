@@ -178,12 +178,12 @@ def load_catalog(filename):
     if fmt in ['csv', 'tab', 'tex'] and fmt in supported:
         log.info("Reading file {0}".format(filename))
         t = ascii.read(filename)
-        catalog = zip(t.columns['ra'], t.columns['dec'])
+        catalog = list(zip(t.columns['ra'], t.columns['dec']))
 
     elif fmt in ['vo', 'vot', 'xml'] and fmt in supported:
         log.info("Reading file {0}".format(filename))
         t = parse_single_table(filename)
-        catalog = zip(t.array['ra'].tolist(), t.array['dec'].tolist())
+        catalog = list(zip(t.array['ra'].tolist(), t.array['dec'].tolist()))
 
     elif fmt == 'cat':
         log.info("Reading ra/dec columns of Aegean catalog")

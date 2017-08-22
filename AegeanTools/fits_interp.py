@@ -141,7 +141,7 @@ def expand(datafile, outfile=None, method='linear'):
     grid[0, :] += lcx/factor
     grid[1, :] += lcy/factor
     grid  *= factor
-    points = zip(np.ravel(grid[0]), np.ravel(grid[1]))
+    points = list(zip(np.ravel(grid[0]), np.ravel(grid[1])))
 
     # Do the interpolation
     hdulist[0].data = np.array(griddata(points, values, (gx, gy), method=method), dtype=np.float32)

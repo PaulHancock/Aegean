@@ -37,7 +37,7 @@ class Region(object):
         if depth is None or depth > self.maxdepth:
             depth = self.maxdepth
         try:
-            sky = zip(ra_cen, dec_cen)
+            sky = list(zip(ra_cen, dec_cen))
             rad = radius
         except TypeError:
             sky = [[ra_cen, dec_cen]]
@@ -61,7 +61,7 @@ class Region(object):
         if depth is None or depth > self.maxdepth:
             depth = self.maxdepth
 
-        ras, decs = zip(*positions)
+        ras, decs = list(zip(*positions))
         sky = self.radec2sky(ras, decs)
         pix = hp.query_polygon(2**depth, self.sky2vec(sky), inclusive=True, nest=True)
         self.add_pixels(pix, depth)
@@ -227,7 +227,7 @@ class Region(object):
                 for p in self.pixeldict[d]:
                     line = "fk5; polygon("
                     # the following int() gets around some problems with np.int64 that exist prior to numpy v 1.8.1
-                    vectors = zip(*hp.boundaries(2**d, int(p), step=1, nest=True))
+                    vectors = list(zip(*hp.boundaries(2**d, int(p), step=1, nest=True)))
                     positions = []
                     for sky in self.vec2sky(np.array(vectors), degrees=True):
                         ra, dec = sky
@@ -284,7 +284,7 @@ class Region(object):
         :return: list of (ra,dec) tuples
         """
         try:
-            sky = zip(ra,dec)
+            sky = list(zip(ra,dec))
             #sky = np.empty((len(ra), 2), dtype=type(ra[0]))
             #sky[:, 0] = ra
             #sky[:, 1] = dec
@@ -321,7 +321,7 @@ class Region(object):
         :return: [(x,y,z), ...]
         """
         theta_phi = cls.sky2ang(sky)
-        theta, phi = map(np.array, zip(*theta_phi))
+        theta, phi = map(np.array, list(zip(*theta_phi)))
         vec = hp.ang2vec(theta, phi)
         return vec
 
@@ -502,7 +502,7 @@ def test_poly():
     ra = [50, 50, 70, 70]
     dec = [-20, -25, -25, -20]
     region = Region(maxdepth=9)
-    positions = zip(np.radians(ra), np.radians(dec))
+    positions = list(zip(np.radians(ra), np.radians(dec)))
     region.add_poly(positions)
     region.write_reg('test.reg')
     print('test_poly PASSED')
