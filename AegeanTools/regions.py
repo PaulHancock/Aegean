@@ -303,7 +303,7 @@ class Region(object):
         """
         try:
             theta_phi = sky.copy()
-        except AttributeError, e:
+        except AttributeError as e:
             theta_phi = np.array(sky)
         theta_phi[:, [1, 0]] = theta_phi[:, [0, 1]]
         theta_phi[:, 0] = np.pi/2 - theta_phi[:, 0]

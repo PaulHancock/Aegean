@@ -288,7 +288,7 @@ class SourceFinder(object):
                 else:
                     amp = np.nanmax(summit)
                     xpeak, ypeak = np.unravel_index(np.nanargmax(summit), summit.shape)
-            except ValueError, e:
+            except ValueError as e:
                 if "All-NaN" in e.message:
                     self.log.warn("Summit of nan's detected - this shouldn't happen")
                     continue
@@ -1076,7 +1076,7 @@ class SourceFinder(object):
                     params[prefix + 'yo'].value -= ymin
                     params[prefix + 'yo'].min -= ymin
                     params[prefix + 'yo'].max -= ymin
-                except Exception, e:
+                except Exception as e:
                     self.log.error(" ARG !")
                     self.log.info(params)
                     self.log.info(params['components'].value)

@@ -253,7 +253,7 @@ def write_table(table, filename):
             os.remove(filename)
         table.write(filename)
         log.info("Wrote {0}".format(filename))
-    except Exception, e:
+    except Exception as e:
         if "Format could not be identified" not in e.message:
             raise e
         else:

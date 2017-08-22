@@ -28,7 +28,7 @@ def load_file_or_hdu(filename):
     else:
         try:
             hdulist = fits.open(filename)
-        except IOError, e:
+        except IOError as e:
             if "END" in e.message:
                 logging.warn(e.message)
                 logging.warn("trying to ignore this, but you should really fix it")

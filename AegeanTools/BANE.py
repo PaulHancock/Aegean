@@ -459,7 +459,7 @@ def load_image(im_name):
     """
     try:
         fitsfile = fits.open(im_name)
-    except IOError, e:
+    except IOError as e:
         if "END" in e.message:
             logging.warn(e.message)
             logging.warn("trying to ignore this, but you should really fix it")
@@ -495,7 +495,7 @@ def save_image(hdu, data, im_name):
     hdu[0].header['HISTORY']='BANE {0}-({1})'.format(__version__, __date__)
     try:
         hdu.writeto(im_name, clobber=True)
-    except hdu.verify.VerifyError,e:
+    except hdu.verify.VerifyError as e:
         if "DATAMAX" in e.message or "DATAMIN" in e.message:
             logging.warn(e.message)
             logging.warn("I will fix this but it will cause some programs to break")
