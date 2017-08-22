@@ -375,9 +375,9 @@ def writeFITSTable(filename, table):
         """
         if isinstance(val, bool):
             types = "L"
-        elif isinstance(val, int):
+        elif isinstance(val, (int, np.int64, np.int32)):
             types = "J"
-        elif isinstance(val, (float, np.float32)):  # float32 is bugged and claims not to be a float
+        elif isinstance(val, (float, np.float64, np.float32)):
             types = "E"
         elif isinstance(val, six.string_types):
             types = "{0}A".format(len(val))
@@ -581,9 +581,9 @@ def writeDB(filename, catalog, meta=None):
             val = getattr(obj, n)
             if isinstance(val, bool):
                 types.append("BOOL")
-            elif isinstance(val, int):
+            elif isinstance(val, (int, np.int64, np.int32)):
                 types.append("INT")
-            elif isinstance(val, (float, np.float32)):  # float32 is bugged and claims not to be a float
+            elif isinstance(val, (float, np.float64, np.float32)):  # float32 is bugged and claims not to be a float
                 types.append("FLOAT")
             elif isinstance(val, six.string_types):
                 types.append("VARCHAR")
