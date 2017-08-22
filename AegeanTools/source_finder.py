@@ -25,7 +25,7 @@ from fits_image import FitsImage, Beam
 from msq2 import MarchingSquares
 from angle_tools import dec2hms, dec2dms, gcd, bear
 from catalogs import load_table, table_to_source_list
-from models import OutputSource, IslandSource, island_itergen
+from models import SimpleSource, OutputSource, IslandSource, island_itergen
 import flags
 
 # need Region in the name space in order to be able to unpickle it
@@ -718,6 +718,11 @@ class SourceFinder(object):
 
         # Default to false until I can verify that this is working
         self.global_data.dobias = False
+
+        # check if the WCS is galactic
+        if 'lon' in self.global_data.img._header['CTYPE1'].lower():
+            self.log.info("Galactic coordinates detected and noted")
+            SimpleSource.galactic = True
         return
 
     def save_background_files(self, image_filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, rms=None, cores=1,

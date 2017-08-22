@@ -306,11 +306,25 @@ def write_catalog(filename, catalog, fmt=None, meta=None):
         # construct a dict of the data
         # this method preserves the data types in the VOTable
         tab_dict = {}
+        name_list = []
         for name in catalog[0].names:
-            tab_dict[name] = [getattr(c, name, None) for c in catalog]
+            col_name = name
+            if catalog[0].galactic:
+                if name.startswith('ra'):
+                    col_name = 'lon'+name[2:]
+                elif name.endswith('ra'):
+                    col_name = name[:-2] + 'lon'
+                elif name.startswith('dec'):
+                    col_name = 'lat'+name[3:]
+                elif name.endswith('dec'):
+                    col_name = name[:-3] + 'lat'
+
+            tab_dict[col_name] = [getattr(c, name, None) for c in catalog]
+            name_list.append(col_name)
         t = Table(tab_dict, meta=meta)
         # re-order the columns
-        t = t[[n for n in catalog[0].names]]
+        t = t[[n for n in name_list]]
+
         if fmt is not None:
             if fmt in ["vot", "vo", "xml"]:
                 vot = from_table(t)
