@@ -852,11 +852,11 @@ class SourceFinder(object):
         self.log.debug("mesh width (pix) x,y: {0},{1}".format(width_x, width_y))
 
         # box centered at image center then tilling outwards
-        xstart = (xcen - width_x / 2) % width_x  # the starting point of the first "full" box
-        ystart = (ycen - width_y / 2) % width_y
+        xstart = int(xcen - width_x / 2) % width_x  # the starting point of the first "full" box
+        ystart = int(ycen - width_y / 2) % width_y
 
-        xend = img_x - (img_x - xstart) % width_x  # the end point of the last "full" box
-        yend = img_y - (img_y - ystart) % width_y
+        xend = img_x - int(img_x - xstart) % width_x  # the end point of the last "full" box
+        yend = img_y - int(img_y - ystart) % width_y
 
         xmins = [0]
         xmins.extend(list(range(xstart, xend, width_x)))
@@ -930,9 +930,9 @@ class SourceFinder(object):
             bkg, rms = np.NaN, np.NaN
         else:
             pixels.sort()
-            p25 = pixels[pixels.size / 4]
-            p50 = pixels[pixels.size / 2]
-            p75 = pixels[pixels.size / 4 * 3]
+            p25 = pixels[int(pixels.size / 4)]
+            p50 = pixels[int(pixels.size / 2)]
+            p75 = pixels[int(pixels.size / 4 * 3)]
             iqr = p75 - p25
             bkg, rms = p50, iqr / 1.34896
         # return the input and output data so we know what we are doing

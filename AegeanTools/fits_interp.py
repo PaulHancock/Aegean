@@ -138,8 +138,8 @@ def expand(datafile, outfile=None, method='linear'):
     lcx = header['BN_RPX2']
     lcy = header['BN_RPX1']
 
-    grid[0, :] += lcx/factor
-    grid[1, :] += lcy/factor
+    grid[0, :] += int(lcx/factor)
+    grid[1, :] += int(lcy/factor)
     grid  *= factor
     points = list(zip(np.ravel(grid[0]), np.ravel(grid[1])))
 
