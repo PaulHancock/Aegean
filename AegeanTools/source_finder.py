@@ -133,7 +133,7 @@ class SourceFinder(object):
             if hasattr(self, k):
                 setattr(self, k, kwargs[k])
             else:
-                print "{0} supplied but ignored".format(k)
+                print("{0} supplied but ignored".format(k))
         return
 
     def _gen_flood_wrap(self, data, rmsimg, innerclip, outerclip=None, domask=False):
@@ -1395,8 +1395,8 @@ class SourceFinder(object):
 
         # Write the output to the output file
         if outfile:
-            print >> outfile, header.format("{0}-({1})".format(__version__, __date__), filename)
-            print >> outfile, OutputSource.header
+            print(header.format("{0}-({1})".format(__version__, __date__), filename), file=outfile)
+            print(OutputSource.header, file=outfile)
 
         sources = []
         for srcs in queue:
@@ -1407,7 +1407,7 @@ class SourceFinder(object):
                         continue
                     sources.append(src)
                     if outfile:
-                        print >> outfile, str(src)
+                        print(str(src), file=outfile)
         self.sources.extend(sources)
         return sources
 
@@ -1560,15 +1560,15 @@ class SourceFinder(object):
 
         # Write the output to the output file
         if outfile:
-            print >> outfile, header.format("{0}-({1})".format(__version__, __date__), filename)
-            print >> outfile, OutputSource.header
+            print(header.format("{0}-({1})".format(__version__, __date__), filename), file=outfile)
+            print(OutputSource.header, file=outfile)
 
         components = 0
         for source in sources:
             if type(source) == OutputSource:
                 components += 1
                 if outfile:
-                    print >> outfile, str(source)
+                    print(str(source), file=outfile)
 
         self.log.info("fit {0} components".format(components))
         self.sources.extend(sources)
@@ -1720,5 +1720,5 @@ if __name__ == "__main__":
     sf.log = log
     sf.find_sources_in_image(filename='..\\Test\Images\\1904-66_SIN.fits')
     for s in sf.sources:
-        print s.formatter.format(s)
+        print(s.formatter.format(s))
     sys.exit(0)

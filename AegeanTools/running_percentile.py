@@ -110,25 +110,25 @@ def test_running_percentiles():
     correct_answers = [0, 2.5, 5.0, 7.5, 10]
     rp = RunningPercentiles()
     rp.add(a)
-    print rp.slist
+    print(rp.slist)
     answer = rp.score()
     if answer == correct_answers:
-        print "RunningPercentiles: TEST 1 PASS"
+        print("RunningPercentiles: TEST 1 PASS")
     to_add = np.arange(11, 26)
     np.random.shuffle(to_add)
     rp.add(to_add)
     to_sub = np.arange(15)
     np.random.shuffle(to_sub)
     rp.sub(to_sub)
-    print rp.slist
+    print(rp.slist)
     answer = rp.score()
     correct_answers = [15, 17.5, 20, 22.5, 25]
     if answer == correct_answers:
-        print "RunningPercentiles: TEST 2 PASS"
+        print("RunningPercentiles: TEST 2 PASS")
     else:
-        print "TEST 2 Fail:"
-        print "correct=",correct_answers
-        print "answer=",answer
+        print("TEST 2 Fail:")
+        print("correct=",correct_answers)
+        print("answer=",answer)
     return
 
 

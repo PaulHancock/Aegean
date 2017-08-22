@@ -218,7 +218,7 @@ if __name__ == "__main__":
     #for i in xrange(5):
     #    srccat.extend(srccat)
     groups = regroup(srccat, eps=np.sqrt(2),far=0.277289506048)
-    print "Sources ", len(table)
-    print "Groups ", len(groups)
+    print("Sources ", len(table))
+    print("Groups ", len(groups))
     for g in groups[:50]:
-        print len(g),[(a.island,a.source) for a in g]
+        print(len(g),[(a.island,a.source) for a in g])

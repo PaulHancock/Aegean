@@ -123,12 +123,12 @@ if __name__ == "__main__":
 
     if results.area is not None:
         region = MIMAS.pickle.load(open(results.area))
-        print "{0} represents an area of {1} deg^2".format(results.area, region.get_area())
+        print("{0} represents an area of {1} deg^2".format(results.area, region.get_area()))
         sys.exit()
 
     if len(results.intersect) > 0:
         if len(results.intersect) == 1:
-            print "intersections requires at least two regions"
+            print("intersections requires at least two regions")
             sys.exit(1)
         else:
             region = MIMAS.intersect_regions(results.intersect)

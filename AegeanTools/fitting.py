@@ -673,7 +673,7 @@ def condon_errors(source, theta_n, psf=None):
         beam = psf.get_beam(source.ra, source.dec)
         if beam is not None:
             theta_n = np.hypot(beam.a, beam.b)
-            print beam, theta_n
+            print(beam, theta_n)
 
     if theta_n is None:
         source.err_a = source.err_b = source.err_peak_flux = source.err_pa = source.err_int_flux = 0
@@ -1100,8 +1100,8 @@ def test_hessian_shape():
     x, y = np.indices((10, 10))
     Hij = hessian(model, x, y)
     if Hij.shape != (nvar, nvar, 10, 10):
-        print "test_hessian_shape FAILED"
-        print "found {0}, expected {1}".format(Hij.shape, (nvar, nvar, 10, 10))
+        print("test_hessian_shape FAILED")
+        print("found {0}, expected {1}".format(Hij.shape, (nvar, nvar, 10, 10)))
         return False
 
     model.add('c1_amp', 1, vary=True)
@@ -1114,11 +1114,11 @@ def test_hessian_shape():
     model['components'].value = 2
     Hij = hessian(model, x, y)
     if Hij.shape != (nvar, nvar, 10, 10):
-        print "test_hessian_shape FAILED"
-        print "found {0}, expected {1}".format(Hij.shape, (nvar, nvar, 10, 10))
+        print("test_hessian_shape FAILED")
+        print("found {0}, expected {1}".format(Hij.shape, (nvar, nvar, 10, 10)))
         return False
 
-    print "test_hessian_shape PASSED"
+    print("test_hessian_shape PASSED")
     return True
 
 
@@ -1221,8 +1221,8 @@ def test_jacobian_shape():
     x, y = np.indices((10, 10))
     Jij = jacobian(model, x, y)
     if Jij.shape != (nvar, 10, 10):
-        print "test_jacobian_shape FAILED"
-        print "found {0}, expected {1}".format(Jij.shape, (nvar, 10, 10))
+        print("test_jacobian_shape FAILED")
+        print("found {0}, expected {1}".format(Jij.shape, (nvar, 10, 10)))
         return False
 
     model.add('c1_amp', 1, vary=True)
@@ -1235,11 +1235,11 @@ def test_jacobian_shape():
     model['components'].value = 2
     Jij = jacobian(model, x, y)
     if Jij.shape != (nvar, 10, 10):
-        print "test_jacobian_shape FAILED"
-        print "found {0}, expected {1}".format(Jij.shape, (nvar, 10, 10))
+        print("test_jacobian_shape FAILED")
+        print("found {0}, expected {1}".format(Jij.shape, (nvar, 10, 10)))
         return False
 
-    print "test_jacobian_shape PASSED"
+    print("test_jacobian_shape PASSED")
     return True
 
 

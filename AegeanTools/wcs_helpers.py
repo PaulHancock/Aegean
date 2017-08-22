@@ -320,19 +320,19 @@ class WCSHelperTest(object):
         Converting a vector from pixel to sky coords and back again should give the
         original vector (within some tolerance).
         """
-        print "Testing vector round trip... ",
+        print("Testing vector round trip... ", end=' ')
         initial = [1, 45]  # r,theta = 1,45 (degrees)
         ref = self.helper.refpix
         ra, dec, dist, ang = self.helper.pix2sky_vec(ref, *initial)
         x, y, r, theta = self.helper.sky2pix_vec([ra, dec], dist, ang)
-        print "Start: x {0}, y {1}, r {2}, theta {3}".format(ref[0], ref[1], *initial)
-        print "sky: ra {0}, dec {1}, dist {2}, ang {3}".format(ra, dec, dist, ang)
-        print "Final: x {0}, y {1}, r {2}, theta {3}".format(x, y, r, theta)
+        print("Start: x {0}, y {1}, r {2}, theta {3}".format(ref[0], ref[1], *initial))
+        print("sky: ra {0}, dec {1}, dist {2}, ang {3}".format(ra, dec, dist, ang))
+        print("Final: x {0}, y {1}, r {2}, theta {3}".format(x, y, r, theta))
         if abs(r - initial[0]) < 1e-9 and abs(theta - initial[1]) < 1e-9:
-            print "Pass"
+            print("Pass")
             return True
         else:
-            print "Fail"
+            print("Fail")
             return False
 
     def test_ellipse_round_trip(self):
@@ -340,7 +340,7 @@ class WCSHelperTest(object):
         Converting an ellipse from pixel to sky coords and back again should give the
         original ellipse (within some tolerance).
         """
-        print "Testing ellipse round trip"
+        print("Testing ellipse round trip")
         # raref, decref = self.helper.pix2sky(self.helper.refpix)
         a = 2 * self.helper.beam.a
         b = self.helper.beam.b
@@ -379,7 +379,7 @@ class WCSHelperTest(object):
         Make a plot showing the defect that occurs when converting major/minor axes
         from sky->pix coordinates
         """
-        print "Testing defect"
+        print("Testing defect")
         # raref, decref = self.helper.pix2sky(self.helper.refpix)
         a = 2 * self.helper.beam.a
         b = self.helper.beam.b

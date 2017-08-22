@@ -116,7 +116,7 @@ def mask_file(regionfile, infile, outfile, negate=False):
     else:
         data = im[0].data
 
-    print data.shape
+    print(data.shape)
     if len(data.shape) == 3:
         for plane in range(data.shape[0]):
             mask_plane(data[plane], wcs, region, negate)

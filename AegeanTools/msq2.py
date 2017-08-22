@@ -220,13 +220,13 @@ if __name__ == '__main__':
     # test_array[2:5,2:5]=np.ones((3,3))
     test_array = np.array(test_array, dtype=np.float)
     test_array[np.where(test_array == 0)] = np.nan
-    print test_array
+    print(test_array)
     msq = MarchingSquares(test_array)
-    print msq.perimeter
+    print((msq.perimeter))
     residual = test_array.copy()
     for p in msq.perimeter:
         try:
             residual[p] = 2
         except IndexError:
             pass
-    print residual
+    print(residual)

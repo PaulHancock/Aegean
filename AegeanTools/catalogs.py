@@ -89,9 +89,9 @@ def show_formats():
         "db": "Sqlite3 database",
         "sqlite": "Sqlite3 database"}
     supported = get_table_formats()
-    print "Extension |     Description       | Supported?"
+    print("Extension |     Description       | Supported?")
     for k in sorted(fmts.keys()):
-        print "{0:10s} {1:24s} {2}".format(k, fmts[k], k in supported)
+        print("{0:10s} {1:24s} {2}".format(k, fmts[k], k in supported))
     return
 
 
@@ -411,8 +411,8 @@ def writeIslandContours(filename, catalog, fmt):
     catalog = [IslandSource, ...]
     """
     out = open(filename, 'w')
-    print >> out, "#Aegean island contours"
-    print >> out, "#AegeanTools.catalogs version {0}-({1})".format(__version__, __date__)
+    print("#Aegean island contours", file=out)
+    print("#AegeanTools.catalogs version {0}-({1})".format(__version__, __date__), file=out)
     line_fmt = 'image;line({0},{1},{2},{3})'
     text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
     mas_fmt = 'image; line({1},{0},{3},{2}) #color = yellow'
@@ -425,19 +425,19 @@ def writeIslandContours(filename, catalog, fmt):
         contour = c.contour
         if len(contour) > 1:
             for p1, p2 in zip(contour[:-1], contour[1:]):
-                print >> out, line_fmt.format(p1[1] + 0.5, p1[0] + 0.5, p2[1] + 0.5, p2[0] + 0.5)
-            print >> out, line_fmt.format(contour[-1][1] + 0.5, contour[-1][0] + 0.5, contour[0][1] + 0.5,
-                                          contour[0][0] + 0.5)
+                print(line_fmt.format(p1[1] + 0.5, p1[0] + 0.5, p2[1] + 0.5, p2[0] + 0.5), file=out)
+            print(line_fmt.format(contour[-1][1] + 0.5, contour[-1][0] + 0.5, contour[0][1] + 0.5,
+                                          contour[0][0] + 0.5), file=out)
         #comment out lines that have invalid ra/dec (WCS problems)
         if np.nan in [c.ra, c.dec]:
-            print >> out, '#',
+            print('#', end=' ', file=out)
         # some islands may not have anchors because they don't have any contours
         if len(c.max_angular_size_anchors) == 4:
-            print >> out, text_fmt.format(c.ra, c.dec, c.island)
-            print >> out, mas_fmt.format(*[a + 0.5 for a in c.max_angular_size_anchors])
+            print(text_fmt.format(c.ra, c.dec, c.island), file=out)
+            print(mas_fmt.format(*[a + 0.5 for a in c.max_angular_size_anchors]), file=out)
         for p1, p2 in c.pix_mask:
             # DS9 uses 1-based instead of 0-based indexing
-            print >> out, x_fmt.format(p1 + 1, p2 + 1)
+            print(x_fmt.format(p1 + 1, p2 + 1), file=out)
     out.close()
     return
 
@@ -452,13 +452,13 @@ def writeIslandBoxes(filename, catalog, fmt):
     """
     out = open(filename, 'w')
 
-    print >> out, "#Aegean Islands"
-    print >> out, "#Aegean version {0}-({1})".format(__version__, __date__)
+    print("#Aegean Islands", file=out)
+    print("#Aegean version {0}-({1})".format(__version__, __date__), file=out)
     if fmt == 'reg':
-        print >> out, "IMAGE"
+        print("IMAGE", file=out)
         box_fmt = 'box({0},{1},{2},{3}) #{4}'
     elif fmt == 'ann':
-        print >> out, "COORD P"
+        print("COORD P", file=out)
         box_fmt = 'box P {0} {1} {2} {3} #{4}'
     else:
         log.warning("Format not supported for island boxes{0}".format(fmt))
@@ -472,7 +472,7 @@ def writeIslandBoxes(filename, catalog, fmt):
         xwidth = xmax - xmin + 1
         ycen = (ymin + ymax) / 2.0 + 1
         ywidth = ymax - ymin + 1
-        print >> out, box_fmt.format(xcen, ycen, xwidth, ywidth, c.island)
+        print(box_fmt.format(xcen, ycen, xwidth, ywidth, c.island), file=out)
     out.close()
     return
 
@@ -514,16 +514,16 @@ def writeAnn(filename, catalog, fmt):
         if fmt == 'ann':
             new_file = re.sub('.ann$', '_{0}.ann'.format(suffix), filename)
             out = open(new_file, 'w')
-            print >> out, "#Aegean version {0}-({1})".format(__version__, __date__)
-            print >> out, 'PA SKY'
-            print >> out, 'FONT hershey12'
-            print >> out, 'COORD W'
+            print("#Aegean version {0}-({1})".format(__version__, __date__), file=out)
+            print('PA SKY', file=out)
+            print('FONT hershey12', file=out)
+            print('COORD W', file=out)
             formatter = "ELLIPSE W {0} {1} {2} {3} {4:+07.3f} #{5}\nTEXT W {0} {1} {5}"
         elif fmt == 'reg':
             new_file = re.sub('.reg$', '_{0}.reg'.format(suffix), filename)
             out = open(new_file, 'w')
-            print >> out, "#Aegean version {0}-({1})".format(__version__, __date__)
-            print >> out, "fk5"
+            print("#Aegean version {0}-({1})".format(__version__, __date__), file=out)
+            print("fk5", file=out)
             formatter = 'ellipse {0} {1} {2:.9f}d {3:.9f}d {4:+07.3f}d # text="{5}"'
             #DS9 has some strange ideas about position angle
             pas = [a - 90 for a in pas]
@@ -531,8 +531,8 @@ def writeAnn(filename, catalog, fmt):
         for ra, dec, bmaj, bmin, pa, name in zip(ras, decs, bmajs, bmins, pas, names):
             #comment out lines that have invalid or stupid entries
             if np.nan in [ra, dec, bmaj, bmin, pa] or bmaj >= 180:
-                print >> out, '#',
-            print >> out, formatter.format(ra, dec, bmaj, bmin, pa, name)
+                print('#', end=' ', file=out)
+            print(formatter.format(ra, dec, bmaj, bmin, pa, name), file=out)
         out.close()
         log.info("wrote {0}".format(new_file))
     if len(islands) > 0:
