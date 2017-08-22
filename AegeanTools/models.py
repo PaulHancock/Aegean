@@ -111,17 +111,24 @@ class IslandSource(SimpleSource):
     def __str__(self):
         return "({0:d})".format(self.island)
 
-    def __cmp__(self, other):
-        """
-        sort order is firstly by island then by source
-        both in ascending order
-        """
-        if self.island > other.island:
-            return 1
-        elif self.island < other.island:
-            return -1
-        else:
-            return 0
+    def __eq__(self, other):
+        return self.island == other.island
+
+    def __ne__(self, other):
+        return self.island != other.island
+
+    def __lt__(self, other):
+        return self.island < other.island
+
+    def __le__(self, other):
+        return self.island <= other.island
+
+    def __gt__(self, other):
+        return self.island > other.island
+
+    def __ge__(self, other):
+        return self.island >= other.island
+
 
 
 class OutputSource(SimpleSource):
@@ -190,30 +197,57 @@ class OutputSource(SimpleSource):
     def __repr__(self):
         return "({0:d},{1:d})".format(self.island, self.source)
 
-    def __cmp__(self, other):
-        """
-        sort order is firstly by island then by source
-        both in ascending order
-        """
-        if self.island > other.island:
-            return 1
-        elif self.island < other.island:
-            return -1
+    def __eq__(self, other):
+        if self.island != other.island:
+            return False
+        if not hasattr(other, 'source'):
+            return False
         else:
-            # if we try to compare a component to and island we put the
-            if not hasattr(other,'source'):
-                return -1
-            try:
-                if self.source > other.source:
-                    return 1
-                elif self.source < other.source:
-                    return -1
-                else:
-                    return 0
-            except AttributeError:
-                # if we try to compare a component to and island we put the island first
-                if not hasattr(other,'source'):
-                    return 1
+            return self.source == other.source
+
+    def __ne__(self, other):
+        if self.island == other.island:
+            return False
+        if not hasattr(other, 'source'):
+            return True
+        else:
+            return self.source != other.source
+
+    def __lt__(self, other):
+        if self.island < other.island:
+            return True
+        # Islands are always less than components
+        if not hasattr(other, 'source'):
+            return True
+        else:
+            return self.source < other.source
+
+    def __le__(self, other):
+        if self.island < other.island:
+            return True
+        # Islands are always less than components
+        if not hasattr(other, 'source'):
+            return True
+        else:
+            return self.source <= other.source
+
+    def __gt__(self, other):
+        if self.island > other.island:
+            return True
+        # Islands are always less than components
+        if not hasattr(other, 'source'):
+            return False
+        else:
+            return self.source > other.source
+
+    def __ge__(self, other):
+        if self.island > other.island:
+            return True
+        # Islands are always less than components
+        if not hasattr(other, 'source'):
+            return False
+        else:
+            return self.source >= other.source
 
 
 class GlobalFittingData(object):
