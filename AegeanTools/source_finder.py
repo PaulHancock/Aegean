@@ -21,7 +21,7 @@ from scipy.ndimage import label, find_objects
 from fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit, \
                     bias_correct, elliptical_gaussian
 from wcs_helpers import WCSHelper, PSFHelper
-from fits_image import FitsImage
+from fits_image import FitsImage, Beam
 from msq2 import MarchingSquares
 from angle_tools import dec2hms, dec2dms, gcd, bear
 from catalogs import load_table, table_to_source_list
@@ -1456,13 +1456,23 @@ class SourceFinder(object):
 
         src_mask = np.ones(len(input_sources), dtype=bool)
 
+        # check to see if the input catalog contains psf information
+        has_psf = getattr(input_sources[0], 'psf_a', None) is not None
+
         # the input sources are the initial conditions for our fits.
         # Expand each source size if needed.
-        if catpsf is not None:
-            self.log.info("Using catalog PSF from {0}".format(catpsf))
-            psf_helper = PSFHelper(catpsf, None)  # might need to set the WCSHelper to be not None
+        if catpsf is not None or has_psf:
+            if catpsf is not None:
+                self.log.info("Using catalog PSF from {0}".format(catpsf))
+                psf_helper = PSFHelper(catpsf, None)  # might need to set the WCSHelper to be not None
+            else:
+                self.log.info("Using catalog PSF from input catalog")
+                psf_helper = None
             for i, src in enumerate(input_sources):
-                catbeam = psf_helper.get_beam(src.ra, src.dec)
+                if has_psf:
+                    catbeam = Beam(src.a*3600, src.b*3600, src.pa)
+                else:
+                    catbeam = psf_helper.get_beam(src.ra, src.dec)
                 imbeam = global_data.psfhelper.get_beam(src.ra, src.dec)
                 # If either of the above are None then we skip this source.
                 if catbeam is None or imbeam is None:
