@@ -1334,6 +1334,7 @@ class SourceFinder(object):
         :param blank: Cause the output image to be blanked where islands are found.
         :param docov: True = include covariance matrix in the fitting process. (default=True)
         :param slice: For image cubes, slice determines which slice is used.
+        :return: list of sources found
         """
 
         # Tell numpy to be quiet
@@ -1412,7 +1413,7 @@ class SourceFinder(object):
 
     def priorized_fit_islands(self, filename, catalogue, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1,
                               rms=None, beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=1.0, outerclip=3,
-                              doregroup=True, docov=True):
+                              doregroup=True, docov=True, slice=None):
         """
         Take an input catalog, and image, and optional background/noise images
         fit the flux and ra/dec for each of the given sources, keeping the morphology fixed
@@ -1438,13 +1439,15 @@ class SourceFinder(object):
         :param ratio: ratio of image psf to catalog psf
         :param outerclip: pixels above an snr of this amount will be used in fitting, <0 -> all pixels.
         :param doregroup:  True - doregroup, False - use island data for groups
+        :param docov: True = include covariance matrix in the fitting process. (default=True)
+        :param slice: For image cubes, slice determines which slice is used.
         :return: a list of source objects
         """
 
         from AegeanTools.cluster import regroup
 
         self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
-                          do_curve=False, beam=beam, lat=lat, psf=imgpsf, docov=docov)
+                          do_curve=False, beam=beam, lat=lat, psf=imgpsf, docov=docov, slice=slice)
 
         global_data = self.global_data
         far = 10 * global_data.beam.a  # degrees
