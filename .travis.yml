@@ -1,9 +1,8 @@
 language: python
 python:
   - "2.7"
-  - "3.4"
-  - "3.5"
+#  - "3.4"
 # command to install dependencies
 install: "pip install -e ."
 # command to run tests
-script: Test/test_BANE.sh
+script: Test/test_aegean.sh
