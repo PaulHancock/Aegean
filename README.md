@@ -32,6 +32,5 @@ Until there is a more appropriate method for crediting software development and 
 
 Status
 =====
-
-[![astropy](http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat)](http://www.astropy.org/)
+[![Build Status](https://travis-ci.org/PaulHancock/Aegean.svg?branch=six)](https://travis-ci.org/PaulHancock/Aegean) [![Coverage Status](https://coveralls.io/repos/github/PaulHancock/Aegean/badge.svg?branch=six)](https://coveralls.io/github/PaulHancock/Aegean?branch=six)
 
