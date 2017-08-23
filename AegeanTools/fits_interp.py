@@ -54,8 +54,8 @@ def compress(datafile, factor, outfile=None):
     data = np.squeeze(hdulist[0].data)
     cx, cy = data.shape[0], data.shape[1]
 
-    nx = cx / factor
-    ny = cy / factor
+    nx = cx // factor
+    ny = cy // factor
     # check to see if we will have some residual data points
     lcx = cx % factor
     lcy = cy % factor
