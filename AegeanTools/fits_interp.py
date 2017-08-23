@@ -174,7 +174,3 @@ def expand(datafile, outfile=None, method='linear'):
         hdulist.writeto(outfile, clobber=True)
         logging.info("Wrote: {0}".format(outfile))
     return hdulist
-
-if __name__ == "__main__":
-    compress("Test/Images/1904-66_AIT.fits", factor=7, outfile='test.fits')
-    expand('test.fits', outfile='test2.fits', method='linear')
