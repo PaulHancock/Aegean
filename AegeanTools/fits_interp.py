@@ -1,14 +1,12 @@
-#! /usr/bin/env python
+#! python
 
 """
 A module to allow fits files to be shrunk in size using decimation, and to be
 grown in size using interpolation.
-
-@author: Paul Hancock
-
-Created:
-3rd Feb 2015
 """
+
+__author__ = 'Paul Hancock'
+__date__ = '23/08/2017'
 
 import numpy as np
 from astropy.io import fits
@@ -30,8 +28,8 @@ def load_file_or_hdu(filename):
             hdulist = fits.open(filename)
         except IOError as e:
             if "END" in e.message:
-                logging.warn(e.message)
-                logging.warn("trying to ignore this, but you should really fix it")
+                logging.warning(e.message)
+                logging.warning("trying to ignore this, but you should really fix it")
                 hdulist = fits.open(filename, ignore_missing_end=True)
             else:
                 raise e
