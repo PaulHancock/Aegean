@@ -39,7 +39,7 @@ def sigmaclip(arr, lo, hi, reps=3):
     :param reps: maximum number of repetitions of the clipping
     :return: clipped array
     """
-    clipped = arr[np.isfinite(arr)]
+    clipped = np.array(arr)[np.isfinite(arr)]
 
     if len(clipped) < 1:
         return clipped
