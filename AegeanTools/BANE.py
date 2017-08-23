@@ -215,7 +215,7 @@ def gen_factors(m, permute=True):
     :return:
     """
     # convert to int if people have been naughty
-    n=int(abs(m))
+    n = int(abs(m))
     # brute force the factors, one of which is always less than sqrt(n)
     for i in range(1, int(n**0.5+1)):
         if n % i == 0:
@@ -377,10 +377,10 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
                 pix_scale = np.sqrt(abs(header['CD1_1']*header['CD2_2']))
                 if 'CD1_2' in header and 'CD2_1' in header:
                     if header['CD1_2'] != 0 or header['CD2_1']!=0:
-                        logging.warn("CD1_2 and/or CD2_1 are non-zero and I don't know what to do with them")
-                        logging.warn("Ingoring them")
+                        logging.warning("CD1_2 and/or CD2_1 are non-zero and I don't know what to do with them")
+                        logging.warning("Ingoring them")
             else:
-                logging.warn("Cannot determine pixel scale, assuming 4 pixels per beam")
+                logging.warning("Cannot determine pixel scale, assuming 4 pixels per beam")
                 pix_scale = beam_size/4.
             # default to 4x the synthesized beam width
             step_size = int(np.ceil(4*beam_size/pix_scale))
@@ -388,7 +388,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
             logging.info("BMAJ and/or BMIN not in fits header.")
             logging.info("Assuming 4 pix/beam, so we have step_size = 16 pixels")
             step_size = 16
-        step_size = (step_size,step_size)
+        step_size = (step_size, step_size)
 
     if box_size is None:
         # default to 6x the step size so we have ~ 30beams
@@ -461,8 +461,8 @@ def load_image(im_name):
         fitsfile = fits.open(im_name)
     except IOError as e:
         if "END" in e.message:
-            logging.warn(e.message)
-            logging.warn("trying to ignore this, but you should really fix it")
+            logging.warning(e.message)
+            logging.warning("trying to ignore this, but you should really fix it")
             fitsfile = fits.open(im_name, ignore_missing_end=True)
 
     data = fitsfile[0].data
