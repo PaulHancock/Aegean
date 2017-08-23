@@ -464,6 +464,8 @@ def load_image(im_name):
             logging.warning(e.message)
             logging.warning("trying to ignore this, but you should really fix it")
             fitsfile = fits.open(im_name, ignore_missing_end=True)
+        else:
+            raise e
 
     data = fitsfile[0].data
     if fitsfile[0].header['NAXIS']>2:
