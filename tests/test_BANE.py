@@ -9,11 +9,6 @@ import os
 __author__ = 'Paul Hancock'
 __date__ = '23/08/2017'
 
-
-###
-# BANE.py
-###
-
 def test_sigmaclip():
     # normal usage case
     data = np.random.random(100)
@@ -42,6 +37,10 @@ def test_mask_data():
     # check that the nan regions overlap
     assert np.all(np.isnan(data) == np.isnan(mask))
 
-###
-# fits_interp.py
-###
+
+if __name__ == "__main__":
+    # introspect and run all the functions starting with 'test'
+    for f in dir():
+        if f.startswith('test'):
+            print(f)
+            exec(f+"()")
