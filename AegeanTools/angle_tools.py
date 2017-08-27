@@ -19,13 +19,10 @@ import numpy as np
 
 def ra2dec(ra):
     """
-    Accepts a string right ascention and converts it to decimal degrees
+    Accepts a string right ascension and converts it to decimal degrees
     requires hh:mm[:ss.s]
     """
-    r = ra.replace(':', ' ').split()
-    if len(r) == 2:
-        r.append(0.0)
-    return (float(r[0]) + float(r[1]) / 60.0 + float(r[2]) / 3600.0) * 15
+    return(dec2dec(ra)*15)
 
 
 def dec2dec(dec):
@@ -33,7 +30,7 @@ def dec2dec(dec):
     Accepts a string declination and converts it to decimal degrees
     requires +/-dd:mm[:ss.s]
     """
-    d = dec.split(':')
+    d = dec.replace(':', ' ').split()
     if len(d) == 2:
         d.append(0.0)
     if d[0].startswith('-') or float(d[0]) < 0:
