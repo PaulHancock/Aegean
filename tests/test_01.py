@@ -55,8 +55,9 @@ def test_fits_interp_compress_then_expand():
     os.remove('test2.fits')
 
 
-
-
-
 if __name__ == "__main__":
-    test_sigmaclip()
+    # introspect and run all the functions starting with 'test'
+    for f in dir():
+        if f.startswith('test'):
+            print(f)
+            exec(f+"()")
