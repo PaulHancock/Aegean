@@ -24,15 +24,7 @@ def load_file_or_hdu(filename):
     if isinstance(filename, fits.HDUList):
         hdulist = filename
     else:
-        try:
-            hdulist = fits.open(filename)
-        except IOError as e:
-            if "END" in e.message:
-                logging.warning(e.message)
-                logging.warning("trying to ignore this, but you should really fix it")
-                hdulist = fits.open(filename, ignore_missing_end=True)
-            else:
-                raise e
+        hdulist = fits.open(filename, ignore_missing_end=True)
     return hdulist
 
 
