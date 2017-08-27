@@ -72,10 +72,10 @@ def pairwise_ellpitical_binary(sources, eps, far=None):
     if far is None:
         far = max(a.a/3600 for a in sources)
     l = len(sources)
-    distances = np.ones((l, l), dtype=bool)
+    distances = np.zeros((l, l), dtype=bool)
     for i in range(l):
-        for j in range(i,l):
-            if j<i:
+        for j in range(i, l):
+            if j < i:
                 continue
             if i == j:
                 distances[i, j] = False
