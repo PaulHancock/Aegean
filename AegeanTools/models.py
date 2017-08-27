@@ -142,7 +142,6 @@ class IslandSource(SimpleSource):
         return self.__gt__(other) or self.__eq__(other)
 
 
-
 class OutputSource(SimpleSource):
     """
     Each source that is fit by Aegean is cast to this type.
@@ -214,51 +213,57 @@ class OutputSource(SimpleSource):
             return False
         if not hasattr(other, 'source'):
             return False
-        else:
-            return self.source == other.source
+        return self.source == other.source
 
     def __ne__(self, other):
-        if self.island == other.island:
-            return False
+        if self.island != other.island:
+            return True
         if not hasattr(other, 'source'):
             return True
-        else:
-            return self.source != other.source
+        return self.source != other.source
 
     def __lt__(self, other):
-        if self.island < other.island:
+        if not hasattr(other, 'island'):
             return True
         # Islands are always less than components
         if not hasattr(other, 'source'):
             return True
-        else:
+        if self.island < other.island:
+            return True
+        if self.island == other.island:
             return self.source < other.source
 
     def __le__(self, other):
-        if self.island < other.island:
+        if not hasattr(other, 'island'):
             return True
         # Islands are always less than components
         if not hasattr(other, 'source'):
             return True
-        else:
+        if self.island < other.island:
+            return True
+        if self.island == other.island:
             return self.source <= other.source
 
     def __gt__(self, other):
-        if self.island > other.island:
-            return True
+        if not hasattr(other, 'island'):
+            return False
         # Islands are always less than components
         if not hasattr(other, 'source'):
             return False
-        else:
+        if self.island > other.island:
+            return True
+        if self.island == other.island:
             return self.source > other.source
 
     def __ge__(self, other):
-        if self.island > other.island:
-            return True
+        if not hasattr(other, 'island'):
+            return False
         # Islands are always less than components
         if not hasattr(other, 'source'):
             return False
-        else:
+        if self.island > other.island:
+            return True
+        if self.island == other.island:
             return self.source >= other.source
 
 
