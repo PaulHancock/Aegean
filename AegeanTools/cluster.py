@@ -115,20 +115,20 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
             _ = catalog[0].pa
             _ = catalog[0].peak_flux
 
-        except AttributeError:
+        except AttributeError as e:
             log.error("catalog is not understood.")
             log.error("catalog: Should be a list of objects with the following properties[units]:\n" +
                       "ra[deg],dec[deg], a[arcsec],b[arcsec],pa[deg], peak_flux[any]")
-            sys.exit(1)
+            raise e
 
     log.info("Regrouping islands within catalog")
     log.debug("Calculating distances")
 
     # most negative declination first
-    srccat = sorted(srccat, key = lambda x: x.dec)
+    srccat = sorted(srccat, key=lambda x: x.dec)
 
     if far is None:
-        far = 0.5 # 10*max(a.a/3600 for a in srccat)
+        far = 0.5  # 10*max(a.a/3600 for a in srccat)
 
     groups = {0: [srccat[0]]}
     last_group = 0
@@ -207,19 +207,3 @@ def group_iter(catalog, eps, min_members=1):
         yield srccat[class_member_mask]
 
 
-if __name__ == "__main__":
-    logging.basicConfig()
-    log = logging.getLogger('Aegean')
-    catalog = '1904_comp.vot'
-    catalog = 'GLEAM_IDR1.fits'
-    table = load_table(catalog)
-    positions = np.array(list(zip(table['ra'],table['dec'])))
-    srccat = list(table_to_source_list(table))
-    # make the catalog stupid big for memory testing.
-    #for i in xrange(5):
-    #    srccat.extend(srccat)
-    groups = regroup(srccat, eps=np.sqrt(2),far=0.277289506048)
-    print("Sources ", len(table))
-    print("Groups ", len(groups))
-    for g in groups[:50]:
-        print(len(g),[(a.island,a.source) for a in g])
