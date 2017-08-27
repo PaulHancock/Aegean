@@ -65,6 +65,9 @@ def dec2hms(x):
     """
     if not np.isfinite(x):
         return 'XX:XX:XX.XX'
+    # wrap negative RA's
+    if x < 0:
+        x += 360
     x /= 15.0
     h = int(x)
     x = (x - h) * 60
