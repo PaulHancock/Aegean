@@ -28,7 +28,7 @@ from .fits_image import FitsImage, Beam
 from .msq2 import MarchingSquares
 from .angle_tools import dec2hms, dec2dms, gcd, bear
 from .catalogs import load_table, table_to_source_list
-from .models import SimpleSource, OutputSource, IslandSource, island_itergen
+from .models import SimpleSource, OutputSource, IslandSource, island_itergen, GlobalFittingData
 from . import flags
 
 # need Region in the name space in order to be able to unpickle it
@@ -56,29 +56,6 @@ header = """#Aegean version {0}
 # constants
 CC2FHWM = (2 * math.sqrt(2 * math.log(2)))
 FWHM2CC = 1 / CC2FHWM
-
-
-class GlobalFittingData(object):
-    """
-    The global data used for fitting.
-    (should be) Read-only once created.
-    Used by island fitting subprocesses.
-    """
-
-    def __init__(self):
-        self.img = None
-        self.dcurve = None
-        self.rmsimg = None
-        self.bkgimg = None
-        self.hdu_header = None
-        self.beam = None
-        self.data_pix = None
-        self.dtype = None
-        self.region = None
-        self.wcshelper = None
-        self.psfhelper = None
-        self.blank = False
-        return
 
 
 class IslandFittingData(object):

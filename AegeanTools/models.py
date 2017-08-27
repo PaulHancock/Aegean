@@ -272,7 +272,6 @@ class GlobalFittingData(object):
     The global data used for fitting.
     (should be) Read-only once created.
     Used by island fitting subprocesses.
-    wcs parameter used by most functions.
     """
 
     def __init__(self):
@@ -282,11 +281,12 @@ class GlobalFittingData(object):
         self.bkgimg = None
         self.hdu_header = None
         self.beam = None
-        self.wcs = None
         self.data_pix = None
         self.dtype = None
         self.region = None
-        self.telescope_lat = None
+        self.wcshelper = None
+        self.psfhelper = None
+        self.blank = False
         return
 
 
