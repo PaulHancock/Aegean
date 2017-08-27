@@ -75,7 +75,6 @@ def test_translate():
         assert_almost_equal(ans, (ra2, dec2), err_msg="{0:5.2f},{1:5.2f} -> {2:g},{3:g} -> {4:5.2f},{5:5.2f} != {6:g},{7:g}".format(ra1, dec1, r, theta, ra2, dec2, *ans))
 
 
-
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
