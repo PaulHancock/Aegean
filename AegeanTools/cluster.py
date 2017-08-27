@@ -75,8 +75,6 @@ def pairwise_ellpitical_binary(sources, eps, far=None):
     distances = np.zeros((l, l), dtype=bool)
     for i in range(l):
         for j in range(i, l):
-            if j < i:
-                continue
             if i == j:
                 distances[i, j] = False
                 continue
