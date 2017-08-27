@@ -106,12 +106,7 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
     else:
         try:
             srccat = catalog
-            _ = catalog[0].ra
-            _ = catalog[0].dec
-            _ = catalog[0].a
-            _ = catalog[0].b
-            _ = catalog[0].pa
-            _ = catalog[0].peak_flux
+            _ = catalog[0].ra, catalog[0].dec, catalog[0].a, catalog[0].b, catalog[0].pa, catalog[0].peak_flux
 
         except AttributeError as e:
             log.error("catalog is not understood.")
