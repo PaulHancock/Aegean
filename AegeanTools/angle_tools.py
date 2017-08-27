@@ -22,7 +22,7 @@ def ra2dec(ra):
     Accepts a string right ascension and converts it to decimal degrees
     requires hh:mm[:ss.s]
     """
-    return(dec2dec(ra)*15)
+    return dec2dec(ra)*15
 
 
 def dec2dec(dec):
