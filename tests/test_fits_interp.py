@@ -43,23 +43,23 @@ def test_expand():
     hdulist = fits.open(fname)
     compressed = fits_interp.compress(hdulist, factor=10)
     # the uncompressed hdu list is missing header keys so test that this gives the expected result
-    assert fits_interp.expand(hdulist) is hdulist
+    assert fits_interp.expand(compressed) is hdulist
+
     # now mix up the CDELT and CD keys
-    cd1 = compressed[0].header['CDELT1']
-    cd2 = compressed[0].header['CDELT2']
-    compressed[0].header['CD1_1'] = cd1
+    compressed = fits_interp.compress(fname, factor=10)  # reload because we pass references
+    compressed[0].header['CD1_1'] = compressed[0].header['CDELT1']
     del compressed[0].header['CDELT1']
-    compressed[0].header['CD2_2'] = cd2
+    compressed[0].header['CD2_2'] = compressed[0].header['CDELT2']
     del compressed[0].header['CDELT2']
     assert isinstance(fits_interp.expand(compressed), fits.HDUList)
-    # now strip CD2_2 and we should get error
-    del compressed[0].header['CD2_2']
-    assert fits_interp.compress(compressed, factor=10) is None
+
+    # now strip CD2_2 and we should return None
+    compressed = fits_interp.compress(fname, factor=10)
+    del compressed[0].header['CDELT2']
+    assert fits_interp.expand(compressed) is None
     # same for CD1_1
-    del compressed[0].header['CD1_1']
-    assert fits_interp.compress(compressed, factor=10) is None
-
-
+    del compressed[0].header['CDELT1']
+    assert fits_interp.expand(compressed) is None
 
 
 def test_fits_interp_compress_then_expand():
