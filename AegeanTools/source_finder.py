@@ -1637,6 +1637,7 @@ def scope2lat(telescope):
     if telescope.upper() in scopes:
         return scopes[telescope.upper()]
     else:
+        log = logging.getLogger("Aegean")
         log.warn("Telescope {0} is unknown".format(telescope))
         log.warn("integrated fluxes may be incorrect")
         return None
@@ -1651,7 +1652,8 @@ def check_cores(cores):
     """
     cores = min(multiprocessing.cpu_count(), cores)
     if six.PY3:
-        logging.info("Multi-cores not supported in python 3+, using one core")
+        log = logging.getLogger("Aegean")
+        log.info("Multi-cores not supported in python 3+, using one core")
         return 1
     try:
         queue = pprocess.Queue(limit=cores, reuse=1)
