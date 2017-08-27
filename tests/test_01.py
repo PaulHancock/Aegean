@@ -45,19 +45,3 @@ def test_mask_data():
 ###
 # fits_interp.py
 ###
-
-def test_fits_interp_compress_then_expand():
-    # test compression and expansion
-    fits_interp.compress("Test/Images/1904-66_AIT.fits", factor=7, outfile='test.fits')
-    fits_interp.expand('test.fits', outfile='test2.fits', method='linear')
-    # cleanup
-    os.remove('test.fits')
-    os.remove('test2.fits')
-
-
-if __name__ == "__main__":
-    # introspect and run all the functions starting with 'test'
-    for f in dir():
-        if f.startswith('test'):
-            print(f)
-            exec(f+"()")
