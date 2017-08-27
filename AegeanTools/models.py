@@ -112,22 +112,34 @@ class IslandSource(SimpleSource):
         return "({0:d})".format(self.island)
 
     def __eq__(self, other):
-        return self.island == other.island
+        if hasattr(other, 'island'):
+            return self.island == other.island
+        else:
+            return False
 
     def __ne__(self, other):
-        return self.island != other.island
+        if hasattr(other, 'island'):
+            return self.island != other.island
+        else:
+            return True
 
     def __lt__(self, other):
-        return self.island < other.island
+        if hasattr(other, 'island'):
+            return self.island < other.island
+        else:
+            return True
 
     def __le__(self, other):
-        return self.island <= other.island
+        return self.__lt__(other) or self.__eq__(other)
 
     def __gt__(self, other):
-        return self.island > other.island
+        if hasattr(other, 'island'):
+            return self.island > other.island
+        else:
+            return False
 
     def __ge__(self, other):
-        return self.island >= other.island
+        return self.__gt__(other) or self.__eq__(other)
 
 
 
