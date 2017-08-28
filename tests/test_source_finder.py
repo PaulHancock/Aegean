@@ -42,6 +42,9 @@ def test_helpers():
     assert sf.scope2lat('MyFriendsTelescope') is None
     # get_aux
     assert np.all(a is None for a in sf.get_aux_files('_$_fkjfjl'))
+    aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
+    assert aux_files['rms'] == 'tests/test_files/1904-66_SIN_rms.fits'
+    assert aux_files['bkg'] == 'tests/test_files/1904-66_SIN_bkg.fits'
 
 
 if __name__ == "__main__":
