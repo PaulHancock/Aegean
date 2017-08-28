@@ -6,7 +6,8 @@ from AegeanTools import source_finder as sf
 from copy import deepcopy
 import numpy as np
 import logging
-
+import os
+import sys
 
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
@@ -45,6 +46,37 @@ def test_helpers():
     aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
     assert aux_files['rms'] == 'tests/test_files/1904-66_SIN_rms.fits'
     assert aux_files['bkg'] == 'tests/test_files/1904-66_SIN_bkg.fits'
+
+
+def test_find_sources():
+    logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
+    log = logging.getLogger("Aegean")
+    sfinder = sf.SourceFinder(log=log)
+    filename = 'tests/test_files/1904-66_SIN.fits'
+    # vanilla source finding
+    found = sfinder.find_sources_in_image(filename, cores=1)
+    assert len(found) == 63
+    # now with some options
+    found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False)
+    assert len(found2) == 116
+    # we should have written some output file
+    assert os.path.exists('dlme')
+    os.remove('dlme')
+
+    # this should find one less source as one of the source centers is outside the image.
+    priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=False, ratio=1.2)
+    assert len(priorized) == 62
+    # this also gives 62 sources even though we turn on regroup
+    priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=True, cores=1, outfile=open('dlme','w'))
+    assert len(priorized) == 62
+    assert len(sfinder.priorized_fit_islands(filename, catalogue=[])) == 0
+    # we should have written some output file
+    assert os.path.exists('dlme')
+    os.remove('dlme')
+
+
+
+
 
 
 if __name__ == "__main__":
