@@ -59,6 +59,10 @@ def test_find_sources():
     # now with some options
     found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False)
     assert len(found2) == 116
+    isle1 = found2[1]
+    assert isle1.int_flux > 0
+    assert isle1.max_angular_size > 0
+    assert isle1.pixels == 21
     # we should have written some output file
     assert os.path.exists('dlme')
     os.remove('dlme')
