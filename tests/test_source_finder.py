@@ -75,10 +75,6 @@ def test_find_sources():
     os.remove('dlme')
 
 
-
-
-
-
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
