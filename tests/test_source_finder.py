@@ -48,6 +48,22 @@ def test_helpers():
     assert aux_files['bkg'] == 'tests/test_files/1904-66_SIN_bkg.fits'
 
 
+def test_load_globals():
+    logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
+    log = logging.getLogger("Aegean")
+    sfinder = sf.SourceFinder(log=log)
+    filename = 'tests/test_files/1904-66_SIN.fits'
+    aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
+    sfinder.load_globals(filename)
+    assert sfinder.global_data.img is not None
+    sfinder.load_globals(filename, bkgin=aux_files['bkg'], rms=1, mask=aux_files['mask'])
+    assert sfinder.global_data.mask is not None
+    sfinder.load_globals(filename, rms=aux_files['rms'], mask='derp', do_curve=False, )
+    assert sfinder.global_data.mask is None
+    img = sfinder._load_aux_image(sfinder.global_data.img, filename)
+    assert img is not None
+
+
 def test_find_and_prior_sources():
     logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
@@ -59,7 +75,8 @@ def test_find_and_prior_sources():
     # now with some options
     aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
     found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
-                                           rmsin=aux_files['rms'], bkgin=aux_files['bkg'], cores=1)
+                                           rmsin=aux_files['rms'], bkgin=aux_files['bkg'],
+                                           mask=aux_files['mask'], cores=1)
     assert len(found2) == 116
     isle1 = found2[1]
     assert isle1.int_flux > 0
