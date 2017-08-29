@@ -48,7 +48,7 @@ def test_helpers():
     assert aux_files['bkg'] == 'tests/test_files/1904-66_SIN_bkg.fits'
 
 
-def test_find_sources():
+def test_find_and_prior_sources():
     logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
@@ -57,7 +57,9 @@ def test_find_sources():
     found = sfinder.find_sources_in_image(filename, cores=1)
     assert len(found) == 63
     # now with some options
-    found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False, cores=1)
+    aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
+    found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
+                                           rmsin=aux_files['rms'], bkgin=aux_files['bkg'], cores=1)
     assert len(found2) == 116
     isle1 = found2[1]
     assert isle1.int_flux > 0
@@ -76,6 +78,30 @@ def test_find_sources():
     # we should have written some output file
     assert os.path.exists('dlme')
     os.remove('dlme')
+
+
+def test_save_files():
+    logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
+    log = logging.getLogger("Aegean")
+    sfinder = sf.SourceFinder(log=log)
+    filename = 'tests/test_files/1904-66_SIN.fits'
+    sfinder.save_background_files(image_filename=filename, outbase='dlme')
+    for ext in ['bkg', 'rms', 'snr', 'crv']:
+        assert os.path.exists("dlme_{0}.fits".format(ext))
+        os.remove("dlme_{0}.fits".format(ext))
+
+
+def test_save_image():
+    logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
+    log = logging.getLogger("Aegean")
+    sfinder = sf.SourceFinder(log=log)
+    filename = 'tests/test_files/1904-66_SIN.fits'
+    _ = sfinder.find_sources_in_image(filename, cores=1, max_summits=0, blank=True)
+    bfile = 'dlme_blanked.fits'
+    sfinder.save_image(bfile)
+    assert os.path.exists(bfile)
+    os.remove(bfile)
+
 
 
 if __name__ == "__main__":
