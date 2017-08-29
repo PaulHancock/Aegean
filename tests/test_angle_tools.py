@@ -75,6 +75,30 @@ def test_translate():
         assert_almost_equal(ans, (ra2, dec2), err_msg="{0:5.2f},{1:5.2f} -> {2:g},{3:g} -> {4:5.2f},{5:5.2f} != {6:g},{7:g}".format(ra1, dec1, r, theta, ra2, dec2, *ans))
 
 
+def test_dist_rhumb():
+    for ra1, dec1, ra2, dec2, dist in [(0, 0, 0, 1, 1),
+                                       (0, 0, 180, 0, 180)
+                                       ]:
+        ans = at.dist_rhumb(ra1, dec1, ra2, dec2)
+        assert_almost_equal(ans, dist)
+
+
+def test_bear_rhumb():
+    for ra1, dec1, ra2, dec2, bear in [(0, 0, 0, 1, 0),
+                                       (0, 0, 180, 0, 90)
+                                       ]:
+        ans = at.bear_rhumb(ra1, dec1, ra2, dec2)
+        assert_almost_equal(ans, bear)
+
+
+def test_translate_rhumb():
+    for (ra1, dec1), (r, theta), (ra2, dec2) in [((0, 0), (1, 0), (0, 1)),
+                                                 ((12, -45), (-1, 180), (12, -44))  # negative r
+                                       ]:
+        ans = at.translate_rhumb(ra1, dec1, r, theta)
+        assert_almost_equal(ans, (ra2, dec2), err_msg="{0:5.2f},{1:5.2f} -> {2:g},{3:g} -> {4:5.2f},{5:5.2f} != {6:g},{7:g}".format(ra1, dec1, r, theta, ra2, dec2, *ans))
+
+
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
