@@ -23,7 +23,6 @@ class MarchingSquares():
     LEFT = 0b0100
     RIGHT = 0b1000
 
-
     def __init__(self, data):
         self.prev = self.NOWHERE
         self.next = self.NOWHERE
@@ -31,18 +30,6 @@ class MarchingSquares():
         self.xsize, self.ysize = data.shape
         self.perimeter = self.do_march()
         return
-
-    def dir2str(self,d):
-        if d == self.UP:
-            return "U"
-        elif d == self.DOWN:
-            return "D"
-        elif d == self.LEFT:
-            return "L"
-        elif d== self.RIGHT:
-            return "R"
-        else:
-            return "x"
 
     def find_start_point(self):
         """
@@ -52,7 +39,6 @@ class MarchingSquares():
             for j, col in enumerate(row):
                 if self.data[i, j] != 0:  # or not np.isfinite(self.data[i,j]):
                     return i, j
-        return None
 
     def step(self, x, y):
         """
@@ -75,7 +61,7 @@ class MarchingSquares():
         if down_right:
             state |= 8
 
-        #what is the next step?
+        # what is the next step?
         if state in [1, 5, 13]:
             self.next = self.UP
         elif state in [2, 3, 7]:
@@ -138,15 +124,12 @@ class MarchingSquares():
             elif self.next == self.NOWHERE:
                 break
             else:
-                #not sure what to do here
-                logging.warn("Failed to determine next step")
+                # not sure what to do here
+                logging.warning("Failed to determine next step")
                 break
-            #stop when we return to the starting location
+            # stop when we return to the starting location
             if x == startx and y == starty:
                 break
-            #if i>max_tries:
-            #	break
-            #i+=1
         return points
 
     def do_march(self):
@@ -211,8 +194,7 @@ class MarchingSquares():
         return perimeters
                 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     logging_level = logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     test_array = np.random.randint(1, size=(9, 9))
