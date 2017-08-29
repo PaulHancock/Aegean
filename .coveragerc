@@ -7,3 +7,5 @@ exclude_lines =
     pragma: no cover
     # Debug-only blocks
     if debug_on:
+    # don't count the default run state
+    if __name__ == "__main__":
