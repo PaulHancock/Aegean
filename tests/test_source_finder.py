@@ -57,18 +57,17 @@ def test_find_sources():
     found = sfinder.find_sources_in_image(filename, cores=1)
     assert len(found) == 63
     # now with some options
-    found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False)
+    found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False, cores=1)
     assert len(found2) == 116
     isle1 = found2[1]
     assert isle1.int_flux > 0
     assert isle1.max_angular_size > 0
-    assert isle1.pixels == 21
     # we should have written some output file
     assert os.path.exists('dlme')
     os.remove('dlme')
 
     # this should find one less source as one of the source centers is outside the image.
-    priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=False, ratio=1.2)
+    priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=False, ratio=1.2, cores=1)
     assert len(priorized) == 62
     # this also gives 62 sources even though we turn on regroup
     priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=True, cores=1, outfile=open('dlme','w'))
