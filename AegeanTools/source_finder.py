@@ -1393,7 +1393,7 @@ class SourceFinder(object):
         return sources
 
     def priorized_fit_islands(self, filename, catalogue, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1,
-                              rms=None, beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=1.0, outerclip=3,
+                              rms=None, beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=None, outerclip=3,
                               doregroup=True, docov=True, slice=None):
         """
         Take an input catalog, and image, and optional background/noise images
@@ -1417,7 +1417,7 @@ class SourceFinder(object):
         :param imgpsf: a psf map that corresponds to the input image
         :param catpsf: a psf map that corresponds to the input catalog
         :param stage: refitting stage
-        :param ratio: ratio of image psf to catalog psf
+        :param ratio: if not None - ratio of image psf to catalog psf, otherwise interpret from catalogue or image if possible
         :param outerclip: pixels above an snr of this amount will be used in fitting, <0 -> all pixels.
         :param doregroup:  True - doregroup, False - use island data for groups
         :param docov: True = include covariance matrix in the fitting process. (default=True)
