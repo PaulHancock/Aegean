@@ -1,0 +1,9 @@
+[run]
+include =
+  AegeanTools/*.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    # Debug-only blocks
+    if debug_on:
