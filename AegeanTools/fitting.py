@@ -587,6 +587,8 @@ def RB_bias(data, pars, ita=None, acf=None):
     if ita is None:
         # N is the noise (data-model)
         N = data - ntwodgaussian_lmfit(pars)(x, y)
+        if acf is None:
+            acf = nan_acf(N)
         ita = make_ita(N, acf=acf)
         log.info('acf.shape {0}'.format(acf.shape))
         log.info('acf[0] {0}'.format(acf[0]))
