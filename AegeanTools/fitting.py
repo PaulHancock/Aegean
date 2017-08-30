@@ -42,8 +42,6 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     except ValueError as e:
         if 'math domain error' in e.args:
             sint, cost = np.nan, np.nan
-        else:
-            raise
     xxo = x - xo
     yyo = y - yo
     exp = (xxo * cost + yyo * sint) ** 2 / sx ** 2 \
