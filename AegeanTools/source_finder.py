@@ -32,17 +32,13 @@ from .models import SimpleSource, OutputSource, IslandSource, island_itergen, Gl
 from . import flags
 
 # need Region in the name space in order to be able to unpickle it
-# This can fail if healpy is not installed
-try:
-    from .regions import Region
+from .regions import Region
 
-    region_available = True
-    try:
-        import cPickle as pickle
-    except ImportError:
-        import pickle
+region_available = True
+try:
+    import cPickle as pickle
 except ImportError:
-    region_available = False
+    import pickle
 
 # multiple cores support
 import pprocess
