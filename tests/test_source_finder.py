@@ -57,9 +57,10 @@ def test_load_globals():
     sfinder.load_globals(filename)
     assert sfinder.global_data.img is not None
     sfinder.load_globals(filename, bkgin=aux_files['bkg'], rms=1, mask=aux_files['mask'])
-    assert sfinder.global_data.mask is not None
-    sfinder.load_globals(filename, rms=aux_files['rms'], mask='derp', do_curve=False, )
-    assert sfinder.global_data.mask is None
+    # region isn't available due to healpy not being installed/required
+    assert sfinder.global_data.region is None
+    sfinder.load_globals(filename, rms=aux_files['rms'], mask='derp', do_curve=False)
+    assert sfinder.global_data.region is None
     img = sfinder._load_aux_image(sfinder.global_data.img, filename)
     assert img is not None
 
