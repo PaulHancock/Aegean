@@ -1033,261 +1033,179 @@ def ntwodgaussian_mpfit(inpars):
     return rfunc
 
 
-def plot_jacobian():
-    """
-    Plot the Jacobian for a test model
-    :return:
-    """
-    nx = 15
-    ny = 12
-    x, y = np.where(np.ones((nx, ny)) == 1)
+if __name__ == "__main__":
 
-    # smoothing = 1.27 # 3pix/beam
-    # smoothing = 2.12 # 5pix/beam
-    smoothing = 1.5  # ~4.2pix/beam
 
-    # The model parameters
-    params = lmfit.Parameters()
-    params.add('c0_amp', value=1, min=0.5, max=2)
-    params.add('c0_xo', value=1. * nx / 2, min=nx / 2. - smoothing / 2., max=nx / 2. + smoothing / 2)
-    params.add('c0_yo', value=1. * ny / 2, min=ny / 2. - smoothing / 2., max=ny / 2. + smoothing / 2.)
-    params.add('c0_sx', value=2 * smoothing, min=0.8 * smoothing)
-    params.add('c0_sy', value=smoothing, min=0.8 * smoothing)
-    params.add('c0_theta', value=45)  #, min=-2*np.pi, max=2*np.pi)
-    params.add('components', value=1, vary=False)
+    def plot_jacobian():
+        """
+        Plot the Jacobian for a test model
+        :return:
+        """
+        nx = 15
+        ny = 12
+        x, y = np.where(np.ones((nx, ny)) == 1)
 
-    def rmlabels(ax):
+        # smoothing = 1.27 # 3pix/beam
+        # smoothing = 2.12 # 5pix/beam
+        smoothing = 1.5  # ~4.2pix/beam
+
+        # The model parameters
+        params = lmfit.Parameters()
+        params.add('c0_amp', value=1, min=0.5, max=2)
+        params.add('c0_xo', value=1. * nx / 2, min=nx / 2. - smoothing / 2., max=nx / 2. + smoothing / 2)
+        params.add('c0_yo', value=1. * ny / 2, min=ny / 2. - smoothing / 2., max=ny / 2. + smoothing / 2.)
+        params.add('c0_sx', value=2 * smoothing, min=0.8 * smoothing)
+        params.add('c0_sy', value=smoothing, min=0.8 * smoothing)
+        params.add('c0_theta', value=45)  #, min=-2*np.pi, max=2*np.pi)
+        params.add('components', value=1, vary=False)
+
+        def rmlabels(ax):
+            ax.set_xticks([])
+            ax.set_yticks([])
+
+        from matplotlib import pyplot
+
+        fig = pyplot.figure(1)
+        # This sets all nan pixels to be a nasty yellow colour
+        cmap = pyplot.cm.cubehelix
+        cmap.set_bad('y', 1.)
+        #kwargs = {'interpolation':'nearest','cmap':cmap,'vmin':-0.1,'vmax':1, 'origin':'lower'}
+        kwargs = {'interpolation': 'nearest', 'cmap': cmap, 'origin': 'lower'}
+        for i, jac in enumerate([emp_jacobian, lmfit_jacobian]):
+            fig = pyplot.figure(i + 1, figsize=(4, 6))
+            jdata = jac(params, x, y)
+            fig.suptitle(str(jac))
+            for k, p in enumerate(['amp', 'xo', 'yo', 'sx', 'sy', 'theta']):
+                ax = fig.add_subplot(3, 2, k + 1)
+                ax.imshow(jdata[:, k].reshape(nx, ny), **kwargs)
+                ax.set_title(p)
+                rmlabels(ax)
+
+        pyplot.show()
+
+    def clx(ax):
+        """
+        Remove the x/y ticks from a given axis
+        :param ax:
+        :return: None
+        """
         ax.set_xticks([])
         ax.set_yticks([])
-
-    from matplotlib import pyplot
-
-    fig = pyplot.figure(1)
-    # This sets all nan pixels to be a nasty yellow colour
-    cmap = pyplot.cm.cubehelix
-    cmap.set_bad('y', 1.)
-    #kwargs = {'interpolation':'nearest','cmap':cmap,'vmin':-0.1,'vmax':1, 'origin':'lower'}
-    kwargs = {'interpolation': 'nearest', 'cmap': cmap, 'origin': 'lower'}
-    for i, jac in enumerate([emp_jacobian, lmfit_jacobian]):
-        fig = pyplot.figure(i + 1, figsize=(4, 6))
-        jdata = jac(params, x, y)
-        fig.suptitle(str(jac))
-        for k, p in enumerate(['amp', 'xo', 'yo', 'sx', 'sy', 'theta']):
-            ax = fig.add_subplot(3, 2, k + 1)
-            ax.imshow(jdata[:, k].reshape(nx, ny), **kwargs)
-            ax.set_title(p)
-            rmlabels(ax)
-
-    pyplot.show()
+        return
 
 
-def test_hessian_shape():
-    """
-    Test to see if the hessian matrix if of the right shape
-    This includes a single source model with only 4 variable params
-    :return: True if the test passes
-    """
-    model = lmfit.Parameters()
-    model.add('c0_amp', 1, vary=True)
-    model.add('c0_xo', 5, vary=True)
-    model.add('c0_yo', 5, vary=True)
-    model.add('c0_sx', 2.001, vary=False)
-    model.add('c0_sy', 2, vary=False)
-    model.add('c0_theta', 0, vary=False)
-    model.add('components', 1, vary=False)
-    nvar = 3
-    x, y = np.indices((10, 10))
-    Hij = hessian(model, x, y)
-    if Hij.shape != (nvar, nvar, 10, 10):
-        print("test_hessian_shape FAILED")
-        print("found {0}, expected {1}".format(Hij.shape, (nvar, nvar, 10, 10)))
-        return False
+    def test_hessian_plots():
+        """
+        Plot the empirical and analytical hessian to check for agreement.
+        :return: None
+        """
+        from matplotlib import pyplot
+        model = lmfit.Parameters()
+        model.add('c0_amp', 1, vary=True)
+        model.add('c0_xo', 20, vary=True)
+        model.add('c0_yo', 20, vary=True)
+        model.add('c0_sx', 5, vary=True)
+        model.add('c0_sy', 4, vary=True)
+        model.add('c0_theta', 37, vary=True)
+        model.add('components', 1, vary=False)
+        x, y = np.indices((40, 40))
+        # Empirical Hessian
+        kwargs = {"interpolation": "nearest", 'aspect': 1, 'vmin': -1, 'vmax': 1}
+        fig, ax = pyplot.subplots(6, 6, squeeze=True, sharex=True, sharey=True, figsize=(5, 6))
+        Hemp = emp_hessian(model, x, y)
+        vars = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
+        for i, row in enumerate(ax):
+            for j, ax in enumerate(row):
+                im = Hemp[i, j, :, :]
+                # im[np.where(abs(im) < 1e-5)] = 0
+                # print vars[i],vars[j], np.amax(im)
+                im /= np.amax(im)
+                ax.imshow(im, **kwargs)
+                if j == 0:
+                    ax.set_ylabel(vars[i])
+                if i == 5:
+                    ax.set_xlabel(vars[j])
+                clx(ax)
+        fig.suptitle('Empirical Hessian')
 
-    model.add('c1_amp', 1, vary=True)
-    model.add('c1_xo', 5, vary=True)
-    model.add('c1_yo', 5, vary=True)
-    model.add('c1_sx', 2.001, vary=True)
-    model.add('c1_sy', 2, vary=True)
-    model.add('c1_theta', 0, vary=True)
-    nvar = 9
-    model['components'].value = 2
-    Hij = hessian(model, x, y)
-    if Hij.shape != (nvar, nvar, 10, 10):
-        print("test_hessian_shape FAILED")
-        print("found {0}, expected {1}".format(Hij.shape, (nvar, nvar, 10, 10)))
-        return False
+        # Analytical Hessian
+        fig, ax = pyplot.subplots(6, 6, squeeze=True, sharex=True, sharey=True, figsize=(5, 6))
+        Hana = hessian(model, x, y)
+        for i, row in enumerate(ax):
+            for j, ax in enumerate(row):
+                im = Hana[i, j, :, :]
+                # im[np.where(abs(im) < 1e-5)] = 0
+                # print vars[i],vars[j], np.amax(im)
+                im /= np.amax(im)
+                ax.imshow(im, **kwargs)
+                if j == 0:
+                    ax.set_ylabel(vars[i])
+                if i == 5:
+                    ax.set_xlabel(vars[j])
+                clx(ax)
+        fig.suptitle('Analytical Hessian')
 
-    print("test_hessian_shape PASSED")
-    return True
+        # Difference
+        fig, ax = pyplot.subplots(6, 6, squeeze=True, sharex=True, sharey=True, figsize=(5, 6))
+        Hana = hessian(model, x, y)
+        for i, row in enumerate(ax):
+            for j, ax in enumerate(row):
+                im1 = Hana[i, j, :, :]
+                im1 /= np.amax(im1)
+                im2 = Hemp[i, j, :, :]
+                im2 /= np.amax(im2)
+                ax.imshow(im1-im2, **kwargs)
+                if j == 0:
+                    ax.set_ylabel(vars[i])
+                if i == 5:
+                    ax.set_xlabel(vars[j])
+                clx(ax)
+        fig.suptitle('Difference')
+        pyplot.show()
 
 
-def clx(ax):
-    """
-    Remove the x/y ticks from a given axis
-    :param ax:
-    :return: None
-    """
-    ax.set_xticks([])
-    ax.set_yticks([])
-    return
+    def test_jacobian_plot():
+        """
 
+        :return:
+        """
+        from matplotlib import pyplot
+        model = lmfit.Parameters()
+        model.add('c0_amp', 1, vary=True)
+        model.add('c0_xo', 20, vary=True)
+        model.add('c0_yo', 20, vary=True)
+        model.add('c0_sx', 5, vary=True)
+        model.add('c0_sy', 4, vary=True)
+        model.add('c0_theta', 37, vary=True)
+        model.add('components', 1, vary=False)
+        x, y = np.indices((40, 40))
 
-def test_hessian_plots():
-    """
-    Plot the empirical and analytical hessian to check for agreement.
-    :return: None
-    """
-    from matplotlib import pyplot
-    model = lmfit.Parameters()
-    model.add('c0_amp', 1, vary=True)
-    model.add('c0_xo', 20, vary=True)
-    model.add('c0_yo', 20, vary=True)
-    model.add('c0_sx', 5, vary=True)
-    model.add('c0_sy', 4, vary=True)
-    model.add('c0_theta', 37, vary=True)
-    model.add('components', 1, vary=False)
-    x, y = np.indices((40, 40))
-    # Empirical Hessian
-    kwargs = {"interpolation": "nearest", 'aspect': 1, 'vmin': -1, 'vmax': 1}
-    fig, ax = pyplot.subplots(6, 6, squeeze=True, sharex=True, sharey=True, figsize=(5, 6))
-    Hemp = emp_hessian(model, x, y)
-    vars = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
-    for i, row in enumerate(ax):
-        for j, ax in enumerate(row):
-            im = Hemp[i, j, :, :]
-            # im[np.where(abs(im) < 1e-5)] = 0
-            # print vars[i],vars[j], np.amax(im)
-            im /= np.amax(im)
-            ax.imshow(im, **kwargs)
-            if j == 0:
-                ax.set_ylabel(vars[i])
-            if i == 5:
-                ax.set_xlabel(vars[j])
-            clx(ax)
-    fig.suptitle('Empirical Hessian')
+        kwargs = {"interpolation": "nearest", 'aspect': 1, 'vmin': -1, 'vmax': 1}
+        vars = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
 
-    # Analytical Hessian
-    fig, ax = pyplot.subplots(6, 6, squeeze=True, sharex=True, sharey=True, figsize=(5, 6))
-    Hana = hessian(model, x, y)
-    for i, row in enumerate(ax):
-        for j, ax in enumerate(row):
-            im = Hana[i, j, :, :]
-            # im[np.where(abs(im) < 1e-5)] = 0
-            # print vars[i],vars[j], np.amax(im)
-            im /= np.amax(im)
-            ax.imshow(im, **kwargs)
-            if j == 0:
-                ax.set_ylabel(vars[i])
-            if i == 5:
-                ax.set_xlabel(vars[j])
-            clx(ax)
-    fig.suptitle('Analytical Hessian')
+        fig, ax = pyplot.subplots(6, 3, sharex=True, sharey=True, figsize=(3, 6))
 
-    # Difference
-    fig, ax = pyplot.subplots(6, 6, squeeze=True, sharex=True, sharey=True, figsize=(5, 6))
-    Hana = hessian(model, x, y)
-    for i, row in enumerate(ax):
-        for j, ax in enumerate(row):
-            im1 = Hana[i, j, :, :]
+        Jemp = emp_jacobian(model, x, y)
+        Jana = jacobian(model, x, y)
+
+        for i, row in enumerate(ax):
+            im1 = Jemp[i, :, :]
             im1 /= np.amax(im1)
-            im2 = Hemp[i, j, :, :]
+            im2 = Jana[i, :, :]
             im2 /= np.amax(im2)
-            ax.imshow(im1-im2, **kwargs)
-            if j == 0:
-                ax.set_ylabel(vars[i])
-            if i == 5:
-                ax.set_xlabel(vars[j])
-            clx(ax)
-    fig.suptitle('Difference')
-    pyplot.show()
+            row[0].imshow(im1, **kwargs)
+            row[0].set_ylabel(vars[i])
+            row[1].imshow(im2, **kwargs)
+            row[2].imshow(im1-im2, **kwargs)
+            clx(row[0])
+            clx(row[1])
+        ax[0][0].set_title("Emp")
+        ax[0][1].set_title("Ana")
+        ax[0][2].set_title("Diff")
+        fig.suptitle('Jacobian Comparison')
+        pyplot.show()
+        return
 
-
-def test_jacobian_shape():
-    """
-    Test to see if the Jacobian matrix if of the right shape
-    This includes a single source model with only 4 variable params
-    :return: True if the test passes
-    """
-    model = lmfit.Parameters()
-    model.add('c0_amp', 1, vary=True)
-    model.add('c0_xo', 5, vary=True)
-    model.add('c0_yo', 5, vary=True)
-    model.add('c0_sx', 2.001, vary=False)
-    model.add('c0_sy', 2, vary=False)
-    model.add('c0_theta', 0, vary=False)
-    model.add('components', 1, vary=False)
-    nvar = 3
-    x, y = np.indices((10, 10))
-    Jij = jacobian(model, x, y)
-    if Jij.shape != (nvar, 10, 10):
-        print("test_jacobian_shape FAILED")
-        print("found {0}, expected {1}".format(Jij.shape, (nvar, 10, 10)))
-        return False
-
-    model.add('c1_amp', 1, vary=True)
-    model.add('c1_xo', 5, vary=True)
-    model.add('c1_yo', 5, vary=True)
-    model.add('c1_sx', 2.001, vary=True)
-    model.add('c1_sy', 2, vary=True)
-    model.add('c1_theta', 0, vary=True)
-    nvar = 9
-    model['components'].value = 2
-    Jij = jacobian(model, x, y)
-    if Jij.shape != (nvar, 10, 10):
-        print("test_jacobian_shape FAILED")
-        print("found {0}, expected {1}".format(Jij.shape, (nvar, 10, 10)))
-        return False
-
-    print("test_jacobian_shape PASSED")
-    return True
-
-
-def test_jacobian_plot():
-    """
-
-    :return:
-    """
-    from matplotlib import pyplot
-    model = lmfit.Parameters()
-    model.add('c0_amp', 1, vary=True)
-    model.add('c0_xo', 20, vary=True)
-    model.add('c0_yo', 20, vary=True)
-    model.add('c0_sx', 5, vary=True)
-    model.add('c0_sy', 4, vary=True)
-    model.add('c0_theta', 37, vary=True)
-    model.add('components', 1, vary=False)
-    x, y = np.indices((40, 40))
-
-    kwargs = {"interpolation": "nearest", 'aspect': 1, 'vmin': -1, 'vmax': 1}
-    vars = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
-
-    fig, ax = pyplot.subplots(6, 3, sharex=True, sharey=True, figsize=(3, 6))
-
-    Jemp = emp_jacobian(model, x, y)
-    Jana = jacobian(model, x, y)
-
-    for i, row in enumerate(ax):
-        im1 = Jemp[i, :, :]
-        im1 /= np.amax(im1)
-        im2 = Jana[i, :, :]
-        im2 /= np.amax(im2)
-        row[0].imshow(im1, **kwargs)
-        row[0].set_ylabel(vars[i])
-        row[1].imshow(im2, **kwargs)
-        row[2].imshow(im1-im2, **kwargs)
-        clx(row[0])
-        clx(row[1])
-    ax[0][0].set_title("Emp")
-    ax[0][1].set_title("Ana")
-    ax[0][2].set_title("Diff")
-    fig.suptitle('Jacobian Comparison')
-    pyplot.show()
-    return
-
-
-if __name__ == "__main__":
-    test_hessian_shape()
-    # test_hessian_plots()
-    test_jacobian_shape()
-    # test_jacobian_plot()
+    test_hessian_plots()
+    test_jacobian_plot()
 
