@@ -796,7 +796,7 @@ def errors(source, model, wcshelper):
     return source
 
 
-def new_errors(source, model, wcshelper):
+def new_errors(source, model, wcshelper):  # pragma: no cover
     """
     Convert pixel based errors into sky coord errors
     Uses covariance matrix for ra/dec errors
