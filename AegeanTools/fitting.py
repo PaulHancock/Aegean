@@ -1004,35 +1004,6 @@ def covar_errors(params, data, errs, B, C=None):
     return params
 
 
-def ntwodgaussian_mpfit(inpars):
-    """
-    Return an array of values represented by multiple Gaussians as parametrized
-    by params = [amp,x0,y0,major,minor,pa]{n}
-    x0,y0,major,minor are in pixels
-    major/minor are interpreted as being sigmas not FWHMs
-    pa is in degrees
-    """
-    try:
-        params = np.array(inpars).reshape(len(inpars) / 6, 6)
-    except ValueError as e:
-        if 'size' in e.message:
-            log.error("inpars requires a multiple of 6 parameters")
-            log.error("only {0} parameters supplied".format(len(inpars)))
-        raise e
-
-    def rfunc(x, y):
-        result = None
-        for p in params:
-            amp, xo, yo, major, minor, pa = p
-            if result is not None:
-                result += elliptical_gaussian(x, y, amp, xo, yo, major, minor, pa)
-            else:
-                result = elliptical_gaussian(x, y, amp, xo, yo, major, minor, pa)
-        return result
-
-    return rfunc
-
-
 if __name__ == "__main__":
 
 
