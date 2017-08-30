@@ -20,7 +20,8 @@ def get_version():
 reqs = ['numpy>=1.10',
         'scipy>=0.16',
         'astropy>=1.0',
-        'pprocess>=0.5']
+        'pprocess>=0.5',
+        'healpy >=1.10']
 
 if sys.version_info < (2, 7):
     reqs.append('lmfit==0.9.1')
