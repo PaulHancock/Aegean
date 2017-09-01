@@ -186,10 +186,6 @@ def load_catalog(filename):
         t = parse_single_table(filename)
         catalog = list(zip(t.array['ra'].tolist(), t.array['dec'].tolist()))
 
-    elif fmt == 'cat':
-        log.info("Reading ra/dec columns of Aegean catalog")
-        lines = [a.strip().split() for a in open(filename, 'r').readlines() if not a.startswith('#')]
-        catalog = [(float(a[5]), float(a[7])) for a in lines]
     else:
         log.info("Assuming ascii format, reading first two columns")
         lines = [a.strip().split() for a in open(filename, 'r').readlines() if not a.startswith('#')]
@@ -198,7 +194,7 @@ def load_catalog(filename):
         except:
             log.error("Expecting two columns of floats but failed to parse")
             log.error("Catalog file {0} not loaded".format(filename))
-            sys.exit()
+            raise Exception("Could not determine file format")
 
     return catalog
 
@@ -222,7 +218,7 @@ def load_table(filename):
     else:
         log.error("Table format not recognized or supported")
         log.error("{0} [{1}]".format(filename, fmt))
-        sys.exit(1)
+        raise Exception("Table format not recognized or supported")
     return t
 
 
