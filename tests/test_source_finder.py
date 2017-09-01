@@ -69,16 +69,16 @@ def test_find_and_prior_sources():
     logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
-    filename = 'tests/test_files/1904-66_SIN.fits'
+    filename = 'tests/test_files/small.fits'
     # vanilla source finding
     found = sfinder.find_sources_in_image(filename, cores=1)
-    assert len(found) == 63
+    assert len(found) == 2
     # now with some options
-    aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
+    aux_files = sf.get_aux_files(filename)
     found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
                                            rmsin=aux_files['rms'], bkgin=aux_files['bkg'],
                                            mask=aux_files['mask'], cores=1)
-    assert len(found2) == 116
+    assert len(found2) == 4
     isle1 = found2[1]
     assert isle1.int_flux > 0
     assert isle1.max_angular_size > 0
@@ -88,10 +88,10 @@ def test_find_and_prior_sources():
 
     # this should find one less source as one of the source centers is outside the image.
     priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=False, ratio=1.2, cores=1)
-    assert len(priorized) == 62
+    assert len(priorized) == 2
     # this also gives 62 sources even though we turn on regroup
     priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=True, cores=1, outfile=open('dlme','w'))
-    assert len(priorized) == 62
+    assert len(priorized) == 2
     assert len(sfinder.priorized_fit_islands(filename, catalogue=[])) == 0
     # we should have written some output file
     assert os.path.exists('dlme')
@@ -102,7 +102,7 @@ def test_save_files():
     logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
-    filename = 'tests/test_files/1904-66_SIN.fits'
+    filename = 'tests/test_files/small.fits'
     sfinder.save_background_files(image_filename=filename, outbase='dlme')
     for ext in ['bkg', 'rms', 'snr', 'crv']:
         assert os.path.exists("dlme_{0}.fits".format(ext))
@@ -113,7 +113,7 @@ def test_save_image():
     logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
-    filename = 'tests/test_files/1904-66_SIN.fits'
+    filename = 'tests/test_files/small.fits'
     _ = sfinder.find_sources_in_image(filename, cores=1, max_summits=0, blank=True)
     bfile = 'dlme_blanked.fits'
     sfinder.save_image(bfile)
