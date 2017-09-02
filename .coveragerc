@@ -1,7 +1,9 @@
 [run]
 include =
   AegeanTools/*.py
-concurrency = multiprocessing
+concurrency =
+  multiprocessing
+  pprocess
 parallel = True
 
 [report]

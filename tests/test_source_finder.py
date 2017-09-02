@@ -98,6 +98,27 @@ def test_find_and_prior_sources():
     os.remove('dlme')
 
 
+def test_find_and_prior_parallel():
+    logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
+    log = logging.getLogger("Aegean")
+    sfinder = sf.SourceFinder(log=log)
+    cores = sf.check_cores(2)
+    # don't bother re-running these tests if we have just 1 core
+    if cores == 1:
+        return
+    filename = 'tests/test_files/1904-66_SIN.fits'
+    # vanilla source finding
+    found = sfinder.find_sources_in_image(filename, cores=cores)
+    assert len(found) == 68
+    # now with some options
+    aux_files = sf.get_aux_files(filename)
+    found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
+                                           rmsin=aux_files['rms'], bkgin=aux_files['bkg'],
+                                           mask=aux_files['mask'], cores=cores)
+    priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=True, cores=cores, outfile=open('dlme','w'))
+    os.remove('dlme')
+
+
 def test_save_files():
     logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
