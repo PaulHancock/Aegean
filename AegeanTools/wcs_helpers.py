@@ -305,9 +305,6 @@ class WCSHelper(object):
         return sep
 
 
-
-
-
 class PSFHelper(WCSHelper):
     """
     A class that will store information about the PSF, which is assumed to be direction dependent.
@@ -371,9 +368,6 @@ class PSFHelper(WCSHelper):
         """
         psf_sky = self.get_psf_sky(ra, dec)
         psf_pix = self.wcshelper.sky2pix_ellipse([ra, dec], psf_sky[0], psf_sky[1], psf_sky[2])[2:]
-        # psf_pix = self.wcshelper.sky2pix_vec([ra, dec], psf_sky[0], 0)[2],\
-        # self.wcshelper.sky2pix_vec([ra, dec], psf_sky[1], 90)[2],\
-        #           psf_sky[2]
         return psf_pix
 
     def get_pixbeam_pixel(self, x, y):
@@ -433,22 +427,3 @@ class PSFHelper(WCSHelper):
         if beam is None:
             return 0
         return beam.a * beam.b * np.pi
-
-
-class PSFHelperTest(object):
-    """
-
-    """
-
-    def __init__(self):
-        psffile = "Test/Images/1904_66_SIN_psf.fits"
-        wcsfile = "Test/Images/1904_66_SIN.fits"
-        psfdata = fits.getdata(psffile)
-        self.helper = PSFHelper(psfdata, WCSHelper.from_file(wcsfile))
-
-
-if __name__ == "__main__":
-    import sys
-
-    test_img = sys.argv[-1]
-    WCSHelperTest(test_img)
