@@ -277,7 +277,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
     :param box_size: size of box over which the filtering is done
     :param cores: number of cores to use
     :param shape: shape of the data array in the file 'filename'
-    :param fn: the function which performs the filtering
+    :param dobkg: calculate background if true
     :return:
     """
 
@@ -453,27 +453,6 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 ###
 # Helper functions
 ###
-def load_image(im_name):
-    """
-    Generic helper function to load a fits file
-    """
-    try:
-        fitsfile = fits.open(im_name)
-    except IOError as e:
-        if "END" in e.message:
-            logging.warning(e.message)
-            logging.warning("trying to ignore this, but you should really fix it")
-            fitsfile = fits.open(im_name, ignore_missing_end=True)
-        else:
-            raise e
-
-    data = fitsfile[0].data
-    if fitsfile[0].header['NAXIS']>2:
-        data = data.squeeze()  # remove axes with length 1
-    logging.info("loaded {0}".format(im_name))
-    return fitsfile, data
-
-
 def write_fits(data, header, file_name):
     """
 
@@ -486,22 +465,4 @@ def write_fits(data, header, file_name):
     hdulist = fits.HDUList([hdu])
     hdulist.writeto(file_name, clobber=True)
     logging.info("Wrote {0}".format(file_name))
-
-
-def save_image(hdu, data, im_name):
-    """
-    Generic helper function to save a fits file with a given name/header
-    This function modifies the fits object!
-    """
-    hdu[0].data = data
-    hdu[0].header['HISTORY']='BANE {0}-({1})'.format(__version__, __date__)
-    try:
-        hdu.writeto(im_name, clobber=True)
-    except hdu.verify.VerifyError as e:
-        if "DATAMAX" in e.message or "DATAMIN" in e.message:
-            logging.warning(e.message)
-            logging.warning("I will fix this but it will cause some programs to break")
-            hdu.writeto(im_name, clobber=True, output_verify="silentfix")
-    logging.info("wrote {0}".format(im_name))
-    return
 
