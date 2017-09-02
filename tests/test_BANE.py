@@ -14,6 +14,7 @@ import logging
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
 
+
 def test_sigmaclip():
     # normal usage case
     data = np.random.random(100)
@@ -61,6 +62,7 @@ def test_filter_image():
     os.remove(rms)
     assert os.path.exists(bkg)
     os.remove(bkg)
+
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
