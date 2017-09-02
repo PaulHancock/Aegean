@@ -1,6 +1,8 @@
 [run]
 include =
   AegeanTools/*.py
+concurrency = multiprocessing
+parallel = True
 
 [report]
 exclude_lines =
