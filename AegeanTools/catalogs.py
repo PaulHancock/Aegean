@@ -363,6 +363,11 @@ def writeIslandContours(filename, catalog, fmt):
     filename = file to write
     catalog = [IslandSource, ...]
     """
+    if fmt != 'reg':
+        log.warning("Format {0} not yet supported".format(fmt))
+        log.warning("not writing anything")
+        return
+
     out = open(filename, 'w')
     print("#Aegean island contours", file=out)
     print("#AegeanTools.catalogs version {0}-({1})".format(__version__, __date__), file=out)
@@ -370,10 +375,6 @@ def writeIslandContours(filename, catalog, fmt):
     text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
     mas_fmt = 'image; line({1},{0},{3},{2}) #color = yellow'
     x_fmt = 'image; point({1},{0}) # point=x'
-    if fmt != 'reg':
-        log.warn("Format {0} not yet supported".format(fmt))
-        log.warn("not writing anything")
-        return
     for c in catalog:
         contour = c.contour
         if len(contour) > 1:
@@ -403,19 +404,21 @@ def writeIslandBoxes(filename, catalog, fmt):
         filename = file to write
         catalog = [IslandSource, ...]
     """
-    out = open(filename, 'w')
+    if fmt not in ['reg', 'ann']:
+        log.warning("Format not supported for island boxes{0}".format(fmt))
+        return  # fmt not supported
 
+    out = open(filename, 'w')
     print("#Aegean Islands", file=out)
     print("#Aegean version {0}-({1})".format(__version__, __date__), file=out)
+
     if fmt == 'reg':
         print("IMAGE", file=out)
         box_fmt = 'box({0},{1},{2},{3}) #{4}'
-    elif fmt == 'ann':
+    else:
         print("COORD P", file=out)
         box_fmt = 'box P {0} {1} {2} {3} #{4}'
-    else:
-        log.warning("Format not supported for island boxes{0}".format(fmt))
-        return  # fmt not supported
+
     for c in catalog:
         # x/y swap for pyfits/numpy translation
         ymin, ymax, xmin, xmax = c.extent
@@ -441,6 +444,10 @@ def writeAnn(filename, catalog, fmt):
         catalog - a list of OutputSource or SimpleSource
         fmt - [.ann|.reg] format to use
     """
+    if fmt not in ['reg', 'ann']:
+        log.warning("Format not supported for island boxes{0}".format(fmt))
+        return  # fmt not supported
+
     components, islands, simples = classify_catalog(catalog)
     if len(components) > 0:
         catalog = sorted(components)
@@ -472,7 +479,7 @@ def writeAnn(filename, catalog, fmt):
             print('FONT hershey12', file=out)
             print('COORD W', file=out)
             formatter = "ELLIPSE W {0} {1} {2} {3} {4:+07.3f} #{5}\nTEXT W {0} {1} {5}"
-        elif fmt == 'reg':
+        else:  # reg
             new_file = re.sub('.reg$', '_{0}.reg'.format(suffix), filename)
             out = open(new_file, 'w')
             print("#Aegean version {0}-({1})".format(__version__, __date__), file=out)
