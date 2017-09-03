@@ -45,5 +45,5 @@ setup(
     scripts=['scripts/aegean', 'scripts/BANE', 'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS'],
     data_files=[('AegeanTools', [os.path.join(data_dir, 'MOC.fits')]) ],
     setup_requires=['pytest-runner'],
-    tests_require=['pytest']
+    tests_require=['pytest', 'nose']
 )
