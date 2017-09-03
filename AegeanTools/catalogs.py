@@ -132,7 +132,7 @@ def save_catalog(filename, catalog, meta=None):
         nothing
     """
     ascii_table_formats = {'csv': 'csv', 'tab': 'tab', 'tex': 'latex', 'html': 'html'}
-    #.ann and .reg are handled by me
+    # .ann and .reg are handled by me
     meta = update_meta_data(meta)
     extension = os.path.splitext(filename)[1][1:].lower()
     if extension in ['ann', 'reg']:
@@ -161,7 +161,7 @@ def load_catalog(filename):
     """
     supported = get_table_formats()
 
-    fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
+    fmt = os.path.splitext(filename)[-1][1:].lower()  # extension sans '.'
 
     if fmt in ['csv', 'tab', 'tex'] and fmt in supported:
         log.info("Reading file {0}".format(filename))
@@ -194,7 +194,7 @@ def load_table(filename):
     """
     supported = get_table_formats()
 
-    fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
+    fmt = os.path.splitext(filename)[-1][1:].lower()  # extension sans '.'
 
     if fmt in ['csv', 'tab', 'tex'] and fmt in supported:
         log.info("Reading file {0}".format(filename))
@@ -219,10 +219,8 @@ def write_table(table, filename):
         if "Format could not be identified" not in e.message:
             raise e
         else:
-            fmt = os.path.splitext(filename)[-1][1:].lower()  #extension sans '.'
-            # TODO: figure out the format of files that are not autodetermined
-            log.critical("Cannot auto-determine format for {0}".format(fmt))
-            sys.exit(1)
+            fmt = os.path.splitext(filename)[-1][1:].lower()  # extension sans '.'
+            raise Exception("Cannot auto-determine format for {0}".format(fmt))
     return
 
 
@@ -343,8 +341,8 @@ def writeFITSTable(filename, table):
         elif isinstance(val, six.string_types):
             types = "{0}A".format(len(val))
         else:
-            log.warn("Column {0} is of unknown type {1}".format(val, type(val)))
-            log.warn("Using 5A")
+            log.warning("Column {0} is of unknown type {1}".format(val, type(val)))
+            log.warning("Using 5A")
             types = "5A"
         return types
 
@@ -356,14 +354,6 @@ def writeFITSTable(filename, table):
     for k in table.meta:
         tbhdu.header['HISTORY'] = ':'.join((k, table.meta[k]))
     tbhdu.writeto(filename, clobber=True)
-
-
-def writeVOTable_dep(filename, catalog):
-    """
-    write VOTables for each of the source types that are in the catalog
-    append an appropriate prefix to the file name for each type of source
-    """
-    write_catalog(filename, catalog, fmt="vo")
 
 
 def writeIslandContours(filename, catalog, fmt):
@@ -391,7 +381,7 @@ def writeIslandContours(filename, catalog, fmt):
                 print(line_fmt.format(p1[1] + 0.5, p1[0] + 0.5, p2[1] + 0.5, p2[0] + 0.5), file=out)
             print(line_fmt.format(contour[-1][1] + 0.5, contour[-1][0] + 0.5, contour[0][1] + 0.5,
                                           contour[0][0] + 0.5), file=out)
-        #comment out lines that have invalid ra/dec (WCS problems)
+        # comment out lines that have invalid ra/dec (WCS problems)
         if np.nan in [c.ra, c.dec]:
             print('#', end=' ', file=out)
         # some islands may not have anchors because they don't have any contours
@@ -425,13 +415,13 @@ def writeIslandBoxes(filename, catalog, fmt):
         box_fmt = 'box P {0} {1} {2} {3} #{4}'
     else:
         log.warning("Format not supported for island boxes{0}".format(fmt))
-        return  #fmt not supported
+        return  # fmt not supported
     for c in catalog:
-        #x/y swap for pyfits/numpy translation
+        # x/y swap for pyfits/numpy translation
         ymin, ymax, xmin, xmax = c.extent
-        #+1 for array/image offset
+        # +1 for array/image offset
         xcen = (xmin + xmax) / 2.0 + 1
-        #+0.5 in each direction to make lines run 'between' DS9 pixels
+        # + 0.5 in each direction to make lines run 'between' DS9 pixels
         xwidth = xmax - xmin + 1
         ycen = (ymin + ymax) / 2.0 + 1
         ywidth = ymax - ymin + 1
@@ -464,7 +454,7 @@ def writeAnn(filename, catalog, fmt):
     if len(catalog) > 0:
         ras = [a.ra for a in catalog]
         decs = [a.dec for a in catalog]
-        if not hasattr(catalog[0], 'a'):  #a being the variable that I used for bmaj.
+        if not hasattr(catalog[0], 'a'):  # a being the variable that I used for bmaj.
             bmajs = [30 / 3600.0 for a in catalog]
             bmins = bmajs
             pas = [0 for a in catalog]
@@ -488,11 +478,11 @@ def writeAnn(filename, catalog, fmt):
             print("#Aegean version {0}-({1})".format(__version__, __date__), file=out)
             print("fk5", file=out)
             formatter = 'ellipse {0} {1} {2:.9f}d {3:.9f}d {4:+07.3f}d # text="{5}"'
-            #DS9 has some strange ideas about position angle
+            # DS9 has some strange ideas about position angle
             pas = [a - 90 for a in pas]
 
         for ra, dec, bmaj, bmin, pa, name in zip(ras, decs, bmajs, bmins, pas, names):
-            #comment out lines that have invalid or stupid entries
+            # comment out lines that have invalid or stupid entries
             if np.nan in [ra, dec, bmaj, bmin, pa] or bmaj >= 180:
                 print('#', end=' ', file=out)
             print(formatter.format(ra, dec, bmaj, bmin, pa, name), file=out)
@@ -502,12 +492,11 @@ def writeAnn(filename, catalog, fmt):
         if fmt == 'reg':
             new_file = re.sub('.reg$', '_isle.reg', filename)
         elif fmt == 'ann':
-            log.warn('kvis islands are currently not working')
+            log.warning('kvis islands are currently not working')
             return
         else:
-            log.warn('format {0} not supported for island annotations'.format(fmt))
+            log.warning('format {0} not supported for island annotations'.format(fmt))
             return
-        #writeIslandBoxes(new_file,islands,fmt)
         writeIslandContours(new_file, islands, fmt)
         log.info("wrote {0}".format(new_file))
 
@@ -524,6 +513,7 @@ def nulls(x):
         return None
     else:
         return x
+
 
 def writeDB(filename, catalog, meta=None):
     """
@@ -549,13 +539,13 @@ def writeDB(filename, catalog, meta=None):
             elif isinstance(val, six.string_types):
                 types.append("VARCHAR")
             else:
-                log.warn("Column {0} is of unknown type {1}".format(n, type(n)))
-                log.warn("Using VARCHAR")
+                log.warning("Column {0} is of unknown type {1}".format(n, type(n)))
+                log.warning("Using VARCHAR")
                 types.append("VARCHAR)")
         return types
 
     if os.path.exists(filename):
-        log.warn("overwriting {0}".format(filename))
+        log.warning("overwriting {0}".format(filename))
         os.remove(filename)
     conn = sqlite3.connect(filename)
     db = conn.cursor()
