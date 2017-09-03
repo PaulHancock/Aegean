@@ -26,15 +26,8 @@ from astropy.table.table import Table
 from astropy.table import Column
 from astropy.io import ascii
 from astropy.io import fits
-
-
-try:
-    from astropy.io.votable import from_table, parse_single_table
-    from astropy.io.votable import writeto as writetoVO
-
-    votables_supported = True
-except ImportError:
-    votables_supported = False
+from astropy.io.votable import from_table, parse_single_table
+from astropy.io.votable import writeto as writetoVO
 
 try:
     import h5py
@@ -102,8 +95,7 @@ def get_table_formats():
     Return a list of file extensions that are supported (mapped to an output)
     """
     fmts = ['reg', 'fits']
-    if votables_supported:
-        fmts.extend(['vo', 'vot', 'xml'])
+    fmts.extend(['vo', 'vot', 'xml'])
     else:
         log.info("VOTables are not supported from this version of Astropy ({0})".format(astropy.__version__))
     if astropy.__version__.startswith('0.2') or astropy.__version__.startswith('0.3'):
