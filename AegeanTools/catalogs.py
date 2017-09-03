@@ -96,17 +96,12 @@ def get_table_formats():
     """
     fmts = ['reg', 'fits']
     fmts.extend(['vo', 'vot', 'xml'])
-    else:
-        log.info("VOTables are not supported from this version of Astropy ({0})".format(astropy.__version__))
-    if astropy.__version__.startswith('0.2') or astropy.__version__.startswith('0.3'):
-        log.info("Ascii tables are not supported with this version of Astropy ({0})".format(astropy.__version__))
-    else:
-        fmts.extend(['csv', 'tab', 'tex', 'html'])
+    fmts.extend(['csv', 'tab', 'tex', 'html'])
     if hdf5_supported:
         fmts.append('hdf5')
     else:
         log.info("HDF5 is not supported by your environment")
-    #assume this is always possible -> though it may not be on some systems
+    # assume this is always possible -> though it may not be on some systems
     fmts.extend(['db', 'sqlite'])
     return fmts
 
