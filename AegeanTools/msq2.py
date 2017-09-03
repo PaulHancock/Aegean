@@ -26,7 +26,7 @@ class MarchingSquares():
     def __init__(self, data):
         self.prev = self.NOWHERE
         self.next = self.NOWHERE
-        self.data = np.nan_to_num(data)
+        self.data = np.nan_to_num(data)  # set all the nan values to be zero
         self.xsize, self.ysize = data.shape
         self.perimeter = self.do_march()
         return
@@ -92,8 +92,6 @@ class MarchingSquares():
             return False
         if self.data[x, y] == 0:
             return False
-        if not np.isfinite(self.data[x, y]):
-            return False
         return True
 
     def walk_perimeter(self, startx, starty):
@@ -121,11 +119,8 @@ class MarchingSquares():
                 y += 1
             elif self.next == self.RIGHT:
                 x += 1
+            # stop if we meet some kind of error
             elif self.next == self.NOWHERE:
-                break
-            else:
-                # not sure what to do here
-                logging.warning("Failed to determine next step")
                 break
             # stop when we return to the starting location
             if x == startx and y == starty:
@@ -192,24 +187,3 @@ class MarchingSquares():
         # restore the data 
         self.data = data_copy
         return perimeters
-                
-
-if __name__ == "__main__":
-    logging_level = logging.INFO
-    logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
-    test_array = np.random.randint(1, size=(9, 9))
-    test_array[0:3, 0:3] = np.ones((3, 3))
-    test_array[0, 0] = 0
-    # test_array[2:5,2:5]=np.ones((3,3))
-    test_array = np.array(test_array, dtype=np.float)
-    test_array[np.where(test_array == 0)] = np.nan
-    print(test_array)
-    msq = MarchingSquares(test_array)
-    print((msq.perimeter))
-    residual = test_array.copy()
-    for p in msq.perimeter:
-        try:
-            residual[p] = 2
-        except IndexError:
-            pass
-    print(residual)
