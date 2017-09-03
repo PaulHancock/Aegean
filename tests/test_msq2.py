@@ -20,17 +20,17 @@ def test_defaults():
 
 
 def test_multi_islands():
-    # make a C and a cap on a background of zeros
+    # make a C and a + on a background of zeros
     data = np.zeros((7, 9), dtype=np.int)
-    data[1, [1, 2, 3, 5, 6, 7]] = 1
-    data[2, [1, 3, 5, 7]] = 1
-    data[3, 1] = 1
+    data[1, [1, 2, 3]] = 1
+    data[2, [1, 3, 6]] = 1
+    data[3, [1, 5, 6, 7]] = 1
     data[4, :] = data[2, :]
     data[5, :] = data[1, :]
     ms = MarchingSquares(data)
     assert np.all(ms.data == data)
     perims = ms.do_march_all()
-    assert len(perims) == 3
+    assert len(perims) == 2
     assert np.all(ms.data == data)
 
 
