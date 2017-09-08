@@ -52,6 +52,7 @@ def test_get_pixinfo():
 def test_get_beam():
     header = fits.getheader('tests/test_files/1904-66_SIN.fits')
     beam = fi.get_beam(header)
+    print(beam)
     assert beam is not None
     assert beam.pa == header['BPA']
 
@@ -128,7 +129,6 @@ def test_pix2sky_sky2pix():
     ra, dec = im.pix2sky([0, 0])
     x, y = im.sky2pix([ra, dec])
     assert_array_almost_equal([0, 0], [x, y])
-
 
 
 if __name__ == "__main__":
