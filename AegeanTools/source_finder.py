@@ -34,7 +34,6 @@ from . import flags
 # need Region in the name space in order to be able to unpickle it
 from .regions import Region
 
-region_available = True
 try:
     import cPickle as pickle
 except ImportError:
@@ -622,9 +621,6 @@ class SourceFinder(object):
         debug = logging.getLogger('Aegean').isEnabledFor(logging.DEBUG)
 
         if mask is None:
-            self.global_data.region = None
-        elif not region_available:
-            self.log.warn("Mask supplied but functionality not available")
             self.global_data.region = None
         else:
             # allow users to supply and object instead of a filename
