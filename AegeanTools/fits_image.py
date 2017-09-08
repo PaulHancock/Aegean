@@ -33,7 +33,7 @@ def get_pixinfo(header):
                     - header["CD1_2"]*header["CD2_1"])
         pixscale = (header["CD1_1"], header["CD2_2"])
         if not (header["CD1_2"] == 0 and header["CD2_1"] == 0):
-            log.warn("Pixels don't appear to be square -> pixscale is wrong")
+            log.warning("Pixels don't appear to be square -> pixscale is wrong")
     elif all(a in header for a in ["CD1_1", "CD2_2"]):
         pixarea = abs(header["CD1_1"]*header["CD2_2"])
         pixscale = (header["CD1_1"], header["CD2_2"])
