@@ -5,7 +5,7 @@ from AegeanTools import fits_image as fi
 from astropy.io import fits
 import logging
 import numpy as np
-from numpy.testing import assert_raises
+from numpy.testing import assert_raises, assert_array_almost_equal
 
 __author__ = 'Paul Hancock'
 __date__ = ''
@@ -113,6 +113,21 @@ def test_init():
     assert_raises(Exception, fi.FitsImage, hdu)
 
 
+def test_get_background_rms():
+    filename = 'tests/test_files/1904-66_SIN.fits'
+    hdu = fits.open(filename)
+    hdu[0].data = np.empty((40, 40))
+    im = fi.FitsImage(hdu)
+    assert im.get_background_rms() > 0
+
+
+def test_pix2sky_sky2pix():
+    filename = 'tests/test_files/1904-66_SIN.fits'
+    hdu = fits.open(filename)
+    im = fi.FitsImage(hdu)
+    ra, dec = im.pix2sky([0, 0])
+    x, y = im.sky2pix([ra, dec])
+    assert_array_almost_equal([0, 0], [x, y])
 
 
 
