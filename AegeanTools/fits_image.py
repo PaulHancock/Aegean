@@ -9,7 +9,6 @@ import numpy
 import astropy.wcs as pywcs
 import scipy.stats
 import logging
-import sys
 from .fits_interp import expand
 
 # Join the Aegean logger
