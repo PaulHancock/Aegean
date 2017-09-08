@@ -4,6 +4,8 @@ from __future__ import print_function
 from AegeanTools import fits_image as fi
 from astropy.io import fits
 import logging
+import numpy as np
+from numpy.testing import assert_raises
 
 __author__ = 'Paul Hancock'
 __date__ = ''
@@ -70,6 +72,46 @@ def test_fix_aips_header():
     # test with some aips history
     header['HISTORY'] = 'AIPS   CLEAN BMAJ=  1.2500E-02 BMIN=  1.2500E-02 BPA=   0.00'
     newhead = fi.fix_aips_header(header)
+
+
+def test_init():
+    filename = 'tests/test_files/1904-66_SIN.fits'
+    # normal invocation
+    im = fi.FitsImage(filename)
+
+    # call with an already opened hdu instead of a file name
+    hdu = fits.open(filename)
+    im = fi.FitsImage(hdu)
+
+    # set bzero/bscale
+    hdu[0].header['BZERO'] = 1
+    hdu[0].header['BSCALE'] = 2
+    im = fi.FitsImage(hdu)
+    assert im.bscale == 2
+    assert im.bzero == 1
+
+    # should be able to supply a beam directly
+    beam = fi.Beam(1, 1, 0)
+    im = fi.FitsImage(hdu, beam=beam, slice=0)
+    assert im.beam is beam
+
+    # raise exception if the beam cannot be determined
+    del hdu[0].header['BMAJ']
+    assert_raises(Exception, fi.FitsImage, hdu)
+
+    # test with 3 image dimensions
+    hdu = fits.open(filename)
+    hdu[0].data = np.empty((3, 3, 3))
+    # this should fail
+    assert_raises(Exception, fi.FitsImage, hdu)
+    # this should be fine
+    im = fi.FitsImage(hdu, slice=0)
+    assert im.x == im.y == 3
+
+    # can't work with 4d data
+    hdu[0].data = np.empty((3, 3, 3, 3))
+    assert_raises(Exception, fi.FitsImage, hdu)
+
 
 
 
