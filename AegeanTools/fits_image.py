@@ -54,19 +54,19 @@ def get_beam(header):
     """
 
     if "BPA" not in header:
-        log.warn("BPA not present in fits header, using 0")
+        log.warning("BPA not present in fits header, using 0")
         bpa = 0
     else:
         bpa = header["BPA"]
 
     if "BMAJ" not in header:
-        log.warn("BMAJ not present in fits header.")
+        log.warning("BMAJ not present in fits header.")
         bmaj = None
     else:
         bmaj = header["BMAJ"]
 
     if "BMIN" not in header:
-        log.warn("BMIN not present in fits header.")
+        log.warning("BMIN not present in fits header.")
         bmin = None
     else:
         bmin = header["BMIN"]
