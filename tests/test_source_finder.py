@@ -11,12 +11,13 @@ import sys
 
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
+log.setLevel(logging.INFO)
 
 
 def test_misc():
-    a = sf.IslandFittingData()
-    b = sf.DummyLM()
-    c = sf.SourceFinder(ignored=None, log=log)
+    sf.IslandFittingData()
+    sf.DummyLM()
+    sf.SourceFinder(ignored=None, log=log)
 
 
 def test_helpers():
@@ -46,27 +47,39 @@ def test_helpers():
     aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
     assert aux_files['rms'] == 'tests/test_files/1904-66_SIN_rms.fits'
     assert aux_files['bkg'] == 'tests/test_files/1904-66_SIN_bkg.fits'
+    assert aux_files['mask'] == 'tests/test_files/1904-66_SIN.mim'
 
 
 def test_load_globals():
-    logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
     filename = 'tests/test_files/1904-66_SIN.fits'
     aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
     sfinder.load_globals(filename)
     assert sfinder.global_data.img is not None
+
+    del sfinder
+    sfinder = sf.SourceFinder(log=log)
     sfinder.load_globals(filename, bkgin=aux_files['bkg'], rms=1, mask=aux_files['mask'])
     # region isn't available due to healpy not being installed/required
-    assert sfinder.global_data.region is None
-    sfinder.load_globals(filename, rms=aux_files['rms'], mask='derp', do_curve=False)
+    assert sfinder.global_data.region is not None
+
+    del sfinder
+    sfinder = sf.SourceFinder(log=log)
+    sfinder.load_globals(filename, rmsin=aux_files['rms'], mask='derp', do_curve=False)
     assert sfinder.global_data.region is None
     img = sfinder._load_aux_image(sfinder.global_data.img, filename)
     assert img is not None
 
+    del sfinder
+    sfinder = sf.SourceFinder(log=log)
+    aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
+    from AegeanTools.regions import Region
+    sfinder.load_globals(filename, rms=1, mask=Region())
+    assert sfinder.global_data.region is not None
+
 
 def test_find_and_prior_sources():
-    logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
     filename = 'tests/test_files/small.fits'
@@ -99,28 +112,33 @@ def test_find_and_prior_sources():
 
 
 def test_find_and_prior_parallel():
-    logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
-    sfinder = sf.SourceFinder(log=log)
     cores = sf.check_cores(2)
     # don't bother re-running these tests if we have just 1 core
     if cores == 1:
         return
     filename = 'tests/test_files/1904-66_SIN.fits'
     # vanilla source finding
+    sfinder = sf.SourceFinder(log=log)
     found = sfinder.find_sources_in_image(filename, cores=cores)
     assert len(found) == 68
     # now with some options
     aux_files = sf.get_aux_files(filename)
+
+    del sfinder
+    sfinder = sf.SourceFinder(log=log)
     found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
                                            rmsin=aux_files['rms'], bkgin=aux_files['bkg'],
                                            mask=aux_files['mask'], cores=cores)
     priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=True, cores=cores, outfile=open('dlme','w'))
     os.remove('dlme')
 
+    del sfinder
+    sfinder = sf.SourceFinder(log=log)
+    sfinder.find_sources_in_image('tests/test_files/1904-66_SIN_neg.fits', doislandflux=True, nonegative=False, cores=cores)
+
 
 def test_save_files():
-    logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
     filename = 'tests/test_files/small.fits'
@@ -131,7 +149,6 @@ def test_save_files():
 
 
 def test_save_image():
-    logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
     filename = 'tests/test_files/small.fits'
@@ -140,7 +157,6 @@ def test_save_image():
     sfinder.save_image(bfile)
     assert os.path.exists(bfile)
     os.remove(bfile)
-
 
 
 if __name__ == "__main__":
