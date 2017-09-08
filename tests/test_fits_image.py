@@ -3,9 +3,14 @@ from __future__ import print_function
 
 from AegeanTools import fits_image as fi
 from astropy.io import fits
+import logging
 
 __author__ = 'Paul Hancock'
 __date__ = ''
+
+logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
+log = logging.getLogger("Aegean")
+log.setLevel(logging.INFO)
 
 
 def test_get_pixinfo():
@@ -40,6 +45,17 @@ def test_get_pixinfo():
     area, scale = fi.get_pixinfo(header)
     assert area == 0
     assert scale == (0, 0)
+
+
+def test_get_beam():
+    header = fits.getheader('tests/test_files/1904-66_SIN.fits')
+    beam = fi.get_beam(header)
+    assert beam is not None
+    assert beam.pa == header['BPA']
+
+    del header['BMAJ'], header['BMIN'], header['BPA']
+    beam = fi.get_beam(header)
+    assert beam is None
 
 
 if __name__ == "__main__":
