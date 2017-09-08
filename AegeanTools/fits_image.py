@@ -109,7 +109,8 @@ def fix_aips_header(header):
     header['HISTORY'] = 'Beam information AIPS->fits by AegeanTools'
     return header
 
-class FitsImage():
+
+class FitsImage(object):
     """
     An object that handles the loading and manipulation of a fits file,
     """
