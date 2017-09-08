@@ -58,6 +58,22 @@ def test_get_beam():
     assert beam is None
 
 
+def test_fix_aips_header():
+    header = fits.getheader('tests/test_files/1904-66_SIN.fits')
+    # test when this function is not needed
+    newhead = fi.fix_aips_header(header)
+
+    # test when beam params are not present, but there is no aips history
+    del header['BMAJ'], header['BMIN'], header['BPA']
+    newhead = fi.fix_aips_header(header)
+
+    # test with some aips history
+    header['HISTORY'] = 'AIPS   CLEAN BMAJ=  1.2500E-02 BMIN=  1.2500E-02 BPA=   0.00'
+    newhead = fi.fix_aips_header(header)
+
+
+
+
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
