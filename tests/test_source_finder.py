@@ -90,7 +90,7 @@ def test_find_and_prior_sources():
     aux_files = sf.get_aux_files(filename)
     found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
                                            rmsin=aux_files['rms'], bkgin=aux_files['bkg'],
-                                           mask=aux_files['mask'], cores=1)
+                                           mask=aux_files['mask'], cores=1, docov=False)
     assert len(found2) == 4
     isle1 = found2[1]
     assert isle1.int_flux > 0
@@ -100,10 +100,10 @@ def test_find_and_prior_sources():
     os.remove('dlme')
 
     # this should find one less source as one of the source centers is outside the image.
-    priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=False, ratio=1.2, cores=1)
+    priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=False, ratio=1.2, cores=2, docov=False)
     assert len(priorized) == 2
     # this also gives 62 sources even though we turn on regroup
-    priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=True, cores=1, outfile=open('dlme','w'))
+    priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=True, cores=1, outfile=open('dlme','w'), stage=1)
     assert len(priorized) == 2
     assert len(sfinder.priorized_fit_islands(filename, catalogue=[])) == 0
     # we should have written some output file
