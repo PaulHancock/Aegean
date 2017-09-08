@@ -153,7 +153,7 @@ class FitsImage(object):
             if self.beam is None:
                 log.critical("Beam info is not in fits header.")
                 log.critical("Beam info not supplied by user. Stopping.")
-                sys.exit(1)
+                raise Exception("Unable to determine beam.")
         else:  # use the supplied beam
             self.beam = beam
         self._rms = None
@@ -162,12 +162,12 @@ class FitsImage(object):
         if len(self._pixels.shape) == 3:
             if slice is None:
                 log.critical("Image is a cube, but no slice is given")
-                sys.exit(1)
+                raise Exception("Image is a cube, but no slice is given")
             log.info("Image is a cube, using slice {0}".format(slice))
             self._pixels = self._pixels[slice, :, :]
         elif len(self._pixels.shape) > 3:
             log.critical("Image has >3 axes.")
-            sys.exit(1)
+            raise Exception("Images with >3 axes not supported.")
         # convert +/- inf to nan
         self._pixels[numpy.where(numpy.isinf(self._pixels))] = numpy.nan
         # del self.hdu
