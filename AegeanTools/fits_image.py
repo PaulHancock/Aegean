@@ -206,7 +206,7 @@ class FitsImage(object):
         Get the sky coordinates [ra,dec] (degrees) given pixel [x,y] (float)
         """
         pixbox = numpy.array([pixel, pixel])
-        skybox = self.wcs.wcs_pix2sky(pixbox, 1)
+        skybox = self.wcs.all_pix2world(pixbox, 1)
         return [float(skybox[0][0]), float(skybox[0][1])]
 
     def get_hdu_header(self):
@@ -217,7 +217,7 @@ class FitsImage(object):
         Get the pixel coordinates [x,y] (floats) given skypos [ra,dec] (degrees)
         """
         skybox = [skypos, skypos]
-        pixbox = self.wcs.wcs_sky2pix(skybox, 1)
+        pixbox = self.wcs.all_world2pix(skybox, 1)
         return [float(pixbox[0][0]), float(pixbox[0][1])] 
 
 
