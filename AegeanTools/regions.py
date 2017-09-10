@@ -3,8 +3,8 @@ from __future__ import print_function
 
 import os
 import datetime
-import healpy as hp #dev on 1.8.1
-import numpy as np #dev on 1.8.1
+import healpy as hp
+import numpy as np
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 from astropy.io import fits
@@ -63,7 +63,7 @@ class Region(object):
         if depth is None or depth > self.maxdepth:
             depth = self.maxdepth
 
-        ras, decs = list(zip(*positions))
+        ras, decs = np.array(list(zip(*positions)))
         sky = self.radec2sky(ras, decs)
         pix = hp.query_polygon(2**depth, self.sky2vec(sky), inclusive=True, nest=True)
         self.add_pixels(pix, depth)
@@ -125,7 +125,6 @@ class Region(object):
         self.demoted = set()
         return
 
-    #@profile
     def sky_within(self, ra, dec, degin=False):
         """
         Test whether a sky position is within this region
@@ -286,12 +285,9 @@ class Region(object):
         :return: list of (ra,dec) tuples
         """
         try:
-            sky = list(zip(ra,dec))
-            #sky = np.empty((len(ra), 2), dtype=type(ra[0]))
-            #sky[:, 0] = ra
-            #sky[:, 1] = dec
+            sky = np.array(list(zip(ra, dec)))
         except TypeError:
-            sky= [(ra,dec)]
+            sky = np.array([(ra, dec)])
         return sky
 
     @staticmethod
