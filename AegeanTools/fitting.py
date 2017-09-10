@@ -493,7 +493,7 @@ def emp_hessian(pars, x, y):
     """
     eps = 1e-5
     matrix = []
-    for i in range(pars['components']):
+    for i in range(pars['components'].value):
         model = emp_jacobian(pars, x, y)
         prefix = "c{0}_".format(i)
         for p in ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']:
