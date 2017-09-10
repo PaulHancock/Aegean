@@ -3,7 +3,7 @@ dist: trusty
 cache: pip
 python:
   - "2.7"
-#  - "3.4"
+  - "3.4"
 # command to install dependencies
 install:
   - pip install -e .
