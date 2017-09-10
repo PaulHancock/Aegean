@@ -299,8 +299,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
     nx, ny = optimum_sections(cores, shape)
 
     # box widths should be multiples of the step_size, and not zero
-    width_x = max(img_x/nx/step_size[0], 1) * step_size[0]
-    width_y = max(img_y/ny/step_size[1], 1) * step_size[1]
+    width_x = int(max(img_x/nx/step_size[0], 1) * step_size[0])
+    width_y = int(max(img_y/ny/step_size[1], 1) * step_size[1])
 
     xstart = width_x
     ystart = width_y
