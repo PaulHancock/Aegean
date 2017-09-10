@@ -548,7 +548,7 @@ def writeDB(filename, catalog, meta=None):
             else:
                 log.warning("Column {0} is of unknown type {1}".format(n, type(n)))
                 log.warning("Using VARCHAR")
-                types.append("VARCHAR)")
+                types.append("VARCHAR")
         return types
 
     if os.path.exists(filename):
@@ -565,7 +565,9 @@ def writeDB(filename, catalog, meta=None):
         stmnt = ','.join(["{0} {1}".format(a, b) for a, b in zip(col_names, col_types)])
         db.execute('CREATE TABLE {0} ({1})'.format(tn, stmnt))
         stmnt = 'INSERT INTO {0} ({1}) VALUES ({2})'.format(tn, ','.join(col_names), ','.join(['?' for i in col_names]))
-        db.executemany(stmnt, [map(nulls, r.as_list()) for r in t])
+        # expend the iterators that are created by python 3+
+        data = list(map(nulls, list(r.as_list() for r in t)))
+        db.executemany(stmnt, data)
         log.info("Created table {0}".format(tn))
     # metadata add some meta data
     db.execute("CREATE TABLE meta (key VARCHAR, val VARCHAR)")
