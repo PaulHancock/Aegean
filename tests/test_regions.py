@@ -13,7 +13,7 @@ def test_radec2sky():
     """Test function: Region.radec2sky"""
     ra, dec = (15, -45)
     sky = Region.radec2sky(ra, dec)
-    assert sky == [(ra, dec)], "radec2sky broken on non-list input"
+    assert np.all(sky == [(ra, dec)]), "radec2sky broken on non-list input"
     ra = [0, 10]
     dec = [-45, 45]
     sky = Region.radec2sky(ra, dec)
