@@ -628,7 +628,7 @@ class SourceFinder(object):
                 self.global_data.region = mask
             elif os.path.exists(mask):
                 self.log.info("Loading mask from {0}".format(mask))
-                self.global_data.region = pickle.load(open(mask))
+                self.global_data.region = pickle.load(open(mask, 'rb'))
             else:
                 self.log.error("File {0} not found for loading".format(mask))
                 self.global_data.region = None
