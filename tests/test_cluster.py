@@ -10,6 +10,11 @@ from copy import deepcopy, copy
 import math
 import numpy as np
 
+import logging
+logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
+log = logging.getLogger("Aegean")
+log.setLevel(logging.INFO)
+
 
 def test_norm_dist():
     src1 = SimpleSource()
