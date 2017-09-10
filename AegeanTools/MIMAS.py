@@ -23,8 +23,8 @@ from astropy.wcs import wcs as pywcs
 from .regions import Region
 from .catalogs import load_table, write_table
 
-__version__ = 'v1.2.5'
-__date__ = '2016-10-14'
+__version__ = 'v1.3.0'
+__date__ = '2017-09-10'
 
 # seems like this fails sometimes
 try:
@@ -262,16 +262,16 @@ def reg2mim(regfile, mimfile, maxdepth):
         elif line.startswith('circle'):
             circles.append(circle2circle(line))
         elif line.startswith('polygon'):
-            logging.warn("Polygons break a lot, but I'll try this one anyway.")
+            logging.warning("Polygons break a lot, but I'll try this one anyway.")
             poly.append(poly2poly(line))
         else:
-            logging.warn("Not sure what to do with {0}".format(line[:-1]))
+            logging.warning("Not sure what to do with {0}".format(line[:-1]))
     container = Dummy(maxdepth=maxdepth)
     container.include_circles = circles
     container.include_polygons = poly
 
     region = combine_regions(container)
-    save_region(region,mimfile)
+    save_region(region, mimfile)
     return
 
 
@@ -303,10 +303,10 @@ def combine_regions(container):
         for c in container.include_circles:
             circles = np.radians(np.array(c))
             if container.galactic:
-                l, b, radii = circles.reshape(3,circles.shape[0]/3)
-                ras, decs = galactic2fk5(l,b)
+                l, b, radii = circles.reshape(3, circles.shape[0]//3)
+                ras, decs = galactic2fk5(l, b)
             else:
-                ras, decs, radii = circles.reshape(3, circles.shape[0]/3)
+                ras, decs, radii = circles.reshape(3, circles.shape[0]//3)
             region.add_circles(ras, decs, radii)
 
     # remove circles
@@ -315,10 +315,10 @@ def combine_regions(container):
             r2 = Region(container.maxdepth)
             circles = np.radians(np.array(c))
             if container.galactic:
-                l, b, radii = circles.reshape(3,circles.shape[0]/3)
-                ras, decs = galactic2fk5(l,b)
+                l, b, radii = circles.reshape(3, circles.shape[0]//3)
+                ras, decs = galactic2fk5(l, b)
             else:
-                ras, decs, radii = circles.reshape(3, circles.shape[0]/3)
+                ras, decs, radii = circles.reshape(3, circles.shape[0]//3)
             r2.add_circles(ras, decs, radii)
             region.without(r2)
 
@@ -326,7 +326,7 @@ def combine_regions(container):
     if len(container.include_polygons) > 0:
         for p in container.include_polygons:
             poly = np.radians(np.array(p))
-            poly = poly.reshape((poly.shape[0]/2, 2))
+            poly = poly.reshape((poly.shape[0]//2, 2))
             region.add_poly(poly)
 
     # remove polygons
