@@ -42,6 +42,8 @@ class Region(object):
         except TypeError:
             sky = [[ra_cen, dec_cen]]
             rad = [radius]
+        sky = np.array(sky)
+        rad = np.array(rad)
         vectors = self.sky2vec(sky)
         for vec, r in zip(vectors, rad):
             pix = hp.query_disc(2**depth, vec, r, inclusive=True, nest=True)
