@@ -84,18 +84,16 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     # TODO: fix the code below so that the above comment can be removed
 
     ymin, ymax, xmin, xmax = region
-
     logging.debug('{0}x{1},{2}x{3} starting at {4}'.format(xmin, xmax, ymin, ymax,
                                                            strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
-    cmin = max(0, ymin - box_size[1]/2)
-    cmax = min(shape[1], ymax + box_size[1]/2)
-    rmin = max(0, xmin - box_size[0]/2)
-    rmax = min(shape[0], xmax + box_size[0]/2)
+    cmin = max(0, ymin - box_size[1]//2)
+    cmax = min(shape[1], ymax + box_size[1]//2)
+    rmin = max(0, xmin - box_size[0]//2)
+    rmax = min(shape[0], xmax + box_size[0]//2)
 
     # Figure out how many axes are in the datafile
     NAXIS = fits.getheader(filename)["NAXIS"]
-
     # It seems that I cannot memmap the same file multiple times without errors
     with fits.open(filename, memmap=False) as a:
         if NAXIS == 2:
