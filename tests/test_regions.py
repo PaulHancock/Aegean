@@ -129,8 +129,8 @@ def test_pickle():
         import cPickle as pickle
     except:
         import pickle
-    pickle.dump(region, open('out_temp.mim', 'w'))
-    region2 = pickle.load(open('out_temp.mim'))
+    pickle.dump(region, open('out_temp.mim', 'wb'))
+    region2 = pickle.load(open('out_temp.mim','rb'))
     assert region.pixeldict == region2.pixeldict, 'pickle/unpickle does not give same region'
     os.remove('out_temp.mim')
 
