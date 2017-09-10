@@ -16,6 +16,7 @@ logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
 log.setLevel(logging.INFO)
 
+
 def test_check_table_formats():
     files = ','.join(['a.csv', 'a.fits', 'a.vot', 'a.hdf5',  'a.ann', 'a.docx', 'a'])
     assert not cat.check_table_formats(files)
