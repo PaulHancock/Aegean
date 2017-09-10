@@ -106,7 +106,7 @@ def mask_file(regionfile, infile, outfile, negate=False):
     assert os.path.exists(infile), "Cannot locate fits file {0}".format(infile)
     im = pyfits.open(infile)
     assert os.path.exists(regionfile), "Cannot locate region file {0}".format(regionfile)
-    region = pickle.load(open(regionfile))
+    region = pickle.load(open(regionfile, 'rb'))
     try:
         wcs = pywcs.WCS(im[0].header, naxis=2)
     except:
@@ -161,7 +161,7 @@ def mask_catalog(regionfile, infile, outfile, negate=False, racol='ra', deccol='
     :return:
     """
     logging.info("Loading region from {0}".format(regionfile))
-    region = pickle.load(open(regionfile, 'r'))
+    region = pickle.load(open(regionfile, 'rb'))
     logging.info("Loading catalog from {0}".format(infile))
     table = load_table(infile)
     masked_table = mask_table(region, table, negate=negate, racol=racol, deccol=deccol)
@@ -170,14 +170,14 @@ def mask_catalog(regionfile, infile, outfile, negate=False, racol='ra', deccol='
 
 
 def mim2reg(mimfile, regfile):
-    region = pickle.load(open(mimfile, 'r'))
+    region = pickle.load(open(mimfile, 'rb'))
     region.write_reg(regfile)
     logging.info("Converted {0} -> {1}".format(mimfile, regfile))
     return
 
 
 def mim2fits(mimfile, fitsfile):
-    region = pickle.load(open(mimfile, 'r'))
+    region = pickle.load(open(mimfile, 'rb'))
     region.write_fits(fitsfile, moctool='MIMAS {0}-{1}'.format(__version__, __date__))
     logging.info("Converted {0} -> {1}".format(mimfile, fitsfile))
     return
@@ -289,12 +289,12 @@ def combine_regions(container):
     # add/rem all the regions from files
     for r in container.add_region:
         logging.info("adding region from {0}".format(r))
-        r2 = pickle.load(open(r[0], 'r'))
+        r2 = pickle.load(open(r[0], 'rb'))
         region.union(r2)
 
     for r in container.rem_region:
         logging.info("removing region from {0}".format(r))
-        r2 = pickle.load(open(r[0], 'r'))
+        r2 = pickle.load(open(r[0], 'rb'))
         region.without(r2)
 
 
@@ -348,8 +348,8 @@ def intersect_regions(flist):
     """
     if len(flist) < 2:
         raise Exception("Require at least two regions to perform intersection")
-    a = pickle.load(open(flist[0]))
-    for b in [pickle.load(open(f)) for f in flist[1:]]:
+    a = pickle.load(open(flist[0], 'rb'))
+    for b in [pickle.load(open(f, 'rb')) for f in flist[1:]]:
         a.intersect(b)
     return a
 
@@ -363,7 +363,7 @@ def save_region(region, filename):
     :param filename: A Filename
     :return: None
     """
-    pickle.dump(region, open(filename, 'w'), protocol=-1)
+    pickle.dump(region, open(filename, 'wb'), protocol=2)
     logging.info("Wrote {0}".format(filename))
     return
 
