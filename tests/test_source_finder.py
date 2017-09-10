@@ -7,7 +7,7 @@ from copy import deepcopy
 import numpy as np
 import logging
 import os
-import sys
+import six
 
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
@@ -99,8 +99,13 @@ def test_find_and_prior_sources():
     assert os.path.exists('dlme')
     os.remove('dlme')
 
+    # pprocess is broken in python3 at the moment so just use 1 core.
+    if six.PY3:
+        cores = 1
+    else:
+        cores = 2
     # this should find one less source as one of the source centers is outside the image.
-    priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=False, ratio=1.2, cores=2, docov=False)
+    priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=False, ratio=1.2, cores=cores, docov=False)
     assert len(priorized) == 2
     # this also gives 62 sources even though we turn on regroup
     priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=True, cores=1, outfile=open('dlme','w'), stage=1)
