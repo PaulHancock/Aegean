@@ -149,7 +149,8 @@ if __name__ == "__main__":
     usage = "usage: %prog -c input.vot -f image.fits -r residual.fits [-m model.fits]"
     parser = OptionParser(usage=usage)
     parser.add_option("-c", "--catalog", dest='catalog', default=None,
-                      help="Catalog in a format that Aegean understands.")
+                      help="Catalog in a format that Aegean understands."+
+                      "\nRA/DEC should be in degrees, a/b/pa should be in arcsec/arcsec/degrees.")
     parser.add_option("-f", "--fitsimage", dest='fitsfile', default=None,
                       help="Input fits file.")
     parser.add_option("-r", "--residual", dest='rfile', default=None,
