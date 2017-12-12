@@ -10,7 +10,7 @@ install:
   - gunzip pprocess-0.5.3.tar.gz
   - tar -xvf pprocess-0.5.3.tar
   - cd pprocess-0.5.3
-  - 2to3 -w .
+  - if [[ ${TRAVIS_PYTHON_VERSION} == 3.6 ]]; then 2to3 -w .; fi
   - pip install -e .
   - cd ..
   - pip install -e .
