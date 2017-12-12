@@ -6,6 +6,13 @@ python:
   - "3.6"
 # command to install dependencies
 install:
+  - wget http://www.boddie.org.uk/python/downloads/pprocess-0.5.3.tar.gz
+  - gunzip pprocess-0.5.3.tar.gz
+  - tar -xvf pprocess-0.5.3.tar
+  - cd pprocess-0.5.3
+  - 2to3 -w .
+  - pip install -e .
+  - cd ..
   - pip install -e .
   - pip install coveralls
 # command to run tests
