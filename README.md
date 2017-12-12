@@ -6,18 +6,19 @@ Programs included:
 * BANE - The Background and Noise Estimation tool. For providing high quality background and noise images for use with Aegean, at a small fraction of the cost of a full box-car smooth.
 * MIMAS - The Multi-resolution Image Masking tool for Aegean Software. For creating image regions which can be used to restrict the source finding of Aegean, to mask fits files, and to create ds9 region files.
 * SR6 - A tool for shrinking and growing fits files, such as those created with BANE.py --compress. Shrinking is done by decimation, growing is done by linear interpolation.
+* AeRes - A tool for adding or subtracting sources from an image - "Aegean Residual". Catalogues must be in Aegean readable format (eg, written by Aegean, modified by user). This can be used to look for missed sources, mis-characterised sources, or for simulating new images.
 
 ^ - by "your" I mean "my"
 
 Installing
 =====
-AegeanTools is guaranteed to work on python 2.7. Earlier versions will often work, but 3.0 is not (yet) supported.
+AegeanTools is built and tested on python 2.7, and 3.6.
 
 You can install via pip using 
 `pip install git+https://github.com/PaulHancock/Aegean.git` (latest)
 `pip install AegeanTools` (stable)
 
-Or you can clone or download the repository and then use `python setup.py install`
+Or you can clone or download the repository and then use `python setup.py install` or `pip install .`
 
 Help
 =====
@@ -25,7 +26,7 @@ Please see the [wiki pages](https://github.com/PaulHancock/Aegean/wiki) for some
 
 Credit
 =====
-If you use Aegean or any of the AegeanTools for your research please credit me by citing [Hancock et al 2012, MNRAS, 422, 1812](http://adsabs.harvard.edu/abs/2012MNRAS.422.1812H), Hancock et al 2017 (submitted).
+If you use Aegean or any of the AegeanTools for your research please credit me by citing [Hancock et al 2012, MNRAS, 422, 1812](http://adsabs.harvard.edu/abs/2012MNRAS.422.1812H), Hancock et al 2018 (PASA, submitted).
 
 Until there is a more appropriate method for crediting software development and maintainance, please also consider including me as a co-author on publications which rely on Aegean or AegeanTools.
 
