@@ -2,7 +2,7 @@ language: python
 dist: trusty
 cache: pip
 python:
-  - "2.7"
+  - "2.7.6"
   - "3.6"
 # command to install dependencies
 install:
