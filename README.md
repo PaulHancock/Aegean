@@ -20,6 +20,18 @@ You can install via pip using
 
 Or you can clone or download the repository and then use `python setup.py install` or `pip install .`
 
+**Notes for installing on python 3**:
+pprocess has not (yet) been updated for python 3. The 2to3 conversion tool does what you need:
+```
+wget http://www.boddie.org.uk/python/downloads/pprocess-0.5.3.tar.gz
+gunzip pprocess-0.5.3.tar.gz
+tar -xvf pprocess-0.5.3.tar
+cd pprocess-0.5.3
+2to3 -w .
+pip install .
+```
+
+
 Help
 =====
 Please see the [wiki pages](https://github.com/PaulHancock/Aegean/wiki) for some help and examples. If you have questions that are not answerd in the wiki please feel free to email me. If you have found a bug or some inconsistency in the code please [submit a ticket](https://github.com/PaulHancock/Aegean/issues) (which will trigger an email to me) and I'll get right on it. 
