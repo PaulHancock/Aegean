@@ -351,6 +351,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
 def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False):
     """
     Create a background and noise image from an input image.
+    Resulting images are written to `outbase_bkg.fits` and `outbase_rms.fits`
 
     Parameters
     ----------
