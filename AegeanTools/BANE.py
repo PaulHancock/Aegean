@@ -350,17 +350,35 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
 
 def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False):
     """
+    Create a background and noise image from an input image.
 
-    :param im_name:
-    :param out_base:
-    :param step_size:
-    :param box_size:
-    :param twopass:
-    :param cores:
-    :param mask:
-    :param compressed:
-    :param running: use the running percentiles filter.
-    :return:
+    Parameters
+    ----------
+    im_name : str or HDUList
+        Image to filter. Either a string filename or an astropy.io.fits.HDUList.
+    out_base : str
+        The output filename base. Will be modified to make _bkg and _rms files.
+    step_size : (int,int)
+        Tuple of the x,y step size in pixels
+    box_size : (int,int)
+        The size of the box in piexls
+    twopass : bool
+        Perform a second pass calculation to ensure that the noise is not contaminated by the background.
+        Default = False
+    cores : int
+        Number of CPU corse to use.
+        Default = all available
+    mask : bool
+        Mask the output array to contain np.nna wherever the input array is nan or not finite.
+        Default = true
+    compressed : bool
+        Return a compressed version of the background/noise images.
+        Default = False
+
+    Returns
+    -------
+    None
+
     """
 
     header = fits.getheader(im_name)
