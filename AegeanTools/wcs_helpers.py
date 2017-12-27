@@ -35,7 +35,6 @@ class WCSHelper(object):
     - the ability to change the beam according to dec-lat
     """
 
-
     def __init__(self, wcs, beam, pixscale, refpix, lat=None):
         """
         Parameters
@@ -61,7 +60,6 @@ class WCSHelper(object):
         self.refpix = refpix
         self.lat = lat
 
-        
     @classmethod
     def from_header(cls, header, beam=None, lat=None):
         """
@@ -121,11 +119,20 @@ class WCSHelper(object):
         header = fits.getheader(filename)
         return cls.from_header(header, beam)
 
-
     def pix2sky(self, pixel):
         """
-        Take pixel=(x,y) coords
-        convert to pos=(ra,dec) coords
+        Convert pixel coordinates into sky coordinates.
+
+        Parameters
+        ----------
+        pixel : (float, float)
+            The (x,y) pixel coordinates
+
+        Returns
+        -------
+        sky : (float, float)
+            The (ra,dec) sky coordinates in degrees
+
         """
         x, y = pixel
         # wcs and pyfits have oposite ideas of x/y
@@ -133,25 +140,46 @@ class WCSHelper(object):
 
     def sky2pix(self, pos):
         """
-        Take pos = (ra,dec) coords
-        convert to pixel = (x,y) coords
+        Convert sky coordinates into pixel coordinates.
+
+        Parameters
+        ----------
+        pos : (float, float)
+            The (ra, dec) sky coordinates (degrees)
+
+        Returns
+        -------
+        pixel : (float, float)
+            The (x,y) pixel coordinates
+
         """
         pixel = self.wcs.wcs_world2pix([pos], 1)
         # wcs and pyfits have oposite ideas of x/y
         return [pixel[0][1], pixel[0][0]]
 
     def sky2pix_vec(self, pos, r, pa):
-        """Convert a vector from sky to pixel corrds
-        vector is calculated at an origin pos=(ra,dec)
-        and has a magnitude (r) [in degrees]
-        and an angle (pa) [in degrees]
-        input:
-            pos - (ra,dec) of vector origin
-            r - magnitude in degrees
-            pa - angle in degrees
-        return:
-        x,y - corresponding to position ra,dec
-        r,theta - magnitude (pixels) and angle (degrees) of the original vector
+        """
+        Convert a vector from sky to pixel coords.
+        The vector has a magnitude, angle, and an origin on the sky.
+
+        Parameters
+        ----------
+        pos : (float, float)
+            The (ra, dec) of the origin of the vector (degrees).
+
+        r : float
+            The magnitude or length of the vector (degrees).
+
+        pa : float
+            The position angle of the vector (degrees).
+
+        Returns
+        -------
+        x, y : float
+            The pixel coordinates of the origin.
+        r, theta : float
+            The magnitude (pixels) and angle (degrees) of the vector.
+
         """
         ra, dec = pos
         x, y = self.sky2pix(pos)
@@ -178,14 +206,10 @@ class WCSHelper(object):
 
         Returns
         -------
-        ra : float
-            ra of the origin point (degrees)
-        dec : float
-            dec of the origin point (degrees)
-        r : float
-            magnitude of the vector (degrees)
-        pa : float
-            position angle of the vector (degrees)
+        ra, dec : float
+            The (ra, dec) of the origin point (degrees).
+        r, pa : float
+            The magnitude and position angle of the vector (degrees).
         """
         ra1, dec1 = self.pix2sky(pixel)
         x, y = pixel
@@ -199,19 +223,25 @@ class WCSHelper(object):
 
     def sky2pix_ellipse(self, pos, a, b, pa):
         """
-        Convert an ellipse from sky to pixel corrds
-        a/b vectors are calculated at an origin pos=(ra,dec)
-        All input parameters are in degrees
-        Output parameters are:
-        x,y - the x,y pixels corresponding to the ra/dec position
-        sx, sy - the major minor axes (FWHM) in pixels
-        theta - the position angle in degrees
+        Convert an ellipse from sky to pixel coordinates.
 
-        :param pos: [ra,dec] of the ellipse center
-        :param a: major axis
-        :param b: minor axis
-        :param pa: position angle
-        :return: x, y, sx, sy, theta
+        Parameters
+        ----------
+        pos : (float, float)
+            The (ra, dec) of the ellipse center (degrees).
+        a, b, pa: float
+            The semi-major axis, semi-minor axis and position angle of the ellipse (degrees).
+
+        Returns
+        -------
+        x,y : float
+            The (x, y) pixel coordinates of the ellipse center.
+        sx, sy : float
+            The major and minor axes (FWHM) in pixels.
+        theta : float
+            The rotation angle of the ellipse (degrees).
+            theta = 0 corresponds to the ellipse being aligned with the x-axis.
+
         """
         ra, dec = pos
         x, y = self.sky2pix(pos)
@@ -234,19 +264,28 @@ class WCSHelper(object):
 
     def pix2sky_ellipse(self, pixel, sx, sy, theta):
         """
-        Convert an ellipse from pixel to sky coords
-        sx/sy vectors are calculated at an origin pos=(x,y)
-        Input parameters are:
-        x,y - the x,y pixels corresponding to the ra/dec position
-        sx, sy - the major minor axes (FWHM) in pixels
-        theta - the position angle in degrees
-        Output params are all in degrees
+        Convert an ellipse from pixel to sky coordinates.
 
-        :param pixel: [x,y] of the ellipse center
-        :param sx: major axis
-        :param sy: minor axis
-        :param theta: position angle
-        :return: ra, dec, a, b, pa
+        Parameters
+        ----------
+        pixel : (float, float)
+            The (x, y) coordinates of the center of the ellipse.
+        sx, sy : float
+            The major and minor axes (FHWM) of the ellipse, in pixels.
+        theta : float
+            The rotation angle of the ellipse (degrees).
+            theta = 0 corresponds to the ellipse being aligned with the x-axis.
+
+        Returns
+        -------
+        ra, dec : float
+            The (ra, dec) coordinates of the center of the ellipse (degrees).
+
+        a, b : float
+            The semi-major and semi-minor axis of the ellipse (degrees).
+
+        pa : float
+            The position angle of the ellipse (degrees).
         """
         ra, dec = self.pix2sky(pixel)
         x, y = pixel
@@ -271,21 +310,34 @@ class WCSHelper(object):
 
     def get_pixbeam_pixel(self, x, y):
         """
-        A wrapper around get_pixbeam for when you only know the pixel coords
-        :param x:
-        :param y:
-        :return:
+        Determine the beam in pixels at the given location in pixel coordinates.
+
+        Parameters
+        ----------
+        x , y : float
+            The pixel coordinates at which the beam is determined.
+
+        Returns
+        -------
+        beam : :class:`AegeanTools.fits_image.Beam`
+            A beam object, with a/b/pa in pixel coordinates.
         """
-        ra, dec = self.pix2sky([x, y])
+        ra, dec = self.pix2sky((x, y))
         return self.get_pixbeam(ra, dec)
 
     def get_beam(self, ra, dec):
         """
-        Determine the beam at the given location
-        The major axis of the beam is scaled by latitude if the lat is known.
-        :param ra: Sky coord
-        :param dec: Sky coord
-        :return: Beam(a,b,pa)
+        Determine the beam at the given sky location.
+
+        Parameters
+        ----------
+        ra, dec : float
+            The sky coordinates at which the beam is determined.
+
+        Returns
+        -------
+        beam : :class:`AegeanTools.fits_image.Beam`
+            A beam object, with a/b/pa in sky coordinates
         """
         # check to see if we need to scale the major axis based on the declination
         if self.lat is None:
@@ -297,9 +349,17 @@ class WCSHelper(object):
 
     def get_pixbeam(self, ra, dec):
         """
-        Use global_data to get beam (sky scale), and img.pixscale.
-        Calculate a beam in pixel scale
-        :return: A beam in pixel scale
+        Determine the beam in pixels at the given location in sky coordinates.
+
+        Parameters
+        ----------
+        ra , dec : float
+            The sly coordinates at which the beam is determined.
+
+        Returns
+        -------
+        beam : :class:`AegeanTools.fits_image.Beam`
+            A beam object, with a/b/pa in pixel coordinates.
         """
 
         if ra is None:
@@ -324,10 +384,17 @@ class WCSHelper(object):
 
     def get_beamarea_deg2(self, ra, dec):
         """
+        Calculate the area of the synthesized beam in square degrees.
 
-        :param ra:
-        :param dec:
-        :return:
+        Parameters
+        ----------
+        ra, dec : float
+            The sky coordinates at which the calculation is made.
+
+        Returns
+        -------
+        area : float
+            The beam area in square degrees.
         """
         barea = abs(self.beam.a * self.beam.b * np.pi)  # in deg**2 at reference coords
         if self.lat is not None:
@@ -336,11 +403,18 @@ class WCSHelper(object):
 
     def get_beamarea_pix(self, ra, dec):
         """
-        Calculate the area of the beam at a given location
-        scale area based on elevation if the telescope latitude is known.
-        :param ra:
-        :param dec:
-        :return:
+        Calculate the beam area in square pixels.
+
+        Parameters
+        ----------
+        ra, dec : float
+            The sky coordinates at which the calculation is made
+        dec
+
+        Returns
+        -------
+        area : float
+            The beam area in square pixels.
         """
         parea = abs(self.pixscale[0] * self.pixscale[1])  # in deg**2 at reference coords
         barea = self.get_beamarea_deg2(ra, dec)
@@ -348,7 +422,19 @@ class WCSHelper(object):
 
     def sky_sep(self, pix1, pix2):
         """
-        calculate the sky separation between two pixels
+        calculate the GCD sky separation (degrees) between two pixels.
+
+        Parameters
+        ----------
+        pix1, pix2 : (float, float)
+            The (x,y) pixel coordinates for the two positions.
+
+        Returns
+        -------
+        dist : float
+            The distance between the two points (degrees).
+        """
+        """
         Input:
             pix1 = [x1,y1]
             pix2 = [x2,y2]
