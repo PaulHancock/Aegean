@@ -26,21 +26,62 @@ log = logging.getLogger('Aegean')
 
 class WCSHelper(object):
     """
-    A wrapper around astropy.wcs that provides extra functionality.
-    Functionality hides the c/fortran indexing troubles, as well as providing:
+    A wrapper around astropy.wcs that provides extra functionality, and hides the c/fortran indexing troubles.
+
+    Useful functions not provided by astropy.wcs
+
     - sky2pix/pix2sky functions for vectors and ellipses.
     - functions for calculating the beam in sky/pixel coords
     - the ability to change the beam according to dec-lat
     """
 
+
+    def __init__(self, wcs, beam, pixscale, refpix, lat=None):
+        """
+        Parameters
+        ----------
+        wcs : astropy.wcs
+            WCS object
+
+        beam : :class:`AegeanTools.fits_image.Beam`
+            The synthesized beam.
+
+        pixscale : (float, float)
+            The pixel scale at the reference location (degrees)
+
+        refpix : (float, float)
+            The reference location in pixel coordinates
+
+        lat : float
+            The latitude of the telescope
+        """
+        self.wcs = wcs
+        self.beam = beam
+        self.pixscale = pixscale
+        self.refpix = refpix
+        self.lat = lat
+
+        
     @classmethod
     def from_header(cls, header, beam=None, lat=None):
         """
-        Create a new WCSHelper class from the given header
-        This will not set the latitude of the telesocpe so this needs to be set by the user
-        if it is needed
-        :param header: HDUHeader
-        :return: a WCSHelper object
+        Create a new WCSHelper class from the given header.
+
+        Parameters
+        ----------
+        header : `astropy.fits.HDUHeader` or string
+            The header to be used to create the WCS helper
+
+        beam : :class:`AegeanTools.fits_image.Beam` or None
+            The synthesized beam. If the supplied beam is None then one is constructed form the header.
+
+        lat : float
+            The latitude of the telescope.
+
+        Returns
+        -------
+        obj : :class:`AegeanTools.wcs_helpers.WCSHelper`
+            A helper object.
         """
         try:
             wcs = pywcs.WCS(header, naxis=2)
@@ -62,20 +103,24 @@ class WCSHelper(object):
     @classmethod
     def from_file(cls, filename, beam=None):
         """
-        Create a new WCSHelper class from a given fits file
-        :param filename:
-        :param beam:
-        :return:
+        Create a new WCSHelper class from a given fits file.
+
+        Parameters
+        ----------
+        filename : string
+            The file to be read
+
+        beam : :class:`AegeanTools.fits_image.Beam` or None
+            The synthesized beam. If the supplied beam is None then one is constructed form the header.
+
+        Returns
+        -------
+        obj : :class:`AegeanTools.wcs_helpers.WCSHelper`
+            A helper object
         """
         header = fits.getheader(filename)
         return cls.from_header(header, beam)
 
-    def __init__(self, wcs, beam, pixscale, refpix, lat=None):
-        self.wcs = wcs
-        self.beam = beam
-        self.pixscale = pixscale
-        self.refpix = refpix
-        self.lat = lat
 
     def pix2sky(self, pixel):
         """
