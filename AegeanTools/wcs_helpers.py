@@ -119,17 +119,28 @@ class WCSHelper(object):
 
     def pix2sky_vec(self, pixel, r, theta):
         """
-        Convert a vector from pixel to sky coords
-        vector is calculated at an origin pixel=(x,y)
-        and has a magnitude (r) [in pixels]
-        and an angle (theta) [in degrees]
-        input:
-            pixel - (x,y) of origin
-            r - magnitude in pixels
-            theta - in degrees
-        return:
-        ra,dec - corresponding to pixels x,y
-        r,pa - magnitude and angle (degrees) of the original vector, as measured on the sky
+        Given and input position and vector in pixel coordinates, calculate
+        the equivalent position and vector in sky coordinates.
+
+        Parameters
+        ----------
+        pixel : (int,int)
+            origin of vector in pixel coordinates
+        r : float
+            magnitude of vector in pixels
+        theta : float
+            angle of vector in degrees
+
+        Returns
+        -------
+        ra : float
+            ra of the origin point (degrees)
+        dec : float
+            dec of the origin point (degrees)
+        r : float
+            magnitude of the vector (degrees)
+        pa : float
+            position angle of the vector (degrees)
         """
         ra1, dec1 = self.pix2sky(pixel)
         x, y = pixel
