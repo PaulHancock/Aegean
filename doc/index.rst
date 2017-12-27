@@ -10,12 +10,6 @@ Welcome to the AegeanTools documentation!
    :maxdepth: 2
    :caption: Contents:
 
-
-
-Indices and tables
-==================
-
-* :ref:`api`
-* :ref:`modules`
-* :ref:`classes`
-* :ref:`search`
+   api
+   modules
+   classes

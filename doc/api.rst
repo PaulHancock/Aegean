@@ -16,8 +16,3 @@ Basic methods
 Full documentation
 ------------------
 
-.. autoclass:: AegeanTools.source_finder.SourceFinder
-    :members:
-
-.. autoclass:: AegeanTools.source_finder.IslandFittingData
-    :members:

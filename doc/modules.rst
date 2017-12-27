@@ -1,6 +1,8 @@
 .. _modules:
 
-====================================
-Modules available within AegeanTools
-====================================
+===================
+AegeanTools modules
+===================
 
+.. automodule:: AegeanTools.angle_tools
+    :members:
