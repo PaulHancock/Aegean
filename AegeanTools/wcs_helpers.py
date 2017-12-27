@@ -449,9 +449,12 @@ class WCSHelper(object):
 
 class PSFHelper(WCSHelper):
     """
-    A class that will store information about the PSF, which is assumed to be direction dependent.
-    PSFHelper contains a WCSHelper within, providing an extra layer of functionality including:
-    - the ability to load psf/beam information from a fits file
+    An extension of the :ref:`AegeanTools.wcs_helpers.WCSHelper` class that also includes information about the
+    point spread function over the sky.
+
+    This allows for the distinction between the point spread function (what a point source looks like) and
+    the synthesized beam in an image. These two can differ at low radio frequencies when the ionosphere is
+    not playing nice.
     """
 
     # This __init__ overwrites that of the parent class without calling 'super'.
