@@ -1,14 +1,13 @@
 #! /usr/bin/env python
 
 """
-tools for manipulating angles on the surface of a sphere
+Tools for manipulating angles on the surface of a sphere
 - distance
 - bearing between two points
 - translation along a path
 - paths are either great circles or rhumb lines
 
 also angle <-> string conversion tools for Aegean
-Will eventually be replaced with those from Astropy
 """
 
 __author__ = "Paul Hancock"
@@ -19,16 +18,38 @@ import numpy as np
 
 def ra2dec(ra):
     """
-    Accepts a string right ascension and converts it to decimal degrees
-    requires hh:mm[:ss.s]
+    Convert sexegessimal RA string into a float in degrees.
+
+    Parameters
+    ----------
+    ra : string
+        A string separated representing the RA.
+        Expected format is `hh:mm[:ss.s]`
+        Colons can be replaced with any whit space character.
+
+    Returns
+    -------
+    ra : float
+        The RA in degrees.
     """
     return dec2dec(ra)*15
 
 
 def dec2dec(dec):
     """
-    Accepts a string declination and converts it to decimal degrees
-    requires +/-dd:mm[:ss.s]
+    Convert sexegessimal RA string into a float in degrees.
+
+    Parameters
+    ----------
+    dec : string
+        A string separated representing the Dec.
+        Expected format is `[+- ]hh:mm[:ss.s]`
+        Colons can be replaced with any whit space character.
+
+    Returns
+    -------
+    dec : float
+        The Dec in degrees.
     """
     d = dec.replace(':', ' ').split()
     if len(d) == 2:
@@ -40,9 +61,18 @@ def dec2dec(dec):
 
 def dec2dms(x):
     """
-    Convert decimal degrees into a sexagessimal DD:MM:SS.SS string
-    :param x:
-    :return:
+    Convert decimal degrees into a sexagessimal string in degrees.
+
+    Parameters
+    ----------
+    x : float
+        Angle in degrees
+
+    Returns
+    -------
+    dms : string
+        String of format [+-]DD:MM:SS.SS
+        or XX:XX:XX.XX if x is not finite.
     """
     if not np.isfinite(x):
         return 'XX:XX:XX.XX'
@@ -59,9 +89,18 @@ def dec2dms(x):
 
 def dec2hms(x):
     """
-    Convert decimal degrees into a sexagessimal HH:MM:SS.SS string
-    :param x:
-    :return:
+    Convert decimal degrees into a sexagessimal string in hours.
+
+    Parameters
+    ----------
+    x : float
+        Angle in degrees
+
+    Returns
+    -------
+    dms : string
+        String of format HH:MM:SS.SS
+        or XX:XX:XX.XX if x is not finite.
     """
     if not np.isfinite(x):
         return 'XX:XX:XX.XX'
@@ -81,10 +120,25 @@ def dec2hms(x):
 # lambda ~ lon ~ RA
 def gcd(ra1, dec1, ra2, dec2):
     """
-    Great circle distance as calculated by the haversine formula
-    ra/dec in degrees
-    returns:
-    sep in degrees
+    Calculate the great circle distance between to points using the haversine formula [1]_.
+
+
+    Parameters
+    ----------
+    ra1, dec1, ra2, dec2 : float
+        The coordinates of the two points of interest.
+        Units are in degrees.
+
+    Returns
+    -------
+    dist : float
+        The distance between the two points in degrees.
+
+    Notes
+    -----
+    This duplicates the functionality of astropy but is faster as there is no creation of SkyCoords objects.
+
+    .. [1] `Haversine formula <https://en.wikipedia.org/wiki/Haversine_formula>`_
     """
     # TODO:  Vincenty formula see - https://en.wikipedia.org/wiki/Great-circle_distance
     dlon = ra2 - ra1
@@ -97,11 +151,19 @@ def gcd(ra1, dec1, ra2, dec2):
 
 def bear(ra1, dec1, ra2, dec2):
     """
-    Calculate the bearing of point b from point a.
-    bearing is East of North [0,360)
-    position angle is East of North (-180,180]
+    Calculate the bearing of point 2 from point 1 along a great circle.
+    The bearing is East of North and is in [0, 360), whereas position angle is also East of North but (-180,180]
+
+    Parameters
+    ----------
+    ra1, dec1, ra2, dec2 : float
+        The sky coordinates (degrees) of the two points.
+
+    Returns
+    -------
+    bear : float
+        The bearing of point 2 from point 1 (degrees).
     """
-    # dlon = ra2 - ra1
     rdec1 = np.radians(dec1)
     rdec2 = np.radians(dec2)
     rdlon = np.radians(ra2-ra1)
@@ -113,9 +175,20 @@ def bear(ra1, dec1, ra2, dec2):
 
 def translate(ra, dec, r, theta):
     """
-    Translate the point (ra,dec) a distance r (degrees) along angle theta (degrees)
-    The translation is taken along an arc of a great circle.
-    Return the (ra,dec) of the translated point.
+    Translate a given point a distance r in the (initial) direction theta, along a  great circle.
+
+
+    Parameters
+    ----------
+    ra, dec : float
+        The initial point of interest (degrees).
+    r, theta : float
+        The distance and initial direction to translate (degrees).
+
+    Returns
+    -------
+    ra, dec : float
+        The translated position (degrees).
     """
     factor = np.sin(np.radians(dec)) * np.cos(np.radians(r))
     factor += np.cos(np.radians(dec)) * np.sin(np.radians(r)) * np.cos(np.radians(theta))
@@ -129,13 +202,22 @@ def translate(ra, dec, r, theta):
 
 def dist_rhumb(ra1, dec1, ra2, dec2):
     """
-    Rhumb line distance between two points
-    distance is in degrees
-    :param ra1:
-    :param dec1:
-    :param ra2:
-    :param dec1:
-    :return:
+    Calculate the Rhumb line distance between two points [1]_.
+    A Rhumb line between two points is one which follows a constant bearing.
+
+    Parameters
+    ----------
+    ra1, dec1, ra2, dec2 : float
+        The position of the two points (degrees).
+
+    Returns
+    -------
+    dist : float
+        The distance between the two points along a line of constant bearing.
+
+    Notes
+    -----
+    .. [1] `Rhumb line <https://en.wikipedia.org/wiki/Rhumb_line>`_
     """
     # verified against website to give correct results
     phi1 = np.radians(dec1)
@@ -157,13 +239,18 @@ def dist_rhumb(ra1, dec1, ra2, dec2):
 
 def bear_rhumb(ra1, dec1, ra2, dec2):
     """
-    The true bearing of a rhumb line that joins to points
-    return bearing in degrees
-    :param ra1:
-    :param dec1:
-    :param ra2:
-    :param dec2:
-    :return:
+    Calculate the bearing of point 2 from point 1 along a Rhumb line.
+    The bearing is East of North and is in [0, 360), whereas position angle is also East of North but (-180,180]
+
+    Parameters
+    ----------
+    ra1, dec1, ra2, dec2 : float
+        The sky coordinates (degrees) of the two points.
+
+    Returns
+    -------
+    dist : float
+        The bearing of point 2 from point 1 along a Rhumb line (degrees).
     """
     # verified against website to give correct results
     phi1 = np.radians(dec1)
@@ -180,14 +267,19 @@ def bear_rhumb(ra1, dec1, ra2, dec2):
 
 def translate_rhumb(ra, dec, r, theta):
     """
-    Translate the point (ra,dec) a distance r (degrees) along angle theta (degrees)
-    The translation is taken along an arc of a rhumb line.
-    Return the (ra,dec) of the translated point.
-    :param ra:
-    :param dec:
-    :param r:
-    :param theta:
-    :return:
+    Translate a given point a distance r in the (initial) direction theta, along a Rhumb line.
+
+    Parameters
+    ----------
+    ra, dec : float
+        The initial point of interest (degrees).
+    r, theta : float
+        The distance and initial direction to translate (degrees).
+
+    Returns
+    -------
+    ra, dec : float
+        The translated position (degrees).
     """
     # verified against website to give correct results
     # with the help of http://williams.best.vwh.net/avform.htm#Rhumb
