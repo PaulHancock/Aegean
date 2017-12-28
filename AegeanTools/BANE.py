@@ -26,18 +26,34 @@ __date__ = '2016-09-01'
 
 def sigmaclip(arr, lo, hi, reps=3):
     """
-    Perform sigma clipping on an array.
-    Return an array whose elements c obey:
-     mean - std*lo < c < mean + std*hi
-    where mean/std refers to the mean/std of the input array.
+    Perform sigma clipping on an array, ignoring non finite values.
 
-    I'd like scipy to do this, but it appears that only scipy v0.16+ has a useful sigmaclip function.
+    During each iteration return an array whose elements c obey:
+    mean -std*lo < c < mean + std*hi
 
-    :param arr: Input array
-    :param lo: Lower limit (mean -std*lo)
-    :param hi: Upper limit (mean +std*hi)
-    :param reps: maximum number of repetitions of the clipping
-    :return: clipped array
+    where mean/std are the mean std of the input array.
+
+    Parameters
+    ----------
+    arr : iterable
+        An iterable array of numeric types.
+    lo : float
+        The negative clipping level.
+    hi : float
+        The positive clipping level.
+    reps : int
+        The number of iterations to perform.
+        Default = 3.
+
+    Returns
+    -------
+    clipped : numpy.array
+        The clipped array.
+        The clipped array may be empty!
+
+    Notes
+    -----
+    Scipy v0.16 now contains a comparable method that will ignore nan/inf values.
     """
     clipped = np.array(arr)[np.isfinite(arr)]
 
@@ -59,24 +75,50 @@ def sigmaclip(arr, lo, hi, reps=3):
     return clipped
 
 
-def sf2(args):
+def _sf2(args):
     """
-    Wrapper for sigma_filter
+    A shallow wrapper for sigma_filter.
+
+    Parameters
+    ----------
+    args : list
+        A list of arguments for sigma_filter
+
+    Returns
+    -------
+    None
     """
     return sigma_filter(*args)
 
 
 def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     """
-    Calculated the rms [and background] for a sub region of an image. Save the resulting calculations
-    into shared memory - irms [and ibkg].
-    :param filename: Fits file to open
-    :param region: Region within fits file that is to be processed
-    :param step_size: The filtering step size
-    :param box_size: The size of the box over which the filter is applied (each step)
-    :param shape: The shape of the fits image
-    :param dobkg: True = do background calculation.
-    :return:
+    Calculate the background and rms for a sub region of an image. The results are
+    written to shared memory - irms and ibkg.
+
+    Parameters
+    ----------
+    filename : string
+        Fits file to open
+
+    region : (float, float, float, float)
+        Region within the fits file that is to be processed. (ymin, ymax, xmin, xmax).
+
+    step_size : (int, int)
+        The filtering step size
+
+    box_size : (int, int)
+        The size of the box over which the filter is applied (each step).
+
+    shape : tuple
+        The shape of the fits image
+
+    dobkg : bool
+        Do a background calculation. If false then only the rms is calculated. Default = True.
+
+    Returns
+    -------
+    None
     """
 
     # Caveat emptor: The code that follows is very difficult to read.
@@ -207,10 +249,20 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
 
 def gen_factors(m, permute=True):
     """
-    Generate a list of integer factors for m
-    :param m: A positive integer
-    :param permute: returns permutations instead of combinations
-    :return:
+    Generate a list of integer factors of the the input m.
+
+    Parameters
+    ----------
+    m : int
+        The number to factorise
+
+    permute : bool
+        If true then yield both x,y and y,x if x*y=m. Otherwise only yield one of the two. Default = True.
+
+    Yields
+    ------
+    x, y : int
+        Two integers x and y such that x*y=m
     """
     # convert to int if people have been naughty
     n = int(abs(m))
@@ -225,10 +277,20 @@ def gen_factors(m, permute=True):
 
 def optimum_sections(cores, data_shape):
     """
-    Choose the best sectioning scheme based on the number of cores available and the shape of the data
-    :param cores: Number of available cores
-    :param data_shape: Shape of the data as [x,y]
-    :return: (nx,ny) the number of divisions in each direction
+    Choose the best sectioning scheme based on the number of corse available and the shape of the data.
+    "Best" here means minimum perimeter.
+
+    Parameters
+    ----------
+    cores : int
+        The number of corse which are going to be doing the processing.
+    data_shape : tuple
+        Shape of the data as (x,y).
+
+    Returns
+    -------
+    nx, ny : int
+        The number of divisions in each dimension.
     """
     if cores == 1:
         return (1, 1)
@@ -249,10 +311,18 @@ def optimum_sections(cores, data_shape):
 def mask_img(data, mask_data):
     """
     Take two images of the same shape, and transfer the mask from one to the other.
-    Masking is done via np.nan values (or any not finite values).
-    :param data: A 2d array of data
-    :param mask_data: An image of at least 2d, some of which may be nan/blank
-    :return: None, data is modified to be np.nan in the places where mask_data is not finite
+    Masking is done via any not finite values. The mask value is numpy.nan.
+
+    Parameters
+    ----------
+    data : numpy.ndarray
+        A 2d array of data that is to be masked. This array is modified in place.
+    mask_data : numpy.ndarray
+        A 2d array of data that contains some not finite value which are to be used to mask the input data.
+
+    Returns
+    -------
+    None
     """
     mask = np.where(np.isnan(mask_data))
     # If the input image has more than 2 dimensions then the mask has too many dimensions
@@ -268,15 +338,33 @@ def mask_img(data, mask_data):
 
 def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
     """
-    Perform a running filter over multiple cores
+    Calculate the background and noise images corresponding to the input file.
+    The calculation is done via a box-car approach and uses multiple cores and shared memory.
 
-    :param filename: data file name
-    :param step_size: mesh/grid increment in pixels
-    :param box_size: size of box over which the filtering is done
-    :param cores: number of cores to use
-    :param shape: shape of the data array in the file 'filename'
-    :param dobkg: calculate background if true
-    :return:
+    Parameters
+    ----------
+    filename : str
+        Filename to be filtered.
+
+    step_size : (int, int)
+        Step size for the filter.
+
+    box_size : (int, int)
+        Box size for the filter.
+
+    cores : int
+        Number of cores to use. If None then use all available.
+
+    shape : (int, int)
+        The shape of the image in the given file.
+
+    dobkg : bool
+        If True then calculate the background, otherwise assume it is zero.
+
+    Returns
+    -------
+    bkg, rms : numpy.ndarray
+        The interpolated background and noise images.
     """
 
     if cores is None:
@@ -327,7 +415,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
             args.append((filename, region, step_size, box_size, shape, dobkg))
 
     pool = multiprocessing.Pool(processes=cores)
-    pool.map(sf2, args)
+    pool.map(_sf2, args)
     pool.close()
     pool.join()
 
@@ -472,14 +560,26 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 ###
 def write_fits(data, header, file_name):
     """
+    Combine data and a fits header to write a fits file.
 
-    :param data:
-    :param file_name:
-    :return:
+    Parameters
+    ----------
+    data : numpy.ndarray
+        The data to be written.
+
+    header : astropy.io.fits.hduheader
+        The header for the fits file.
+
+    file_name : string
+        The file to write
+
+    Returns
+    -------
+    None
     """
     hdu = fits.PrimaryHDU(data)
     hdu.header = header
     hdulist = fits.HDUList([hdu])
     hdulist.writeto(file_name, clobber=True)
     logging.info("Wrote {0}".format(file_name))
-
+    return
