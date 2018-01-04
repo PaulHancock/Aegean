@@ -18,10 +18,25 @@ def get_pixinfo(header):
     Return some pixel information based on the given hdu header
     pixarea - the area of a single pixel in deg2
     pixscale - the side lengths of a pixel (assuming they are square)
-    :param header: HDUHeader
-    :return: pixarea, pixscale
+
+    Parameters
+    ----------
+    header : HDUHeader or dict
+        FITS header information
+
+    Returns
+    -------
+    pixarea : float
+        The are of a single pixel at the reference location, in square degrees.
+
+    pixscale : (float, float)
+        The pixel scale in degrees, at the reference location.
+
+    Notes
+    -----
+    The reference location is not always at the image center, and the pixel scale/area may
+    change over the image, depending on the projection.
     """
-    # this is correct at the center of the image for all images, and everywhere for conformal projections
     if all(a in header for a in ["CDELT1", "CDELT2"]):
         pixarea = abs(header["CDELT1"]*header["CDELT2"])
         pixscale = (header["CDELT1"], header["CDELT2"])
@@ -43,11 +58,21 @@ def get_pixinfo(header):
 
 def get_beam(header):
     """
-    Read the supplied fits header and extract the beam information
-    BPA may be missing but will be assumed to be zero
-    if BMAJ or BMIN are missing then return None instead of a beam object
-    :param header: HDUheader
-    :return: a Beam object or None
+    Create a :class:`AegeanTools.fits_image.Beam` object from a fits header.
+
+    BPA may be missing but will be assumed to be zero.
+
+    if BMAJ or BMIN are missing then return None instead of a beam object.
+
+    Parameters
+    ----------
+    header : HDUHeader
+        The fits header.
+
+    Returns
+    -------
+    beam : :class:`AegeanTools.fits_image.Beam`
+        Beam object, with a, b, and pa in degrees.
     """
 
     if "BPA" not in header:
@@ -78,8 +103,17 @@ def fix_aips_header(header):
     Search through an image header. If the keywords BMAJ/BMIN/BPA are not set,
     but there are AIPS history cards, then we can populate the BMAJ/BMIN/BPA.
     Fix the header if possible, otherwise don't. Either way, don't complain.
-    :param header:
-    :return:
+
+
+    Parameters
+    ----------
+    header : HDUHeader
+        Fits header which may or may not have AIPS history cards.
+
+    Returns
+    -------
+    header : HDUHeader
+        A header which has BMAJ, BMIN, and BPA keys, as well as a new HISTORY card.
     """
     if 'BMAJ' in header and 'BMIN' in header and 'BPA' in header:
         # The header already has the required keys so there is nothing to do
