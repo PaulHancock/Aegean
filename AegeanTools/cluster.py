@@ -27,11 +27,23 @@ fwhm2cc = 1/cc2fwhm
 def norm_dist(src1, src2):
     """
     Calculate the normalised distance between two sources.
-
     Sources are elliptical Gaussians.
-    :param src1: type Aegean.models.SimpleSource
-    :param src2: type Aegean.models.SimpleSource
-    :return:
+
+    The normalised distance is calculated as the GCD distance between the centers,
+    divided by quadrature sum of the radius of each ellipse along a line joining the two ellipses.
+
+    For ellipses that touch at a single point, the normalized distance will be 1/sqrt(2).
+
+    Parameters
+    ----------
+    src1, src2 : object
+        The two positions to compare. Objects must have the following parameters: (ra, dec, a, b, pa).
+
+    Returns
+    -------
+    dist: float
+        The normalised distance.
+
     """
     if src1 == src2:
         return 0
@@ -50,9 +62,23 @@ def norm_dist(src1, src2):
 
 def sky_dist(src1, src2):
     """
-    Return the distance between two sources in degrees
+    Great circle distance between two sources.
+    A check is made to determine if the two sources are the same object, in this case
+    the distance is zero.
 
-    A light wrapper around angle_tools.gcd
+    Parameters
+    ----------
+    src1, src2 : object
+        Two sources to check. Objects must have parameters (ra,dec) in degrees.
+
+    Returns
+    -------
+    distance : float
+        The distance between the two sources.
+
+    See Also
+    --------
+    :func:`AegeanTools.angle_tools.gcd`
     """
 
     if src1 == src2:
@@ -62,11 +88,32 @@ def sky_dist(src1, src2):
 
 def pairwise_ellpitical_binary(sources, eps, far=None):
     """
-    Calculate the probability of an association between each pair of sources.
-    0<= probability <=1
-    Form this into a matrix.
-    :param sources: A list of sources sorted by declination
-    :return: a matrix of probabilities.
+    Do a pairwise comparison of all sources and determine if they have a normalized distance within
+    eps.
+
+    Form this into a matrix of shape NxN.
+
+
+    Parameters
+    ----------
+    sources : list
+        A list of sources (objects with parameters: ra,dec,a,b,pa)
+
+    eps : float
+        Normalised distance constraint.
+
+    far : float
+        If sources have a dec that differs by more than this amount then they are considered to be not matched.
+        This is a short-cut around performing GCD calculations.
+
+    Returns
+    -------
+    prob : numpy.ndarray
+        A 2d array of True/False.
+
+    See Also
+    --------
+    :func:`AegeanTools.cluster.norm_dist`
     """
     if far is None:
         far = max(a.a/3600 for a in sources)
@@ -90,15 +137,37 @@ def pairwise_ellpitical_binary(sources, eps, far=None):
 
 def regroup(catalog, eps, far=None, dist=norm_dist):
     """
-    Regroup the islands of a catalog according to their normalised distance
-    return a list of island groups, sources have their (island,source) parameters relabeled
-    :param catalog: A list of objects with the following properties[units]:
-                    ra[deg],dec[deg], a[arcsec],b[arcsec],pa[deg], peak_flux[any]
-    :param eps: maximum normalised distance within which sources are considered to be grouped
-    :param far: (degrees) sources that are further than this distance appart will not be grouped, and will not be tested
-    :param dist: a function that calculates the distance between two sources must accept two SimpleSource objects.
-    :return: groups of sources as a dict {id:[src, ...], ...}
+    Regroup the islands of a catalog according to their normalised distance.
+    Return a list of island groups. Sources have their (island,source) parameters relabeled.
+
+
+    Parameters
+    ----------
+    catalog : str or object
+        Either a filename to read into a source list, or a list of objects with the following properties[units]:
+        ra[deg],dec[deg], a[arcsec],b[arcsec],pa[deg], peak_flux[any]
+
+    eps : float
+        maximum normalised distance within which sources are considered to be grouped
+
+    far : float
+        (degrees) sources that are further than this distance appart will not be grouped, and will not be tested.
+        Default = None.
+
+    dist : func
+        a function that calculates the distance between two sources must accept two SimpleSource objects.
+        Default = :func:`AegeanTools.cluster.norm_dist`
+
+    Returns
+    -------
+    islands : list
+        A list of islands. Each island is a list of sources.
+
+    See Also
+    --------
+    :func:`AegeanTools.cluster.norm_dist`
     """
+
     if isinstance(catalog, str):
         table = load_table(catalog)
         srccat = table_to_source_list(table)
@@ -158,5 +227,3 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
             src.source = comp
         islands.append(groups[isle])
     return islands
-
-
