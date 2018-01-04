@@ -218,7 +218,7 @@ class FitsImage(object):
         return [float(pixbox[0][0]), float(pixbox[0][1])] 
 
 
-class Beam():
+class Beam(object):
     """
     Small class to hold the properties of the beam
     """
