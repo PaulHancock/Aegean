@@ -47,10 +47,17 @@ log = logging.getLogger('Aegean')
 # writing table formats
 def check_table_formats(files):
     """
-    Determine whether the supplied table filenames are supported formats.
-    The format is determined from the extension.
-    :param files: A comma-separated string of filenames (no spaces)
-    :return:
+    Determine whether a list of files are of a recognizable output type.
+
+    Parameters
+    ----------
+    files : str
+        A list of file names
+
+    Returns
+    -------
+    result : bool
+        True if *all* the file names are supported
     """
     cont = True
     formats = get_table_formats()
@@ -67,8 +74,12 @@ def check_table_formats(files):
 
 def show_formats():
     """
-    Print a list of table formats that are supported and the extensions that they are assumed to have
-    :return:
+    Print a list of all the file formats that are supported for writing.
+    The file formats are determined by their extensions.
+
+    Returns
+    -------
+    None
     """
     fmts = {
         "ann": "Kvis annotation",
@@ -92,7 +103,12 @@ def show_formats():
 
 def get_table_formats():
     """
-    Return a list of file extensions that are supported (mapped to an output)
+    Create a list of file extensions that are supported for writing.
+
+    Returns
+    -------
+    fmts : list
+        A list of file name extensions that are supported.
     """
     fmts = ['reg', 'fits']
     fmts.extend(['vo', 'vot', 'xml'])
@@ -108,10 +124,17 @@ def get_table_formats():
 
 def update_meta_data(meta=None):
     """
-    Update the metadata to include the DATE, PROGRAM, and PROGVER keys
-    if they do not already exist.
-    :param meta:
-    :return:
+    Modify the metadata dictionary.
+    DATE, PROGRAM, and PROGVER are added/modified.
+
+    Parameters
+    ----------
+    meta : dict
+        The dictionary to be modified, default = None (empty)
+
+    Returns
+    -------
+        An updated dictionary.
     """
     if meta is None:
         meta = {}
@@ -125,11 +148,33 @@ def update_meta_data(meta=None):
 
 def save_catalog(filename, catalog, meta=None):
     """
-    input:
-        filename - name of file to write, format determined by extension
-        catalog - a list of sources (OutputSources, SimpleSources, or IslandSource)
-    returns:
-        nothing
+    Save a catalogue of sources using filename as a model. Meta data can be written to some file types
+    (fits, votable).
+
+    Each type of source will be in a separate file:
+
+    - base_comp.ext :class:`AegeanTools.models.OutputSource`
+    - base_isle.ext :class:`AegeanTools.models.IslandSource`
+    - base_simp.ext :class:`AegeanTools.models.SimpleSource`
+
+
+    Where filename = `base.ext`
+
+    Parameters
+    ----------
+    filename : str
+        Name of file to write, format is determined by extension.
+
+    catalog : list
+        A list of sources to write. Sources must be of type :class:`AegeanTools.models.OutputSource`,
+        :class:`AegeanTools.models.SimpleSource`, or :class:`AegeanTools.models.IslandSource`.
+
+    meta : dict
+        Meta data to be written to the output file. Support for metadata depends on file type.
+
+    Returns
+    -------
+    None
     """
     ascii_table_formats = {'csv': 'csv', 'tab': 'tab', 'tex': 'latex', 'html': 'html'}
     # .ann and .reg are handled by me
@@ -152,12 +197,18 @@ def save_catalog(filename, catalog, meta=None):
 
 def load_catalog(filename):
     """
-    load a catalog and extract the source positions
-    acceptable formats are:
-    csv,tab,tex - from astropy.io.ascii
-    vo,vot,xml - votable format
-    cat - format created by Aegean
-    returns [(ra,dec),...]
+    Load a catalogue and extract the source positions (only)
+
+    Parameters
+    ----------
+    filename : str
+        Filename to read. Supported types are csv, tab, tex, vo, vot, and xml.
+
+    Returns
+    -------
+    catalogue : list
+        A list of [ (ra, dec), ...]
+
     """
     supported = get_table_formats()
 
@@ -188,9 +239,19 @@ def load_catalog(filename):
 
 def load_table(filename):
     """
+    Load a table from a given file.
 
-    :param filename:
-    :return:
+    Supports csv, tab, tex, vo, vot, xml, fits, and hdf5.
+
+    Parameters
+    ----------
+    filename : str
+        File to read
+
+    Returns
+    -------
+    table : Table
+        Table of data.
     """
     supported = get_table_formats()
 
@@ -210,6 +271,21 @@ def load_table(filename):
 
 
 def write_table(table, filename):
+    """
+    Write a table to a file.
+
+    Parameters
+    ----------
+    table : Table
+        Table to be written
+
+    filename : str
+        Destination for saving table.
+
+    Returns
+    -------
+    None
+    """
     try:
         if os.path.exists(filename):
             os.remove(filename)
@@ -226,10 +302,26 @@ def write_table(table, filename):
 
 def table_to_source_list(table, src_type=OutputSource):
     """
-    Wrangle a table into a list of sources given by src_type
-    :param table: astropy table instance
-    :param src_type: an object type for this source, something that derives from SimpleSource is best
-    :return:
+    Convert a table of data into a list of sources.
+
+    A single table must have consistent source types given by src_type. src_type should be one of
+    :class:`AegeanTools.models.OutputSource`, :class:`AegeanTools.models.SimpleSource`,
+    or :class:`AegeanTools.models.IslandSource`.
+
+
+    Parameters
+    ----------
+    table : Table
+        Table of sources
+
+    src_type : class
+        Sources must be of type :class:`AegeanTools.models.OutputSource`,
+        :class:`AegeanTools.models.SimpleSource`, or :class:`AegeanTools.models.IslandSource`.
+
+    Returns
+    -------
+    sources : list
+        A list of objects of the given type.
     """
     source_list = []
     if table is None:
@@ -254,11 +346,30 @@ def table_to_source_list(table, src_type=OutputSource):
 
 def write_catalog(filename, catalog, fmt=None, meta=None):
     """
-    Write a catalog (list of sourcees) to a file with format determined by extension
-    :param filename: output file name
-    :param catalog: a list of sources
-    :param fmt: the format to use (defualt is to guess from extension)
-    :param meta: metadata to be used for formats like fits/votable
+    Write a catalog (list of sources) to a file with format determined by extension.
+
+    Sources must be of type :class:`AegeanTools.models.OutputSource`,
+    :class:`AegeanTools.models.SimpleSource`, or :class:`AegeanTools.models.IslandSource`.
+
+    Parameters
+    ----------
+    filename : str
+        Base name for file to write. `_simp`, `_comp`, or `_isle` will be added to differentiate
+        the different types of sources that are being written.
+
+    catalog : list
+        A list of source objects. Sources must be of type :class:`AegeanTools.models.OutputSource`,
+        :class:`AegeanTools.models.SimpleSource`, or :class:`AegeanTools.models.IslandSource`.
+
+    fmt : str
+        The file format extension.
+
+    meta : dict
+        A dictionary to be used as metadata for some file types (fits, VOTable).
+
+    Returns
+    -------
+    None
     """
     if meta is None:
         meta = {}
@@ -322,12 +433,24 @@ def write_catalog(filename, catalog, fmt=None, meta=None):
 
 def writeFITSTable(filename, table):
     """
+    Convert a table into a FITSTable and then write to disk.
 
-    :param filename:
-    :param table:
-    :return:
+    Parameters
+    ----------
+    filename : str
+        Filename to write.
+
+    table : Table
+        Table to write.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Due to a bug in numpy, `int32` and `float32` are converted to `int64` and `float64` before writing.
     """
-
     def FITSTableType(val):
         """
         Return the FITSTable type corresponding to each named parameter in obj
@@ -356,12 +479,28 @@ def writeFITSTable(filename, table):
     tbhdu.writeto(filename, clobber=True)
 
 
-def writeIslandContours(filename, catalog, fmt):
+def writeIslandContours(filename, catalog, fmt='reg'):
     """
-    Draw a contour around the pixels of each island
-    Input:
-    filename = file to write
-    catalog = [IslandSource, ...]
+    Write an output file in ds9 .reg format that outlines the boundaries of each island.
+
+    Parameters
+    ----------
+    filename : str
+        Filename to write.
+
+    catalog : list
+        List of sources. Only those of type :class:`AegeanTools.models.IslandSource` will have contours drawn.
+
+    fmt : str
+        Output format type. Currently only 'reg' is supported (default)
+
+    Returns
+    -------
+    None
+
+    See Also
+    --------
+    :func:`AegeanTools.catalogs.writeIslandBoxes`
     """
     if fmt != 'reg':
         log.warning("Format {0} not yet supported".format(fmt))
@@ -398,11 +537,26 @@ def writeIslandContours(filename, catalog, fmt):
 
 def writeIslandBoxes(filename, catalog, fmt):
     """
-    Draw a box around each island in the given catalog.
-    The box simply outlines the pixels used in the fit.
-    Input:
-        filename = file to write
-        catalog = [IslandSource, ...]
+    Write an output file in ds9 .reg, or kvis .ann format that contains bounding boxes for all the islands.
+
+    Parameters
+    ----------
+    filename : str
+        Filename to write.
+
+    catalog : list
+        List of sources. Only those of type :class:`AegeanTools.models.IslandSource` will have contours drawn.
+
+    fmt : str
+        Output format type. Currently only 'reg' and 'ann' are supported. Default = 'reg'.
+
+    Returns
+    -------
+    None
+
+    See Also
+    --------
+    :func:`AegeanTools.catalogs.writeIslandContours`
     """
     if fmt not in ['reg', 'ann']:
         log.warning("Format not supported for island boxes{0}".format(fmt))
@@ -437,8 +591,33 @@ def writeAnn(filename, catalog, fmt):
     """
     Write an annotation file that can be read by Kvis (.ann) or DS9 (.reg).
     Uses ra/dec from catalog.
-    Draws ellipses if bmaj/bmin/pa are in catalog
-    Draws 30" circles otherwise
+    Draws ellipses if bmaj/bmin/pa are in catalog. Draws 30" circles otherwise.
+
+    Only :class:`AegeanTools.models.OutputSource` will appear in the annotation file
+    unless there are none, in which case :class:`AegeanTools.models.SimpleSource` (if present)
+    will be written. If any :class:`AegeanTools.models.IslandSource` objects are present then
+    an island contours file will be written.
+
+    Parameters
+    ----------
+    filename : str
+        Output filename base.
+
+    catalog : list
+        List of sources.
+
+    fmt : ['ann', 'reg']
+        Output file type.
+
+    Returns
+    -------
+    None
+
+    See Also
+    --------
+    AegeanTools.catalogs.writeIslandContours
+    """
+    """
     Input:
         filename - file to write to
         catalog - a list of OutputSource or SimpleSource
@@ -450,27 +629,27 @@ def writeAnn(filename, catalog, fmt):
 
     components, islands, simples = classify_catalog(catalog)
     if len(components) > 0:
-        catalog = sorted(components)
+        cat = sorted(components)
         suffix = "comp"
     elif len(simples) > 0:
-        catalog = simples
+        cat = simples
         suffix = "simp"
     else:
-        catalog = []
+        cat = []
 
-    if len(catalog) > 0:
-        ras = [a.ra for a in catalog]
-        decs = [a.dec for a in catalog]
-        if not hasattr(catalog[0], 'a'):  # a being the variable that I used for bmaj.
-            bmajs = [30 / 3600.0 for a in catalog]
+    if len(cat) > 0:
+        ras = [a.ra for a in cat]
+        decs = [a.dec for a in cat]
+        if not hasattr(cat[0], 'a'):  # a being the variable that I used for bmaj.
+            bmajs = [30 / 3600.0 for a in cat]
             bmins = bmajs
-            pas = [0 for a in catalog]
+            pas = [0 for a in cat]
         else:
-            bmajs = [a.a / 3600.0 for a in catalog]
-            bmins = [a.b / 3600.0 for a in catalog]
-            pas = [a.pa for a in catalog]
+            bmajs = [a.a / 3600.0 for a in cat]
+            bmins = [a.b / 3600.0 for a in cat]
+            pas = [a.pa for a in cat]
 
-        names = [a.__repr__() for a in catalog]
+        names = [a.__repr__() for a in cat]
         if fmt == 'ann':
             new_file = re.sub('.ann$', '_{0}.ann'.format(suffix), filename)
             out = open(new_file, 'w')
@@ -512,9 +691,16 @@ def writeAnn(filename, catalog, fmt):
 
 def nulls(x):
     """
-    convert values of -1 into None
-    :param x: assumed to be float but w/e
-    :return: x or None
+    Convert values of -1 into None.
+
+    Parameters
+    ----------
+    x : float or int
+        Value to convert
+
+    Returns
+    -------
+    val : [x, None]
     """
     if x == -1:
         return None
@@ -525,9 +711,22 @@ def nulls(x):
 def writeDB(filename, catalog, meta=None):
     """
     Output an sqlite3 database containing one table for each source type
-    inputs:
-    filename - output filename
-    catalog - a catalog of sources to populated the database with
+
+    Parameters
+    ----------
+    filename : str
+        Output filename
+
+    catalog : list
+        List of sources of type :class:`AegeanTools.models.OutputSource`,
+        :class:`AegeanTools.models.SimpleSource`, or :class:`AegeanTools.models.IslandSource`.
+
+    meta : dict
+        Meta data to be written to table `meta`
+
+    Returns
+    -------
+    None
     """
 
     def sqlTypes(obj, names):
