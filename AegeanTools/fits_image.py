@@ -109,15 +109,28 @@ def fix_aips_header(header):
 
 class FitsImage(object):
     """
-    An object that handles the loading and manipulation of a fits file,
+    An object that handles the loading and manipulation of a fits file.
     """
 
     def __init__(self, filename=None, hdu_index=0, beam=None, slice=None):
         """
-        filename: the name of the fits image file or an instance of astropy.io.fits.HDUList
-        hdu_index = index of FITS HDU when extensions are used (0 is primary HDU)
-        hdu = a pyfits hdu. if provided the object is constructed from this instead of
-              opening the file (filename is ignored)  
+        Parameters
+        ----------
+        filename : str or astropy.io.fits.HDUList
+            The name of the fits image or an already loaded HDUList
+
+        hdu_index : int
+            The index of the FITS HDU. Default = 0.
+
+        beam : Beam
+            The synthesized beam for this image, using sky coordinates.
+            If beam is None then it will be created from the fits header.
+            Default = None.
+
+        slice : int
+            If the input data has 3 dimensions then this will specify the index into the 3rd dimension
+            which will be extracted as the image.
+            Default = None.
         """
 
         self.hdu = expand(filename)[hdu_index] # auto detects if the file needs expanding
@@ -171,20 +184,49 @@ class FitsImage(object):
         log.debug("Using axes {0} and {1}".format(self._header['CTYPE1'], self._header['CTYPE2']))
 
     def get_pixels(self):
+        """
+        Get the image data.
+
+        Returns
+        -------
+        pixels : numpy.ndarray
+            2d Array of image pixels.
+        """
         return self._pixels
 
     def set_pixels(self, pixels):
         """
-        Allow the pixels to be replaced
-        Will only work if pixels.shape is the same as self._pixels.shape
+        Set the image data.
+        Will not work if the new image has a different shape than the current image.
+
+        Parameters
+        ----------
+        pixels : numpy.ndarray
+            New image data
+
+        Returns
+        -------
+        None
         """
         assert pixels.shape == self._pixels.shape, "Shape mismatch between pixels supplied {0} and existing image pixels {1}".format(pixels.shape,self._pixels.shape)
         self._pixels = pixels
-            
+        # reset this so that it is calculated next time the function is called
+        self._rms = None
+        return
+
     def get_background_rms(self):
         """
-        Return the background RMS (Jy)
-        NB - value is calculated on first request then cached for speed
+        Calculate the rms of the image. The rms is calculated from the interqurtile range (IQR), to
+        reduce bias from source pixels.
+
+        Returns
+        -------
+        rms : float
+            The image rms.
+
+        Notes
+        -----
+        The rms value is cached after first calculation.
         """
         # TODO: return a proper background RMS ignoring the sources
         # This is an approximate method suggested by PaulH.
@@ -200,16 +242,44 @@ class FitsImage(object):
     
     def pix2sky(self, pixel):
         """
-        Get the sky coordinates [ra,dec] (degrees) given pixel [x,y] (float)
+        Get the sky coordinates for a given image pixel.
+
+        Parameters
+        ----------
+        pixel : (float, float)
+            Image coordinates.
+
+        Returns
+        -------
+        ra,dec : float
+            Sky coordinates (degrees)
+
         """
         pixbox = numpy.array([pixel, pixel])
         skybox = self.wcs.all_pix2world(pixbox, 1)
         return [float(skybox[0][0]), float(skybox[0][1])]
 
     def get_hdu_header(self):
+        """
+        Get the image header.
+        """
         return self._header
 
     def sky2pix(self, skypos):
+        """
+        Get the pixel coordinates for a given sky position (degrees).
+
+        Parameters
+        ----------
+        skypos : (float,float)
+            ra,dec position in degrees.
+
+        Returns
+        -------
+        x,y : float
+            Pixel coordinates.
+
+        """
         """
         Get the pixel coordinates [x,y] (floats) given skypos [ra,dec] (degrees)
         """
@@ -220,7 +290,8 @@ class FitsImage(object):
 
 class Beam(object):
     """
-    Small class to hold the properties of the beam
+    Small class to hold the properties of the beam.
+    Properties are a,b,pa. No assumptions are made as to the units, but both a and b have to be >0.
     """
     def __init__(self, a, b, pa, pixa=None, pixb=None):
         assert a > 0, "major axis must be >0"
