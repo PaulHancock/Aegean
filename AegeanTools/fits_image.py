@@ -1,9 +1,7 @@
-"""
-Created on 18/07/2011
+#! /usr/bin/env python
+from __future__ import print_function
 
-@author: jay
-Modified by: Paul Hancock 2012 onwards
-"""
+__author__= "Paul Hancock"
 
 import numpy
 import astropy.wcs as pywcs
