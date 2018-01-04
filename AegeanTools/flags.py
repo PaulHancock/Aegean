@@ -1,3 +1,6 @@
+"""
+Flag constants for use by Aegean.
+"""
 # Err Flags for fitting routines
 FITERRSMALL   = 1 # 00001
 FITERR        = 2 # 00010
