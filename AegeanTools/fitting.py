@@ -30,12 +30,23 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     Generate a model 2d Gaussian with the given parameters.
     Evaluate this model at the given locations x,y.
 
-    :param x,y: locations at which to calculate values
-    :param amp: amplitude of Gaussian
-    :param xo,yo: position of Gaussian
-    :param major,minor: axes (sigmas)
-    :param theta: position angle (degrees) CCW from x-axis
-    :return: Gaussian function evaluated at x,y locations
+    Parameters
+    ----------
+    x, y : numeric or array-like
+        locations at which to evaluate the gaussian
+    amp : float
+        Peak value.
+    xo, yo : float
+        Center of the gaussian.
+    sx, sy : float
+        major/minor axes in sigmas
+    theta : float
+        position angle (degrees) CCW from x-axis
+
+    Returns
+    -------
+    data : numeric or array-like
+        Gaussian function evaluated at the x,y locations.
     """
     try:
         sint, cost = math.sin(np.radians(theta)), math.cos(np.radians(theta))
@@ -54,12 +65,21 @@ def Cmatrix(x, y, sx, sy, theta):
     """
     Construct a correlation matrix corresponding to the data.
     The matrix assumes a gaussian correlation function.
-    :param x:
-    :param y:
-    :param sx: \sigma_x for pix beam
-    :param sy: \sigma_y for pix beam
-    :param theta: \theta for pix beam
-    :return:
+
+    Parameters
+    ----------
+    x, y : array-like
+        locations at which to evaluate the correlation matirx
+    sx, sy : float
+        major/minor axes of the gaussian correlation function (sigmas)
+
+    theta : float
+        position angle of the gaussian correlation function (degrees)
+
+    Returns
+    -------
+    data : array-like
+        The C-matrix.
     """
     C = np.vstack([elliptical_gaussian(x, y, 1, i, j, sx, sy, theta) for i, j in zip(x, y)])
     return C
@@ -68,8 +88,17 @@ def Cmatrix(x, y, sx, sy, theta):
 def Bmatrix(C):
     """
     Calculate a matrix which is effectively the square root of the correlation matrix C
-    :param C: A covariance matrix
-    :return: A matrix B such the B.dot(B') = inv(C)
+
+
+    Parameters
+    ----------
+    C : 2d array
+        A covariance matrix
+
+    Returns
+    -------
+    B : 2d array
+        A matrix B such the B.dot(B') = inv(C)
     """
     # this version of finding the square root of the inverse matrix
     # suggested by Cath Trott
@@ -87,10 +116,22 @@ def jacobian(pars, x, y):
     Analytical calculation of the Jacobian for an elliptical gaussian
     Will work for a model that contains multiple Gaussians, and for which
     some components are not being fit (don't vary).
-    :param pars: lmfit.Model
-    :param x: x-values over which the model is evaluated
-    :param y: y-values over which the model is evaluated
-    :return:
+
+    Parameters
+    ----------
+    pars : lmfit.Model
+        The model parameters
+    x, y : list
+        Locations at which the jacobian is being evaluated
+
+    Returns
+    -------
+    j : 2d array
+        The Jacobian.
+
+    See Also
+    --------
+    :func:`AegeanTools.fitting.emp_jacobian`
     """
 
     matrix = []
@@ -150,6 +191,24 @@ def emp_jacobian(pars, x, y):
     An empirical calculation of the Jacobian
     Will work for a model that contains multiple Gaussians, and for which
     some components are not being fit (don't vary).
+
+    Parameters
+    ----------
+    pars : lmfit.Model
+        The model parameters
+    x, y : list
+        Locations at which the jacobian is being evaluated
+
+    Returns
+    -------
+    j : 2d array
+        The Jacobian.
+
+    See Also
+    --------
+    :func:`AegeanTools.fitting.jacobian`
+    """
+    """
     :param pars: lmfit.Model
     :param x: x-values over which the model is evaluated
     :param y: y-values over which the model is evaluated
@@ -172,18 +231,41 @@ def emp_jacobian(pars, x, y):
 
 def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
     """
-    Wrapper around :jacobian: that gives the output in a format
-    that is required for lmfit.
-    :param pars: lmfit.Model
-    :param x: x-values over which the model is evaluated
-    :param y: y-values over which the model is evaluated
-    :param errs: a vector of 1\sigma errors (optional)
-    :param B: a B-matrix (optional) see B_matrix
-    :param emp: True = use empirical Jacobian
-    :return:
+    Wrapper around :func:`AegeanTools.fitting.jacobian` and :func:`AegeanTools.fitting.emp_jacobian`
+    which gives the output in a format that is required for lmfit.
+
+    Parameters
+    ----------
+    pars : lmfit.Model
+        The model parameters
+
+    x, y : list
+        Locations at which the jacobian is being evaluated
+
+    errs : list
+        a vector of 1\sigma errors (optional). Default = None
+
+    B : 2d-array
+        a B-matrix (optional) see :func:`AegeanTools.fitting.Bmatrix`
+
+    emp : bool
+        If true the use the empirical Jacobian, otherwise use the analytical one.
+        Default = False.
+
+    Returns
+    -------
+    j : 2d-array
+        A Jacobian.
+
+    See Also
+    --------
+    :func:`AegeanTools.fitting.Bmatrix`
+    :func:`AegeanTools.fitting.jacobian`
+    :func:`AegeanTools.fitting.emp_jacobian`
+
     """
     if emp:
-        matrix = emp_jacobian(pars, x, y, errs, B)
+        matrix = emp_jacobian(pars, x, y)
     else:
         # calculate in the normal way
         matrix = jacobian(pars, x, y)
@@ -207,10 +289,22 @@ def hessian(pars, x, y):
     Only parameters that vary will contribute to the hessian.
     Thus there will be a total of nvar x nvar entries, each of which is a
     len(x) x len(y) array.
-    :param pars: lmfit.Parameters() object
-    :param x: indices
-    :param y: indices
-    :return: np.array of shape (nvar, nvar, len(x), len(y))
+
+    Parameters
+    ----------
+    pars : lmfit.Parameters
+        The model
+    x, y : list
+        locations at which to evaluate the Hessian
+
+    Returns
+    -------
+    h : np.array
+        Hessian. Shape will be (nvar, nvar, len(x), len(y))
+
+    See Also
+    --------
+    :func:`AegeanTools.fitting.emp_hessian`
     """
     j = 0  # keeping track of the number of variable parameters
     # total number of variable parameters
@@ -485,11 +579,30 @@ def hessian(pars, x, y):
 def emp_hessian(pars, x, y):
     """
     Calculate the hessian matrix empirically.
-    Relies on :emp_jacobian: for the first order derivatives
-    :param pars:
-    :param x:
-    :param y:
-    :return:
+    Create a hessian matrix corresponding to the source model 'pars'
+    Only parameters that vary will contribute to the hessian.
+    Thus there will be a total of nvar x nvar entries, each of which is a
+    len(x) x len(y) array.
+
+    Parameters
+    ----------
+    pars : lmfit.Parameters
+        The model
+    x, y : list
+        locations at which to evaluate the Hessian
+
+    Returns
+    -------
+    h : np.array
+        Hessian. Shape will be (nvar, nvar, len(x), len(y))
+
+    Notes
+    -----
+    Uses :func:`AegeanTools.fitting.emp_jacobian` to calculate the first order derivatives.
+
+    See Also
+    --------
+    :func:`AegeanTools.fitting.hessian`
     """
     eps = 1e-5
     matrix = []
