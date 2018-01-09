@@ -18,8 +18,15 @@ def load_file_or_hdu(filename):
     """
     Load a file from disk and return an HDUList
     If filename is already an HDUList return that instead
-    :param filename: Filename or HDUList
-    :return: HDUList
+
+    Parameters
+    ----------
+    filename : str or HDUList
+        File or HDU to be loaded
+
+    Returns
+    -------
+    hdulist : HDUList
     """
     if isinstance(filename, fits.HDUList):
         hdulist = filename
@@ -30,11 +37,27 @@ def load_file_or_hdu(filename):
 
 def compress(datafile, factor, outfile=None):
     """
+    Compress a file using decimation.
 
-    :param datafile: Filename or HDUList (hdulist will be modified)
-    :param factor: factor to be reduced
-    :param outfile: filename to write (default=None, don't write to file)
-    :return: An HDUlist of the reduced data
+    Parameters
+    ----------
+    datafile : str or HDUList
+        Input data to be loaded. (HDUList will be modified if passed).
+
+    factor : int
+        Decimation factor.
+
+    outfile : str
+        File to be written. Default = None, which means don't write a file.
+
+    Returns
+    -------
+    hdulist : HDUList
+        A decimated HDUList
+
+    See Also
+    --------
+    :func:`AegeanTools.fits_interp.expand`
     """
     if not (factor > 0 and isinstance(factor, int)):
         logging.error("factor must be a positive integer")
@@ -106,10 +129,33 @@ def expand(datafile, outfile=None, method='linear'):
     interpolation is carried out by scipy.interpolate.griddata so method can be any valid method
     accepted by that function.
 
-    :param datafile: filename or HDUList of file to work on
-    :param outfile: filename to write to (default = None)
-    :param method: interpolation method (default='linear')
-    :return: HDUList of the expanded data
+    It is assumed that the file has been compressed and that there are 'BN_?' keywords in the
+    fits header that describe how the compression was done.
+
+    Parameters
+    ----------
+    datafile : str or HDUList
+        filename or HDUList of file to work on
+
+    outfile : str
+        filename to write to (default = None)
+
+    method : str
+        interpolation method (default='linear').
+
+    Returns
+    -------
+    hdulist : HDUList
+        HDUList of the expanded data.
+
+    See Also
+    --------
+    :func:`AegeanTools.fits_interp.compress`
+
+    Notes
+    -----
+    Methods other than 'linear' can be supplied and will be passed to the interpolator, however
+    testing shows that only the linear interpolation works on large images. ymmv!
     """
     hdulist = load_file_or_hdu(datafile)
 
@@ -130,7 +176,7 @@ def expand(datafile, outfile=None, method='linear'):
 
     grid[0, :] += int(lcx/factor)
     grid[1, :] += int(lcy/factor)
-    grid  *= factor
+    grid *= factor
     points = list(zip(np.ravel(grid[0]), np.ravel(grid[1])))
 
     # Do the interpolation
