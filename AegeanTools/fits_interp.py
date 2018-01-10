@@ -129,7 +129,7 @@ def expand(datafile, outfile=None, method='linear'):
     interpolation is carried out by scipy.interpolate.griddata so method can be any valid method
     accepted by that function.
 
-    It is assumed that the file has been compressed and that there are 'BN_?' keywords in the
+    It is assumed that the file has been compressed and that there are `BN_?` keywords in the
     fits header that describe how the compression was done.
 
     Parameters
