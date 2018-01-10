@@ -449,7 +449,7 @@ class WCSHelper(object):
 
 class PSFHelper(WCSHelper):
     """
-    An extension of the :ref:`AegeanTools.wcs_helpers.WCSHelper` class that also includes information about the
+    An extension of the :class:`AegeanTools.wcs_helpers.WCSHelper` class that also includes information about the
     point spread function over the sky.
 
     This allows for the distinction between the point spread function (what a point source looks like) and
