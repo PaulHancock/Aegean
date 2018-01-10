@@ -623,8 +623,17 @@ def nan_acf(noise):
     """
     Calculate the autocorrelation function of the noise
     where the noise is a 2d array that may contain nans
-    :param noise:
-    :return:
+
+
+    Parameters
+    ----------
+    noise : 2d-array
+        Noise image.
+
+    Returns
+    -------
+    acf : 2d-array
+        The ACF.
     """
     corr = np.zeros(noise.shape)
     ix,jx = noise.shape
@@ -646,9 +655,20 @@ def make_ita(noise, acf=None):
     """
     Create the matrix ita of the noise where the noise may be a masked array
     where ita(x,y) is the correlation between pixel pairs that have the same separation as x and y.
-    :param noise: A possibly masked 2d array
-    :param acf: the autocorrelation matrix. (None = calculate from data)
-    :return: ita
+
+    Parameters
+    ----------
+    noise : 2d-array
+        The noise image
+
+    acf : 2d-array
+        The autocorrelation matrix. (None = calculate from data).
+        Default = None.
+
+    Returns
+    -------
+    ita : 2d-array
+        The matrix ita
     """
     if acf is None:
         acf = nan_acf(noise)
@@ -670,11 +690,27 @@ def RB_bias(data, pars, ita=None, acf=None):
     """
     Calculate the expected bias on each of the parameters in the model pars.
     Only parameters that are allowed to vary will have a bias.
-    :param data: data that was fit
-    :param pars: lmfit.Parameters() of the fitted model
-    :param ita: the ita matrix
-    :param acf: the (normalized) noise correlation function
-    :return:
+    Calculation follows the description of Refrieger & Brown 1998 (cite).
+
+
+    Parameters
+    ----------
+    data : 2d-array
+        data that was fit
+
+    pars : lmfit.Parameters
+        The model
+
+    ita : 2d-array
+        The ita matrix (optional).
+
+    acf : 2d-array
+        The acf for the data.
+
+    Returns
+    -------
+    bias : array
+        The bias on each of the parameters
     """
     log.info("data {0}".format(data.shape))
     nparams = np.sum([pars[k].vary for k in pars.keys() if k != 'components'])
@@ -727,11 +763,27 @@ def RB_bias(data, pars, ita=None, acf=None):
 
 def bias_correct(params, data, acf=None):
     """
-    Apply a bias correction to the given fit parameters
-    :param params:
-    :param data:
-    :param C:
-    :return:
+    Calculate and apply a bias correction to the given fit parameters
+
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        The model parameters. These will be modified.
+
+    data : 2d-array
+        The data which was used in the fitting
+
+    acf : 2d-array
+        ACF of the data. Default = None.
+
+    Returns
+    -------
+    None
+
+    See Also
+    --------
+    :func:`AegeanTools.fitting.RB_bias`
     """
     bias = RB_bias(data, params, acf=acf)
     i = 0
@@ -747,10 +799,22 @@ def bias_correct(params, data, acf=None):
 def CRB_errs(jac, C, B=None):
     """
     Calculate minimum errors given by the Cramer-Rao bound
-    :param jac: the jacobian
-    :param C: the correlation matrix
-    :param B: B.dot(B') should = inv(C), ie B ~ sqrt(inv(C))
-    :return: array of errors for the model parameters
+
+    Parameters
+    ----------
+    jac : 2d-array
+        Jacobian corresponding to the data and model.
+
+    C : 2d-array
+        Data covariance matrix
+
+    B : 2d-array
+        The square root of C. Default = None, which means that it will be calculated from C.
+
+    Returns
+    -------
+    errs : list
+        The uncertainty on each of the parameters.
     """
     if B is not None:
         fim_inv = inv(np.transpose(jac).dot(B).dot(np.transpose(B)).dot(jac))
@@ -767,9 +831,22 @@ def condon_errors(source, theta_n, psf=None):
     using the description of Condon'97
     All parameters are assigned errors, assuming that all params were fit.
     If some params were held fixed then these errors are overestimated.
-    :param source: Source for which errors need to be calculated
-    :param theta_n: The angular size of an image pixel
-    :return: The same source but with errors assigned.
+
+    Parameters
+    ----------
+    source : :class:`AegeanTools.models.SimpleSource`
+        The source which was fit.
+
+    theta_n : float
+        A measure of the beam sampling. (See Condon'97).
+
+    psf : :class:`AegeanTools.fits_image.Beam`
+        The psf at the location of the source.
+
+    Returns
+    -------
+    None
+
     """
 
     # indices for the calculation or rho
@@ -827,9 +904,23 @@ def condon_errors(source, theta_n, psf=None):
 def errors(source, model, wcshelper):
     """
     Convert pixel based errors into sky coord errors
-    :param source: Source object
-    :param wcshelper: WCSHelper object
-    :return:
+
+    Parameters
+    ----------
+    source : :class:`AegeanTools.models.SimpleSource`
+        The source which was fit.
+
+    model : lmfit.Parameters
+        The model which was fit.
+
+    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
+        WCS information.
+
+    Returns
+    -------
+    source : :class:`AegeanTools.models.SimpleSource`
+        The modified source obejct.
+
     """
 
     # if the source wasn't fit then all errors are -1
@@ -916,9 +1007,23 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
     Convert pixel based errors into sky coord errors
     Uses covariance matrix for ra/dec errors
     and calculus approach to a/b/pa errors
-    :param source: Source object
-    :param wcshelper: WCSHelper object
-    :return:
+
+    Parameters
+    ----------
+    source : :class:`AegeanTools.models.SimpleSource`
+        The source which was fit.
+
+    model : lmfit.Parameters
+        The model which was fit.
+
+    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
+        WCS information.
+
+    Returns
+    -------
+    source : :class:`AegeanTools.models.SimpleSource`
+        The modified source obejct.
+
     """
 
     # if the source wasn't fit then all errors are -1
@@ -1019,9 +1124,18 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
 
 def ntwodgaussian_lmfit(params):
     """
-    theta is in degrees
-    :param params: model parameters (can be multiple)
-    :return: a function that maps (x,y) -> model
+    Convert an lmfit.Parameters object into a function which calculates the model.
+
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        Model parameters, can have multiple components.
+
+    Returns
+    -------
+    model : func
+        A function f(x,y) that will compute the model.
     """
 
     def rfunc(x, y):
@@ -1048,9 +1162,36 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
-    input: data - pixel information
-           params - and lmfit.Model instance
-    return: fit results, modified model
+
+    Parameters
+    ----------
+    data : 2d-array
+        Image data
+
+    params : lmfit.Parameters
+        Initial model guess.
+
+    B : 2d-array
+        B matrix to be used in residual calculations.
+        Default = None.
+
+    errs : 1d-array
+
+    dojac : bool
+        If true then an analytic jacobian will be passed to the fitting routine.
+
+    Returns
+    -------
+    result : ?
+        lmfit.minimize result.
+
+    params : lmfit.Params
+        Fitted model.
+
+    See Also
+    --------
+    :func:`AegeanTools.fitting.lmfit_jacobian`
+
     """
     # copy the params so as not to change the initial conditions
     # in case we want to use them elsewhere
@@ -1081,12 +1222,29 @@ def covar_errors(params, data, errs, B, C=None):
     """
     Take a set of parameters that were fit with lmfit, and replace the errors
     with the 1\sigma errors calculated using the covariance matrix.
-    :param params: lmfit.Model
-    :param data: data over which the model was fit
-    :param errs: a matrix of 1\sigma errors
-    :param B: B matrix (see Bmatrix)
-    :param C: C matrix (optional, will obviate the need for Bmatrix)
-    :return:
+
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        Model
+
+    data : 2d-array
+        Image data
+
+    errs : 2d-array ?
+        Image noise.
+
+    B : 2d-array
+        B matrix.
+
+    C : 2d-array
+        C matrix. Optional. If supplied then Bmatrix will not be used.
+
+    Returns
+    -------
+    params : lmfit.Parameters
+        Modified model.
     """
 
     mask = np.where(np.isfinite(data))
