@@ -242,9 +242,58 @@ class IslandSource(SimpleSource):
 
 class OutputSource(SimpleSource):
     """
-    Each source that is fit by Aegean is cast to this type.
-    The parameters of the source are stored, along with a string
-    formatter that makes printing easy. (as does OutputSource.__str__)
+    A Gaussian component, aka a source, that was measured by Aegean.
+
+    Attributes
+    ----------
+    island : int
+        The island which this component is part of.
+
+    source : int
+        The source number within the island.
+
+    background, local_rms : float
+        Background and local noise level in the image at the location of this source.
+
+    ra, err_ra, dec, err-dec : float
+        Sky location of the source including uncertainties. Decimal degrees.
+
+    ra_str, dec_str : str
+        Sky location in HH:MM:SS.SS +DD:MM:SS.SS format.
+
+    galactic : bool
+        If true then ra,dec are interpreted as glat,glon instead.
+        Default = False.
+        This is a class attribute, not an instance attribute.
+
+    peak_flux, err_peak_flux : float
+        The peak flux and associated uncertainty.
+
+    int_flux, err_int_flux : float
+        Integrated flux and associated uncertainty.
+
+    a, err_a, b, err_b, pa, err_pa: float
+        Shape parameters for this source and associated uncertainties.
+        a/b are in arcsec, pa is in degrees East of North.
+
+    residual_mean, residual_std : float
+        The mean and standard deviation of the model-data for this island
+        of pixels.
+
+    psf_a, psf_b, psf_pa : float
+        The shape parameters for the point spread function
+        (degrees).
+
+    flags : int
+        Flags. See :module:`AegeanTools.flags`.
+
+    uuid : str
+        Unique ID for this source. This is random and not dependent on the source properties.
+
+    See Also
+    --------
+    :module:`AegeanTools.flags`
+
     """
     #header for the output
     header = "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags\n" + \
