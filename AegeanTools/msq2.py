@@ -1,22 +1,18 @@
 #! /usr/bin/env python
 from __future__ import print_function
-
-"""
-Implementation of a marching squares algorithm.
-With reference to http://devblog.phillipspiess.com/2010/02/23/better-know-an-algorithm-1-marching-squares/
-but written in python
-by Paul Hancock
-May 2014
-"""
-
 from copy import copy
-import logging
 import numpy as np
+
+__author__ = "Paul Hancock"
 
 
 class MarchingSquares():
     """
+    Implementation of a marching squares algorithm.
+    With reference to http://devblog.phillipspiess.com/2010/02/23/better-know-an-algorithm-1-marching-squares/
+    but written in python
     """
+
     NOWHERE = 0b0000
     UP = 0b0001
     DOWN = 0b0010
