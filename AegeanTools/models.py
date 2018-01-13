@@ -295,14 +295,6 @@ class OutputSource(SimpleSource):
         self._sanitise()
         return self.formatter.format(self)
 
-    def as_list_dep(self):
-        """Return a list of all the parameters that are stored in this Source"""
-        return [self.island, self.source, self.background, self.local_rms,
-                self.ra_str, self.dec_str, self.ra, self.err_ra, self.dec, self.err_dec,
-                self.peak_flux, self.err_peak_flux, self.int_flux, self.err_int_flux,
-                self.a, self.err_a, self.b, self.err_b,
-                self.pa, self.err_pa, self.flags]
-
     def __repr__(self):
         return "({0:d},{1:d})".format(self.island, self.source)
 
