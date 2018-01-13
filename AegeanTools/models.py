@@ -472,10 +472,23 @@ class IslandFittingData(object):
     All the data required to fit a single island.
     Instances are pickled and passed to the fitting subprocesses
 
-    isle_num = island number (int)
-    i = the pixel island (a 2D numpy array of pixel values)
-    scalars=(innerclip,outerclip,max_summits)
-    offsets=(xmin,xmax,ymin,ymax)
+    Attributes
+    ----------
+    isle_num : int
+        island number
+
+    i : 2d-array
+        a 2D numpy array of pixel values
+
+    scalars : (innerclip, outerclip, max_summits)
+        Inner and outer clipping limits (sigma), and the maximum number of components that should be fit.
+
+    offsets : (xmin, xmax, ymin, ymax)
+        The offset between the boundaries of the island i, within the
+        larger image.
+
+    doislandflux : boolean
+        If true then also measure properties of the island.
     """
 
     def __init__(self, isle_num=0, i=None, scalars=None, offsets=(0,0,1,1), doislandflux=False):
