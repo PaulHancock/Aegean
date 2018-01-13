@@ -11,7 +11,7 @@ def test_simple_source():
     # make a new source without failing
     ss = models.SimpleSource()
     ss.ra = np.float32(12)
-    ss.sanitise()
+    ss._sanitise()
     assert isinstance(ss.ra, np.float64)
     # convert to string without failing
     a = "{0}".format(ss)
