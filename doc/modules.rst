@@ -77,12 +77,6 @@ regions
 .. automodule:: AegeanTools.regions
     :members:
 
-running_percentile
-------------------
-
-.. automodule:: AegeanTools.running_percentile
-    :members:
-
 source_finder
 -------------
 
