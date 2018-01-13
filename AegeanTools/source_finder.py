@@ -34,10 +34,10 @@ from . import flags
 # need Region in the name space in order to be able to unpickle it
 from .regions import Region
 
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
+if six.PY2:
+    import cPickle
+else:
+    import _pickle as cPickle
 
 # multiple cores support
 import pprocess
@@ -628,7 +628,7 @@ class SourceFinder(object):
                 self.global_data.region = mask
             elif os.path.exists(mask):
                 self.log.info("Loading mask from {0}".format(mask))
-                self.global_data.region = pickle.load(open(mask, 'rb'))
+                self.global_data.region = cPickle.load(open(mask, 'rb'))
             else:
                 self.log.error("File {0} not found for loading".format(mask))
                 self.global_data.region = None
