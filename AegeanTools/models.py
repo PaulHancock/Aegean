@@ -501,10 +501,24 @@ class IslandFittingData(object):
 
 def classify_catalog(catalog):
     """
-    look at a catalog of sources and split them according to their class
-    returns:
-    components - sources of type OutputSource
-    islands - sources of type IslandSource
+    Look at a list of sources and split them according to their class.
+
+    Parameters
+    ----------
+    catalog : iterable
+        A list or iterable object of {SimpleSource, IslandSource, OutputSource} objects, possibly mixed.
+        Any other objects will be silently ignored.
+
+    Returns
+    -------
+    components : list
+        List of sources of type OutputSource
+
+    islands : list
+        List of sources of type IslandSource
+
+    simples : list
+        List of source of type SimpleSource
     """
     components = []
     islands = []
@@ -524,8 +538,16 @@ def island_itergen(catalog):
     Iterate over a catalog of sources, and return an island worth of sources at a time.
     Yields a list of components, one island at a time
 
-    :param catalog: A list of objects which have island/source attributes
-    :return:
+    Parameters
+    ----------
+    catalog : iterable
+        A list or iterable of :class:`AegeanTools.models.OutputSource` objects.
+
+    Yields
+    ------
+    group : list
+        A list of all sources within an island, one island at a time.
+
     """
     # reverse sort so that we can pop the last elements and get an increasing island number
     catalog = sorted(catalog)
