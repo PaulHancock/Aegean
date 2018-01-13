@@ -408,9 +408,47 @@ class OutputSource(SimpleSource):
 
 class GlobalFittingData(object):
     """
-    The global data used for fitting.
+    A class to hold the properties associated with an image.
+    [ These were once in the global scope of a monolithic script, hence the name].
     (should be) Read-only once created.
     Used by island fitting subprocesses.
+
+    Attributes
+    ----------
+    img : :class:`AegeanTools.fits_image.FitsImage`
+        Image that is being analysed, aka the input image.
+
+    dcurve : 2d-array
+        Image of +1,0,-1 representing the curvature of the input image.
+
+    rmsimg, bkgimg : 2d-array
+        The noise and background of the input image.
+
+    hdu_header : HDUHeader
+        FITS header for the input image.
+
+    beam : :class:`AegeanTools.fits_image.Beam`
+        The synthesized beam of the input image.
+
+    data_pix : 2d-array
+        A link to the data array that is contained within the `img`.
+
+    dtype : {np.float32, np.float64}
+        The data type for the input image. Will be enforced upon writing.
+
+    region : :class:`AegeanTools.regions.Region`
+        The region that will be used to limit the source finding of Aegean.
+
+    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
+        A helper object for WCS operations, created from `hdu_header`.
+
+    psfhelper : :class:`AegeanTools.wcs_helpers.PSFHelper`
+        A helper objects for tracking the changes in PSF over the image.
+
+    blank : bool
+        If true, then the input image will be blanked at the location of each of
+        the measured islands.
+
     """
 
     def __init__(self):
