@@ -204,7 +204,7 @@ class IslandSource(SimpleSource):
         self.extent = 0
         self.contour = []
         self.max_angular_size_anchors = []
-        self.pix_mask = [] # the ra/dec of all the non masked pixels in this island.
+        #self.pix_mask = [] # the ra/dec of all the non masked pixels in this island.
 
     def __str__(self):
         return "({0:d})".format(self.island)
