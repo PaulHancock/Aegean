@@ -13,7 +13,39 @@ import uuid
 
 class SimpleSource(object):
     """
-    A (forced) measurement of flux at a given location
+    The base source class for an elliptical Gaussian.
+
+    Attributes
+    ----------
+    background, local_rms : float
+        Background and local noise level in the image at the location of this source.
+
+    ra, dec : float
+        Sky location of this source.
+
+    galactic : bool
+        If true then ra,dec are interpreted as glat,glon instead.
+        Default = False.
+        This is a class attribute, not an instance attribute.
+
+    peak_flux, err_peak_flux : float
+        The peak flux value and associated uncertainty.
+
+    peak_pixel : float
+        Value of the brightest pixel for this source.
+
+    flags : int
+        Flags. See :module:`AegeanTools.flags`.
+
+    a, b, pa : float
+        Shape parameters for this source.
+
+    uuid : str
+        Unique ID for this source. This is random and not dependent on the source properties.
+
+    See Also
+    --------
+    :module:`AegeanTools.flags`
     """
     header = "#RA           DEC          Flux      err     a     b         pa  flags\n" + \
              "#                        Jy/beam   Jy/beam   ''    ''        deg WNCPES\n" + \
