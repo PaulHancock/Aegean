@@ -73,29 +73,22 @@ class SimpleSource(object):
 
     def _sanitise(self):
         """
-        Convert various numpy types to np.float64 so that they will print properly
+        Convert attributes of type npumpy.float32 to numpy.float64 so that they will print properly.
         """
         for k in self.__dict__:
             if type(self.__dict__[k]) in [np.float32]:  # np.float32 has a broken __str__ method
                 self.__dict__[k] = np.float64(self.__dict__[k])
 
     def __str__(self):
-        """
-        convert to string
-        """
         self._sanitise()
         return self.formatter.format(self)
 
     def __repr__(self):
-        """
-        A string representation of the name of this source
-        which is always just an empty string
-        """
         return self.__str__()
 
     def as_list(self):
         """
-        return an ordered list of the source attributes
+        Return an *ordered* list of the source attributes
         """
         self._sanitise()
         l = []
