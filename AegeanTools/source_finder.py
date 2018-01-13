@@ -22,7 +22,7 @@ from scipy.ndimage import label, find_objects
 
 # AegeanTools
 from .fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit, \
-                    bias_correct, elliptical_gaussian
+                     bias_correct, elliptical_gaussian
 from .wcs_helpers import WCSHelper, PSFHelper
 from .fits_image import FitsImage, Beam
 from .msq2 import MarchingSquares
@@ -146,14 +146,14 @@ class SourceFinder(object):
             xmin, xmax = f[i][0].start, f[i][0].stop
             ymin, ymax = f[i][1].start, f[i][1].stop
             if np.any(snr[xmin:xmax, ymin:ymax] > innerclip):  # obey inner clip constraint
-                #self.log.info("{1} Island {0} is above the inner clip limit".format(i, data.shape))
+                # self.log.info("{1} Island {0} is above the inner clip limit".format(i, data.shape))
                 data_box = copy.copy(data[xmin:xmax, ymin:ymax])  # copy so that we don't blank the master data
                 data_box[np.where(
                     snr[xmin:xmax, ymin:ymax] < outerclip)] = np.nan  # blank pixels that are outside the outerclip
                 data_box[np.where(l[xmin:xmax, ymin:ymax] != i + 1)] = np.nan  # blank out other summits
                 # check if there are any pixels left unmasked
                 if not np.any(np.isfinite(data_box)):
-                    #self.log.info("{1} Island {0} has no non-masked pixels".format(i,data.shape))
+                    # self.log.info("{1} Island {0} has no non-masked pixels".format(i,data.shape))
                     continue
                 if domask and (self.global_data.region is not None):
                     y, x = np.where(snr[xmin:xmax, ymin:ymax] >= outerclip)
@@ -165,7 +165,7 @@ class SourceFinder(object):
                     if not np.any(mask):
                         continue
                     self.log.debug("Mask {0}".format(mask))
-                #self.log.info("{1} Island {0} will be fit".format(i, data.shape))
+                # self.log.info("{1} Island {0} will be fit".format(i, data.shape))
                 yield data_box, xmin, xmax, ymin, ymax
 
     ##
@@ -1245,8 +1245,9 @@ class SourceFinder(object):
             model.covar = result.covar
             if self.global_data.dobias and self.global_data.docov:
                 x, y = np.indices(idata.shape)
-                acf = elliptical_gaussian(x, y, 1, 0, 0, pixbeam.a * FWHM2CC * fac, pixbeam.b * FWHM2CC * fac, pixbeam.pa)
-                bias_correct(model, idata, acf=acf*errs**2)
+                acf = elliptical_gaussian(x, y, 1, 0, 0, pixbeam.a * FWHM2CC * fac, pixbeam.b * FWHM2CC * fac,
+                                          pixbeam.pa)
+                bias_correct(model, idata, acf=acf * errs ** 2)
 
             if not result.success:
                 is_flag |= flags.FITERR
@@ -1464,7 +1465,7 @@ class SourceFinder(object):
                 psf_helper = None
             for i, src in enumerate(input_sources):
                 if has_psf:
-                    catbeam = Beam(src.a*3600, src.b*3600, src.pa)
+                    catbeam = Beam(src.a * 3600, src.b * 3600, src.pa)
                 else:
                     catbeam = psf_helper.get_beam(src.ra, src.dec)
                 imbeam = global_data.psfhelper.get_beam(src.ra, src.dec)
@@ -1675,16 +1676,17 @@ def get_aux_files(basename):
     :return: dict of filenames or None with keys (bkg, rms, mask, cat, psf)
     """
     base = os.path.splitext(basename)[0]
-    files = {"bkg": base+"_bkg.fits",
-             "rms": base+"_rms.fits",
-             "mask": base+".mim",
-             "cat": base+"_comp.fits",
-             "psf": base+"_psf.fits"}
+    files = {"bkg": base + "_bkg.fits",
+             "rms": base + "_rms.fits",
+             "mask": base + ".mim",
+             "cat": base + "_comp.fits",
+             "psf": base + "_psf.fits"}
 
     for k in files.keys():
         if not os.path.exists(files[k]):
             files[k] = None
     return files
+
 
 if __name__ == "__main__":
     # configure logging
