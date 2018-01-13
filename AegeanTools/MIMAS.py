@@ -24,6 +24,7 @@ from astropy.wcs import wcs as pywcs
 from .regions import Region
 from .catalogs import load_table, write_table
 
+__author__ = "Paul Hancock"
 __version__ = 'v1.3.0'
 __date__ = '2017-09-10'
 
@@ -38,6 +39,38 @@ filewcs = None
 
 
 class Dummy():
+    """
+    A state storage class for MIMAS to work with.
+
+    Attributes
+    ----------
+    add_region : list
+        List of :class:`AegeanTools.MIMAS.Region`s to be added.
+
+    rem_region : list
+        List of :class:`AegeanTools.MIMAS.Region`s to be subtracted.
+
+    include_circles : [[ra, dec, radius],...]
+        List of circles to be added to the region, units are degrees.
+
+    exclude_circles : [[ra, dec, radius], ...]
+        List of circles to be subtracted from the region, units are degrees.
+
+    include_polygons : [[ra,dec, ...], ...]
+        List of polygons to be added to the region, units are degrees.
+
+    exclude_polygons : [[ra,dec, ...], ...]
+        List of polygons to be subtracted from the region, units are degrees.
+
+    maxdepth : int
+        Depth or resolution of the region for HEALPix.
+        There are 4*2**maxdepth pixels at the deepest layer.
+        Default = 8.
+
+    galactic: bool
+        If true then all ra/dec coordinates will be interpreted as if they were in galactic
+        lat/lon (degrees)
+    """
     def __init__(self, maxdepth=8):
         self.add_region = []
         self.rem_region = []
@@ -53,9 +86,16 @@ class Dummy():
 def galactic2fk5(l, b):
     """
     Convert galactic l/b to fk5 ra/dec
-    :param l: longitude in radians
-    :param b: latitude in radians
-    :return: ra, dec in radians
+
+    Parameters
+    ----------
+    l, b : float
+        Galactic coordinates in radians.
+
+    Returns
+    -------
+    ra, dec : float
+        FK5 ecliptic coordinates in radians.
     """
     a = SkyCoord(l, b, unit=(u.radian, u.radian), frame='galactic')
     return a.fk5.ra.radian, a.fk5.dec.radian
@@ -64,11 +104,26 @@ def galactic2fk5(l, b):
 def mask_plane(data, wcs, region, negate=False):
     """
     Mask a 2d image (data) such that pixels within 'region' are set to nan.
-    :param data: 2d numpy.array
-    :param wcs: a WCS object
-    :param region: a MIMAS region
-    :param negate: If True then pixels *outside* the region are set to nan.
-    :return: the masked data (which is modified in place anyway)
+
+    Parameters
+    ----------
+    data : 2d-array
+        Image array.
+
+    wcs : astropy.wcs.WCS
+        WCS for the image in question.
+
+    region : :class:`AegeanTools.regions.Region`
+        A region within which the image pixels will be masked.
+
+    negate : bool
+        If True then pixels *outside* the region are masked.
+        Default = False.
+
+    Returns
+    -------
+    masked : 2d-array
+        The original array, but masked as required.
     """
     # create an array but don't set the values (they are random)
     indexes = np.empty((data.shape[0]*data.shape[1], 2), dtype=int)
@@ -95,13 +150,28 @@ def mask_plane(data, wcs, region, negate=False):
 
 def mask_file(regionfile, infile, outfile, negate=False):
     """
-    Created a masked version of file, using region.
-    This does not change the shape or size of the image, it just sets some pixels to be null/nan
-    :param regionfile: A Region that describes the area of interest
-    :param infile: The name of the fits file to mask.
-    :param outfile: The masked file to be written
-    :param negate: Keep pixles that are outside the supplied region
-    :return: None
+    Created a masked version of file, using a region.
+
+
+    Parameters
+    ----------
+    regionfile : str
+        A file which can be loaded as a :class:`AegeanTools.regions.Region`.
+        The image will be masked according to this region.
+
+    infile : str
+        Input FITS image.
+
+    outfile : str
+        Output FITS image.
+
+    negate :  bool
+        If True then pixels *outside* the region are masked.
+        Default = False.
+
+    See Also
+    --------
+    :func:`AegeanTools.MIMAS.mask_plane`
     """
     # Check that the input file is accessible and then open it
     assert os.path.exists(infile), "Cannot locate fits file {0}".format(infile)
@@ -134,12 +204,28 @@ def mask_table(region, table, negate=False, racol='ra', deccol='dec'):
     """
     Apply a given mask (region) to the table, removing all the rows with ra/dec inside the region
     If negate=False then remove the rows with ra/dec outside the region.
-    :param region: an AegeanTools.regions.Region
-    :param table: input table
-    :param negate: reverse the masking
-    :param racol: the name of the column containing the ra coordinates - default 'ra'
-    :param deccol: the name of the column containing the dec coordinates - default 'dec'
-    :return: filtered table
+
+
+    Parameters
+    ----------
+    region : :class:`AegeanTools.regions.Region`
+        Region to mask.
+
+    table : Astropy.table.Table
+        Table to be masked.
+
+    negate :  bool
+        If True then pixels *outside* the region are masked.
+        Default = False.
+
+    racol, deccol : str
+        The name of the columns in `table` that should be interpreted as ra and dec.
+        Default = 'ra', 'dec'
+
+    Returns
+    -------
+    masked : Astropy.table.Table
+        A view of the given table which has been masked.
     """
     inside = region.sky_within(table[racol], table[deccol], degin=True)
     if not negate:
@@ -153,13 +239,33 @@ def mask_catalog(regionfile, infile, outfile, negate=False, racol='ra', deccol='
     """
     Apply a region file as a mask to a catalog, removing all the rows with ra/dec inside the region
     If negate=False then remove the rows with ra/dec outside the region.
-    :param regionfile: name of a .mim file
-    :param infile: an catalogue that can be read by AegeanTools.catalogs.load_table
-    :param outfile: output filename
-    :param negate: reverse the masking
-    :param racol: the name of the column containing the ra coordinates - default 'ra'
-    :param deccol: the name of the column containing the dec coordinates - default 'dec'
-    :return:
+
+
+    Parameters
+    ----------
+    regionfile : str
+        A file which can be loaded as a :class:`AegeanTools.regions.Region`.
+        The catalogue will be masked according to this region.
+
+    infile : str
+        Input catalogue.
+
+    outfile : str
+        Output catalogue.
+
+    negate :  bool
+        If True then pixels *outside* the region are masked.
+        Default = False.
+
+    racol, deccol : str
+        The name of the columns in `table` that should be interpreted as ra and dec.
+        Default = 'ra', 'dec'
+
+    See Also
+    --------
+    :func:`AegeanTools.MIMAS.mask_table`
+
+    :func:`AegeanTools.catalogs.load_table`
     """
     logging.info("Loading region from {0}".format(regionfile))
     region = cPickle.load(open(regionfile, 'rb'))
@@ -171,6 +277,18 @@ def mask_catalog(regionfile, infile, outfile, negate=False, racol='ra', deccol='
 
 
 def mim2reg(mimfile, regfile):
+    """
+    Convert a MIMAS region (.mim) file into a DS9 region (.reg) file.
+
+    Parameters
+    ----------
+    mimfile : str
+        Input file in MIMAS format.
+
+    regfile : str
+        Output file.
+
+    """
     region = cPickle.load(open(mimfile, 'rb'))
     region.write_reg(regfile)
     logging.info("Converted {0} -> {1}".format(mimfile, regfile))
@@ -178,6 +296,17 @@ def mim2reg(mimfile, regfile):
 
 
 def mim2fits(mimfile, fitsfile):
+    """
+    Convert a MIMAS region (.mim) file into a MOC region (.fits) file.
+
+    Parameters
+    ----------
+    mimfile : str
+        Input file in MIMAS format.
+
+    fitsfile : str
+        Output file.
+    """
     region = cPickle.load(open(mimfile, 'rb'))
     region.write_fits(fitsfile, moctool='MIMAS {0}-{1}'.format(__version__, __date__))
     logging.info("Converted {0} -> {1}".format(mimfile, fitsfile))
@@ -186,9 +315,17 @@ def mim2fits(mimfile, fitsfile):
 
 def box2poly(line):
     """
-    Convert a line that describes a box in ds9 format, into a polygon that is given by the corners of the box
-    :param line: text
-    :return: list of [ ra,dec,ra,dec, ...  ]
+    Convert a string that describes a box in ds9 format, into a polygon that is given by the corners of the box
+
+    Parameters
+    ----------
+    line : str
+        A string containing a DS9 region command for a box.
+
+    Returns
+    -------
+    poly : [ra, dec, ...]
+        The corners of the box in clockwise order from top left.
     """
     words = re.split('[(\s,)]', line)
     ra = words[1]
@@ -211,6 +348,19 @@ def box2poly(line):
 
 
 def circle2circle(line):
+    """
+    Parse a string that describes a circle in ds9 format.
+
+    Parameters
+    ----------
+    line : str
+        A string containing a DS9 region command for a circle.
+
+    Returns
+    -------
+    circle : [ra, dec, radius]
+        The center and radius of the circle.
+    """
     words = re.split('[(,\s)]', line)
     ra = words[1]
     dec = words[2]
@@ -226,9 +376,19 @@ def circle2circle(line):
 
 def poly2poly(line):
     """
-    This function works but the resulting polygons break healpy.
-    :param line:
-    :return:
+    Parse a string of text containing a DS9 description of a polygon.
+
+    This function works but is not very robust due to the constraints of healpy.
+
+    Parameters
+    ----------
+    line : str
+        A string containing a DS9 region command for a polygon.
+
+    Returns
+    -------
+    poly : [ra, dec, ...]
+        The coordinates of the polygon.
     """
     words = re.split('[(\s,)]', line)
     ras = np.array(words[1::2])
@@ -248,10 +408,19 @@ def poly2poly(line):
 
 def reg2mim(regfile, mimfile, maxdepth):
     """
-    Read a ds9 regions file and create a mim file from it
-    :param regfile:
-    :param mimfile:
-    :return:
+    Parse a DS9 region file and write a MIMAS region (.mim) file.
+
+    Parameters
+    ----------
+    regfile : str
+        DS9 region (.reg) file.
+
+    mimfile : str
+        MIMAS region (.mim) file.
+
+    maxdepth : str
+        Depth/resolution of the region file.
+
     """
     logging.info("Reading regions from {0}".format(regfile))
     lines = (l for l in open(regfile, 'r') if not l.startswith('#'))
@@ -280,9 +449,19 @@ def combine_regions(container):
     """
     Return a region that is the combination of those specified in the container.
     The container is typically a results instance that comes from argparse.
-    Any object with the properties [maxdepth,add_region,rem_region,include_circles, exclude_circles] will work
-    :param container: Object containing the region descriptions.
-    :return: A region
+
+    Order of construction is: add regions, subtract regions, add circles, subtract circles,
+    add polygons, subtract polygons.
+
+    Parameters
+    ----------
+    container : :class:`AegeanTools.MIMAS.Dummy`
+        The regions to be combined.
+
+    Returns
+    -------
+    region : :class:`AegeanTools.regions.Region`
+        The constructed region.
     """
     # create empty region
     region = Region(container.maxdepth)
@@ -343,9 +522,18 @@ def combine_regions(container):
 
 def intersect_regions(flist):
     """
-    Perform the intersection of all the regions in the given list.
-    :param flist: list of region filenames
-    :return: a region
+    Construct a region which is the intersection of all regions described in the given
+    list of file names.
+
+    Parameters
+    ----------
+    flist : list
+        A list of region filenames.
+
+    Returns
+    -------
+    region : :class:`AegeanTools.regions.Region`
+        The intersection of all regions, possibly empty.
     """
     if len(flist) < 2:
         raise Exception("Require at least two regions to perform intersection")
@@ -355,14 +543,17 @@ def intersect_regions(flist):
     return a
 
 
-
-
 def save_region(region, filename):
     """
     Save the given region to a file
-    :param region: A Region
-    :param filename: A Filename
-    :return: None
+
+    Parameters
+    ----------
+    region : :class:`AegeanTools.regions.Region`
+        A region.
+
+    filename : str
+        Output file name.
     """
     cPickle.dump(region, open(filename, 'wb'), protocol=2)
     logging.info("Wrote {0}".format(filename))
@@ -371,10 +562,15 @@ def save_region(region, filename):
 
 def save_as_image(region, filename):
     """
+    Convert a MIMAS region (.mim) file into a image (eg .png)
 
-    :param region:
-    :param filename:
-    :return:
+    Parameters
+    ----------
+    region : :class:`AegeanTools.regions.Region`
+        Region of interest.
+
+    filename : str
+        Output filename.
     """
     import healpy as hp
     pixels = list(region.get_demoted())
