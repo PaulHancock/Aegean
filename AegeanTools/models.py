@@ -71,7 +71,7 @@ class SimpleSource(object):
 
 
 
-    def sanitise(self):
+    def _sanitise(self):
         """
         Convert various numpy types to np.float64 so that they will print properly
         """
@@ -83,7 +83,7 @@ class SimpleSource(object):
         """
         convert to string
         """
-        self.sanitise()
+        self._sanitise()
         return self.formatter.format(self)
 
     def __repr__(self):
@@ -97,7 +97,7 @@ class SimpleSource(object):
         """
         return an ordered list of the source attributes
         """
-        self.sanitise()
+        self._sanitise()
         l = []
         for name in self.names:
             l.append(getattr(self, name))
@@ -226,7 +226,7 @@ class OutputSource(SimpleSource):
         self.psf_pa = 0
 
     def __str__(self):
-        self.sanitise()
+        self._sanitise()
         return self.formatter.format(self)
 
     def as_list_dep(self):
