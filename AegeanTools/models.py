@@ -21,7 +21,7 @@ class SimpleSource(object):
         Background and local noise level in the image at the location of this source.
 
     ra, dec : float
-        Sky location of this source.
+        Sky location of this source. Decimal degrees.
 
     galactic : bool
         If true then ra,dec are interpreted as glat,glon instead.
@@ -99,8 +99,81 @@ class SimpleSource(object):
 
 class IslandSource(SimpleSource):
     """
-    Each island of pixels can be characterised in a basic manner.
-    This class contains info relevant to such objects.
+    An island of pixels.
+
+
+    Attributes
+    ----------
+    island: int
+        The island identification number
+
+    components : int
+        The number of components that make up this island.
+
+    background, local_rms : float
+        Background and local noise level in the image at the location of this source.
+
+    ra, dec : float
+        Sky location of the brightest pixel in this island. Decimal degrees.
+
+    ra_str, dec_str : str
+        Sky location in HH:MM:SS.SS +DD:MM:SS.SS format.
+
+    galactic : bool
+        If true then ra,dec are interpreted as glat,glon instead.
+        Default = False.
+        This is a class attribute, not an instance attribute.
+
+    peak_flux, peak_pixel : float
+        Value of the brightest pixel for this source.
+
+    int_flux, err_int_flux : float
+        Integrated flux and associated uncertainty.
+
+    x_width, y_width : int
+        The extent of the island in pixel space. The width is of the smallest bounding box.
+
+    max_angular_size : float
+        The maximum angular size of the island in sky coordinates (degrees).
+
+    pa : float
+        Position angle for the line representing the maximum angular size.
+
+    pixels : int
+        The number of pixels covered by this island.
+
+    area : float
+        The area of this island in sky coordinates (square degrees).
+
+    beam_area : float
+        The area of the synthesized beam of the image at the location of the brightest pixel.
+        (square degrees).
+
+    eta : float
+        A factor that accounts for the difference between the integrated flux
+        counted by summing pixels, and the integrated flux that would be produced
+        by integrating an appropriately sized Gaussian.
+
+    extent : float
+
+    contour : list
+        A list of pixel coordinates that mark the pixel boundaries for this island
+        of pixels.
+
+    max_angular_size_anchors : [x1, y1, x2, y2]
+        The end points of the vector that describes the maximum angular size
+        of this island.
+
+    flags : int
+        Flags. See :module:`AegeanTools.flags`.
+
+    uuid : str
+        Unique ID for this source. This is random and not dependent on the source properties.
+
+    See Also
+    --------
+    :module:`AegeanTools.flags`
+
     """
     names = ['island', 'components', 'background', 'local_rms', 'ra_str', 'dec_str', 'ra', 'dec',
              'peak_flux', 'int_flux', 'err_int_flux', 'eta', 'x_width', 'y_width', 'max_angular_size', 'pa',
