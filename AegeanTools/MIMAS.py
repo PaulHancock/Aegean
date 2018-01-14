@@ -45,10 +45,10 @@ class Dummy():
     Attributes
     ----------
     add_region : list
-        List of :class:`AegeanTools.MIMAS.Region`s to be added.
+        List of :class:`AegeanTools.MIMAS.Region` to be added.
 
     rem_region : list
-        List of :class:`AegeanTools.MIMAS.Region`s to be subtracted.
+        List of :class:`AegeanTools.MIMAS.Region` to be subtracted.
 
     include_circles : [[ra, dec, radius],...]
         List of circles to be added to the region, units are degrees.
