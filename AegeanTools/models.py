@@ -499,6 +499,24 @@ class IslandFittingData(object):
         self.doislandflux = doislandflux
 
 
+class DummyLM(object):
+    """
+    A dummy copy of the lmfit results, for use when no fitting was done.
+
+    Attributes
+    ----------
+    residual : [np.nan, np.nan]
+        The residual background and rms.
+
+    success: bool
+        False - the fitting has failed.
+    """
+
+    def __init__(self):
+        self.residual = [np.nan, np.nan]
+        self.success = False
+
+
 def classify_catalog(catalog):
     """
     Look at a list of sources and split them according to their class.

@@ -28,7 +28,8 @@ from .fits_image import FitsImage, Beam
 from .msq2 import MarchingSquares
 from .angle_tools import dec2hms, dec2dms, gcd, bear
 from .catalogs import load_table, table_to_source_list
-from .models import SimpleSource, OutputSource, IslandSource, island_itergen, GlobalFittingData
+from .models import SimpleSource, OutputSource, IslandSource, island_itergen, \
+    GlobalFittingData, IslandFittingData, DummyLM
 from . import flags
 
 # need Region in the name space in order to be able to unpickle it
@@ -51,35 +52,6 @@ header = """#Aegean version {0}
 # constants
 CC2FHWM = (2 * math.sqrt(2 * math.log(2)))
 FWHM2CC = 1 / CC2FHWM
-
-
-class IslandFittingData(object):
-    """
-    All the data required to fit a single island.
-    Instances are pickled and passed to the fitting subprocesses
-
-    isle_num = island number (int)
-    i = the pixel island (a 2D numpy array of pixel values)
-    scalars=(innerclip,outerclip,max_summits)
-    offsets=(xmin,xmax,ymin,ymax)
-    """
-
-    def __init__(self, isle_num=0, i=None, scalars=None, offsets=(0, 0, 1, 1), doislandflux=False):
-        self.isle_num = isle_num
-        self.i = i
-        self.scalars = scalars
-        self.offsets = offsets
-        self.doislandflux = doislandflux
-
-
-class DummyLM(object):
-    """
-    A dummy copy of the lmfit results, for use when no fitting was done.
-    """
-
-    def __init__(self):
-        self.residual = [np.nan, np.nan]
-        self.success = False
 
 
 class SourceFinder(object):
