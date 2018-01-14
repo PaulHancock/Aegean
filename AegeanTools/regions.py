@@ -9,11 +9,26 @@ from astropy.coordinates import SkyCoord
 import astropy.units as u
 from astropy.io import fits
 
+__author__ = "Paul Hancock"
 
 class Region(object):
     """
     A Region object represents a footprint on the sky. This is done in a way similar to a MOC.
     The region is stored as a list of healpix pixels, allowing for binary set-like operations.
+
+    Attributes
+    ----------
+    maxdepth : int
+        The depth or resolution of the region.
+        At the deepest level there will be 4*2**maxdepth pixels on the sky.
+        Default = 11
+
+    pixeldict : dict
+        A dictionary of sets, each set containing the pixels within the region. The sets are indexed by their
+        layer number.
+
+    demoted : set
+        A representation of this region at the deepest layer.
     """
 
     def __init__(self, maxdepth=11):
@@ -28,11 +43,15 @@ class Region(object):
     def add_circles(self, ra_cen, dec_cen, radius, depth=None):
         """
         Add one or more circles to this region
-        :param ra_cen: ra or list of ras for circle centers
-        :param dec_cen: dec or list of decs for circle centers
-        :param radius: radius or list of radii for circles
-        :param depth: The depth at which we wish to represent the circle (forced to be <=maxdepth)
-        :return: None
+
+        Parameters
+        ----------
+        ra_cen, dec_cen, radius : float or list
+            The center and radius of the circle or circles to add to this region.
+
+        depth : int
+            The depth at which the given circles will be inserted.
+
         """
         if depth is None or depth > self.maxdepth:
             depth = self.maxdepth
@@ -53,10 +72,15 @@ class Region(object):
 
     def add_poly(self, positions, depth=None):
         """
-        Add a single polygon to this region
-        :param positions: list of [ (ra,dec), ... ] positions that form the polygon
-        :param depth: The depth at which we wish to represent the circle (forced to be <=maxdepth
-        :return: None
+        Add a single polygon to this region.
+
+        Parameters
+        ----------
+        positions : [[ra, dec], ...]
+            Positions for the vertices of the polygon. The polygon needs to be convex and non-intersecting.
+
+        depth : int
+            The deepth at which the polygon will be inserted.
         """
         assert len(positions) >= 3, "A minimum of three coordinate pairs are required"
 
@@ -71,12 +95,37 @@ class Region(object):
         return
 
     def add_pixels(self, pix, depth):
+        """
+        Add one or more HEALPix pixels to this region.
+
+        Parameters
+        ----------
+        pix : int or iterable
+            The pixels to be added
+
+        depth : int
+            The depth at which the pixels are added.
+        """
         if depth not in self.pixeldict:
             self.pixeldict[depth] = set()
         self.pixeldict[depth].update(set(pix))
         pass
 
     def get_area(self, degrees=True):
+        """
+        Calculate the total area represented by this region.
+
+        Parameters
+        ----------
+        degrees : bool
+            If True then return the area in square degrees, otherwise use steradians.
+            Default = True.
+
+        Returns
+        -------
+        area : float
+            The area of the region.
+        """
         area = 0
         for d in range(1, self.maxdepth+1):
             area += len(self.pixeldict[d])*hp.nside2pixarea(2**d, degrees=degrees)
@@ -84,14 +133,21 @@ class Region(object):
 
     def get_demoted(self):
         """
-        :return: Return a set of pixels that represent this region at maxdepth
+        Get a representation of this region at the deepest level.
+
+        Returns
+        -------
+        demoted : set
+            A set of pixels, at the highest resolution.
         """
         self._demote_all()
         return self.demoted
 
     def _demote_all(self):
         """
-        Represent this region as pixels at maxdepth only
+        Convert the multi-depth pixeldict into a single set of pixels at the deepest layer.
+
+        The result is cached, and reset when any changes are made to this region.
         """
         # only do the calculations if the demoted list is empty
         if len(self.demoted) == 0:
@@ -128,10 +184,20 @@ class Region(object):
     def sky_within(self, ra, dec, degin=False):
         """
         Test whether a sky position is within this region
-        :param ra: RA in radians
-        :param dec: Dec in radians
-        :param degin: True if the input parameters are in degrees instead of radians
-        :return: True if RA/Dec is within this region
+
+        Parameters
+        ----------
+        ra, dec : float
+            Sky position.
+
+        degin : bool
+            If True the ra/dec is interpreted as degrees, otherwise as radians.
+            Default = False.
+
+        Returns
+        -------
+        within : bool
+            True if the given position is within one of the region's pixels.
         """
         sky = self.radec2sky(ra, dec)
 
@@ -154,8 +220,16 @@ class Region(object):
 
     def union(self, other, renorm=True):
         """
-        Add another Region by performing union on their pixlists
-        :param other: A Region
+        Add another Region by performing union on their pixlists.
+
+        Parameters
+        ----------
+        other : :class:`AegeanTools.regions.Region`
+            The region to be combined.
+
+        renorm : bool
+            Perform renormalisation after the operation?
+            Default = True.
         """
         # merge the pixels that are common to both
         for d in range(1, min(self.maxdepth, other.maxdepth)+1):
@@ -174,9 +248,14 @@ class Region(object):
 
     def without(self, other):
         """
-        Remove the overlap between this region and the other region
-        :param other: Another region
-        :return: None
+        Subtract another Region by performing a difference operation on their pixlists.
+
+        Requires both regions to have the same maxdepth.
+
+        Parameters
+        ----------
+        other : :class:`AegeanTools.regions.Region`
+            The region to be combined.
         """
         # work only on the lowest level
         # TODO: Allow this to be done for regions with different depths.
@@ -189,9 +268,14 @@ class Region(object):
 
     def intersect(self, other):
         """
-        intersect this region with another
-        :param other: a region
-        :return: None
+        Combine with another Region by performing intersection on their pixlists.
+
+        Requires both regions to have the same maxdepth.
+
+        Parameters
+        ----------
+        other : :class:`AegeanTools.regions.Region`
+            The region to be combined.
         """
         # work only on the lowest level
         # TODO: Allow this to be done for regions with different depths.
@@ -204,9 +288,14 @@ class Region(object):
 
     def symmetric_difference(self, other):
         """
+        Combine with another Region by performing the symmetric difference of their pixlists.
 
-        :param other:
-        :return:
+        Requires both regions to have the same maxdepth.
+
+        Parameters
+        ----------
+        other : :class:`AegeanTools.regions.Region`
+            The region to be combined.
         """
         # work only on the lowest level
         # TODO: Allow this to be done for regions with different depths.
@@ -220,8 +309,11 @@ class Region(object):
     def write_reg(self, filename):
         """
         Write a ds9 region file that represents this region as a set of diamonds.
-        :param filename: file to write
-        :return: None
+
+        Parameters
+        ----------
+        filename : str
+            File to write
         """
         with open(filename, 'w') as out:
             for d in range(1, self.maxdepth+1):
@@ -243,8 +335,15 @@ class Region(object):
     def write_fits(self, filename, moctool=''):
         """
         Write a fits file representing the MOC of this region.
-        :param filename: Output filename
-        :return: None
+
+        Parameters
+        ----------
+        filename : str
+            File to write
+
+        moctool : str
+            String to be written to fits header with key "MOCTOOL".
+            Default = ''
         """
         datafile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'MOC.fits')
         hdulist = fits.open(datafile)
@@ -268,7 +367,11 @@ class Region(object):
         """
         Create a list of all the pixels that cover this region.
         This list contains overlapping pixels of different orders.
-        :return: A list of HealPix pixel numbers.
+
+        Returns
+        -------
+        pix : list
+            A list of HEALPix pixel numbers.
         """
         pd = []
         for d in range(1, self.maxdepth):
@@ -280,9 +383,16 @@ class Region(object):
         """
         Convert [ra], [dec] to [(ra[0], dec[0]),....]
         and also  ra,dec to [(ra,dec)] if ra/dec are not iterable
-        :param ra: float or list of floats
-        :param dec: float or list of floats
-        :return: list of (ra,dec) tuples
+
+        Parameters
+        ----------
+        ra, dec : float or iterable
+            Sky coordinates
+
+        Returns
+        -------
+        sky : numpy.array
+            array of (ra,dec) coordinates.
         """
         try:
             sky = np.array(list(zip(ra, dec)))
@@ -296,8 +406,17 @@ class Region(object):
         Convert ra,dec coordinates to theta,phi coordinates
         ra -> phi
         dec -> theta
-        :param sky: float [(ra,dec),...]
-        :return: A list of [(theta,phi), ...]
+
+        Parameters
+        ----------
+        sky : numpy.array
+            Array of (ra,dec) coordinates.
+            See :func:`AegeanTools.regions.Region.radec2sky`
+
+        Returns
+        -------
+        theta_phi : numpy.array
+            Array of (theta,phi) coordinates.
         """
         try:
             theta_phi = sky.copy()
@@ -314,9 +433,21 @@ class Region(object):
     @classmethod
     def sky2vec(cls, sky):
         """
-        Convert sky positions in to 3d-vectors
-        :param sky: [(ra,dec), ...]
-        :return: [(x,y,z), ...]
+        Convert sky positions in to 3d-vectors on the unit sphere.
+
+        Parameters
+        ----------
+        sky : numpy.array
+            Sky coordinates as an array of (ra,dec)
+
+        Returns
+        -------
+        vec : numpy.array
+            Unit vectors as an array of (x,y,z)
+
+        See Also
+        --------
+        :func:`AegeanTools.regions.Region.vec2sky`
         """
         theta_phi = cls.sky2ang(sky)
         theta, phi = map(np.array, list(zip(*theta_phi)))
@@ -327,9 +458,22 @@ class Region(object):
     def vec2sky(cls, vec, degrees=False):
         """
         Convert [x,y,z] vectors into sky coordinates ra,dec
-        :param vec: An array-like list of ([x,y,z],...)
-        :param degrees: Return ra/dec in degrees? Default = false
-        :return: [(ra,...),(dec,...)]
+
+        Parameters
+        ----------
+        vec : numpy.array
+            Unit vectors as an array of (x,y,z)
+
+        degrees
+
+        Returns
+        -------
+        sky : numpy.array
+            Sky coordinates as an array of (ra,dec)
+
+        See Also
+        --------
+        :func:`AegeanTools.regions.Region.sky2vec`
         """
         theta, phi = hp.vec2ang(vec)
         ra = phi
