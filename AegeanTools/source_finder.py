@@ -56,7 +56,19 @@ FWHM2CC = 1 / CC2FHWM
 
 class SourceFinder(object):
     """
-    The Aegean source finding program
+    The Aegean source finding algorithm
+
+    Attributes
+    ----------
+    global_data : :class:`AegeanTools.models.GlobalFittingData`
+        State holder for properties.
+
+    sources : list
+        List of sources that have been found/measured.
+
+    log : logging.log
+        Logger to use.
+        Default = None
     """
 
     def __init__(self, **kwargs):
@@ -78,12 +90,28 @@ class SourceFinder(object):
 
         Needs to work for entire image, and also for components within an island.
 
-        :param data: and island not a 2d array of pixel values
-        :param rmsimg: 2d array of rms values
-        :param innerclip: seed clip value
-        :param outerclip: flood clip value
-        :param domask: look for a region mask in globals, and only return islands that are within the mask
-        :return:
+        Parameters
+        ----------
+        data : 2d-array
+            Image array.
+
+        rmsimg : 2d-array
+            Noise image.
+
+        innerclip, outerclip :float
+            Seed (inner) and flood (outer) clipping values.
+
+        domask : bool
+            If True then look for a region mask in globals, only return islands that are within the region.
+            Default = False.
+
+        Yields
+        ------
+        data_box : 2d-array
+            A island of sources with subthreshold values masked.
+
+        xmin, xmax, ymin, ymax : int
+            The corners of the data_box within the initial data array.
         """
 
         if outerclip is None:
@@ -137,16 +165,34 @@ class SourceFinder(object):
         Estimates the number of sources in an island and returns initial parameters for the fit as well as
         limits on those parameters.
 
-        :param data: np.ndarray of flux values
-        :param rmsimg: np.ndarray of 1sigma values
-        :param curve: np.ndarray of curvature values
-        :param beam: beam object
-        :param innerclip: the inner clipping level for flux data, in sigmas
-        :param outerclip: the outer clipping level for flux data, in sigmas
-        :param offsets: the (x,y) offset of data within it's parent image
-        :param max_summits: if not None, only this many summits/components will be fit. More components may be
-                            present in the island, but subsequent components will not have free parameters
-        :return: an lmfit.Parameters object that describes our model
+        Parameters
+        ----------
+        data : 2d-array
+            (sub) image of flux values. Background should be subtracted.
+
+        rmsimg : 2d-array
+            Image of 1sigma values
+
+        curve : 2d-array
+            Image of curvature values [-1,0,+1]
+
+        beam : :class:`AegeanTools.fits_image.Beam`
+            The beam information for the image.
+
+        innerclip, outerclip : float
+            Inerr and outer level for clipping (sigmas).
+
+        offsets : (int, int)
+            The (x,y) offset of data within it's parent image
+
+        max_summits : int
+            If not None, only this many summits/components will be fit. More components may be
+            present in the island, but subsequent components will not have free parameters.
+
+        Returns
+        -------
+        model : lmfit.Parameters
+            The initial estimate of parameters for the components within this island.
         """
 
         debug_on = self.log.isEnabledFor(logging.DEBUG)
@@ -346,13 +392,25 @@ class SourceFinder(object):
         """
         Convert fitting results into a set of components
 
-        :param result: the results from lmfit (pixel data etc.)
-        :param model: the model that was fit
-        :param island_data: an IslandFittingData object
-        :param isflags: flags that should be added to this island (in addition to those within the model)
-        :return: a list of components [and islands]
-        """
+        Parameters
+        ----------
+        result : lmfit.MinimizerResult
+            The fitting results.
 
+        model : lmfit.Parameters
+            The model that was fit.
+
+        island_data : :class:`AegeanTools.models.IslandFittingData`
+            Data about the island that was fit.
+
+        isflags : int
+            Flags that should be added to this island (in addition to those within the model)
+
+        Returns
+        -------
+        sources : list
+            A list of components, and islands if requested.
+        """
         global_data = self.global_data
 
         # island data
@@ -555,22 +613,54 @@ class SourceFinder(object):
         """
         Populate the global_data object by loading or calculating the various components
 
-        :param filename: Main image which source finding is run on
-        :param hdu_index: HDU index of the image within the fits file, default is 0 (first)
-        :param bkgin: background image filename or HDUList
-        :param rmsin: rms/noise image filename or HDUList
-        :param beam: Beam object representing the synthsized beam. Will replace what is in the FITS header.
-        :param verb: write extra lines to INFO level log
-        :param rms: a float that represents a constant rms level for the entire image
-        :param cores: number of cores to use if different from what is autodetected
-        :param do_curve: if True a curvature map will be created, default=True
-        :param mask: filename or Region object
-        :param lat: latitude of the observing telescope (declination of zenith)
-        :param psf: filename or HDUList of a psf image
-        :param blank: True = blank output image where islands are found
-        :param docov: True = use covariance matrix in fitting
-        :param slice: For an image cube, which slice to use.
-        :return: None
+        Parameters
+        ----------
+        filename : str or HDUList
+            Main image which source finding is run on
+
+        hdu_index : int
+            HDU index of the image within the fits file, default is 0 (first)
+
+        bkgin, rmsin : str or HDUList
+            background and noise image filename or HDUList
+
+        beam : :class:`AegeanTools.fits_image.Beam`
+            Beam object representing the synthsized beam. Will replace what is in the FITS header.
+
+        verb : bool
+            Verbose. Write extra lines to INFO level log.
+
+        rms : float
+            A float that represents a constant rms level for the entire image.
+            Default = None, which causes the rms to be loaded or calculated.
+
+        cores : int
+            Number of cores to use if different from what is autodetected.
+
+
+        do_curve : bool
+            If True a curvature map will be created, default=True.
+
+        mask : str or :class:`AegeanTools.regions.Region`
+            filename or Region object
+
+        lat : float
+            Latitude of the observing telescope (declination of zenith)
+
+        psf : str or HDUList
+            Filename or HDUList of a psf image
+
+        blank : bool
+            True = blank output image where islands are found.
+            Default = False.
+
+        docov : bool
+            True = use covariance matrix in fitting.
+            Default = True.
+
+        slice : int
+            For an image cube, which slice to use.
+
         """
         # don't reload already loaded data
         if self.global_data.img is not None:
@@ -664,15 +754,32 @@ class SourceFinder(object):
         Generate and save the background and RMS maps as FITS files.
         They are saved in the current directly as aegean-background.fits and aegean-rms.fits.
 
-        :param image_filename: filename or HDUList of image
-        :param hdu_index: if fits file has more than one hdu, it can be specified here
-        :param bkgin: a background image filename or HDUList
-        :param rmsin: an rms image filename or HDUList
-        :param beam: beam parameters to override those given in fits header
-        :param rms: forced rms value
-        :param cores: cores to use
-        :param outbase: basename for output files
-        :return:
+        Parameters
+        ----------
+        image_filename : str or HDUList
+            Input image.
+
+        hdu_index : int
+            If fits file has more than one hdu, it can be specified here.
+            Default = 0.
+
+        bkgin, rmsin : str or HDUList
+            Background and noise image filename or HDUList
+
+        beam : :class:`AegeanTools.fits_image.Beam`
+            Beam object representing the synthsized beam. Will replace what is in the FITS header.
+
+
+        rms : float
+            A float that represents a constant rms level for the entire image.
+            Default = None, which causes the rms to be loaded or calculated.
+
+        cores : int
+            Number of cores to use if different from what is autodetected.
+
+        outbase : str
+            Basename for output files.
+
         """
 
         self.log.info("Saving background / RMS maps")
@@ -725,8 +832,11 @@ class SourceFinder(object):
         """
         Save the image data.
         This is probably only useful if the image data has been blanked.
-        :param outname: Name for the output file
-        :return:
+
+        Parameters
+        ----------
+        outname : str
+            Name for the output file.
         """
         hdu = self.global_data.img.hdu
         hdu.data = self.global_data.img._pixels
@@ -741,17 +851,21 @@ class SourceFinder(object):
 
     def _make_bkg_rms(self, mesh_size=20, forced_rms=None, cores=None):
         """
-        Calculate an rms image and a bkg image
-        reads  data_pix, beam, rmsimg, bkgimg from global_data
-        writes rmsimg, bkgimg to global_data
-        is able to run on multiple cores
+        Calculate an rms image and a bkg image.
 
-        :param mesh_size: number of beams per box default = 20
-        :param forced_rms: the rms of the image
-                           None => calculate the rms and bkg levels (default)
-                           <float> => assume zero background and constant rms
-        :param cores: number of cores to use, default = None = 1 core
-        :return: None
+        Parameters
+        ----------
+        mesh_size : int
+            Number of beams per box default = 20
+
+        forced_rms : bool
+            The rms of the image.
+            If None:  calculate the rms and bkg levels (default).
+            Otherwise assume zero background and constant rms
+
+        cores: int
+            Number of cores to use if different from what is autodetected.
+
         """
         if forced_rms:
             self.global_data.bkgimg[:] = 0
@@ -844,16 +958,18 @@ class SourceFinder(object):
         The mean is estimated as the median of data.
         The RMS is estimated as the IQR of data / 1.34896.
 
-        reads/writes data from global_data
-        works only on the sub-region specified by
-        ymin,ymax,xmin,xmax
-        Background and RMS are set to np.nan if data contains fewer than 4 non nan values.
+        Parameters
+        ----------
+        xmin, xmax, ymin, ymax : int
+            The bounding region over which the bkg/rms will be calculated.
 
-        :param xmin:
-        :param xmax:
-        :param ymin:
-        :param ymax:
-        :return: ymin, ymax, xmin, xmax, bkg, rms
+        Returns
+        -------
+        ymin, ymax, xmin, xmax : int
+            A copy of the input parameters
+
+        bkg, rms : float
+            The calculated background and noise.
         """
         data = self.global_data.data_pix[ymin:ymax, xmin:xmax]
         pixels = np.extract(np.isfinite(data), data).ravel()
@@ -874,9 +990,19 @@ class SourceFinder(object):
         """
         Load a fits file (bkg/rms/curve) and make sure that
         it is the same shape as the main image.
-        :param image: main FitsImage object
-        :param auxfile: filename of auxiliary file to be loaded
-        :return: FitsImage(auxfile)
+
+        Parameters
+        ----------
+        image : :class:`AegeanTools.fits_image.FitsImage`
+            The main image that has already been loaded.
+
+        auxfile : str or HDUList
+            The auxiliary file to be loaded.
+
+        Returns
+        -------
+        aux : :class:`AegeanTools.fits_image.FitsImage`
+            The loaded image.
         """
         auximg = FitsImage(auxfile, beam=self.global_data.beam).get_pixels()
         if auximg.shape != image.get_pixels().shape:
@@ -892,11 +1018,24 @@ class SourceFinder(object):
         """
         Do island refitting (priorized fitting) on a group of islands.
 
-        :param group: A list of islands group=[ [(0,0),(0,1)],[(1,0)] ...]
-        :param stage: refit stage
-        :param outerclip: ignored, placed holder for future development
-        :param istart: the starting island number
-        :return: a list of sources (including islands)
+        Parameters
+        ----------
+        group : list
+            A list of components grouped by island.
+
+        stage : int
+            Refitting stage.
+
+        outerclip : float
+            Ignored, placed holder for future development.
+
+        istart : int
+            The starting island number.
+
+        Returns
+        -------
+        sources : list
+            List of sources (and islands).
         """
         global_data = self.global_data
         sources = []
@@ -1130,8 +1269,16 @@ class SourceFinder(object):
         """
         Take an Island, do all the parameter estimation and fitting.
 
-        :param island_data: an IslandFittingData object
-        :return: a list of sources that are within the island
+
+        Parameters
+        ----------
+        island_data : :class:`AegeanTools.models.IslandFittingData`
+            The island to be fit.
+
+        Returns
+        -------
+        sources : list
+            The sources that were fit.
         """
         global_data = self.global_data
 
@@ -1226,8 +1373,16 @@ class SourceFinder(object):
         This function just wraps around fit_island, so that when we do multiprocesing
         a single process will fit multiple islands before returning results.
 
-        :param islands: a list of IslandFittingData objects
-        :return: a list of OutputSources
+
+        Parameters
+        ----------
+        islands : list of :class:`AegeanTools.models.IslandFittingData`
+            The islands to be fit.
+
+        Returns
+        -------
+        sources : list
+            The sources that were fit.
         """
         self.log.debug("Fitting group of {0} islands".format(len(islands)))
         sources = []
@@ -1243,32 +1398,69 @@ class SourceFinder(object):
         """
         Run the Aegean source finder.
 
-        :param filename: image filename or HDUList
-        :param hdu_index: the index of the FITS HDU (extension)
-        :param outfile: file for printing catalog (NOT a table, just a text file of my own design)
-        :param rms: use this rms for the entire image (will also assume that background is 0)
-        :param max_summits: fit up to this many components to each island (extras are included but not fit)
-        :param innerclip: the seeding clip, in sigmas, for seeding islands of pixels
-        :param outerclip: the flood clip in sigmas, used for flooding islands
-        :param cores: number of CPU cores to use. None means all cores.
-        :param rmsin: filename or HDUList for an rms/noise image.
-                      If None, aegean will use the Zones algorithm to calculate one
-        :param bkgin: filename or HDUList for a background image
-                      If None, aegean will use the Zones algorithm to calculate one
-        :param beam: (major,minor,pa) (all degrees) of the synthesised beam to use.
-                      Replaces whatever is given in the FITS header.
-                      If the FITS header has no BMAJ/BMIN then this is required.
-        :param doislandflux: calculate the properties of the islands as well as the components
-        :param nopositive: if true, sources with positive fluxes will not be reported
-        :param nonegative: if true, sources with negative fluxes will not be reported
-        :param mask: the filename of a region file created by MIMAS.
-                     Islands outside of this region will be ignored.
-        :param lat: The latitude of the telescope (or declination of zenith)
-        :param imgpsf: filename or HDUList for a psf image.
-        :param blank: Cause the output image to be blanked where islands are found.
-        :param docov: True = include covariance matrix in the fitting process. (default=True)
-        :param slice: For image cubes, slice determines which slice is used.
-        :return: list of sources found
+
+        Parameters
+        ----------
+        filename : str or HDUList
+            Image filename or HDUList.
+
+        hdu_index : int
+            The index of the FITS HDU (extension).
+
+        outfile : str
+            file for printing catalog (NOT a table, just a text file of my own design)
+
+        rms : float
+            Use this rms for the entire image (will also assume that background is 0)
+
+        max_summits : int
+            Fit up to this many components to each island (extras are included but not fit)
+
+        innerclip, outerclip : float
+            The seed (inner) and flood (outer) clipping level (sigmas).
+
+        cores : int
+            Number of CPU cores to use. None means all cores.
+
+        rmsin, bkgin : str or HDUList
+            Filename or HDUList for the noise and background images.
+            If either are None, then it will be calculated internally.
+
+        beam : (major, minor, pa)
+            Floats representing the synthesised beam (degrees).
+            Replaces whatever is given in the FITS header.
+            If the FITS header has no BMAJ/BMIN then this is required.
+
+        doislandflux : bool
+            If True then each island will also be characterized.
+
+        nopositive, nonegative : bool
+            Whether to return positive or negative sources.
+            Default nopositive=False, nonegative=True.
+
+        mask : str
+            The filename of a region file created by MIMAS.
+            Islands outside of this region will be ignored.
+
+        lat : float
+            The latitude of the telescope (declination of zenith).
+
+        imgpsf : str or HDUList
+             Filename or HDUList for a psf image.
+
+        blank : bool
+            Cause the output image to be blanked where islands are found.
+
+        docov : bool
+            If True then include covariance matrix in the fitting process. (default=True)
+
+        slice : int
+            For image cubes, slice determines which slice is used.
+
+        Returns
+        -------
+        sources : list
+            List of sources found.
         """
 
         # Tell numpy to be quiet
@@ -1357,25 +1549,66 @@ class SourceFinder(object):
 
         Multiple cores can be specified, and will be used.
 
-        :param filename: image file or hdu
-        :param catalogue: catalogue file name, or an np.array of OutputSource objects
-        :param hdu_index:
-        :param outfile: output file for ascii output (not tables)
-        :param bkgin: background image name
-        :param rmsin: noise image name
-        :param cores: number of cores to use
-        :param rms: if not none, then use this constant rms for the entire image
-        :param beam: beam parameters to be used instead of those that may be in the fits header
-        :param lat: latitude of telescope
-        :param imgpsf: a psf map that corresponds to the input image
-        :param catpsf: a psf map that corresponds to the input catalog
-        :param stage: refitting stage
-        :param ratio: if not None - ratio of image psf to catalog psf, otherwise interpret from catalogue or image if possible
-        :param outerclip: pixels above an snr of this amount will be used in fitting, <0 -> all pixels.
-        :param doregroup:  True - doregroup, False - use island data for groups
-        :param docov: True = include covariance matrix in the fitting process. (default=True)
-        :param slice: For image cubes, slice determines which slice is used.
-        :return: a list of source objects
+
+        Parameters
+        ----------
+        filename : str or HDUList
+            Image filename or HDUList.
+
+        catalogue : str or list
+            Input catalogue file name or list of OutputSource objects.
+
+        hdu_index : int
+            The index of the FITS HDU (extension).
+
+        outfile : str
+            file for printing catalog (NOT a table, just a text file of my own design)
+
+        rmsin, bkgin : str or HDUList
+            Filename or HDUList for the noise and background images.
+            If either are None, then it will be calculated internally.
+
+        cores : int
+            Number of CPU cores to use. None means all cores.
+
+        rms : float
+            Use this rms for the entire image (will also assume that background is 0)
+
+        beam : (major, minor, pa)
+            Floats representing the synthesised beam (degrees).
+            Replaces whatever is given in the FITS header.
+            If the FITS header has no BMAJ/BMIN then this is required.
+
+        lat : float
+            The latitude of the telescope (declination of zenith).
+
+        imgpsf : str or HDUList
+             Filename or HDUList for a psf image.
+
+        catpsf : str or HDUList
+             Filename or HDUList for the catalogue psf image.
+
+        stage : int
+            Refitting stage
+
+        ratio : float
+            If not None - ratio of image psf to catalog psf, otherwise interpret from catalogue or image if possible
+
+        innerclip, outerclip : float
+            The seed (inner) and flood (outer) clipping level (sigmas).
+
+        docov : bool
+            If True then include covariance matrix in the fitting process. (default=True)
+
+        slice : int
+            For image cubes, slice determines which slice is used.
+
+
+        Returns
+        -------
+        sources : list
+            List of sources measured.
+
         """
 
         from AegeanTools.cluster import regroup
@@ -1512,11 +1745,15 @@ class SourceFinder(object):
 # Helpers
 def fix_shape(source):
     """
-    Ensure that a>=b for a given source object
-    if a<b then swap a/b and increment pa by 90
-    err_a/err_b are also swapped as needed
-    :param source: any object with a/b/pa/err_a/err_b properties
-    :return: None
+    Ensure that a>=b for a given source object.
+    If a<b then swap a/b and increment pa by 90.
+    err_a/err_b are also swapped as needed.
+
+    Parameters
+    ----------
+    source : object
+        any object with a/b/pa/err_a/err_b properties
+
     """
     if source.a < source.b:
         source.a, source.b = source.b, source.a
@@ -1530,8 +1767,15 @@ def pa_limit(pa):
     Position angle is periodic with period 180\deg
     Constrain pa such that -90<pa<=90
 
-    :param pa: position angle (degrees)
-    :return: position angle (degrees)
+    Parameters
+    ----------
+    pa : float
+        Initial position angle.
+
+    Returns
+    -------
+    pa : float
+        Rotate position angle.
     """
     while pa <= -90:
         pa += 180
@@ -1542,10 +1786,18 @@ def pa_limit(pa):
 
 def theta_limit(theta):
     """
-    Angle theta is periodic with period pi
-    Constrain theta such that -pi/2<theta<=pi/2
-    :param theta: angle in radians
-    :return: angle in radians
+    Angle theta is periodic with period pi.
+    Constrain theta such that -pi/2<theta<=pi/2.
+
+    Parameters
+    ----------
+    theta : float
+        Input angle.
+
+    Returns
+    -------
+    theta : float
+        Rotate angle.
     """
     while theta <= -1 * np.pi / 2:
         theta += np.pi
@@ -1559,10 +1811,20 @@ def scope2lat(telescope):
     Convert a telescope name into a latitude
     returns None when the telescope is unknown.
 
-    :param telescope: a string
-    :return: a latitude or None
+    Parameters
+    ----------
+    telescope : str
+        Acronym (name) of telescope, eg MWA.
+
+    Returns
+    -------
+    lat : float
+        The latitude of the telescope.
+
+    Notes
+    -----
+    These values were taken from wikipedia so have varying precision/accuracy
     """
-    # Note: these values were taken from wikipedia so have varying precision/accuracy
     scopes = {'MWA': -26.703319,
               "ATCA": -30.3128,
               "VLA": 34.0790,
@@ -1600,8 +1862,17 @@ def check_cores(cores):
     """
     Determine how many cores we are able to use.
     Return 1 if we are not able to make a queue via pprocess.
-    :param cores: the number of cores requested by the user
-    :return: number of cores available
+
+    Parameters
+    ----------
+    cores : int
+        The number of cores that are requested.
+
+    Returns
+    -------
+    cores : int
+        The number of cores available.
+
     """
     cores = min(multiprocessing.cpu_count(), cores)
     if six.PY3:
@@ -1632,8 +1903,15 @@ def get_aux_files(basename):
 
     will return filenames if they exist, or None where they do not.
 
-    :param basename: the name/path of the input image
-    :return: dict of filenames or None with keys (bkg, rms, mask, cat, psf)
+    Parameters
+    ----------
+    basename : str
+        The name/path of the input image.
+
+    Returns
+    -------
+    aux : dict
+        Dict of filenames or None with keys (bkg, rms, mask, cat, psf)
     """
     base = os.path.splitext(basename)[0]
     files = {"bkg": base + "_bkg.fits",
