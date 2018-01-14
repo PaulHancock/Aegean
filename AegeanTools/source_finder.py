@@ -61,18 +61,6 @@ class SourceFinder(object):
 
     def __init__(self, **kwargs):
         self.global_data = GlobalFittingData()
-        self.global_data.img = None
-        self.global_data.dcurve = None
-        self.global_data.rmsimg = None
-        self.global_data.bkgimg = None
-        self.global_data.hdu_header = None
-        self.global_data.beam = None
-        self.global_data.data_pix = None
-        self.global_data.dtype = None
-        self.global_data.region = None
-        self.global_data.wcshelper = None
-        self.global_data.psfhelper = None
-
         self.sources = []
         self.log = None
 
