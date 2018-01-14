@@ -39,6 +39,11 @@ class MarchingSquares():
     def step(self, x, y):
         """
         Move from the current location to the next
+
+        Parameters
+        ----------
+        x, y : int
+            The current location
         """
         up_left = self.solid(x - 1, y - 1)
         up_right = self.solid(x, y - 1)
@@ -83,6 +88,16 @@ class MarchingSquares():
     def solid(self, x, y):
         """
         Determine whether the pixel x,y is nonzero
+
+        Parameters
+        ----------
+        x, y : int
+            The pixel of interest.
+
+        Returns
+        -------
+        solid : bool
+            True if the pixel is not zero.
         """
         if not(0 <= x < self.xsize) or not(0 <= y < self.ysize):
             return False
@@ -92,6 +107,18 @@ class MarchingSquares():
 
     def walk_perimeter(self, startx, starty):
         """
+        Starting at a point on the perimeter of a region, 'walk' the perimeter to return
+        to the starting point. Record the path taken.
+
+        Parameters
+        ----------
+        startx, starty : int
+            The starting location. Assumed to be on the perimeter of a region.
+
+        Returns
+        -------
+        perimeter : list
+            A list of pixel coordinates [ [x1,y1], ...] that constitute the perimeter of the region.
         """
         # checks
         startx = max(startx, 0)
@@ -126,6 +153,11 @@ class MarchingSquares():
     def do_march(self):
         """
         March about and trace the outline of our object
+
+        Returns
+        -------
+        perimeter : list
+            The pixels on the perimeter of the region [[x1, y1], ...]
         """
         x, y = self.find_start_point()
         perimeter = self.walk_perimeter(x, y)
@@ -134,8 +166,12 @@ class MarchingSquares():
     def _blank_within(self, perimeter):
         """
         Blank all the pixels within the given perimeter.
-        :param perimeter:
-        :return None:
+
+        Parameters
+        ----------
+        perimeter : list
+            The perimeter of the region.
+
         """
         # Method:
         # scan around the perimeter filling 'up' from each pixel
@@ -164,7 +200,16 @@ class MarchingSquares():
 
     def do_march_all(self):
         """
-        Recursive march in the case that we have a fragmented shape
+        Recursive march in the case that we have a fragmented shape.
+
+        Returns
+        -------
+        perimeters : [perimeter1, ...]
+           The perimeters of all the regions in the image.
+
+        See Also
+        --------
+        :func:`AegeanTools.msq2.MarchingSquares.do_march`
         """
         # copy the data since we are going to be modifying it
         data_copy = copy(self.data)
