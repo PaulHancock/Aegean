@@ -52,7 +52,7 @@ def test_classify_catalogue():
     ss = []
     isl = []
     out = []
-    all = []
+    mixed = []
     for i in range(10):
         a = models.SimpleSource()
         ss.append(a)
@@ -65,8 +65,8 @@ def test_classify_catalogue():
         d.island = i
         d.source = 1
         out.extend([c, d])
-        all.extend([a, b, c, d])
-    a, b, c = models.classify_catalog(all)
+        mixed.extend([a, b, c, d])
+    a, b, c = models.classify_catalog(mixed)
     if not (np.all(b == isl)): raise AssertionError()
     if not (np.all(a == out)): raise AssertionError()
     groups = list(models.island_itergen(a))

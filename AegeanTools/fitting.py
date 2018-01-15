@@ -356,7 +356,7 @@ def hessian(pars, x, y):
 
             if yo_var:
                 # H(amp,yo)/G =  1.0*(-sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*cos(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*sin(t))/(amp*sx**2*sy**2)
-                hmat[j][k] = -(xsin - ycos)*cost/sy2 + (xcos + ysin)*sint/sx2 
+                hmat[j][k] = -(xsin - ycos)*cost/sy2 + (xcos + ysin)*sint/sx2
                 hmat[j][k] *= model/amp
                 k += 1
 
@@ -1357,18 +1357,18 @@ if __name__ == "__main__":
         kwargs = {"interpolation": "nearest", 'aspect': 1, 'vmin': -1, 'vmax': 1}
         fig, ax = pyplot.subplots(6, 6, squeeze=True, sharex=True, sharey=True, figsize=(5, 6))
         Hemp = emp_hessian(model, x, y)
-        vars = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
+        params = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
         for i, row in enumerate(ax):
             for j, ax in enumerate(row):
                 im = Hemp[i, j, :, :]
                 # im[np.where(abs(im) < 1e-5)] = 0
-                # print vars[i],vars[j], np.amax(im)
+                # print params[i],params[j], np.amax(im)
                 im /= np.amax(im)
                 ax.imshow(im, **kwargs)
                 if j == 0:
-                    ax.set_ylabel(vars[i])
+                    ax.set_ylabel(params[i])
                 if i == 5:
-                    ax.set_xlabel(vars[j])
+                    ax.set_xlabel(params[j])
                 clx(ax)
         fig.suptitle('Empirical Hessian')
 
@@ -1379,13 +1379,13 @@ if __name__ == "__main__":
             for j, ax in enumerate(row):
                 im = Hana[i, j, :, :]
                 # im[np.where(abs(im) < 1e-5)] = 0
-                # print vars[i],vars[j], np.amax(im)
+                # print params[i],params[j], np.amax(im)
                 im /= np.amax(im)
                 ax.imshow(im, **kwargs)
                 if j == 0:
-                    ax.set_ylabel(vars[i])
+                    ax.set_ylabel(params[i])
                 if i == 5:
-                    ax.set_xlabel(vars[j])
+                    ax.set_xlabel(params[j])
                 clx(ax)
         fig.suptitle('Analytical Hessian')
 
@@ -1400,9 +1400,9 @@ if __name__ == "__main__":
                 im2 /= np.amax(im2)
                 ax.imshow(im1-im2, **kwargs)
                 if j == 0:
-                    ax.set_ylabel(vars[i])
+                    ax.set_ylabel(params[i])
                 if i == 5:
-                    ax.set_xlabel(vars[j])
+                    ax.set_xlabel(params[j])
                 clx(ax)
         fig.suptitle('Difference')
         pyplot.show()

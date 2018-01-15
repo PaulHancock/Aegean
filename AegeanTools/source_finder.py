@@ -1732,7 +1732,7 @@ class SourceFinder(object):
 
         components = 0
         for source in sources:
-            if type(source) == OutputSource:
+            if isinstance(source, OutputSource):
                 components += 1
                 if outfile:
                     print(str(source), file=outfile)

@@ -333,7 +333,7 @@ def table_to_source_list(table, src_type=OutputSource):
                 # copy the value to our object
                 val = row[param]
                 # hack around float32's broken-ness
-                if type(val) == np.float32:
+                if isinstance(val, np.float32):
                     val = np.float64(val)
                 setattr(src, param, val)
         # save this object to our list of sources

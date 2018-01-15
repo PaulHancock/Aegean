@@ -179,7 +179,7 @@ class FitsImage(object):
             self.bscale = self._header["BSCALE"]
         else:
             self.bscale = 1
-            
+
         self.filename = filename
         # fix possible problems with miriad generated fits files % HT John Morgan.
         try:
@@ -320,7 +320,7 @@ class FitsImage(object):
         """
         skybox = [skypos, skypos]
         pixbox = self.wcs.all_world2pix(skybox, 1)
-        return [float(pixbox[0][0]), float(pixbox[0][1])] 
+        return [float(pixbox[0][0]), float(pixbox[0][1])]
 
 
 class Beam(object):
