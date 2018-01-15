@@ -1466,7 +1466,7 @@ class SourceFinder(object):
         # Tell numpy to be quiet
         np.seterr(invalid='ignore')
         if cores is not None:
-            assert (cores >= 1), "cores must be one or more"
+            if not (cores >= 1): raise AssertionError("cores must be one or more")
 
         self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, cores=cores,
                           verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank, docov=docov, slice=slice)
@@ -1732,7 +1732,7 @@ class SourceFinder(object):
 
         components = 0
         for source in sources:
-            if type(source) == OutputSource:
+            if isinstance(source, OutputSource):
                 components += 1
                 if outfile:
                     print(str(source), file=outfile)
@@ -1885,7 +1885,7 @@ def check_cores(cores):
         cores = 1
     else:
         try:
-            temp = queue.manage(pprocess.MakeReusable(fix_shape))
+            _ = queue.manage(pprocess.MakeReusable(fix_shape))
         except:
             cores = 1
     return cores

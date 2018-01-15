@@ -34,7 +34,7 @@ def test_CandBmatrix():
     C = fitting.Cmatrix(x, y, sx=1, sy=2, theta=0)
     if np.any(np.isnan(C)): raise AssertionError()
     B = fitting.Bmatrix(C)
-    if np.any(np.isnan(C)): raise AssertionError()
+    if np.any(np.isnan(B)): raise AssertionError()
 
 
 def test_hessian_shape():
@@ -105,7 +105,7 @@ def test_emp_vs_ana_jacobian():
     model.add('c0_sy', 2, vary=False)
     model.add('c0_theta', 0, vary=False)
     model.add('components', 1, vary=False)
-    nvar = 3
+
     x, y = np.indices((10, 10))
     emp_Jij = fitting.emp_jacobian(model, x, y)
     ana_Jij = fitting.jacobian(model, x, y)
@@ -118,7 +118,7 @@ def test_emp_vs_ana_jacobian():
     model.add('c1_sx', 2.001, vary=True)
     model.add('c1_sy', 2, vary=True)
     model.add('c1_theta', 0, vary=True)
-    nvar = 9
+
     model['components'].value = 2
     emp_Jij = fitting.emp_jacobian(model, x, y)
     ana_Jij = fitting.jacobian(model, x, y)
@@ -135,7 +135,7 @@ def test_emp_vs_ana_hessian():
     model.add('c0_sy', 2, vary=False)
     model.add('c0_theta', 0, vary=False)
     model.add('components', 1, vary=False)
-    nvar = 3
+
     x, y = np.indices((10, 10))
     emp_Hij = fitting.emp_hessian(model, x, y)
     ana_Hij = fitting.hessian(model, x, y)
@@ -148,7 +148,7 @@ def test_emp_vs_ana_hessian():
     model.add('c1_sx', 2.001, vary=True)
     model.add('c1_sy', 2, vary=True)
     model.add('c1_theta', 0, vary=True)
-    nvar = 9
+
     model['components'].value = 2
     emp_Hij = fitting.emp_hessian(model, x, y)
     ana_Hij = fitting.hessian(model, x, y)

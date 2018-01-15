@@ -32,7 +32,7 @@ class MarchingSquares():
         Find the first location in our array that is not empty
         """
         for i, row in enumerate(self.data):
-            for j, col in enumerate(row):
+            for j, _ in enumerate(row):
                 if self.data[i, j] != 0:  # or not np.isfinite(self.data[i,j]):
                     return i, j
 
@@ -213,7 +213,7 @@ class MarchingSquares():
         """
         # copy the data since we are going to be modifying it
         data_copy = copy(self.data)
-        
+
         # iterate through finding an island, creating a perimeter,
         # and then blanking the island
         perimeters = []
@@ -225,6 +225,6 @@ class MarchingSquares():
             self._blank_within(perim)
             p = self.find_start_point()
 
-        # restore the data 
+        # restore the data
         self.data = data_copy
         return perimeters

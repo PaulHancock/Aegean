@@ -4,10 +4,10 @@ from __future__ import print_function
 __author__ = 'Paul Hancock'
 __date__ = ''
 
-from AegeanTools.wcs_helpers import WCSHelper, PSFHelper
+from AegeanTools.wcs_helpers import WCSHelper
 from astropy.io import fits
 import numpy as np
-from numpy.testing import assert_almost_equal, assert_approx_equal
+from numpy.testing import assert_almost_equal
 
 
 def verify_beam(beam):
@@ -77,7 +77,7 @@ def test_vector_round_trip():
     initial = [1, 45]  # r,theta = 1,45 (degrees)
     ref = helper.refpix
     ra, dec, dist, ang = helper.pix2sky_vec(ref, *initial)
-    x, y, r, theta = helper.sky2pix_vec([ra, dec], dist, ang)
+    _, _ , r, theta = helper.sky2pix_vec([ra, dec], dist, ang)
     if not ((abs(r - initial[0]) < 1e-9) and (abs(theta - initial[1]) < 1e-9)): raise AssertionError()
 
 
@@ -95,7 +95,7 @@ def test_ellipse_round_trip():
     # SIN projection isn't valid for all decs
     declist = list(range(-85, -10, 10))
     ras, decs = np.meshgrid(ralist, declist)
-    for i, (ra, dec) in enumerate(zip(ras.ravel(), decs.ravel())):
+    for _, (ra, dec) in enumerate(zip(ras.ravel(), decs.ravel())):
         if ra < 0:
             ra += 360
         x, y, sx, sy, theta = helper.sky2pix_ellipse([ra, dec], a, b, pa)

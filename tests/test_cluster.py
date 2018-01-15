@@ -6,7 +6,7 @@ __date__ = ''
 
 from AegeanTools import cluster
 from AegeanTools.models import SimpleSource
-from copy import deepcopy, copy
+from copy import deepcopy
 import math
 import numpy as np
 
@@ -65,7 +65,7 @@ def test_regroup():
     # this should throw an attribute error
     try:
         cluster.regroup([1], eps=1)
-    except AttributeError as e:
+    except AttributeError as _:
         pass
 
     # this should result in 51 groups

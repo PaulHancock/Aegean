@@ -10,7 +10,6 @@ __version__ = "1.0"
 __date__ = "2016-07-26"
 
 # Standard imports
-import sys
 import os
 import numpy as np
 import re
@@ -21,9 +20,7 @@ from time import gmtime, strftime
 from .models import OutputSource, classify_catalog
 
 # input/output table formats
-import astropy
 from astropy.table.table import Table
-from astropy.table import Column
 from astropy.io import ascii
 from astropy.io import fits
 from astropy.io.votable import from_table, parse_single_table
@@ -62,7 +59,7 @@ def check_table_formats(files):
     cont = True
     formats = get_table_formats()
     for t in files.split(','):
-        name, ext = os.path.splitext(t)
+        _, ext = os.path.splitext(t)
         ext = ext[1:].lower()
         if ext not in formats:
             cont = False
@@ -336,7 +333,7 @@ def table_to_source_list(table, src_type=OutputSource):
                 # copy the value to our object
                 val = row[param]
                 # hack around float32's broken-ness
-                if type(val) == np.float32:
+                if isinstance(val, np.float32):
                     val = np.float64(val)
                 setattr(src, param, val)
         # save this object to our list of sources

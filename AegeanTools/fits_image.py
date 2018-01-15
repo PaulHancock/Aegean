@@ -179,7 +179,7 @@ class FitsImage(object):
             self.bscale = self._header["BSCALE"]
         else:
             self.bscale = 1
-            
+
         self.filename = filename
         # fix possible problems with miriad generated fits files % HT John Morgan.
         try:
@@ -242,7 +242,8 @@ class FitsImage(object):
         -------
         None
         """
-        assert pixels.shape == self._pixels.shape, "Shape mismatch between pixels supplied {0} and existing image pixels {1}".format(pixels.shape,self._pixels.shape)
+        if not (pixels.shape == self._pixels.shape):
+            raise AssertionError("Shape mismatch between pixels supplied {0} and existing image pixels {1}".format(pixels.shape,self._pixels.shape))
         self._pixels = pixels
         # reset this so that it is calculated next time the function is called
         self._rms = None
@@ -319,7 +320,7 @@ class FitsImage(object):
         """
         skybox = [skypos, skypos]
         pixbox = self.wcs.all_world2pix(skybox, 1)
-        return [float(pixbox[0][0]), float(pixbox[0][1])] 
+        return [float(pixbox[0][0]), float(pixbox[0][1])]
 
 
 class Beam(object):
@@ -328,8 +329,8 @@ class Beam(object):
     Properties are a,b,pa. No assumptions are made as to the units, but both a and b have to be >0.
     """
     def __init__(self, a, b, pa, pixa=None, pixb=None):
-        assert a > 0, "major axis must be >0"
-        assert b > 0, "minor axis must be >0"
+        if not (a > 0): raise AssertionError("major axis must be >0")
+        if not (b > 0): raise AssertionError("minor axis must be >0")
         self.a = a
         self.b = b
         self.pa = pa

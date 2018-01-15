@@ -201,7 +201,7 @@ def test_intersect():
 def test_demote():
     a = Region(maxdepth=8)
     a.add_circles(0, np.radians(-90), np.radians(1))
-    ipd = a.pixeldict.copy()
+    _ = a.pixeldict.copy()
     fpd = a.get_demoted()
     if not (fpd == a.pixeldict[8]): raise AssertionError()
     for i in range(1, 8):

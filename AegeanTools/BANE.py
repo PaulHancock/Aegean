@@ -62,7 +62,7 @@ def sigmaclip(arr, lo, hi, reps=3):
 
     std = np.std(clipped)
     mean = np.mean(clipped)
-    for i in range(int(reps)):
+    for _ in range(int(reps)):
         clipped = clipped[np.where(clipped > mean-std*lo)]
         clipped = clipped[np.where(clipped < mean+std*hi)]
         pstd = std

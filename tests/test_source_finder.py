@@ -132,10 +132,10 @@ def test_find_and_prior_parallel():
 
     del sfinder
     sfinder = sf.SourceFinder(log=log)
-    found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
+    _ = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
                                            rmsin=aux_files['rms'], bkgin=aux_files['bkg'],
                                            mask=aux_files['mask'], cores=cores)
-    priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=True, cores=cores, outfile=open('dlme','w'))
+    _ = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=True, cores=cores, outfile=open('dlme','w'))
     os.remove('dlme')
 
     del sfinder
