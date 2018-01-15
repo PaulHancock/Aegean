@@ -301,7 +301,7 @@ class SourceFinder(object):
 
             pixbeam = global_data.psfhelper.get_pixbeam_pixel(yo + offsets[0], xo + offsets[1])
             if pixbeam is None:
-                self.log.debug(" Summit has invalid WCS/Beam - Skipping.".format(i))
+                self.log.debug(" Summit has invalid WCS/Beam - Skipping.")
                 continue
 
             # set a square limit based on the size of the pixbeam
@@ -1223,7 +1223,7 @@ class SourceFinder(object):
                             if 'amp' not in p:
                                 params[p].vary = False
                     else:
-                        self.log.debug(" no not-masked pixels, skipping".format(src.island, src.source))
+                        self.log.debug(" no not-masked pixels, skipping")
                     continue
 
                 # do the fit
