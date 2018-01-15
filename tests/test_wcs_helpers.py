@@ -11,26 +11,26 @@ from numpy.testing import assert_almost_equal, assert_approx_equal
 
 
 def verify_beam(beam):
-    assert beam is not None
-    assert beam.a > 0
-    assert beam.b > 0
-    assert beam.pa is not None
+    if beam is None: raise AssertionError()
+    if not (beam.a > 0): raise AssertionError()
+    if not (beam.b > 0): raise AssertionError()
+    if beam.pa is None: raise AssertionError()
 
 
 def test_from_header():
     fname = 'tests/test_files/1904-66_SIN.fits'
     header = fits.getheader(fname)
     helper = WCSHelper.from_header(header)
-    assert helper.beam is not None
+    if helper.beam is None: raise AssertionError()
     del header['BMAJ'], header['BMIN'], header['BPA']
     helper = WCSHelper.from_header(header)
-    assert helper.beam is None
+    if helper.beam is not None: raise AssertionError()
 
 
 def test_from_file():
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
-    assert helper.beam is not None
+    if helper.beam is None: raise AssertionError()
 
 
 def test_get_pixbeam():
@@ -49,9 +49,9 @@ def test_get_pixbeam():
     verify_beam(beam)
 
     area = helper.get_beamarea_pix(285, -66)
-    assert area > 0
+    if not (area > 0): raise AssertionError()
     area = helper.get_beamarea_deg2(285, -66)
-    assert area >0
+    if not (area >0): raise AssertionError()
 
     beam = helper.get_pixbeam(285, -66)
     verify_beam(beam)
@@ -64,7 +64,7 @@ def test_sky_sep():
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
     dist = helper.sky_sep([0, 0], [1, 1])
-    assert dist > 0
+    if not (dist > 0): raise AssertionError()
 
 
 def test_vector_round_trip():
@@ -78,7 +78,7 @@ def test_vector_round_trip():
     ref = helper.refpix
     ra, dec, dist, ang = helper.pix2sky_vec(ref, *initial)
     x, y, r, theta = helper.sky2pix_vec([ra, dec], dist, ang)
-    assert (abs(r - initial[0]) < 1e-9) and (abs(theta - initial[1]) < 1e-9)
+    if not ((abs(r - initial[0]) < 1e-9) and (abs(theta - initial[1]) < 1e-9)): raise AssertionError()
 
 
 def test_ellipse_round_trip():
@@ -102,11 +102,9 @@ def test_ellipse_round_trip():
         ra_f, dec_f, major, minor, pa_f = helper.pix2sky_ellipse([x, y], sx, sy, theta)
         assert_almost_equal(ra, ra_f)
         assert_almost_equal(dec, dec_f)
-        assert abs(a-major)/a < 0.05
-        assert abs(b-minor)/b < 0.05
-        assert abs(pa-pa_f) < 1
-
-
+        if not (abs(a-major)/a < 0.05): raise AssertionError()
+        if not (abs(b-minor)/b < 0.05): raise AssertionError()
+        if not (abs(pa-pa_f) < 1): raise AssertionError()
 
 
 if __name__ == "__main__":

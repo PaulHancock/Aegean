@@ -14,9 +14,9 @@ def test_defaults():
     data[1:4, 2] = 1
     data[2, 1:4] = 1
     ms = MarchingSquares(data)
-    assert ms.xsize == ms.ysize == 5
-    assert len(ms.perimeter) == 12
-    assert ms.find_start_point() == (1, 2)
+    if not (ms.xsize == ms.ysize == 5): raise AssertionError()
+    if not (len(ms.perimeter) == 12): raise AssertionError()
+    if not (ms.find_start_point() == (1, 2)): raise AssertionError()
 
 
 def test_multi_islands():
@@ -28,10 +28,10 @@ def test_multi_islands():
     data[4, :] = data[2, :]
     data[5, :] = data[1, :]
     ms = MarchingSquares(data)
-    assert np.all(ms.data == data)
+    if not (np.all(ms.data == data)): raise AssertionError()
     perims = ms.do_march_all()
-    assert len(perims) == 2
-    assert np.all(ms.data == data)
+    if not (len(perims) == 2): raise AssertionError()
+    if not (np.all(ms.data == data)): raise AssertionError()
 
 
 if __name__ == "__main__":

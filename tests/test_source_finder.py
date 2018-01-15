@@ -28,26 +28,26 @@ def test_helpers():
     src.pa = 90
     src2 = deepcopy(src)
     sf.fix_shape(src2)
-    assert src.a == src2.b
-    assert src.b == src2.a
-    assert src.pa == src2.pa - 90
+    if not (src.a == src2.b): raise AssertionError()
+    if not (src.b == src2.a): raise AssertionError()
+    if not (src.pa == src2.pa - 90): raise AssertionError()
     # pa limit
-    assert sf.pa_limit(-180.) == 0.
-    assert sf.pa_limit(95.) == -85.
+    if not (sf.pa_limit(-180.) == 0.): raise AssertionError()
+    if not (sf.pa_limit(95.) == -85.): raise AssertionError()
     # theta limit
-    assert sf.theta_limit(0.) == 0.
-    assert sf.theta_limit(np.pi) == 0.
-    assert sf.theta_limit(-3*np.pi/2) == np.pi/2
+    if not (sf.theta_limit(0.) == 0.): raise AssertionError()
+    if not (sf.theta_limit(np.pi) == 0.): raise AssertionError()
+    if not (sf.theta_limit(-3*np.pi/2) == np.pi/2): raise AssertionError()
     # scope2lat
-    assert sf.scope2lat('MWA') == -26.703319
-    assert sf.scope2lat('mwa') == -26.703319
-    assert sf.scope2lat('MyFriendsTelescope') is None
+    if not (sf.scope2lat('MWA') == -26.703319): raise AssertionError()
+    if not (sf.scope2lat('mwa') == -26.703319): raise AssertionError()
+    if sf.scope2lat('MyFriendsTelescope') is not None: raise AssertionError()
     # get_aux
-    assert np.all(a is None for a in sf.get_aux_files('_$_fkjfjl'))
+    if not (np.all(a is None for a in sf.get_aux_files('_$_fkjfjl'))): raise AssertionError()
     aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
-    assert aux_files['rms'] == 'tests/test_files/1904-66_SIN_rms.fits'
-    assert aux_files['bkg'] == 'tests/test_files/1904-66_SIN_bkg.fits'
-    assert aux_files['mask'] == 'tests/test_files/1904-66_SIN.mim'
+    if not (aux_files['rms'] == 'tests/test_files/1904-66_SIN_rms.fits'): raise AssertionError()
+    if not (aux_files['bkg'] == 'tests/test_files/1904-66_SIN_bkg.fits'): raise AssertionError()
+    if not (aux_files['mask'] == 'tests/test_files/1904-66_SIN.mim'): raise AssertionError()
 
 
 def test_load_globals():
@@ -56,27 +56,27 @@ def test_load_globals():
     filename = 'tests/test_files/1904-66_SIN.fits'
     aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
     sfinder.load_globals(filename)
-    assert sfinder.global_data.img is not None
+    if sfinder.global_data.img is None: raise AssertionError()
 
     del sfinder
     sfinder = sf.SourceFinder(log=log)
     sfinder.load_globals(filename, bkgin=aux_files['bkg'], rms=1, mask=aux_files['mask'])
     # region isn't available due to healpy not being installed/required
-    assert sfinder.global_data.region is not None
+    if sfinder.global_data.region is None: raise AssertionError()
 
     del sfinder
     sfinder = sf.SourceFinder(log=log)
     sfinder.load_globals(filename, rmsin=aux_files['rms'], mask='derp', do_curve=False)
-    assert sfinder.global_data.region is None
+    if sfinder.global_data.region is not None: raise AssertionError()
     img = sfinder._load_aux_image(sfinder.global_data.img, filename)
-    assert img is not None
+    if img is None: raise AssertionError()
 
     del sfinder
     sfinder = sf.SourceFinder(log=log)
     aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
     from AegeanTools.regions import Region
     sfinder.load_globals(filename, rms=1, mask=Region())
-    assert sfinder.global_data.region is not None
+    if sfinder.global_data.region is None: raise AssertionError()
 
 
 def test_find_and_prior_sources():
@@ -85,18 +85,18 @@ def test_find_and_prior_sources():
     filename = 'tests/test_files/small.fits'
     # vanilla source finding
     found = sfinder.find_sources_in_image(filename, cores=1)
-    assert len(found) == 2
+    if not (len(found) == 2): raise AssertionError()
     # now with some options
     aux_files = sf.get_aux_files(filename)
     found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
                                            rmsin=aux_files['rms'], bkgin=aux_files['bkg'],
                                            mask=aux_files['mask'], cores=1, docov=False)
-    assert len(found2) == 4
+    if not (len(found2) == 4): raise AssertionError()
     isle1 = found2[1]
-    assert isle1.int_flux > 0
-    assert isle1.max_angular_size > 0
+    if not (isle1.int_flux > 0): raise AssertionError()
+    if not (isle1.max_angular_size > 0): raise AssertionError()
     # we should have written some output file
-    assert os.path.exists('dlme')
+    if not (os.path.exists('dlme')): raise AssertionError()
     os.remove('dlme')
 
     # pprocess is broken in python3 at the moment so just use 1 core.
@@ -106,13 +106,13 @@ def test_find_and_prior_sources():
         cores = 2
     # this should find one less source as one of the source centers is outside the image.
     priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=False, ratio=1.2, cores=cores, docov=False)
-    assert len(priorized) == 2
+    if not (len(priorized) == 2): raise AssertionError()
     # this also gives 62 sources even though we turn on regroup
     priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=True, cores=1, outfile=open('dlme','w'), stage=1)
-    assert len(priorized) == 2
-    assert len(sfinder.priorized_fit_islands(filename, catalogue=[])) == 0
+    if not (len(priorized) == 2): raise AssertionError()
+    if not (len(sfinder.priorized_fit_islands(filename, catalogue=[])) == 0): raise AssertionError()
     # we should have written some output file
-    assert os.path.exists('dlme')
+    if not (os.path.exists('dlme')): raise AssertionError()
     os.remove('dlme')
 
 
@@ -126,7 +126,7 @@ def test_find_and_prior_parallel():
     # vanilla source finding
     sfinder = sf.SourceFinder(log=log)
     found = sfinder.find_sources_in_image(filename, cores=cores)
-    assert len(found) == 68
+    if not (len(found) == 68): raise AssertionError()
     # now with some options
     aux_files = sf.get_aux_files(filename)
 
@@ -149,7 +149,7 @@ def test_save_files():
     filename = 'tests/test_files/small.fits'
     sfinder.save_background_files(image_filename=filename, outbase='dlme')
     for ext in ['bkg', 'rms', 'snr', 'crv']:
-        assert os.path.exists("dlme_{0}.fits".format(ext))
+        if not (os.path.exists("dlme_{0}.fits".format(ext))): raise AssertionError()
         os.remove("dlme_{0}.fits".format(ext))
 
 
@@ -160,7 +160,7 @@ def test_save_image():
     _ = sfinder.find_sources_in_image(filename, cores=1, max_summits=0, blank=True)
     bfile = 'dlme_blanked.fits'
     sfinder.save_image(bfile)
-    assert os.path.exists(bfile)
+    if not (os.path.exists(bfile)): raise AssertionError()
     os.remove(bfile)
 
 
