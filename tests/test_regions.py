@@ -226,4 +226,4 @@ if __name__ == "__main__":
     for f in dir():
         if f.startswith('test'):
             print(f)
-            exec(f+"()")
+            globals()[f]()
