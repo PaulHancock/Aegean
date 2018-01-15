@@ -32,7 +32,8 @@ def test_dec2dms():
                       (np.nan, "XX:XX:XX.XX"),
                       (np.inf, "XX:XX:XX.XX")]:
         ans = at.dec2dms(dec)
-        assert ans == dstr, "{0} != {1}".format(ans, dstr)
+        if not ans == dstr:
+            raise AssertionError("{0} != {1}".format(ans, dstr))
 
 
 def test_dec2hms():
@@ -42,7 +43,8 @@ def test_dec2hms():
                       (np.nan, "XX:XX:XX.XX"),
                       (np.inf, "XX:XX:XX.XX")]:
         ans = at.dec2hms(dec)
-        assert ans == dstr, "{0} != {1}".format(ans, dstr)
+        if not ans == dstr:
+            raise AssertionError("{0} != {1}".format(ans, dstr))
 
 
 def test_gcd():

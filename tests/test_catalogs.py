@@ -19,8 +19,11 @@ log.setLevel(logging.INFO)
 
 def test_check_table_formats():
     files = ','.join(['a.csv', 'a.fits', 'a.vot', 'a.hdf5',  'a.ann', 'a.docx', 'a'])
-    assert not cat.check_table_formats(files)
-    assert cat.check_table_formats('files.fits')
+
+    if cat.check_table_formats(files):
+        raise AssertionError()
+    if not cat.check_table_formats('files.fits'):
+        raise AssertionError()
 
 
 def test_show_formats():
@@ -31,16 +34,20 @@ def test_get_table_formats():
     formats = cat.get_table_formats()
     for f in formats:
         name = 'a.'+f
-        assert cat.check_table_formats(name)
+        if not cat.check_table_formats(name):
+            raise AssertionError()
 
 
 def test_update_meta_data():
     meta = None
     meta = cat.update_meta_data(meta)
-    assert 'PROGRAM' in meta
+    if 'PROGRAM' not in meta:
+        raise AssertionError()
+
     meta = {'DATE': 1}
     meta = cat.update_meta_data(meta)
-    assert meta['DATE'] == 1
+    if not meta['DATE'] == 1:
+        raise AssertionError()
 
 
 def test_load_save_catalog():
@@ -49,21 +56,29 @@ def test_load_save_catalog():
         fout = 'a.'+ext
         cat.save_catalog(fout, catalog, meta=None)
         fout = 'a_comp.'+ext
-        assert os.path.exists(fout)
+        if not os.path.exists(fout):
+            raise AssertionError()
+
         catin = cat.load_catalog(fout)
-        assert len(catin) == len(catalog)
+        if not len(catin) == len(catalog):
+            raise AssertionError()
+
         os.remove(fout)
 
     for ext in ['reg', 'ann', 'bla']:
         fout = 'a.'+ext
         cat.save_catalog(fout, catalog, meta=None)
         fout = 'a_comp.'+ext
-        assert os.path.exists(fout)
+        if not os.path.exists(fout):
+            raise AssertionError()
+
         os.remove(fout)
 
     fout = 'a.db'
     cat.save_catalog(fout, catalog, meta=None)
-    assert os.path.exists(fout)
+    if not os.path.exists(fout):
+        raise AssertionError()
+
     os.remove(fout)
 
     badfile = open("file.fox", 'w')
@@ -75,7 +90,9 @@ def test_load_save_catalog():
     badfile.close()
     catin = cat.load_catalog('file.fox')
     print(catin)
-    assert len(catin) == 1
+    if not len(catin) == 1:
+        raise AssertionError()
+
     os.remove('file.fox')
 
 
@@ -86,13 +103,17 @@ def test_load_table_write_table():
         cat.save_catalog(fout, catalog, meta=None)
         fout = 'a_comp.'+fmt
         tab = cat.load_table(fout)
-        assert len(tab) == len(catalog)
+        if not len(tab) == len(catalog):
+            raise AssertionError()
+
         os.remove(fout)
 
     cat.save_catalog('a.csv', catalog, meta=None)
     tab = cat.load_table('a_comp.csv')
     cat.write_table(tab, 'a.csv')
-    assert os.path.exists('a.csv')
+    if not os.path.exists('a.csv'):
+        raise AssertionError()
+
     os.remove('a.csv')
 
     assert_raises(Exception, cat.write_table, tab, 'bla.fox')
@@ -104,11 +125,17 @@ def test_write_comp_isl_simp():
     catalog[0].galactic = True
     out = 'a.csv'
     cat.write_catalog(out, catalog)
-    assert os.path.exists('a_isle.csv')
+    if not os.path.exists('a_isle.csv'):
+        raise AssertionError()
+
     os.remove('a_isle.csv')
-    assert os.path.exists('a_comp.csv')
+    if not os.path.exists('a_comp.csv'):
+        raise AssertionError()
+
     os.remove('a_comp.csv')
-    assert os.path.exists('a_simp.csv')
+    if not os.path.exists('a_simp.csv'):
+        raise AssertionError()
+
     os.remove('a_simp.csv')
 
 
@@ -117,7 +144,9 @@ def dont_test_load_save_fits_tables():
     # probably a bug that will be fixed by astropy later.
     catalog = [OutputSource()]
     cat.save_catalog('a.fits', catalog, meta=None)
-    assert os.path.exists('a_comp.fits')
+    if not os.path.exists('a_comp.fits'):
+        raise AssertionError()
+
     os.remove('a_comp.fits')
     # Somehow this doesn't work for my simple test cases
     # catin = cat.load_table('a_comp.fits')
@@ -134,37 +163,53 @@ def test_write_contours_boxes():
     src.extent = [1, 4, 1, 4]
     catalog = [src]
     cat.writeIslandContours('out.reg', catalog, fmt='reg')
-    assert os.path.exists('out.reg')
+    if not os.path.exists('out.reg'):
+        raise AssertionError()
+
     os.remove('out.reg')
     # shouldn't write anything
     cat.writeIslandContours('out.ann', catalog, fmt='ann')
-    assert not os.path.exists('out.ann')
+    if os.path.exists('out.ann'):
+        raise AssertionError()
 
     cat.writeIslandBoxes('out.reg', catalog, fmt='reg')
-    assert os.path.exists('out.reg')
+    if not os.path.exists('out.reg'):
+        raise AssertionError()
+
     os.remove('out.reg')
     cat.writeIslandBoxes('out.ann', catalog, fmt='ann')
-    assert os.path.exists('out.ann')
+    if not os.path.exists('out.ann'):
+        raise AssertionError()
+
     os.remove('out.ann')
     # shouldn't write anything
     cat.writeIslandBoxes('out.ot', catalog, fmt='ot')
-    assert not os.path.exists('out.ot')
+    if os.path.exists('out.ot'):
+        raise AssertionError()
 
 
 def test_write_ann():
     # write regular and simple sources for .ann files
     cat.writeAnn('out.ann', [OutputSource()], fmt='ann')
-    assert os.path.exists('out_comp.ann')
+    if not os.path.exists('out_comp.ann'):
+        raise AssertionError()
+
     os.remove('out_comp.ann')
     cat.writeAnn('out.ann', [SimpleSource()], fmt='ann')
-    assert os.path.exists('out_simp.ann')
+    if not os.path.exists('out_simp.ann'):
+        raise AssertionError()
+
     os.remove('out_simp.ann')
     # same but for .reg files
     cat.writeAnn('out.reg', [OutputSource()], fmt='reg')
-    assert os.path.exists('out_comp.reg')
+    if not os.path.exists('out_comp.reg'):
+        raise AssertionError()
+
     os.remove('out_comp.reg')
     cat.writeAnn('out.reg', [SimpleSource()], fmt='reg')
-    assert os.path.exists('out_simp.reg')
+    if not os.path.exists('out_simp.reg'):
+        raise AssertionError()
+
     os.remove('out_simp.reg')
 
 

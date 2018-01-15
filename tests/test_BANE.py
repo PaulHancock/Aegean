@@ -19,20 +19,26 @@ def test_sigmaclip():
     # normal usage case
     data = np.random.random(100)
     data[13] = np.nan
-    assert len(BANE.sigmaclip(data, 3, 4, reps=4)) > 0
+    if not len(BANE.sigmaclip(data, 3, 4, reps=4)) > 0:
+        raise AssertionError()
 
     # test list where all elements get clipped
-    assert len(BANE.sigmaclip([-10, 10], 1, 2, reps=2)) == 0
+    if not len(BANE.sigmaclip([-10, 10], 1, 2, reps=2)) == 0:
+        raise AssertionError()
 
     # test empty list
-    assert len(BANE.sigmaclip([], 0, 3)) == 0
+    if not len(BANE.sigmaclip([], 0, 3)) == 0:
+        raise AssertionError()
 
 
 def test_optimum_sections():
     # typical case
-    assert BANE.optimum_sections(8, (64, 64)) == (2, 4)
+    if not BANE.optimum_sections(8, (64, 64)) == (2, 4):
+        raise AssertionError()
+
     # redundant case
-    assert BANE.optimum_sections(1, (134, 1200)) == (1, 1)
+    if not BANE.optimum_sections(1, (134, 1200)) == (1, 1):
+        raise AssertionError()
 
 
 def test_mask_data():
@@ -41,7 +47,8 @@ def test_mask_data():
     mask[3:5, 0:2] = np.nan
     BANE.mask_img(data, mask)
     # check that the nan regions overlap
-    assert np.all(np.isnan(data) == np.isnan(mask))
+    if not np.all(np.isnan(data) == np.isnan(mask)):
+        raise AssertionError()
 
 
 def test_filter_image():
@@ -53,14 +60,22 @@ def test_filter_image():
     # hdu = fits.getheader(fname)
     # shape = hdu[0]['NAXIS1'], hdu[0]['NAXIS2']
     BANE.filter_image(fname, step_size=[10, 10], box_size=[100, 100], cores=1, out_base=outbase)
-    assert os.path.exists(rms)
+    if not os.path.exists(rms):
+        raise AssertionError()
+
     os.remove(rms)
-    assert os.path.exists(bkg)
+    if not os.path.exists(bkg):
+        raise AssertionError()
+
     os.remove(bkg)
     BANE.filter_image(fname, cores=2, out_base=outbase, twopass=True, compressed=True)
-    assert os.path.exists(rms)
+    if not os.path.exists(rms):
+        raise AssertionError()
+
     os.remove(rms)
-    assert os.path.exists(bkg)
+    if not os.path.exists(bkg):
+        raise AssertionError()
+
     os.remove(bkg)
 
 
