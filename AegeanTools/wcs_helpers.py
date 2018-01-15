@@ -14,7 +14,6 @@ from .angle_tools import gcd, bear, translate
 from .fits_image import Beam, get_beam, get_pixinfo
 
 # the glory of astropy
-import astropy
 import astropy.wcs as pywcs
 from astropy.io import fits
 

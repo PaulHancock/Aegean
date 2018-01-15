@@ -4,11 +4,8 @@ from __future__ import print_function
 """
 MIMAS - The Multi-resolution Image Mask for Aegean Software
 
-Created: Paul Hancock, Oct 2014
-
 TODO: Write an in/out reader for MOC formats described by
 http://arxiv.org/abs/1505.02937
-
 """
 
 import logging

@@ -64,25 +64,25 @@ def test_get_beam():
 def test_fix_aips_header():
     header = fits.getheader('tests/test_files/1904-66_SIN.fits')
     # test when this function is not needed
-    newhead = fi.fix_aips_header(header)
+    _ = fi.fix_aips_header(header)
 
     # test when beam params are not present, but there is no aips history
     del header['BMAJ'], header['BMIN'], header['BPA']
-    newhead = fi.fix_aips_header(header)
+    _ = fi.fix_aips_header(header)
 
     # test with some aips history
     header['HISTORY'] = 'AIPS   CLEAN BMAJ=  1.2500E-02 BMIN=  1.2500E-02 BPA=   0.00'
-    newhead = fi.fix_aips_header(header)
+    _ = fi.fix_aips_header(header)
 
 
 def test_init():
     filename = 'tests/test_files/1904-66_SIN.fits'
     # normal invocation
-    im = fi.FitsImage(filename)
+    _ = fi.FitsImage(filename)
 
     # call with an already opened hdu instead of a file name
     hdu = fits.open(filename)
-    im = fi.FitsImage(hdu)
+    _ = fi.FitsImage(hdu)
 
     # set bzero/bscale
     hdu[0].header['BZERO'] = 1

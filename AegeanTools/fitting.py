@@ -1077,7 +1077,7 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
             (a, b), e = np.linalg.eig(mat)
             pa = np.degrees(np.arctan2(*e[0]))
             # transform this ellipse into sky coordinates
-            ra, dec, major, minor, pa = wcshelper.pix2sky_ellipse([xo, yo], a, b, pa)
+            _, dec, major, minor, pa = wcshelper.pix2sky_ellipse([xo, yo], a, b, pa)
 
             # now determine the radius of the ellipse along the ra/dec directions.
             source.err_ra = major*minor / np.hypot(major*np.sin(np.radians(pa)), minor*np.cos(np.radians(pa)))
@@ -1255,7 +1255,7 @@ def covar_errors(params, data, errs, B, C=None):
             J = lmfit_jacobian(params, mask[0], mask[1], errs=errs)
             covar = np.transpose(J).dot(inv(C)).dot(J)
             onesigma = np.sqrt(np.diag(inv(covar)))
-        except (np.linalg.linalg.LinAlgError, ValueError) as e:
+        except (np.linalg.linalg.LinAlgError, ValueError) as _:
             C = None
 
     if C is None:
@@ -1263,7 +1263,7 @@ def covar_errors(params, data, errs, B, C=None):
             J = lmfit_jacobian(params, mask[0], mask[1], B=B, errs=errs)
             covar = np.transpose(J).dot(J)
             onesigma = np.sqrt(np.diag(inv(covar)))
-        except (np.linalg.linalg.LinAlgError, ValueError) as e:
+        except (np.linalg.linalg.LinAlgError, ValueError) as _:
             onesigma = [-2] * len(mask[0])
 
     for i in range(params['components'].value):

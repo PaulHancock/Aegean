@@ -1885,7 +1885,7 @@ def check_cores(cores):
         cores = 1
     else:
         try:
-            temp = queue.manage(pprocess.MakeReusable(fix_shape))
+            _ = queue.manage(pprocess.MakeReusable(fix_shape))
         except:
             cores = 1
     return cores
