@@ -82,7 +82,7 @@ class Region(object):
         depth : int
             The deepth at which the polygon will be inserted.
         """
-        assert len(positions) >= 3, "A minimum of three coordinate pairs are required"
+        if not (len(positions) >= 3): raise AssertionError("A minimum of three coordinate pairs are required")
 
         if depth is None or depth > self.maxdepth:
             depth = self.maxdepth
@@ -259,7 +259,7 @@ class Region(object):
         """
         # work only on the lowest level
         # TODO: Allow this to be done for regions with different depths.
-        assert self.maxdepth == other.maxdepth, "Regions must have the same maxdepth"
+        if not (self.maxdepth == other.maxdepth): raise AssertionError("Regions must have the same maxdepth")
         self._demote_all()
         opd = set(other.get_demoted())
         self.pixeldict[self.maxdepth].difference_update(opd)
@@ -279,7 +279,7 @@ class Region(object):
         """
         # work only on the lowest level
         # TODO: Allow this to be done for regions with different depths.
-        assert self.maxdepth == other.maxdepth, "Regions must have the same maxdepth"
+        if not (self.maxdepth == other.maxdepth): raise AssertionError("Regions must have the same maxdepth")
         self._demote_all()
         opd = set(other.get_demoted())
         self.pixeldict[self.maxdepth].intersection_update(opd)
@@ -299,7 +299,7 @@ class Region(object):
         """
         # work only on the lowest level
         # TODO: Allow this to be done for regions with different depths.
-        assert self.maxdepth == other.maxdepth, "Regions must have the same maxdepth"
+        if not (self.maxdepth == other.maxdepth): raise AssertionError("Regions must have the same maxdepth")
         self._demote_all()
         opd = set(other.get_demoted())
         self.pixeldict[self.maxdepth].symmetric_difference_update(opd)

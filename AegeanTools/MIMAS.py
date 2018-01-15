@@ -171,9 +171,9 @@ def mask_file(regionfile, infile, outfile, negate=False):
     :func:`AegeanTools.MIMAS.mask_plane`
     """
     # Check that the input file is accessible and then open it
-    assert os.path.exists(infile), "Cannot locate fits file {0}".format(infile)
+    if not os.path.exists(infile): raise AssertionError("Cannot locate fits file {0}".format(infile))
     im = pyfits.open(infile)
-    assert os.path.exists(regionfile), "Cannot locate region file {0}".format(regionfile)
+    if not os.path.exists(regionfile): raise AssertionError("Cannot locate region file {0}".format(regionfile))
     region = cPickle.load(open(regionfile, 'rb'))
     try:
         wcs = pywcs.WCS(im[0].header, naxis=2)
