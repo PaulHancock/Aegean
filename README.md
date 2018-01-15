@@ -45,9 +45,11 @@ Until there is a more appropriate method for crediting software development and 
 
 Status
 =====
-Travis: [![Build Status](https://travis-ci.org/PaulHancock/Aegean.svg?branch=master)](https://travis-ci.org/PaulHancock/Aegean) 
+[![Build Status](https://travis-ci.org/PaulHancock/Aegean.svg?branch=master)](https://travis-ci.org/PaulHancock/Aegean) 
 
-Coveralls: [![Coverage Status](https://coveralls.io/repos/github/PaulHancock/Aegean/badge.svg?branch=master)](https://coveralls.io/github/PaulHancock/Aegean?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/PaulHancock/Aegean/badge.svg?branch=master)](https://coveralls.io/github/PaulHancock/Aegean?branch=master)
 
-Codacy: [![Codacy Badge](https://api.codacy.com/project/badge/Grade/014fb9c86b3f42b49ad94cd4384cfa78)](https://www.codacy.com/app/mr.paul.hancock/Aegean?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=PaulHancock/Aegean&amp;utm_campaign=Badge_Grade)
+[![Documentation Status](https://readthedocs.org/projects/aegeantools/badge/?version=latest)](http://aegeantools.readthedocs.io/en/latest/?badge=latest)
+ 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/014fb9c86b3f42b49ad94cd4384cfa78)](https://www.codacy.com/app/mr.paul.hancock/Aegean?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=PaulHancock/Aegean&amp;utm_campaign=Badge_Grade)
 
