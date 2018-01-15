@@ -27,8 +27,10 @@ def test_norm_dist():
     src2.dec = 1/3600.
     src2.a = 1
     src2.b = 1
-    assert cluster.norm_dist(src1, src1) == 0
-    assert cluster.norm_dist(src1, src2) == 1/math.sqrt(2)
+    if not cluster.norm_dist(src1, src1) == 0:
+        raise AssertionError()
+    if not cluster.norm_dist(src1, src2) == 1/math.sqrt(2):
+        raise AssertionError()
 
 
 def test_sky_dist():
@@ -38,8 +40,10 @@ def test_sky_dist():
     src2 = SimpleSource()
     src2.ra = 0
     src2.dec = 1/3600.
-    assert cluster.sky_dist(src1, src1) == 0.
-    assert cluster.sky_dist(src1, src2) == 1/3600.
+    if not cluster.sky_dist(src1, src1) == 0.:
+        raise AssertionError()
+    if not cluster.sky_dist(src1, src2) == 1/3600.:
+        raise AssertionError()
 
 
 def test_pairwise_elliptical_binary():
@@ -53,7 +57,8 @@ def test_pairwise_elliptical_binary():
     src3 = deepcopy(src1)
     src3.dec = 50
     mat = cluster.pairwise_ellpitical_binary([src1, src2, src3], eps=0.5)
-    assert np.all(mat == [[False, True, False], [True, False, False], [False, False, False]])
+    if not np.all(mat == [[False, True, False], [True, False, False], [False, False, False]]):
+        raise AssertionError()
 
 
 def test_regroup():
@@ -65,10 +70,14 @@ def test_regroup():
 
     # this should result in 51 groups
     a = cluster.regroup('tests/test_files/1904_comp.fits', eps=1/3600.)
-    assert len(a) == 51
+    if not len(a) == 51:
+        raise AssertionError()
+
     # this should give 1 group
     a = cluster.regroup('tests/test_files/1904_comp.fits', eps=10, far=1000)
-    assert len(a) == 1
+    if not len(a) == 1:
+        raise AssertionError()
+
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'

@@ -12,32 +12,32 @@ def test_simple_source():
     ss = models.SimpleSource()
     ss.ra = np.float32(12)
     ss._sanitise()
-    assert isinstance(ss.ra, np.float64)
+    if not (isinstance(ss.ra, np.float64)): raise AssertionError()
     # convert to string without failing
     a = "{0}".format(ss)
-    assert a == ' 12.0000000   0.0000000  0.000000  0.000000  0.00  0.00    0.0 000000'
-    assert ss.__repr__() == ss.__str__()
-    assert np.all(ss.as_list()[:-1] == [0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0])
+    if not (a == ' 12.0000000   0.0000000  0.000000  0.000000  0.00  0.00    0.0 000000'): raise AssertionError()
+    if not (ss.__repr__() == ss.__str__()): raise AssertionError()
+    if not (np.all(ss.as_list()[:-1] == [0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0])): raise AssertionError()
     isl = models.IslandSource()
     isl2 = models.IslandSource()
-    assert isl < ss
-    assert isl <= ss
-    assert not(isl > ss)
-    assert not(isl >= ss)
-    assert isl == isl2
-    assert not(isl != isl2)
+    if not (isl < ss): raise AssertionError()
+    if not (isl <= ss): raise AssertionError()
+    if isl > ss: raise AssertionError()
+    if isl >= ss: raise AssertionError()
+    if not (isl == isl2): raise AssertionError()
+    if isl != isl2: raise AssertionError()
     out = models.OutputSource()
     out.source = 1
     out2 = models.OutputSource()
     out2.source = 2
     out3 = models.OutputSource()
     out3.island = 1
-    assert out < out2
-    assert out3 > out2
-    assert out <= out2
-    assert out3 >= out
-    assert out != out2
-    assert out == out
+    if not (out < out2): raise AssertionError()
+    if not (out3 > out2): raise AssertionError()
+    if not (out <= out2): raise AssertionError()
+    if not (out3 >= out): raise AssertionError()
+    if not (out != out2): raise AssertionError()
+    if not (out == out): raise AssertionError()
 
 
 def test_global_fitting_data():
@@ -67,10 +67,10 @@ def test_classify_catalogue():
         out.extend([c, d])
         all.extend([a, b, c, d])
     a, b, c = models.classify_catalog(all)
-    assert np.all(b == isl)
-    assert np.all(a == out)
+    if not (np.all(b == isl)): raise AssertionError()
+    if not (np.all(a == out)): raise AssertionError()
     groups = list(models.island_itergen(a))
-    assert len(groups) == 10
+    if not (len(groups) == 10): raise AssertionError()
 
 
 if __name__ == "__main__":

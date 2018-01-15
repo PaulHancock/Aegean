@@ -19,46 +19,46 @@ def test_get_pixinfo():
     header = fits.getheader('tests/test_files/1904-66_SIN.fits')
 
     area, scale = fi.get_pixinfo(header)
-    assert area > 0
-    assert len(scale) == 2
+    if not area > 0: raise AssertionError()
+    if not len(scale) == 2: raise AssertionError()
 
     header['CD1_1'] = header['CDELT1']
     del header['CDELT1']
     header['CD2_2'] = header['CDELT2']
     del header['CDELT2']
     area, scale = fi.get_pixinfo(header)
-    assert area > 0
-    assert len(scale) == 2
+    if not area > 0: raise AssertionError()
+    if not len(scale) == 2: raise AssertionError()
 
     header['CD1_2'] = 0
     header['CD2_1'] = 0
     area, scale = fi.get_pixinfo(header)
-    assert area > 0
-    assert len(scale) == 2
+    if not area > 0: raise AssertionError()
+    if not len(scale) == 2: raise AssertionError()
 
     header['CD1_2'] = header['CD1_1']
     header['CD2_1'] = header['CD2_2']
     area, scale = fi.get_pixinfo(header)
-    assert area == 0
-    assert len(scale) == 2
+    if not area == 0: raise AssertionError()
+    if not len(scale) == 2: raise AssertionError()
 
     for f in ['CD1_1', 'CD1_2', 'CD2_2', 'CD2_1']:
         del header[f]
     area, scale = fi.get_pixinfo(header)
-    assert area == 0
-    assert scale == (0, 0)
+    if not area == 0: raise AssertionError()
+    if not scale == (0, 0): raise AssertionError()
 
 
 def test_get_beam():
     header = fits.getheader('tests/test_files/1904-66_SIN.fits')
     beam = fi.get_beam(header)
     print(beam)
-    assert beam is not None
-    assert beam.pa == header['BPA']
+    if beam is None : raise AssertionError()
+    if beam.pa != header['BPA']: raise AssertionError()
 
     del header['BMAJ'], header['BMIN'], header['BPA']
     beam = fi.get_beam(header)
-    assert beam is None
+    if beam is not None : raise AssertionError()
 
 
 def test_fix_aips_header():
@@ -88,13 +88,13 @@ def test_init():
     hdu[0].header['BZERO'] = 1
     hdu[0].header['BSCALE'] = 2
     im = fi.FitsImage(hdu)
-    assert im.bscale == 2
-    assert im.bzero == 1
+    if not im.bscale == 2: raise AssertionError()
+    if not im.bzero == 1: raise AssertionError()
 
     # should be able to supply a beam directly
     beam = fi.Beam(1, 1, 0)
     im = fi.FitsImage(hdu, beam=beam, slice=0)
-    assert im.beam is beam
+    if not (im.beam is beam): raise AssertionError()
 
     # raise exception if the beam cannot be determined
     del hdu[0].header['BMAJ']
@@ -107,7 +107,7 @@ def test_init():
     assert_raises(Exception, fi.FitsImage, hdu)
     # this should be fine
     im = fi.FitsImage(hdu, slice=0)
-    assert im.x == im.y == 3
+    if not (im.x == im.y == 3): raise AssertionError()
 
     # can't work with 4d data
     hdu[0].data = np.empty((3, 3, 3, 3))
@@ -119,7 +119,7 @@ def test_get_background_rms():
     hdu = fits.open(filename)
     hdu[0].data = np.empty((40, 40))
     im = fi.FitsImage(hdu)
-    assert im.get_background_rms() > 0
+    if not (im.get_background_rms() > 0): raise AssertionError()
 
 
 def test_pix2sky_sky2pix():
