@@ -109,7 +109,6 @@ class Region(object):
         if depth not in self.pixeldict:
             self.pixeldict[depth] = set()
         self.pixeldict[depth].update(set(pix))
-        pass
 
     def get_area(self, degrees=True):
         """
