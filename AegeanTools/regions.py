@@ -359,7 +359,7 @@ class Region(object):
         hdulist[1].header['MOCID'] = (' ', 'Identifier of the collection')
         hdulist[1].header['ORIGIN'] = (' ', 'MOC origin')
         time = datetime.datetime.utcnow()
-        hdulist[1].header['DATE'] = (datetime.datetime.strftime(time, fmt="%Y-%m-%dT%H:%m:%SZ"), 'MOC creation date')
+        hdulist[1].header['DATE'] = (datetime.datetime.strftime(time, format="%Y-%m-%dT%H:%m:%SZ"), 'MOC creation date')
         hdulist.writeto(filename, clobber=True)
         return
 
