@@ -118,7 +118,7 @@ def test_sky_within():
     if np.any(region.sky_within(ra[0]+5*radius[0], dec[0])): raise AssertionError("Failed on position outside of region")
     try:
         region.sky_within(np.nan, dec[0])
-    except ValueError, e:
+    except ValueError as e:
         raise AssertionError("Failed with a nan position")
 
 
