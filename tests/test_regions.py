@@ -116,6 +116,10 @@ def test_sky_within():
     if not (np.all(region.sky_within(ra[0], dec[0]))): raise AssertionError("Failed on position at center of region")
     if not (np.all(region.sky_within(ra, dec))): raise AssertionError("Failed on list of positions")
     if np.any(region.sky_within(ra[0]+5*radius[0], dec[0])): raise AssertionError("Failed on position outside of region")
+    try:
+        region.sky_within(np.nan, dec[0])
+    except ValueError, e:
+        raise AssertionError("Failed with a nan position")
 
 
 def test_pickle():
