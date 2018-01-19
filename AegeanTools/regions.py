@@ -204,17 +204,16 @@ class Region(object):
             sky = np.radians(sky)
 
         theta_phi = self.sky2ang(sky)
-        # cut out any entries that have nan for theta or phi
-        mask = np.logical_and.reduce(np.isfinite(theta_phi), axis=0)
-        theta_phi = theta_phi[:, mask]
-        # need to check shape as the above can give 'empty' arrays of shape (22,0)
-        if theta_phi.shape[1] < 1:
-            return False
+        # Set values that are nan to be zero and record a mask
+        mask = np.bitwise_not(np.logical_and.reduce(np.isfinite(theta_phi), axis=1))
+        theta_phi[mask, :] = 0
 
         theta, phi = theta_phi.transpose()
         pix = hp.ang2pix(2**self.maxdepth, theta, phi, nest=True)
         pixelset = self.get_demoted()
         result = np.in1d(pix, list(pixelset))
+        # apply the mask and set the shonky values to False
+        result[mask] = False
         return result
 
     def union(self, other, renorm=True):
