@@ -1,0 +1,22 @@
+numpy>=1.10
+scipy>=0.16
+astropy>=1.0
+pprocess>=0.5
+healpy >=1.10
+astropy==2.0.3
+attrs==17.3.0
+backports.functools-lru-cache==1.4
+cycler==0.10.0
+funcsigs==1.0.2
+matplotlib==2.1.1
+numpy==1.13.3
+pluggy==0.6.0
+pprocess==0.5.1
+py==1.5.2
+pyparsing==2.2.0
+pytest==3.3.1
+python-dateutil==2.6.1
+pytz==2017.3
+scipy==1.0.0
+six==1.11.0
+subprocess32==3.2.7
