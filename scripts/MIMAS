@@ -123,7 +123,7 @@ if __name__ == "__main__":
         sys.exit()
 
     if results.area is not None:
-        region = MIMAS.pickle.load(open(results.area))
+        region = MIMAS.cPickle.load(open(results.area))
         print("{0} represents an area of {1} deg^2".format(results.area, region.get_area()))
         sys.exit()
 
