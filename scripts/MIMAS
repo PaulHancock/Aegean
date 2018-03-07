@@ -131,6 +131,9 @@ if __name__ == "__main__":
         if len(results.intersect) == 1:
             print("intersections requires at least two regions")
             sys.exit(1)
+        elif results.outfile is None:
+            print("outfile is required")
+            sys.exit(1)
         else:
             region = MIMAS.intersect_regions(results.intersect)
             MIMAS.save_region(region, results.outfile)
