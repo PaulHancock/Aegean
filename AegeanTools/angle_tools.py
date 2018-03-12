@@ -145,7 +145,7 @@ def gcd(ra1, dec1, ra2, dec2):
     dlat = dec2 - dec1
     a = np.sin(np.radians(dlat) / 2) ** 2
     a += np.cos(np.radians(dec1)) * np.cos(np.radians(dec2)) * np.sin(np.radians(dlon) / 2) ** 2
-    sep = np.degrees(2 * np.arcsin(min(1, np.sqrt(a))))
+    sep = np.degrees(2 * np.arcsin(np.minimum(1, np.sqrt(a))))
     return sep
 
 

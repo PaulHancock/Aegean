@@ -45,7 +45,7 @@ def norm_dist(src1, src2):
         The normalised distance.
 
     """
-    if src1 == src2:
+    if np.all(src1 == src2):
         return 0
     dist = gcd(src1.ra, src1.dec, src2.ra, src2.dec) # degrees
 
@@ -81,7 +81,7 @@ def sky_dist(src1, src2):
     :func:`AegeanTools.angle_tools.gcd`
     """
 
-    if src1 == src2:
+    if np.all(src1 == src2):
         return 0
     return gcd(src1.ra, src1.dec, src2.ra, src2.dec) # degrees
 

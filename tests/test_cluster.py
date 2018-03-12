@@ -46,6 +46,34 @@ def test_sky_dist():
         raise AssertionError()
 
 
+def test_vectorized():
+    # random data as struct array with interface like SimpleSource
+    X = np.random.RandomState(0).rand(20, 6)
+    Xr = np.rec.array(X.view([('ra', 'f8'), ('dec', 'f8'),
+                              ('a', 'f8'), ('b', 'f8'),
+                              ('pa', 'f8'),
+                              ('peak_flux', 'f8')]).ravel())
+
+    def to_ss(x):
+        "Convert numpy.rec to SimpleSource"
+        out = SimpleSource()
+        for f in Xr.dtype.names:
+            setattr(out, f, getattr(x, f))
+        return out
+
+    for dist in [cluster.norm_dist, cluster.sky_dist]:
+        x0 = Xr[0]
+        # calculate distance of x0 to all of Xr with vectorized operations:
+        dx0all = dist(x0, Xr)
+        for i in range(len(Xr)):
+            xi = Xr[i]
+            dx0xi = dist(x0, xi)
+            # check equivalence between pairs of sources and vectorized
+            assert np.isclose(dx0xi, dx0all[i], atol=0)
+            # check equivalence between SimpleSource and numpy.record
+            assert np.isclose(dx0xi, dist(to_ss(x0), to_ss(xi)), atol=0)
+
+
 def test_pairwise_elliptical_binary():
     src1 = SimpleSource()
     src1.ra = 0
