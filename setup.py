@@ -19,7 +19,7 @@ def get_version():
 
 reqs = ['numpy>=1.10',
         'scipy>=0.16',
-        'astropy>=1.0',
+        'astropy>=2.0, <3',
         'pprocess>=0.5',
         'healpy >=1.10']
 
