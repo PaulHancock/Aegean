@@ -137,6 +137,11 @@ def pairwise_ellpitical_binary(sources, eps, far=None):
 
 def regroup_vectorized(srccat, eps, far=None, dist=norm_dist):
     """
+    Regroup the islands of a catalog according to their normalised distance.
+
+    Assumes srccat is recarray-like for efficiency.
+    Return a list of island groups.
+
     Parameters
     ----------
     srccat : np.rec.arry or pd.DataFrame
