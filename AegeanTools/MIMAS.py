@@ -192,7 +192,7 @@ def mask_file(regionfile, infile, outfile, negate=False):
     else:
         mask_plane(data, wcs, region, negate)
     im[0].data = data
-    im.writeto(outfile, clobber=True)
+    im.writeto(outfile, overwrite=True)
     logging.info("Wrote {0}".format(outfile))
     return
 

@@ -580,6 +580,6 @@ def write_fits(data, header, file_name):
     hdu = fits.PrimaryHDU(data)
     hdu.header = header
     hdulist = fits.HDUList([hdu])
-    hdulist.writeto(file_name, clobber=True)
+    hdulist.writeto(file_name, overwrite=True)
     logging.info("Wrote {0}".format(file_name))
     return

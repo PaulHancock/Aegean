@@ -358,7 +358,7 @@ class Region(object):
         hdulist[1].header['ORIGIN'] = (' ', 'MOC origin')
         time = datetime.datetime.utcnow()
         hdulist[1].header['DATE'] = (datetime.datetime.strftime(time, format="%Y-%m-%dT%H:%m:%SZ"), 'MOC creation date')
-        hdulist.writeto(filename, clobber=True)
+        hdulist.writeto(filename, overwrite=True)
         return
 
     def _uniq(self):

@@ -812,19 +812,19 @@ class SourceFinder(object):
         snr_out = outbase + '_snr.fits'
 
         new_hdu.data = bkgimg
-        new_hdu.writeto(background_out, clobber=True)
+        new_hdu.writeto(background_out, overwrite=True)
         self.log.info("Wrote {0}".format(background_out))
 
         new_hdu.data = rmsimg
-        new_hdu.writeto(noise_out, clobber=True)
+        new_hdu.writeto(noise_out, overwrite=True)
         self.log.info("Wrote {0}".format(noise_out))
 
         new_hdu.data = curve
-        new_hdu.writeto(curve_out, clobber=True)
+        new_hdu.writeto(curve_out, overwrite=True)
         self.log.info("Wrote {0}".format(curve_out))
 
         new_hdu.data = self.global_data.data_pix / rmsimg
-        new_hdu.writeto(snr_out, clobber=True)
+        new_hdu.writeto(snr_out, overwrite=True)
         self.log.info("Wrote {0}".format(snr_out))
         return
 
@@ -845,7 +845,7 @@ class SourceFinder(object):
         for c in ['CRPIX3', 'CRPIX4', 'CDELT3', 'CDELT4', 'CRVAL3', 'CRVAL4', 'CTYPE3', 'CTYPE4']:
             if c in hdu.header:
                 del hdu.header[c]
-        hdu.writeto(outname, clobber=True)
+        hdu.writeto(outname, overwrite=True)
         self.log.info("Wrote {0}".format(outname))
         return
 

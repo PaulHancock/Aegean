@@ -117,7 +117,7 @@ def compress(datafile, factor, outfile=None):
     hdulist[0].data = np.array(new_data, dtype=np.float32)
     hdulist[0].header = header
     if outfile is not None:
-        hdulist.writeto(outfile, clobber=True)
+        hdulist.writeto(outfile, overwrite=True)
         logging.info("Wrote: {0}".format(outfile))
     return hdulist
 
@@ -209,6 +209,6 @@ def expand(datafile, outfile=None, method='linear'):
     del header['BN_CFAC'], header['BN_NPX1'], header['BN_NPX2'], header['BN_RPX1'], header['BN_RPX2']
     hdulist[0].header = header
     if outfile is not None:
-        hdulist.writeto(outfile, clobber=True)
+        hdulist.writeto(outfile, overwrite=True)
         logging.info("Wrote: {0}".format(outfile))
     return hdulist

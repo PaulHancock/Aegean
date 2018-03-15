@@ -405,9 +405,9 @@ def write_catalog(filename, catalog, fmt=None, meta=None):
             elif fmt in ['fits']:
                 writeFITSTable(filename, t)
             else:
-                ascii.write(t, filename, fmt)
+                ascii.write(t, filename, fmt, overwrite=True)
         else:
-            ascii.write(t, filename)
+            ascii.write(t, filename, overwrite=True)
         return
 
     # sort the sources into types and then write them out individually
@@ -473,7 +473,7 @@ def writeFITSTable(filename, table):
     tbhdu = fits.BinTableHDU.from_columns(cols)
     for k in table.meta:
         tbhdu.header['HISTORY'] = ':'.join((k, table.meta[k]))
-    tbhdu.writeto(filename, clobber=True)
+    tbhdu.writeto(filename, overwrite=True)
 
 
 def writeIslandContours(filename, catalog, fmt='reg'):
