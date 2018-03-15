@@ -11,6 +11,8 @@ def test_simple_source():
     # make a new source without failing
     ss = models.SimpleSource()
     ss.ra = np.float32(12)
+    ss.dec = ss.peak_flux = ss.err_peak_flux = ss.a = ss.b = ss.pa = 0.
+    ss.local_rms = ss.background = ss.peak_pixel = 0.
     ss._sanitise()
     if not (isinstance(ss.ra, np.float64)): raise AssertionError()
     # convert to string without failing
