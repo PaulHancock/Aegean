@@ -1643,11 +1643,13 @@ class SourceFinder(object):
                 skybeam = global_data.psfhelper.get_beam(src.ra, src.dec)
                 if skybeam is None:
                     src_mask[i] = False
+                    self.log.info("Excluding source ({0.island},{0.source}) due to lack of psf knowledge".format(src))
                     continue
                 src.a = np.sqrt(src.a ** 2 + (skybeam.a * 3600) ** 2 * (1 - 1 / ratio ** 2))
                 src.b = np.sqrt(src.b ** 2 + (skybeam.b * 3600) ** 2 * (1 - 1 / ratio ** 2))
                 # source with funky a/b are also rejected
                 if not np.all(np.isfinite((src.a, src.b))):
+                    self.log.info("Excluding source ({0.island},{0.source}) due to funky psf ({0.a},{0.b},{0.pa})".format(src))
                     src_mask[i] = False
         elif catpsf is not None or has_psf:
             if catpsf is not None:
@@ -1683,6 +1685,11 @@ class SourceFinder(object):
 
         self.log.info("{0} sources in catalog".format(len(input_sources)))
         self.log.info("{0} sources accepted".format(sum(src_mask)))
+
+        if len(src_mask) < 1:
+            self.log.debug("No sources accepted for priorized fitting")
+            return []
+
         input_sources = input_sources[src_mask]
         # redo the grouping if required
         if doregroup:
