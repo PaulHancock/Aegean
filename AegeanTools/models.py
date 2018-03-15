@@ -56,17 +56,17 @@ class SimpleSource(object):
              'pa', 'uuid']
     galactic = False
     def __init__(self):
-        self.background = 0.0
-        self.local_rms = 0.0
-        self.ra = 0.0
-        self.dec = 0.0
-        self.peak_flux = 0.0
-        self.err_peak_flux = 0.0
+        self.background = np.nan
+        self.local_rms = np.nan
+        self.ra = np.nan
+        self.dec = np.nan
+        self.peak_flux = np.nan
+        self.err_peak_flux = np.nan
         self.flags = 0
-        self.peak_pixel = 0.0
-        self.a = 0.0
-        self.b = 0.0
-        self.pa = 0.0
+        self.peak_pixel = np.nan
+        self.a = np.nan
+        self.b = np.nan
+        self.pa = np.nan
         self.uuid = str(uuid.uuid4())
 
 
@@ -189,19 +189,19 @@ class IslandSource(SimpleSource):
         #ra = None # degrees
         #dec = None # degrees
         #peak_flux = None # Jy/beam
-        self.int_flux = 0.0  # Jy
-        self.err_int_flux = 0.0  # Jy
-        self.x_width = 0
-        self.y_width = 0
-        self.max_angular_size = 0
-        self.pa = 0
-        self.pixels = 0
-        self.area = 0
-        self.beam_area = 0  # at the brightest pixel
-        self.components = 0
-        self.eta = 0.0
+        self.int_flux = np.nan  # Jy
+        self.err_int_flux = np.nan  # Jy
+        self.x_width = np.nan
+        self.y_width = np.nan
+        self.max_angular_size = np.nan
+        self.pa = np.nan
+        self.pixels = np.nan
+        self.area = np.nan
+        self.beam_area = np.nan  # at the brightest pixel
+        self.components = np.nan
+        self.eta = np.nan
         # not included in 'names' and thus not included by default in most output
-        self.extent = 0
+        self.extent = np.nan
         self.contour = []
         self.max_angular_size_anchors = []
         self.pix_mask = [] # the ra/dec of all the non masked pixels in this island.
@@ -319,26 +319,26 @@ class OutputSource(SimpleSource):
         self.ra_str = ''  #str
         self.dec_str = ''  #str
         #ra = None # degrees
-        self.err_ra = 0.0  # degrees
+        self.err_ra = np.nan  # degrees
         #dec = None # degrees
-        self.err_dec = 0.0
+        self.err_dec = np.nan
         #peak_flux = None # Jy/beam
         #err_peak_flux = None # Jy/beam
-        self.int_flux = 0.0  #Jy
-        self.err_int_flux = 0.0  #Jy
+        self.int_flux = np.nan  #Jy
+        self.err_int_flux = np.nan  #Jy
         #self.a = 0.0 # major axis (arcsecs)
-        self.err_a = 0.0  # arcsecs
+        self.err_a = np.nan  # arcsecs
         #self.b = 0.0 # minor axis (arcsecs)
-        self.err_b = 0.0  # arcsecs
+        self.err_b = np.nan  # arcsecs
         #self.pa = 0.0 # position angle (degrees - WHAT??)
-        self.err_pa = 0.0  # degrees
+        self.err_pa = np.nan  # degrees
         self.flags = 0x0
-        self.residual_mean = 0
-        self.residual_std = 0
+        self.residual_mean = np.nan
+        self.residual_std = np.nan
         #
-        self.psf_a = 0
-        self.psf_b = 0
-        self.psf_pa = 0
+        self.psf_a = np.nan
+        self.psf_b = np.nan
+        self.psf_pa = np.nan
 
     def __str__(self):
         self._sanitise()
