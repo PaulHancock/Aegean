@@ -22,11 +22,13 @@ def test_norm_dist():
     src1.dec = 0
     src1.a = 1.
     src1.b = 1.
+    src1.pa = 0.
     src2 = SimpleSource()
     src2.ra = 0
     src2.dec = 1/3600.
     src2.a = 1
     src2.b = 1
+    src2.pa = 0.
     if not cluster.norm_dist(src1, src1) == 0:
         raise AssertionError()
     if not cluster.norm_dist(src1, src2) == 1/math.sqrt(2):
@@ -80,6 +82,7 @@ def test_pairwise_elliptical_binary():
     src1.dec = 0
     src1.a = 1.
     src1.b = 1.
+    src1.pa = 0.
     src2 = deepcopy(src1)
     src2.dec = 1/3600.
     src3 = deepcopy(src1)
