@@ -1629,6 +1629,18 @@ class SourceFinder(object):
             self.log.debug("No input sources for priorized fitting")
             return []
 
+        # reject sources with missing params
+        ok = True
+        for param in ['ra', 'dec', 'peak_flux', 'a', 'b', 'pa']:
+            if np.isnan(getattr(input_sources[0], param)):
+                self.log.info("Source 0, is missing param '{0}'".format(param))
+                ok = False
+        if not ok:
+            self.log.error("Missing parameters! Not fitting.")
+            self.log.error("Maybe your table is missing or mis-labeled columns?")
+            return []
+        del ok
+
         src_mask = np.ones(len(input_sources), dtype=bool)
 
         # check to see if the input catalog contains psf information
