@@ -867,7 +867,7 @@ def condon_errors(source, theta_n, psf=None):
             print(beam, theta_n)
 
     if theta_n is None:
-        source.err_a = source.err_b = source.err_peak_flux = source.err_pa = source.err_int_flux = 0
+        source.err_a = source.err_b = source.err_peak_flux = source.err_pa = source.err_int_flux = 0.0
         return
 
     smoothing = major * minor / (theta_n ** 2)
@@ -925,8 +925,8 @@ def errors(source, model, wcshelper):
 
     # if the source wasn't fit then all errors are -1
     if source.flags & (flags.NOTFIT | flags.FITERR):
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
-        source.err_ra = source.err_dec = source.err_int_flux = -1
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1.0
+        source.err_ra = source.err_dec = source.err_int_flux = -1.0
         return source
     # copy the errors from the model
     prefix = "c{0}_".format(source.source)
@@ -952,8 +952,8 @@ def errors(source, model, wcshelper):
     # It is possible for this to fail, even if the ra/dec conversion works elsewhere
     if not all(np.isfinite(ref)):
         source.flags |= flags.WCSERR
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
-        source.err_ra = source.err_dec = source.err_int_flux = -1
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1.0
+        source.err_ra = source.err_dec = source.err_int_flux = -1.0
         return source
 
     # position errors
@@ -988,14 +988,14 @@ def errors(source, model, wcshelper):
             [xo + sx * np.cos(np.radians(theta + 90)), yo + (sy + err_sy) * np.sin(np.radians(theta + 90))])
         source.err_b = gcd(ref[0], ref[1], offset[0], offset[1]) * 3600
     else:
-        source.err_a = source.err_b = -1
+        source.err_a = source.err_b = -1.0
 
     sqerr = 0
     sqerr += (source.err_peak_flux / source.peak_flux) ** 2 if source.err_peak_flux > 0 else 0
     sqerr += (source.err_a / source.a) ** 2 if source.err_a > 0 else 0
     sqerr += (source.err_b / source.b) ** 2 if source.err_b > 0 else 0
     if sqerr == 0:
-        source.err_int_flux = -1
+        source.err_int_flux = -1.0
     else:
         source.err_int_flux = abs(source.int_flux * np.sqrt(sqerr))
 
@@ -1028,8 +1028,8 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
 
     # if the source wasn't fit then all errors are -1
     if source.flags & (flags.NOTFIT | flags.FITERR):
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
-        source.err_ra = source.err_dec = source.err_int_flux = -1
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1.0
+        source.err_ra = source.err_dec = source.err_int_flux = -1.0
         return source
     # copy the errors/values from the model
     prefix = "c{0}_".format(source.source)
@@ -1053,8 +1053,8 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
     # check for inf/nan errors -> these sources have poor fits.
     if not all(a is not None and np.isfinite(a) for a in pix_errs):
         source.flags |= flags.FITERR
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
-        source.err_ra = source.err_dec = source.err_int_flux = -1
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1.0
+        source.err_ra = source.err_dec = source.err_int_flux = -1.0
         return source
 
     # calculate the reference coordinate
@@ -1063,8 +1063,8 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
     # It is possible for this to fail, even if the ra/dec conversion works elsewhere
     if not all(np.isfinite(ref)):
         source.flags |= flags.WCSERR
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
-        source.err_ra = source.err_dec = source.err_int_flux = -1
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1.0
+        source.err_ra = source.err_dec = source.err_int_flux = -1.0
         return source
 
     # calculate position errors by transforming the error ellipse
@@ -1072,7 +1072,7 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
         # determine the error ellipse from the Jacobian
         mat = model.covar[1:3, 1:3]
         if not(np.all(np.isfinite(mat))):
-            source.err_ra = source.err_dec = -1
+            source.err_ra = source.err_dec = -1.0
         else:
             (a, b), e = np.linalg.eig(mat)
             pa = np.degrees(np.arctan2(*e[0]))
