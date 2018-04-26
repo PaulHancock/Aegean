@@ -10,5 +10,5 @@ generally.
 
 """
 __author__ = 'Paul Hancock'
-__version__ = '2.0b448'
+__version__ = '2.0b450'
 __date__ = '2018-04-26'
