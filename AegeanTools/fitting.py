@@ -890,10 +890,10 @@ def condon_errors(source, theta_n, psf=None):
     source.err_dec = np.sqrt(err_xo2 * np.cos(phi)**2 + err_yo2 * np.sin(phi)**2)
 
     if (major == 0) or (minor == 0):
-        source.err_pa = -1
+        source.err_pa = ERR_MASK
     # if major/minor are very similar then we should not be able to figure out what pa is.
     elif abs(2 * (major-minor) / (major+minor)) < 0.01:
-        source.err_pa = -1
+        source.err_pa = ERR_MASK
     else:
         source.err_pa = np.degrees(np.sqrt(4 / rho2('pa')) * (major * minor / (major ** 2 - minor ** 2)))
 
@@ -975,7 +975,7 @@ def errors(source, model, wcshelper):
             [xo + sx * np.cos(np.radians(theta + err_theta)), yo + sy * np.sin(np.radians(theta + err_theta))])
         source.err_pa = abs(bear(ref[0], ref[1], off1[0], off1[1]) - bear(ref[0], ref[1], off2[0], off2[1]))
     else:
-        source.err_pa = -1
+        source.err_pa = ERR_MASK
 
     if model[prefix + 'sx'].vary and model[prefix + 'sy'].vary \
             and all(np.isfinite([err_sx, err_sy])):
@@ -1097,7 +1097,7 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
         # scale the initial theta error by this amount
         source.err_pa = abs(bear(ref[0], ref[1], off1[0], off1[1]) - bear(ref[0], ref[1], off2[0], off2[1])) * err_theta
     else:
-        source.err_pa = -1
+        source.err_pa = ERR_MASK
 
     if model[prefix + 'sx'].vary and model[prefix + 'sy'].vary:
         # major axis error
@@ -1114,8 +1114,7 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
             [xo + sx * np.cos(np.radians(theta + 90)), yo + (sy + 0.1) * np.sin(np.radians(theta + 90))])
         source.err_b = gcd(ref[0], ref[1], offset[0], offset[1])/0.1*err_sy * 3600
     else:
-        source.err_a = source.err_b = -1
-
+        source.err_a = source.err_b = ERR_MASK
     sqerr = 0
     sqerr += (source.err_peak_flux / source.peak_flux) ** 2 if source.err_peak_flux > 0 else 0
     sqerr += (source.err_a / source.a) ** 2 if source.err_a > 0 else 0
