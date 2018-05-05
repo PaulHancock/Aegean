@@ -47,11 +47,11 @@ class SimpleSource(object):
     --------
     :module:`AegeanTools.flags`
     """
-    header = "#RA           DEC          Flux      err     a     b         pa  flags\n" + \
-             "#                        Jy/beam   Jy/beam   ''    ''        deg WNCPES\n" + \
-             "#======================================================================="
+    header = "#RA           DEC          Flux      err     a     b         pa     flags\n" + \
+             "#                        Jy/beam   Jy/beam   ''    ''        deg  ZWNCPES\n" + \
+             "#========================================================================"
 
-    formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.a:5.2f} {0.b:5.2f} {0.pa:6.1f} {0.flags:06b}"
+    formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.a:5.2f} {0.b:5.2f} {0.pa:6.1f} {0.flags:07b}"
     names = ['background', 'local_rms', 'ra', 'dec', 'peak_flux', 'err_peak_flux', 'flags', 'peak_pixel', 'a', 'b',
              'pa', 'uuid']
     galactic = False
@@ -62,7 +62,7 @@ class SimpleSource(object):
         self.dec = np.nan
         self.peak_flux = np.nan
         self.err_peak_flux = np.nan
-        self.flags = 0
+        self.flags = 0x0
         self.peak_pixel = np.nan
         self.a = np.nan
         self.b = np.nan
@@ -296,16 +296,16 @@ class OutputSource(SimpleSource):
 
     """
     #header for the output
-    header = "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags\n" + \
-             "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   WNCPES\n" + \
-             "#==========================================================================================================================================================================================="
+    header = "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err    flags\n" + \
+             "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   ZWNCPES\n" + \
+             "#============================================================================================================================================================================================"
 
     #formatting strings for making nice output
     formatter = "({0.island:04d},{0.source:02d}) {0.background: 8.6f} {0.local_rms: 8.6f} " + \
                 "{0.ra_str:12s} {0.dec_str:12s} {0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} {0.err_dec: 9.7f} " + \
                 "{0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} {0.err_int_flux: 8.6f} " + \
                 "{0.a:5.2f} {0.err_a:5.2f} {0.b:5.2f} {0.err_b:5.2f} " + \
-                "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:06b}"
+                "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:07b}"
     names = ['island', 'source', 'background', 'local_rms', 'ra_str', 'dec_str', 'ra', 'err_ra', 'dec', 'err_dec',
              'peak_flux', 'err_peak_flux', 'int_flux', 'err_int_flux', 'a', 'err_a', 'b', 'err_b', 'pa', 'err_pa',
              'flags','residual_mean','residual_std','uuid','psf_a','psf_b','psf_pa']
