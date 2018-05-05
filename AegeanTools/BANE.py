@@ -147,7 +147,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         else:
             logging.error("Too many NAXIS for me {0}".format(NAXIS))
             logging.error("fix your file to be more sane")
-            sys.exit(1)
+            raise Exception("Too many NAXIS")
 
     # x/y min/max should refer to indices into data
     # this is the region over which we want to operate
