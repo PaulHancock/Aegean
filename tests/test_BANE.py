@@ -87,6 +87,14 @@ def test_ND_images():
         BANE.filter_image(fname, out_base=outbase)
         os.remove(rms)
         os.remove(bkg)
+
+    fname = fbase.format(5)
+    try:
+        BANE.filter_image(fname,out_base=outbase)
+    except Exception as e:
+        pass
+    else:
+        raise AssertionError()
     
 
 if __name__ == "__main__":
