@@ -7,6 +7,7 @@ __date__ = ''
 from AegeanTools import catalogs as cat
 from AegeanTools.models import OutputSource, IslandSource, SimpleSource
 from AegeanTools.msq2 import MarchingSquares
+from astropy import table
 import numpy as np
 from numpy.testing import assert_raises
 import os
@@ -217,6 +218,16 @@ def test_table_to_source_list():
     slist = cat.table_to_source_list(None)
     if not (slist == []):
         raise AssertionError()
+
+
+def test_writeFITSTable():
+    tab = table.Table.read('tests/test_files/1904_comp.fits')
+    outfile = 'dlme.fits'
+    tab.meta ={'test':'test'}
+    cat.writeFITSTable(outfile, tab)
+    if not os.path.exists(outfile):
+        raise AssertionError()
+    os.remove(outfile)
 
 
 if __name__ == "__main__":
