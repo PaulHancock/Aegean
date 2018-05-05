@@ -136,19 +136,19 @@ if __name__ == "__main__":
                       help='If --save is True, then this specifies the base name of the background and noise images. ' +
                            '[default: inferred from input image]')
 
-    parser.add_option('--measure', dest='measure', action='store_true', default=False,
-                      help='Enable forced measurement mode. Requires an input source list via --input. ' +
-                           'Sets --find to false. [default: false]')
+#    parser.add_option('--measure', dest='measure', action='store_true', default=False,
+#                      help='Enable forced measurement mode. Requires an input source list via --input. ' +
+#                           'Sets --find to false. [default: false]')
     parser.add_option('--priorized', dest='priorized', default=0, type=int,
-                      help="Enable priorized fitting, with stage = n [default=1]")
+                      help="Enable priorized fitting level n=[1,2,3]. 1=fit flux, 2=fit flux/position, 3=fit flux/position/shape.")
     parser.add_option('--ratio', dest='ratio', default=None, type=float,
                       help="The ratio of synthesized beam sizes (image psf / input catalog psf). " +
                            "For use with priorized.")
     parser.add_option('--noregroup', dest='regroup', default=True, action='store_false',
                       help='Do not regroup islands before priorized fitting.')
     parser.add_option('--input', dest='input', default=None,
-                      help='If --measure is true, this gives the filename for a catalog of locations at which ' +
-                           'fluxes will be measured. [default: none]')
+                      help='If --priorized is used, this gives the filename for a catalog of locations at which ' +
+                           'fluxes will be measured.')
     parser.add_option('--catpsf', dest='catpsf', default=None,
                       help='A psf map corresponding to the input catalog. This will allow for the correct resizing of' +
                            ' sources when the catalog and image psfs differ.')
@@ -208,8 +208,8 @@ if __name__ == "__main__":
         log.warning('Requested no positive sources, but no negative sources. Nothing to find.')
         sys.exit()
 
-    # if measure/save are enabled we turn off "find" unless it was specifically set
-    if (options.measure or options.save or options.priorized) and not options.find:
+    # if priorized/save are enabled we turn off "find" unless it was specifically set
+    if (options.save or options.priorized) and not options.find:
         options.find = False
     else:
         options.find = True
@@ -312,9 +312,9 @@ if __name__ == "__main__":
 
     sources = []
 
-    # do forced measurements using catfile
-    if options.measure and options.priorized == 0:
-        raise NotImplementedError("forced measurements are not supported")
+#    # do forced measurements using catfile
+#    if options.measure and options.priorized == 0:
+#        raise NotImplementedError("forced measurements are not supported")
 
     if options.priorized > 0:
         if options.ratio is not None:
