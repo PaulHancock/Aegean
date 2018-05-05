@@ -213,6 +213,12 @@ def test_write_ann():
     os.remove('out_simp.reg')
 
 
+def test_table_to_source_list():
+    slist = cat.table_to_source_list(None)
+    if not (slist == []):
+        raise AssertionError()
+
+
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
