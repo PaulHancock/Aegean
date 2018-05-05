@@ -17,7 +17,7 @@ def test_simple_source():
     if not (isinstance(ss.ra, np.float64)): raise AssertionError()
     # convert to string without failing
     a = "{0}".format(ss)
-    if not (a == ' 12.0000000   0.0000000  0.000000  0.000000  0.00  0.00    0.0 000000'): raise AssertionError()
+    if not (a == ' 12.0000000   0.0000000  0.000000  0.000000  0.00  0.00    0.0 0000000'): raise AssertionError()
     if not (ss.__repr__() == ss.__str__()): raise AssertionError()
     if not (np.all(ss.as_list()[:-1] == [0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0])): raise AssertionError()
     isl = models.IslandSource()
