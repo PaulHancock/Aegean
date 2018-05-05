@@ -415,7 +415,12 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
             args.append((filename, region, step_size, box_size, shape, dobkg))
 
     pool = multiprocessing.Pool(processes=cores)
-    pool.map(_sf2, args)
+    try:
+        pool.map_async(_sf2, args).get(timeout=10000000)
+    except KeyboardInterrupt:
+        logging.error("Caught keyboard interrupt")
+        pool.close()
+        sys.exit(1)
     pool.close()
     pool.join()
 
