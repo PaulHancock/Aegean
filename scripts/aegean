@@ -140,7 +140,8 @@ if __name__ == "__main__":
 #                      help='Enable forced measurement mode. Requires an input source list via --input. ' +
 #                           'Sets --find to false. [default: false]')
     parser.add_option('--priorized', dest='priorized', default=0, type=int,
-                      help="Enable priorized fitting level n=[1,2,3]. 1=fit flux, 2=fit flux/position, 3=fit flux/position/shape.")
+                      help="Enable priorized fitting level n=[1,2,3]. 1=fit flux, 2=fit flux/position, 3=fit flux/position/shape." + 
+                           "See the GitHub wiki for more detsils." )
     parser.add_option('--ratio', dest='ratio', default=None, type=float,
                       help="The ratio of synthesized beam sizes (image psf / input catalog psf). " +
                            "For use with priorized.")
