@@ -21,8 +21,8 @@ from time import gmtime, strftime
 from .fits_interp import compress
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.4.6'
-__date__ = '2016-09-01'
+__version__ = 'v1.5.0'
+__date__ = '2018-05-05'
 
 def sigmaclip(arr, lo, hi, reps=3):
     """

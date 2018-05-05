@@ -23,7 +23,7 @@ from .catalogs import load_table, write_table
 
 __author__ = "Paul Hancock"
 __version__ = 'v1.3.0'
-__date__ = '2017-09-10'
+__date__ = '2018-05-05'
 
 # seems like this fails sometimes
 if six.PY2:
