@@ -75,7 +75,19 @@ def test_filter_image():
         raise AssertionError()
 
     os.remove(bkg)
+    
 
+def test_ND_images():
+    fbase = 'tests/test_files/small_{0}D.fits'
+    outbase = 'dlme'
+    rms = outbase + '_rms.fits'
+    bkg = outbase + '_bkg.fits'
+    # this should work just fine, but trigger different NAXIS checks
+    for fname in [fbase.format(n) for n in [3,4]]:
+        BANE.filter_image(fname, out_base=outbase)
+        os.remove(rms)
+        os.remove(bkg)
+    
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
