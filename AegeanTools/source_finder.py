@@ -1249,14 +1249,20 @@ class SourceFinder(object):
             island_data = IslandFittingData(inum, i=idata, offsets=offsets, doislandflux=False, scalars=(4, 4, None))
             new_src = self.result_to_components(result, model, island_data, src.flags)
 
-            # preserve the uuid so we can do exact matching between catalogs
+
             for ns, s in zip(new_src, included_sources):
+                # preserve the uuid so we can do exact matching between catalogs
                 ns.uuid = s.uuid
+
+                # flag the sources as having been priorized
+                ns.flags |= flags.PRIORIZED
+
                 # if the position wasn't fit then copy the errors from the input catalog
                 if stage < 2:
                     ns.err_ra = s.err_ra
                     ns.err_dec = s.err_dec
                     ns.flags |= flags.FIXED2PSF
+
                 # if the shape wasn't fit then copy the errors from the input catalog
                 if stage < 3:
                     ns.err_a = s.err_a
