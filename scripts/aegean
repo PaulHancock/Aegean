@@ -35,7 +35,7 @@ from AegeanTools.catalogs import show_formats, check_table_formats, save_catalog
 from AegeanTools import fitting
 import multiprocessing
 
-from AegeanTools import __version__, __date__
+from AegeanTools import __version__, __date__, __citation__
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -111,9 +111,6 @@ if __name__ == "__main__":
     parser.add_option('--slice', dest='slice', type=int, default=None,
                       help='If the input data is a cube, then this slice will determine which slice will be processed by aegean')
 
-    parser.add_option('--versions', dest='file_versions', action="store_true", default=False,
-                      help='Show the file versions of relevant modules. [default: false]')
-
     parser.add_option('--island', dest='doislandflux', action="store_true", default=False,
                       help='Also calculate the island flux in addition to the individual components. [default: false]')
     parser.add_option('--nopositive', dest='nopositive', action="store_true", default=False,
@@ -153,8 +150,17 @@ if __name__ == "__main__":
     parser.add_option('--catpsf', dest='catpsf', default=None,
                       help='A psf map corresponding to the input catalog. This will allow for the correct resizing of' +
                            ' sources when the catalog and image psfs differ.')
+    parser.add_option('--versions', dest='file_versions', action="store_true", default=False,
+                      help='Show the file versions of relevant modules. [default: false]')
+    parser.add_option('--cite', dest='cite', action="store_true", default=False,
+                      help='Show citation information.')
 
     (options, args) = parser.parse_args()
+
+
+    if options.cite:
+        print(__citation__)
+        sys.exit(0)
 
     # configure logging
     logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")

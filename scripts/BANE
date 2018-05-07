@@ -7,7 +7,7 @@ import os
 from optparse import OptionParser
 
 # Aegean tools
-from AegeanTools import BANE
+from AegeanTools import BANE, __citation__
 
 __author__ = 'Paul Hancock'
 
@@ -35,8 +35,16 @@ if __name__=="__main__":
     parser.add_option('--debug', dest='debug', action='store_true', help='debug mode, default=False')
     parser.add_option('--compress', dest='compress', action='store_true', default=False,
                       help='Produce a compressed output file.')
+    parser.add_option('--cite', dest='cite', action="store_true", default=False,
+                      help='Show citation information.')
+
     parser.set_defaults(out_base=None, step_size=None, box_size=None, twopass=True, cores=None, usescipy=False, debug=False)
+
     (options, args) = parser.parse_args()
+
+    if options.cite:
+        print(__citation__)
+        sys.exit(0)
 
     # Get the BANE logger.
     logging = BANE.logging
