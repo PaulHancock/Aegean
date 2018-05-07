@@ -55,3 +55,6 @@ Status
  
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/014fb9c86b3f42b49ad94cd4384cfa78)](https://www.codacy.com/app/mr.paul.hancock/Aegean?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=PaulHancock/Aegean&amp;utm_campaign=Badge_Grade)
 
+[![DOI](https://zenodo.org/badge/22051760.svg)](https://zenodo.org/badge/latestdoi/22051760) - latest release
+
+
