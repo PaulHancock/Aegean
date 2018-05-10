@@ -126,7 +126,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     # TODO: fix the code below so that the above comment can be removed
 
     ymin, ymax, xmin, xmax = region
-    logging.debug('{0}x{1},{2}x{3} starting at {4}'.format(xmin, xmax, ymin, ymax,
+    logging.debug('{0}-{1},{2}-{3} starting at {4}'.format(xmin, xmax, ymin, ymax,
                                                            strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
     cmin = max(0, ymin - box_size[1]//2)
@@ -180,6 +180,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         calculate the boundaries of the box centered at x,y
         with size = box_size
         """
+        # TODO: check that / should be //
         x_min = int(max(0, x-box_size[0]/2))
         x_max = int(min(data.shape[0]-1, x+box_size[0]/2))
         y_min = int(max(0, y-box_size[1]/2))
@@ -218,7 +219,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         interpolated_rms = np.array(ifunc((gx, gy)), dtype=np.float32)
         del ifunc
     else:
-        interpolated_rms = np.empty((len(gx), len(gy)), dtype=np.float32)*np.nan
+        logging.debug("rms is all nans")
+        interpolated_rms = np.empty(gx.shape, dtype=np.float32)*np.nan
     with irms.get_lock():
         logging.debug("Writing rms to sharemem")
         for i, row in enumerate(interpolated_rms):
@@ -234,7 +236,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
             interpolated_bkg = np.array(ifunc((gx, gy)), dtype=np.float32)
             del ifunc
         else:
-            interpolated_bkg = np.empty((len(gx), len(gy)), dtype=np.float32)*np.nan
+            logging.debug("bkg is all nans")
+            interpolated_bkg = np.empty(gx.shape, dtype=np.float32)*np.nan
         with ibkg.get_lock():
             logging.debug("Writing bkg to sharemem")
             for i, row in enumerate(interpolated_bkg):
@@ -407,6 +410,11 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
     ymaxs = [ystart]
     ymaxs.extend(list(range(ystart+width_y, yend+1, width_y)))
     ymaxs[-1] = img_y
+
+    logging.debug("xmins {0}".format(xmins))
+    logging.debug("xmaxs {0}".format(xmaxs))
+    logging.debug("ymins {0}".format(ymins))
+    logging.debug("ymaxs {0}".format(ymaxs))
 
     args = []
     for xmin, xmax in zip(xmins, xmaxs):
