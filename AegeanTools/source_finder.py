@@ -1686,7 +1686,7 @@ class SourceFinder(object):
                 psf_helper = None
             for i, src in enumerate(input_sources):
                 if has_psf:
-                    catbeam = Beam(src.psf_a * 3600, src.psf_b * 3600, src.psf_pa)
+                    catbeam = Beam(src.psf_a / 3600, src.psf_b / 3600, src.psf_pa)
                 else:
                     catbeam = psf_helper.get_beam(src.ra, src.dec)
                 imbeam = global_data.psfhelper.get_beam(src.ra, src.dec)
