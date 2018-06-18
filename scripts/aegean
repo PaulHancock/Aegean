@@ -135,9 +135,6 @@ if __name__ == "__main__":
                       help='If --save is True, then this specifies the base name of the background and noise images. ' +
                            '[default: inferred from input image]')
 
-#    parser.add_option('--measure', dest='measure', action='store_true', default=False,
-#                      help='Enable forced measurement mode. Requires an input source list via --input. ' +
-#                           'Sets --find to false. [default: false]')
     parser.add_option('--priorized', dest='priorized', default=0, type=int,
                       help="Enable priorized fitting level n=[1,2,3]. 1=fit flux, 2=fit flux/position, 3=fit flux/position/shape. " + 
                            "See the GitHub wiki for more details." )
@@ -321,10 +318,6 @@ if __name__ == "__main__":
         options.outfile = open(options.outfile, 'w')
 
     sources = []
-
-#    # do forced measurements using catfile
-#    if options.measure and options.priorized == 0:
-#        raise NotImplementedError("forced measurements are not supported")
 
     if options.priorized > 0:
         if options.ratio is not None:
