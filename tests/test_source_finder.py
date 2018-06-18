@@ -66,6 +66,18 @@ def test_load_globals():
 
     del sfinder
     sfinder = sf.SourceFinder(log=log)
+    sfinder.load_globals(filename, bkgin=aux_files['bkg'], bkg=0, mask=aux_files['mask'])
+    # region isn't available due to healpy not being installed/required
+    if sfinder.global_data.region is None: raise AssertionError()
+
+    del sfinder
+    sfinder = sf.SourceFinder(log=log)
+    sfinder.load_globals(filename, bkgin=aux_files['bkg'], rms=1, bkg=0, mask=aux_files['mask'])
+    # region isn't available due to healpy not being installed/required
+    if sfinder.global_data.region is None: raise AssertionError()
+
+    del sfinder
+    sfinder = sf.SourceFinder(log=log)
     sfinder.load_globals(filename, rmsin=aux_files['rms'], mask='derp', do_curve=False)
     if sfinder.global_data.region is not None: raise AssertionError()
     img = sfinder._load_aux_image(sfinder.global_data.img, filename)
