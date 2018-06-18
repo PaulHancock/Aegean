@@ -766,9 +766,9 @@ class SourceFinder(object):
             Beam object representing the synthsized beam. Will replace what is in the FITS header.
 
 
-        rms : float
-            A float that represents a constant rms level for the entire image.
-            Default = None, which causes the rms to be loaded or calculated.
+        rms, bkg : float
+            A float that represents a constant rms/bkg level for the entire image.
+            Default = None, which causes the rms/bkg to be loaded or calculated.
 
         cores : int
             Number of cores to use if different from what is autodetected.
