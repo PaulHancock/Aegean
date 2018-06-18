@@ -713,15 +713,6 @@ class SourceFinder(object):
                 self.log.info("Calculating background and rms data")
             self._make_bkg_rms(mesh_size=20, forced_rms=rms, forced_bkg=bkg, cores=cores)
 
-# This is all done in the above _make_bkg_rms so do not do it again
-#        # if a forced rms was supplied use that instead
-#        if rms is not None:
-#            self.global_data.rmsimg = np.ones(self.global_data.data_pix.shape) * rms
-#
-#        # if a forced bkg was supplied use that instead
-#        if rms is not None:
-#            self.global_data.bkgimg = np.ones(self.global_data.data_pix.shape) * bkg
-
         # replace the calculated images with input versions, if the user has supplied them.
         if bkgin:
             if verb:
@@ -956,12 +947,6 @@ class SourceFinder(object):
             for xmin, xmax in zip(xmins, xmaxs):
                 for ymin, ymax in zip(ymins, ymaxs):
                     queue.append(self._estimate_bkg_rms(xmin, xmax, ymin, ymax))
-
-#        # construct the bkg and rms images
-#        if self.global_data.rmsimg is None:
-#            self.global_data.rmsimg = np.empty(data.shape, dtype=self.global_data.dtype)
-#        if self.global_data.bkgimg is None:
-#            self.global_data.bkgimg = np.empty(data.shape, dtype=self.global_data.dtype)
 
         # only copy across the bkg/rms if they are not already set
         if (forced_rms is None):
