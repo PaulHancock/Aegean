@@ -80,7 +80,9 @@ if __name__ == "__main__":
     parser.add_option("--tformats", dest='table_formats', action="store_true", default=False,
                       help='Show a list of table formats supported in this install, and their extensions')
     parser.add_option("--forcerms", dest='rms', type='float', default=None,
-                      help="Assume a single image noise of rms, and a background of zero. [default: false]")
+                      help="Assume a single image noise of rms. [default: None]")
+    parser.add_option("--forcebkg", dest='bkg', type='float', default=None,
+                      help="Assume a single image background of bkg. [default: None]")
     parser.add_option("--noise", dest='noiseimg', default=None,
                       help="A .fits file that represents the image noise (rms), created from Aegean with --save " +
                            "or BANE. [default: none]")

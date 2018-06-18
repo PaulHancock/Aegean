@@ -608,7 +608,7 @@ class SourceFinder(object):
     ##
     # Setting up 'global' data and calculating bkg/rms
     ##
-    def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, cores=1,
+    def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, bkg=None, cores=1,
                      do_curve=True, mask=None, lat=None, psf=None, blank=False, docov=True, slice=slice):
         """
         Populate the global_data object by loading or calculating the various components
@@ -630,9 +630,9 @@ class SourceFinder(object):
         verb : bool
             Verbose. Write extra lines to INFO level log.
 
-        rms : float
-            A float that represents a constant rms level for the entire image.
-            Default = None, which causes the rms to be loaded or calculated.
+        rms, bkg : float
+            A float that represents a constant rms/bkg levels for the entire image.
+            Default = None, which causes the rms/bkg to be loaded or calculated.
 
         cores : int
             Number of cores to use if different from what is autodetected.
@@ -711,11 +711,16 @@ class SourceFinder(object):
         if not (rmsin and bkgin):
             if verb:
                 self.log.info("Calculating background and rms data")
-            self._make_bkg_rms(mesh_size=20, forced_rms=rms, cores=cores)
+            self._make_bkg_rms(mesh_size=20, forced_rms=rms, forced_bkg=bkg, cores=cores)
 
-        # if a forced rms was supplied use that instead
-        if rms is not None:
-            self.global_data.rmsimg = np.ones(self.global_data.data_pix.shape) * rms
+# This is all done in the above _make_bkg_rms so do not do it again
+#        # if a forced rms was supplied use that instead
+#        if rms is not None:
+#            self.global_data.rmsimg = np.ones(self.global_data.data_pix.shape) * rms
+#
+#        # if a forced bkg was supplied use that instead
+#        if rms is not None:
+#            self.global_data.bkgimg = np.ones(self.global_data.data_pix.shape) * bkg
 
         # replace the calculated images with input versions, if the user has supplied them.
         if bkgin:
@@ -849,7 +854,7 @@ class SourceFinder(object):
         self.log.info("Wrote {0}".format(outname))
         return
 
-    def _make_bkg_rms(self, mesh_size=20, forced_rms=None, cores=None):
+    def _make_bkg_rms(self, mesh_size=20, forced_rms=None, forced_bkg=None, cores=None):
         """
         Calculate an rms image and a bkg image.
 
@@ -858,18 +863,29 @@ class SourceFinder(object):
         mesh_size : int
             Number of beams per box default = 20
 
-        forced_rms : bool
+        forced_rms : float
             The rms of the image.
-            If None:  calculate the rms and bkg levels (default).
-            Otherwise assume zero background and constant rms
+            If None:  calculate the rms level (default).
+            Otherwise assume a constant rms.
+
+        forced_bkg : float
+            The background level of the image.
+            If None: calculate the background level (default).
+            Otherwise assume a constant background.
 
         cores: int
             Number of cores to use if different from what is autodetected.
 
         """
-        if forced_rms:
-            self.global_data.bkgimg[:] = 0
+        if (forced_rms is not None):
+            self.log.info("Forcing rms = {0}".format(forced_rms))
             self.global_data.rmsimg[:] = forced_rms
+        if (forced_bkg is not None):
+            self.log.info("Forcing bkg = {0}".format(forced_bkg))
+            self.global_data.bkgimge[:] = forced_bkg
+
+        # If we known both the rms and the bkg then there is nothing to compute
+        if (forced_rms is not None) and (forced_bkg is not None):
             return
 
         data = self.global_data.data_pix
@@ -947,9 +963,14 @@ class SourceFinder(object):
         if self.global_data.bkgimg is None:
             self.global_data.bkgimg = np.empty(data.shape, dtype=self.global_data.dtype)
 
-        for ymin, ymax, xmin, xmax, bkg, rms in queue:
-            self.global_data.bkgimg[ymin:ymax, xmin:xmax] = bkg
-            self.global_data.rmsimg[ymin:ymax, xmin:xmax] = rms
+        # only copy across the bkg/rms if they are not already set
+        if (forced_rms is not None):
+            for ymin, ymax, xmin, xmax, bkg, rms in queue:
+                self.global_data.rmsimg[ymin:ymax, xmin:xmax] = rms
+        if (forced_bkg is not None):
+            for ymin, ymax, xmin, xmax, bkg, rms in queue:
+                self.global_data.bkgimg[ymin:ymax, xmin:xmax] = bkg
+
         return
 
     def _estimate_bkg_rms(self, xmin, xmax, ymin, ymax):
