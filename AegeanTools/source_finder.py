@@ -949,11 +949,11 @@ class SourceFinder(object):
                     queue.append(self._estimate_bkg_rms(xmin, xmax, ymin, ymax))
 
         # only copy across the bkg/rms if they are not already set
-        if (forced_rms is None):
-            for ymin, ymax, xmin, xmax, bkg, rms in queue:
+        # queue can only be traversed once so we have to put the if inside the loop
+        for ymin, ymax, xmin, xmax, bkg, rms in queue:
+            if (forced_rms is None):
                 self.global_data.rmsimg[ymin:ymax, xmin:xmax] = rms
-        if (forced_bkg is None):
-            for ymin, ymax, xmin, xmax, bkg, rms in queue:
+            if (forced_rms is None):
                 self.global_data.bkgimg[ymin:ymax, xmin:xmax] = bkg
 
         return
