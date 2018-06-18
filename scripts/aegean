@@ -302,7 +302,8 @@ if __name__ == "__main__":
     # Generate and save the background FITS files with the Aegean default calculator
     if options.save:
         sf.save_background_files(filename, hdu_index=hdu_index, cores=options.cores, beam=options.beam,
-                                  outbase=options.outbase, bkgin=options.backgroundimg, rmsin=options.noiseimg)
+                                 outbase=options.outbase, bkgin=options.backgroundimg, rmsin=options.noiseimg,
+                                 rms=options.rms, bkg=options.bkg)
         sys.exit(0)
 
     # check that the output table formats are supported (if given)
@@ -344,7 +345,7 @@ if __name__ == "__main__":
         if options.doislandflux:
             log.warn("--island requested but not yet supported for priorized fitting")
         sf.priorized_fit_islands(filename, catalogue=options.input, hdu_index=options.hdu_index,
-                                 rms=options.rms,
+                                 rms=options.rms, bkg=options.bkg,
                                  outfile=options.outfile, bkgin=options.backgroundimg,
                                  rmsin=options.noiseimg, beam=options.beam, lat=lat, imgpsf=options.imgpsf,
                                  catpsf=options.catpsf,
@@ -355,7 +356,7 @@ if __name__ == "__main__":
     if options.find:
         log.info("Finding sources.")
         found = sf.find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,
-                                         rms=options.rms,
+                                         rms=options.rms, bkg=options.bkg,
                                          max_summits=options.max_summits,
                                          innerclip=options.innerclip,
                                          outerclip=options.outerclip, cores=options.cores, rmsin=options.noiseimg,
