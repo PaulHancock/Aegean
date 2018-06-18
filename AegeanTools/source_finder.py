@@ -753,7 +753,7 @@ class SourceFinder(object):
             SimpleSource.galactic = True
         return
 
-    def save_background_files(self, image_filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, rms=None, cores=1,
+    def save_background_files(self, image_filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, rms=None, bkg=None, cores=1,
                               outbase=None):
         """
         Generate and save the background and RMS maps as FITS files.
@@ -789,7 +789,7 @@ class SourceFinder(object):
 
         self.log.info("Saving background / RMS maps")
         # load image, and load/create background/rms images
-        self.load_globals(image_filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms,
+        self.load_globals(image_filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms, bkg=bkg,
                           cores=cores, do_curve=True)
         img = self.global_data.img
         bkgimg, rmsimg = self.global_data.bkgimg, self.global_data.rmsimg
@@ -882,7 +882,7 @@ class SourceFinder(object):
             self.global_data.rmsimg[:] = forced_rms
         if (forced_bkg is not None):
             self.log.info("Forcing bkg = {0}".format(forced_bkg))
-            self.global_data.bkgimge[:] = forced_bkg
+            self.global_data.bkgimg[:] = forced_bkg
 
         # If we known both the rms and the bkg then there is nothing to compute
         if (forced_rms is not None) and (forced_bkg is not None):
@@ -957,17 +957,17 @@ class SourceFinder(object):
                 for ymin, ymax in zip(ymins, ymaxs):
                     queue.append(self._estimate_bkg_rms(xmin, xmax, ymin, ymax))
 
-        # construct the bkg and rms images
-        if self.global_data.rmsimg is None:
-            self.global_data.rmsimg = np.empty(data.shape, dtype=self.global_data.dtype)
-        if self.global_data.bkgimg is None:
-            self.global_data.bkgimg = np.empty(data.shape, dtype=self.global_data.dtype)
+#        # construct the bkg and rms images
+#        if self.global_data.rmsimg is None:
+#            self.global_data.rmsimg = np.empty(data.shape, dtype=self.global_data.dtype)
+#        if self.global_data.bkgimg is None:
+#            self.global_data.bkgimg = np.empty(data.shape, dtype=self.global_data.dtype)
 
         # only copy across the bkg/rms if they are not already set
-        if (forced_rms is not None):
+        if (forced_rms is None):
             for ymin, ymax, xmin, xmax, bkg, rms in queue:
                 self.global_data.rmsimg[ymin:ymax, xmin:xmax] = rms
-        if (forced_bkg is not None):
+        if (forced_bkg is None):
             for ymin, ymax, xmin, xmax, bkg, rms in queue:
                 self.global_data.bkgimg[ymin:ymax, xmin:xmax] = bkg
 
@@ -1418,7 +1418,7 @@ class SourceFinder(object):
             sources.extend(res)
         return sources
 
-    def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, max_summits=None, innerclip=5,
+    def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, bkg=None, max_summits=None, innerclip=5,
                               outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
                               nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None, blank=False,
                               docov=True, slice=None):
@@ -1495,7 +1495,7 @@ class SourceFinder(object):
         if cores is not None:
             if not (cores >= 1): raise AssertionError("cores must be one or more")
 
-        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, cores=cores,
+        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, bkg=bkg, cores=cores,
                           verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank, docov=docov, slice=slice)
         global_data = self.global_data
         rmsimg = global_data.rmsimg
@@ -1565,7 +1565,7 @@ class SourceFinder(object):
         return sources
 
     def priorized_fit_islands(self, filename, catalogue, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1,
-                              rms=None, beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=None, outerclip=3,
+                              rms=None, bkg=None, beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=None, outerclip=3,
                               doregroup=True, docov=True, slice=None):
         """
         Take an input catalog, and image, and optional background/noise images
@@ -1640,7 +1640,7 @@ class SourceFinder(object):
 
         from AegeanTools.cluster import regroup
 
-        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
+        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, bkg=bkg, cores=cores, verb=True,
                           do_curve=False, beam=beam, lat=lat, psf=imgpsf, docov=docov, slice=slice)
 
         global_data = self.global_data
