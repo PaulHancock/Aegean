@@ -113,6 +113,8 @@ if __name__ == "__main__":
                         help='Show a list of table formats supported in this install, and their extensions')
     group3.add_argument('--blankout', dest='blank', action="store_true", default=False,
                         help="Create a blanked output image. [Only works if cores=1].")
+    group3.add_argument('--colprefix', dest='column_prefix', default=None, type=str,
+                        help='Prepend each column name with "prefix_". Default = prepend nothing')
 
     # SF config options
     group4 = parser.add_argument_group("Source finding/fitting configuration options:")
@@ -400,5 +402,5 @@ if __name__ == "__main__":
                 "PROGVER": "{0}-({1})".format(__version__, __date__),
                 "FITSFILE": filename}
         for t in options.tables.split(','):
-            save_catalog(t, sources)
+            save_catalog(t, sources, prefix=options.column_prefix)
     sys.exit()
