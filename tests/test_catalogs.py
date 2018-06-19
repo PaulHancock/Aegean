@@ -66,6 +66,16 @@ def test_load_save_catalog():
 
         os.remove(fout)
 
+    # test the prefix is being written.
+    fout = 'a.csv'
+    cat.save_catalog(fout, catalog, meta=None, prefix='test')
+    fout = 'a_comp.csv'
+    if not os.path.exists(fout):
+        raise AssertionError()
+    if 'test_ra' not in open(fout).readlines()[0]:
+        raise AssertionError()
+    os.remove(fout)
+
     for ext in ['reg', 'ann', 'bla']:
         fout = 'a.'+ext
         cat.save_catalog(fout, catalog, meta=None)
