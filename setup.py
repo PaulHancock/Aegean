@@ -21,7 +21,8 @@ reqs = ['numpy>=1.10',
         'scipy>=0.16',
         'astropy>=2.0, <3',
         'pprocess>=0.5',
-        'healpy >=1.10']
+        'healpy >=1.10',
+        'six>=1.11']
 
 if sys.version_info < (2, 7):
     reqs.append('lmfit==0.9.1')
@@ -36,7 +37,7 @@ setup(
     author="Paul Hancock",
     author_email="Mr.Paul.Hancock@gmail.com",
     description="The Aegean source finding program, and associated tools.",
-    # license = "BSD",
+    # license = "LGPL",
     # keywords="example documentation tutorial",
     url="https://github.com/PaulHancock/Aegean",
     long_description=read('README.md'),
