@@ -10,8 +10,8 @@ generally.
 
 """
 __author__ = 'Paul Hancock'
-__version__ = '2.0.1'
-__date__ = '2018-05-07'
+__version__ = '2.0.2'
+__date__ = '2018-06-21'
 __citation__ = """
 % If your work makes use of AegeanTools please cite the following papers as appropriate:
 
@@ -36,7 +36,7 @@ archivePrefix = "arXiv",
 
 % Basic description of Aegean
 @ARTICLE{Hancock_Aegean_2012,
-   author = {{Hancock}, P.~J. and {Murphy}, T. and {Gaensler}, B.~M. and 
+   author = {{Hancock}, P.~J. and {Murphy}, T. and {Gaensler}, B.~M. and
 	{Hopkins}, A. and {Curran}, J.~R.},
     title = "{Compact continuum source finding for next generation radio surveys}",
   journal = {\mnras},
