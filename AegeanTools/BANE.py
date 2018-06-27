@@ -385,7 +385,10 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
     irms = multiprocessing.Array('f', alen)
 
     logging.info("using {0} cores".format(cores))
-    nx, ny = optimum_sections(cores, shape)
+    # nx, ny = optimum_sections(cores, shape)
+    # Use a striped sectioning scheme
+    nx = 1
+    ny = 8
 
     # box widths should be multiples of the step_size, and not zero
     width_x = int(max(img_x/nx/step_size[0], 1) * step_size[0])
