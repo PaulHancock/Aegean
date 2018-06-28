@@ -1,3 +1,13 @@
+2018-06-28
+============
+BANE
+ - multiple changes that allow BANE to be run in memory constrained enviornments
+ - force image segmentation to always be in horizontal stripes
+ - add new option `--stripes` to control the number of stripes
+ - allow `--stripes` and `--cores` to be different
+ - make better use of shared memory to reduce memory footprint
+ - update BANE to version 1.6.0
+
 v 2.0.2
 =======
 General

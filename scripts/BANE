@@ -37,6 +37,8 @@ if __name__=="__main__":
                       help='Produce a compressed output file.')
     parser.add_option('--cite', dest='cite', action="store_true", default=False,
                       help='Show citation information.')
+    parser.add_option('--stripes', dest='stripes', type='int', nargs=1, default=None,
+                      help='Number of slices.')
 
     parser.set_defaults(out_base=None, step_size=None, box_size=None, twopass=True, cores=None, usescipy=False, debug=False)
 
@@ -72,5 +74,5 @@ if __name__=="__main__":
 
     BANE.filter_image(im_name=filename, out_base=options.out_base, step_size=options.step_size,
                       box_size=options.box_size, twopass=options.twopass, cores=options.cores,
-                      mask=options.mask, compressed=options.compress)
+                      mask=options.mask, compressed=options.compress, nslice=options.stripes)
 
