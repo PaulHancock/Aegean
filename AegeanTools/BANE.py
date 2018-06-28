@@ -455,6 +455,9 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
     pool.close()
     pool.join()
 
+    rms = np.array(irms)
+    if dobkg:
+        bkg = np.array(ibkg)
     return bkg, rms
 
 
