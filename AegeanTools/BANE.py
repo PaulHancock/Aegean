@@ -21,12 +21,9 @@ from time import gmtime, strftime
 # Aegean tools
 from .fits_interp import compress
 
-#profiling
-#from memory_profiler import profile
-
 __author__ = 'Paul Hancock'
-__version__ = 'v1.5.0'
-__date__ = '2018-05-05'
+__version__ = 'v1.6.0'
+__date__ = '2018-06-28'
 
 def sigmaclip(arr, lo, hi, reps=3):
     """
@@ -370,6 +367,10 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
     cores : int
         Number of cores to use. If None then use all available.
 
+    nslice : int
+        The image will be divided into this many horizontal stripes for processing.
+        Default = None = equal to cores
+
     shape : (int, int)
         The shape of the image in the given file.
 
@@ -384,24 +385,25 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
 
     if cores is None:
         cores = multiprocessing.cpu_count()
+    if nslice is None:
+        nslice = cores
 
     img_y, img_x = shape
     # initialise some shared memory
     alen = shape[0]*shape[1]
     if dobkg:
         global ibkg
-        # ibkg = multiprocessing.Array('f', alen)
         bkg = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
         ibkg = multiprocessing.sharedctypes.Array(bkg._type_, bkg, lock=True)
     else:
+        bkg = None
         ibkg = None
     global irms
-    # irms = multiprocessing.Array('f', alen)
     rms = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
     irms = multiprocessing.sharedctypes.Array(rms._type_, rms, lock=True)
 
     logging.info("using {0} cores".format(cores))
-    # nx, ny = optimum_sections(cores, shape)
+    logging.info("using {0} stripes".format(nslice))
     # Use a striped sectioning scheme
     nx = 1
     ny = nslice
@@ -452,29 +454,11 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
         sys.exit(1)
     pool.close()
     pool.join()
-    # no need to do any more converts!
-    if not dobkg:
-        bkg = None
-    return bkg, rms #np.ctypeslib.as_array(ibkg), np.ctypeslib.as_array(irms)
 
-    # reshape our 1d arrays back into a 2d image
-    if dobkg:
-        logging.debug("reshaping bkg")
-        interpolated_bkg = np.reshape(np.array(ibkg[:], dtype=np.float32), shape)
-        logging.debug(" bkg is {0}".format(interpolated_bkg.dtype))
-        logging.debug(" ... done at {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-    else:
-        interpolated_bkg = None
-    del ibkg
-    logging.debug("reshaping rms")
-    interpolated_rms = np.reshape(np.array(irms[:], dtype=np.float32), shape)
-    logging.debug(" ... done at {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-    del irms
-
-    return interpolated_bkg, interpolated_rms
+    return bkg, rms
 
 
-def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False, nslice=8):
+def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False, nslice=None):
     """
     Create a background and noise image from an input image.
     Resulting images are written to `outbase_bkg.fits` and `outbase_rms.fits`
@@ -495,6 +479,9 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
     cores : int
         Number of CPU corse to use.
         Default = all available
+    nslice : int
+        The image will be divided into this many horizontal stripes for processing.
+        Default = None = equal to cores
     mask : bool
         Mask the output array to contain np.nna wherever the input array is nan or not finite.
         Default = true
@@ -544,7 +531,6 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 
     logging.info("using grid_size {0}, box_size {1}".format(step_size,box_size))
     logging.info("on data shape {0}".format(shape))
-    logging.info("using {0} slices".format(nslice))
     bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, nslice=nslice)
     logging.info("done")
 
@@ -564,7 +550,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         temp_name = tempfile.name
         del data, header, tempfile, rms
         logging.info("running second pass to get a better rms")
-        junk, rms = filter_mc_sharemem(temp_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, dobkg=False)
+        junk, rms = filter_mc_sharemem(temp_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, dobkg=False, nslice=nslice)
         del junk
         rms = np.array(rms, dtype=np.float32)
         os.remove(temp_name)
