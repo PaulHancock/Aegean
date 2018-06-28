@@ -10,6 +10,7 @@ from astropy.io import fits
 import copy
 import logging
 import multiprocessing
+import multiprocessing.sharedctypes
 import numpy as np
 import os
 from scipy.interpolate import LinearNDInterpolator
@@ -19,6 +20,9 @@ from time import gmtime, strftime
 
 # Aegean tools
 from .fits_interp import compress
+
+#profiling
+from memory_profiler import profile
 
 __author__ = 'Paul Hancock'
 __version__ = 'v1.5.0'
@@ -88,7 +92,13 @@ def _sf2(args):
     -------
     None
     """
-    return sigma_filter(*args)
+    # an easier to debug traceback when multiprocessing
+    # thanks to https://stackoverflow.com/a/16618842/1710603
+    try:
+        return sigma_filter(*args)
+    except:
+        import traceback
+        raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
 def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
@@ -137,7 +147,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     # Figure out how many axes are in the datafile
     NAXIS = fits.getheader(filename)["NAXIS"]
     # It seems that I cannot memmap the same file multiple times without errors
-    with fits.open(filename, memmap=False) as a:
+    with fits.open(filename, memmap=True) as a:
         if NAXIS == 2:
             data = a[0].section[rmin:rmax, cmin:cmax]
         elif NAXIS == 3:
@@ -149,6 +159,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
             logging.error("fix your file to be more sane")
             raise Exception("Too many NAXIS")
 
+    logging.debug('data size is {0}'.format(data.shape))
     # x/y min/max should refer to indices into data
     # this is the region over which we want to operate
     ymin -= cmin
@@ -221,12 +232,12 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     else:
         logging.debug("rms is all nans")
         interpolated_rms = np.empty(gx.shape, dtype=np.float32)*np.nan
+
+    # [xmin, ymin]
     with irms.get_lock():
         logging.debug("Writing rms to sharemem")
         for i, row in enumerate(interpolated_rms):
-            start_idx = np.ravel_multi_index((xmin + i, ymin), shape)
-            end_idx = start_idx + len(row)
-            irms[start_idx:end_idx] = row
+            irms[i] = np.ctypeslib.as_ctypes(row)
     logging.debug(" .. done writing rms")
 
     if dobkg:
@@ -241,12 +252,13 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         with ibkg.get_lock():
             logging.debug("Writing bkg to sharemem")
             for i, row in enumerate(interpolated_bkg):
-                start_idx = np.ravel_multi_index((xmin + i, ymin), shape)
-                end_idx = start_idx + len(row)
-                ibkg[start_idx:end_idx] = row
+                ibkg[i] = np.ctypeslib.as_ctypes(row)
         logging.debug(" .. done writing bkg")
     logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin, xmax, ymin, ymax,
                                                            strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    del bkg_points, bkg_values
+    del rms_points, rms_values
+
     return
 
 
@@ -338,8 +350,8 @@ def mask_img(data, mask_data):
     except IndexError:
         logging.info("failed to mask file, not a critical failure")
 
-
-def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
+# @profile
+def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, nslice=8):
     """
     Calculate the background and noise images corresponding to the input file.
     The calculation is done via a box-car approach and uses multiple cores and shared memory.
@@ -378,17 +390,21 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
     alen = shape[0]*shape[1]
     if dobkg:
         global ibkg
-        ibkg = multiprocessing.Array('f', alen)
+        # ibkg = multiprocessing.Array('f', alen)
+        bkg = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
+        ibkg = multiprocessing.sharedctypes.Array(bkg._type_, bkg, lock=True)
     else:
         ibkg = None
     global irms
-    irms = multiprocessing.Array('f', alen)
+    # irms = multiprocessing.Array('f', alen)
+    rms = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
+    irms = multiprocessing.sharedctypes.Array(rms._type_, rms, lock=True)
 
     logging.info("using {0} cores".format(cores))
     # nx, ny = optimum_sections(cores, shape)
     # Use a striped sectioning scheme
-    nx = 1
-    ny = 8
+    nx = nslice
+    ny = 1
 
     # box widths should be multiples of the step_size, and not zero
     width_x = int(max(img_x/nx/step_size[0], 1) * step_size[0])
@@ -425,15 +441,21 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
             region = [xmin, xmax, ymin, ymax]
             args.append((filename, region, step_size, box_size, shape, dobkg))
 
-    pool = multiprocessing.Pool(processes=cores)
+    # start a new process for each task, hopefully to reduce residual memory use
+    pool = multiprocessing.Pool(processes=cores, maxtasksperchild=1)
     try:
-        pool.map_async(_sf2, args).get(timeout=10000000)
+        # chunksize=1 ensures that we only send a single task to each process
+        pool.map_async(_sf2, args, chunksize=1).get(timeout=10000000)
     except KeyboardInterrupt:
         logging.error("Caught keyboard interrupt")
         pool.close()
         sys.exit(1)
     pool.close()
     pool.join()
+    # no need to do any more converts!
+    if not dobkg:
+        bkg = None
+    return bkg, rms #np.ctypeslib.as_array(ibkg), np.ctypeslib.as_array(irms)
 
     # reshape our 1d arrays back into a 2d image
     if dobkg:
@@ -452,7 +474,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
     return interpolated_bkg, interpolated_rms
 
 
-def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False):
+def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False, nslice=8):
     """
     Create a background and noise image from an input image.
     Resulting images are written to `outbase_bkg.fits` and `outbase_rms.fits`
@@ -522,7 +544,8 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 
     logging.info("using grid_size {0}, box_size {1}".format(step_size,box_size))
     logging.info("on data shape {0}".format(shape))
-    bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape)
+    logging.info("using {0} slices".format(nslice))
+    bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, nslice=nslice)
     logging.info("done")
 
     # force float 32s to avoid bloated files
