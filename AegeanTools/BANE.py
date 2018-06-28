@@ -403,8 +403,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
     logging.info("using {0} cores".format(cores))
     # nx, ny = optimum_sections(cores, shape)
     # Use a striped sectioning scheme
-    nx = nslice
-    ny = 1
+    nx = 1
+    ny = nslice
 
     # box widths should be multiples of the step_size, and not zero
     width_x = int(max(img_x/nx/step_size[0], 1) * step_size[0])
