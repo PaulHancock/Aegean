@@ -22,7 +22,7 @@ from time import gmtime, strftime
 from .fits_interp import compress
 
 #profiling
-from memory_profiler import profile
+#from memory_profiler import profile
 
 __author__ = 'Paul Hancock'
 __version__ = 'v1.5.0'
@@ -350,7 +350,7 @@ def mask_img(data, mask_data):
     except IndexError:
         logging.info("failed to mask file, not a critical failure")
 
-# @profile
+
 def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, nslice=8):
     """
     Calculate the background and noise images corresponding to the input file.
