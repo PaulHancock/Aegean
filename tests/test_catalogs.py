@@ -125,7 +125,8 @@ def test_load_table_write_table():
         if not len(tab) == len(catalog):
             raise AssertionError()
 
-        os.remove(fout)
+    # by keeping this out of the loop, we make use of the internal remove function
+    os.remove(fout)
 
     cat.save_catalog('a.csv', catalog, meta=None)
     tab = cat.load_table('a_comp.csv')
