@@ -188,7 +188,7 @@ class FitsImage(object):
         # fix possible problems with miriad generated fits files % HT John Morgan.
         try:
             self.wcs = pywcs.WCS(self._header, naxis=2)
-        except:
+        except:  # TODO: figure out what error is being thrown
             self.wcs = pywcs.WCS(str(self._header), naxis=2)
 
         self.x = self._header['NAXIS1']
