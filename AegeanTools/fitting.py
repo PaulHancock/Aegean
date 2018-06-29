@@ -1331,6 +1331,9 @@ if __name__ == "__main__":
         params.add('components', value=1, vary=False)
 
         def rmlabels(ax):
+            """
+            Remove tick labels from a plot
+            """
             ax.set_xticks([])
             ax.set_yticks([])
 
