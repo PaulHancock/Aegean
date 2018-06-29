@@ -81,7 +81,7 @@ class WCSHelper(object):
         """
         try:
             wcs = pywcs.WCS(header, naxis=2)
-        except:
+        except:  # TODO: figure out what error is being thrown
             wcs = pywcs.WCS(str(header), naxis=2)
 
         if beam is None:
