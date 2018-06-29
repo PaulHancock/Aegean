@@ -122,7 +122,7 @@ def test_sky_within():
     try:
         region.sky_within(np.nan, dec[0])
     except ValueError as e:
-        raise AssertionError("Failed with a nan position")
+        raise AssertionError("Failed with a nan position\n" + e.message)
 
 
 def test_pickle():
