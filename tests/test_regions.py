@@ -203,6 +203,7 @@ def test_intersect():
 
 
 def test_demote():
+    """Test that we can demote a region"""
     a = Region(maxdepth=8)
     a.add_circles(0, np.radians(-90), np.radians(1))
     _ = a.pixeldict.copy()
