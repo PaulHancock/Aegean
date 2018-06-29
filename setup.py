@@ -1,3 +1,7 @@
+#! /usr/bin/env python
+"""
+Setup for AegeanTools
+"""
 import os
 import sys
 from setuptools import setup
