@@ -26,12 +26,12 @@ from astropy.io import fits
 from astropy.io.votable import from_table, parse_single_table
 from astropy.io.votable import writeto as writetoVO
 
-try:
-    import h5py
-
-    hdf5_supported = True
-except ImportError:
-    hdf5_supported = False
+# try:
+#     import h5py
+#
+#     hdf5_supported = True
+# except ImportError:
+#     hdf5_supported = False
 
 import sqlite3
 
@@ -82,7 +82,6 @@ def show_formats():
         "ann": "Kvis annotation",
         "reg": "DS9 regions file",
         "fits": "FITS Binary Table",
-        "hdf5": "HDF-5 format",
         "csv": "Comma separated values",
         "tab": "tabe separated values",
         "tex": "LaTeX table format",
@@ -110,10 +109,10 @@ def get_table_formats():
     fmts = ['reg', 'fits']
     fmts.extend(['vo', 'vot', 'xml'])
     fmts.extend(['csv', 'tab', 'tex', 'html'])
-    if hdf5_supported:
-        fmts.append('hdf5')
-    else:
-        log.info("HDF5 is not supported by your environment")
+    # if hdf5_supported:
+    #     fmts.append('hdf5')
+    # else:
+    #     log.info("HDF5 is not supported by your environment")
     # assume this is always possible -> though it may not be on some systems
     fmts.extend(['db', 'sqlite'])
     return fmts
