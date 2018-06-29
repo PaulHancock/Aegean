@@ -1,6 +1,10 @@
+#! /usr/bin/env python
 """
 Flag constants for use by Aegean.
 """
+
+__author__ = "Paul Hancock"
+
 # Err Flags for fitting routines
 FITERRSMALL   = 1 #      1
 FITERR        = 2 #     10

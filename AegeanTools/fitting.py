@@ -1,9 +1,9 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 Provide fitting routines and helper fucntions to Aegean
 """
+
+from __future__ import print_function
 
 __author__ = "Paul Hancock"
 
@@ -15,16 +15,15 @@ import lmfit
 from .angle_tools import gcd, bear
 
 # Other AegeanTools
-# from models import OutputSource, IslandSource
 from . import flags
 
-# ERR_MASK is used to indicate that the err_x value is not able to be determined
-ERR_MASK = -1.0
 
 # join the Aegean logger
 import logging
-
 log = logging.getLogger('Aegean')
+
+# ERR_MASK is used to indicate that the err_x value is not able to be determined
+ERR_MASK = -1.0
 
 
 # Modelling and fitting functions

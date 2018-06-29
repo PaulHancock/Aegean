@@ -1,25 +1,24 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 This module contains two classes that provide WCS functions that are not
 part of the WCS toolkit, as well as some wrappers around the provided tools
 to make them a lot easier to use.
 """
+
+from __future__ import print_function
+
 __author__ = 'Paul Hancock'
 
+import astropy.wcs as pywcs
+from astropy.io import fits
 import numpy as np
 
+# AegeanTools
 from .angle_tools import gcd, bear, translate
 from .fits_image import Beam, get_beam, get_pixinfo
 
-# the glory of astropy
-import astropy.wcs as pywcs
-from astropy.io import fits
-
 # join the Aegean logger
 import logging
-
 log = logging.getLogger('Aegean')
 
 

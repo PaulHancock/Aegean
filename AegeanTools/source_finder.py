@@ -1,9 +1,11 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 The Aegean source finding program.
 """
+
+from __future__ import print_function
+
+__author__ = "Paul Hancock"
 
 # standard imports
 import sys

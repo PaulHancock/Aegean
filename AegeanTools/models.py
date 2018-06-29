@@ -1,10 +1,10 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 Different types of sources that Aegean is able to fit
 
 """
+
+from __future__ import print_function
 
 __author__ = "Paul Hancock"
 
