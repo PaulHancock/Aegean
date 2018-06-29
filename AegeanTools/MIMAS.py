@@ -1,12 +1,16 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 MIMAS - The Multi-resolution Image Mask for Aegean Software
 
 TODO: Write an in/out reader for MOC formats described by
 http://arxiv.org/abs/1505.02937
 """
+
+from __future__ import print_function
+
+__author__ = "Paul Hancock"
+__version__ = 'v1.3.0'
+__date__ = '2018-05-05'
 
 import logging
 import numpy as np
@@ -20,10 +24,6 @@ from astropy.io import fits as pyfits
 from astropy.wcs import wcs as pywcs
 from .regions import Region
 from .catalogs import load_table, write_table
-
-__author__ = "Paul Hancock"
-__version__ = 'v1.3.0'
-__date__ = '2018-05-05'
 
 # seems like this fails sometimes
 if six.PY2:

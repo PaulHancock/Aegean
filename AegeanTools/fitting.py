@@ -1,9 +1,9 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 Provide fitting routines and helper fucntions to Aegean
 """
+
+from __future__ import print_function
 
 __author__ = "Paul Hancock"
 
@@ -15,16 +15,15 @@ import lmfit
 from .angle_tools import gcd, bear
 
 # Other AegeanTools
-# from models import OutputSource, IslandSource
 from . import flags
 
-# ERR_MASK is used to indicate that the err_x value is not able to be determined
-ERR_MASK = -1.0
 
 # join the Aegean logger
 import logging
-
 log = logging.getLogger('Aegean')
+
+# ERR_MASK is used to indicate that the err_x value is not able to be determined
+ERR_MASK = -1.0
 
 
 # Modelling and fitting functions
@@ -1141,6 +1140,19 @@ def ntwodgaussian_lmfit(params):
     """
 
     def rfunc(x, y):
+        """
+        Compute the model given by params, at pixel coordinates x,y
+
+        Parameters
+        ----------
+        x, y : numpy.ndarray
+            The x/y pixel coordinates at which the model is being evaluated
+
+        Returns
+        -------
+        result : numpy.ndarray
+            Model
+        """
         result = None
         for i in range(params['components'].value):
             prefix = "c{0}_".format(i)
@@ -1202,6 +1214,19 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     mask = np.where(np.isfinite(data))
 
     def residual(params, **kwargs):
+        """
+        The residual function required by lmfit
+
+        Parameters
+        ----------
+        params: lmfit.Params
+            The parameters of the model being fit
+
+        Returns
+        -------
+        result : numpy.ndarray
+            Model - Data
+        """
         f = ntwodgaussian_lmfit(params)  # A function describing the model
         model = f(*mask)  # The actual model
         if B is None:
@@ -1306,6 +1331,9 @@ if __name__ == "__main__":
         params.add('components', value=1, vary=False)
 
         def rmlabels(ax):
+            """
+            Remove tick labels from a plot
+            """
             ax.set_xticks([])
             ax.set_yticks([])
 

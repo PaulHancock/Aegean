@@ -1,9 +1,9 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 Module for reading at writing catalogs
 """
+
+from __future__ import print_function
 
 __author__ = "Paul Hancock"
 __version__ = "1.0"

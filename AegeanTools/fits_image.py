@@ -1,4 +1,8 @@
 #! /usr/bin/env python
+"""
+Tools for interacting with fits images (HUDLists)
+"""
+
 from __future__ import print_function
 
 __author__= "Paul Hancock"

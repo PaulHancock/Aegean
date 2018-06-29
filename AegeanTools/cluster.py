@@ -1,12 +1,12 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 Cluster and crossmatch tools and analysis functions.
 
 Includes:
 - DBSCAN clustering
 """
+
+from __future__ import print_function
 
 __author__= "Paul Hancock"
 

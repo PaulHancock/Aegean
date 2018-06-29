@@ -5,6 +5,10 @@ This module contains all of the BANE specific code
 The function filter_image should be imported from elsewhere and run as is.
 """
 
+__author__ = 'Paul Hancock'
+__version__ = 'v1.6.0'
+__date__ = '2018-06-28'
+
 # standard imports
 from astropy.io import fits
 import copy
@@ -20,10 +24,6 @@ from time import gmtime, strftime
 
 # Aegean tools
 from .fits_interp import compress
-
-__author__ = 'Paul Hancock'
-__version__ = 'v1.6.0'
-__date__ = '2018-06-28'
 
 def sigmaclip(arr, lo, hi, reps=3):
     """
