@@ -278,7 +278,7 @@ class FitsImage(object):
             iqr = p75 - p25
             self._rms = iqr / 1.34896
         return self._rms
-    
+
     def pix2sky(self, pixel):
         """
         Get the sky coordinates for a given image pixel.
