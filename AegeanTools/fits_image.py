@@ -319,9 +319,6 @@ class FitsImage(object):
             Pixel coordinates.
 
         """
-        """
-        Get the pixel coordinates [x,y] (floats) given skypos [ra,dec] (degrees)
-        """
         skybox = [skypos, skypos]
         pixbox = self.wcs.all_world2pix(skybox, 1)
         return [float(pixbox[0][0]), float(pixbox[0][1])]
