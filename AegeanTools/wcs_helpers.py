@@ -432,13 +432,6 @@ class WCSHelper(object):
         dist : float
             The distance between the two points (degrees).
         """
-        """
-        Input:
-            pix1 = [x1,y1]
-            pix2 = [x2,y2]
-        Returns:
-            sep = separation in degrees
-        """
         pos1 = self.pix2sky(pix1)
         pos2 = self.pix2sky(pix2)
         sep = gcd(pos1[0], pos1[1], pos2[0], pos2[1])
