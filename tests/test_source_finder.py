@@ -6,6 +6,8 @@ Test source_finder.py
 __author__ = 'Paul Hancock'
 
 from AegeanTools import source_finder as sf
+from AegeanTools.fits_image import Beam
+from AegeanTools import flags
 from copy import deepcopy
 import numpy as np
 import logging
@@ -184,6 +186,33 @@ def test_save_image():
     sfinder.save_image(bfile)
     if not (os.path.exists(bfile)): raise AssertionError()
     os.remove(bfile)
+
+
+def test_esimate_lmfit_parinfo():
+    """Test estimate_lmfit_parinfo"""
+    log = logging.getLogger("Aegean")
+    # log.setLevel(logging.DEBUG)
+    sfinder = sf.SourceFinder(log=log)
+
+    data = np.zeros(shape=(3, 3))
+    rmsimg = np.ones(shape=(3, 3))
+    beam = Beam(1, 1, 0)
+
+    # should hit isnegative
+    data[1, 1] = -6
+    # should hit outerclip is None
+    outerclip = None
+    # should run error because curve is the wrong shape
+    curve = np.zeros((3, 4))
+    try:
+        sfinder.estimate_lmfit_parinfo(data=data, rmsimg=rmsimg, curve=curve,
+                                        beam=beam, innerclip=5, outerclip=outerclip)
+    except AssertionError as e:
+        e.message +='Passed'
+    else:
+        raise AssertionError("estimate_lmfit_parinfo should err when curve.shape != data.shape")
+
+    return
 
 
 if __name__ == "__main__":
