@@ -132,12 +132,11 @@ def test_find_and_prior_sources():
         raise AssertionError()
     os.remove('dlme')
 
-    # # pprocess is broken in python3 at the moment so just use 1 core.
-    # if six.PY3:
-    #     cores = 1
-    # else:
-    #     cores = 2
-    cores = 2
+    # pprocess is broken in python3 at the moment so just use 1 core.
+    if six.PY3:
+        cores = 1
+    else:
+        cores = 2
     # this should find one less source as one of the source centers is outside the image.
     priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=False, ratio=1.2, cores=cores, docov=False)
     if not (len(priorized) == 2): raise AssertionError()
@@ -153,11 +152,12 @@ def test_find_and_prior_sources():
 def test_find_and_prior_parallel():
     """Test find/piroirze with parallel operation"""
     log = logging.getLogger("Aegean")
+
+    # pprocess is broken in python3 at the moment so just use 1 core.
+    if six.PY3:
+        return
     cores = 2
-    # cores = sf.check_cores(2)
-    # # don't bother re-running these tests if we have just 1 core
-    # if cores == 1:
-    #     return
+
     filename = 'tests/test_files/1904-66_SIN.fits'
     # vanilla source finding
     sfinder = sf.SourceFinder(log=log)
@@ -222,7 +222,7 @@ def test_esimate_lmfit_parinfo():
         sfinder.estimate_lmfit_parinfo(data=data, rmsimg=rmsimg, curve=curve,
                                         beam=beam, innerclip=5, outerclip=outerclip)
     except AssertionError as e:
-        e.message +='Passed'
+        e.message = 'Passed'
     else:
         raise AssertionError("estimate_lmfit_parinfo should err when curve.shape != data.shape")
 
