@@ -1,6 +1,5 @@
-#! python
+#! /usr/bin/env python
 __author__ = 'Paul Hancock'
-__date__ = ''
 
 from AegeanTools import source_finder as sf
 from copy import deepcopy
@@ -15,12 +14,14 @@ log.setLevel(logging.INFO)
 
 
 def test_misc():
+    """Test some random things"""
     sf.IslandFittingData()
     sf.DummyLM()
     sf.SourceFinder(ignored=None, log=log)
 
 
 def test_helpers():
+    """Test the helper functions"""
     # fix shape
     src = sf.OutputSource()
     src.a = 1
@@ -51,6 +52,7 @@ def test_helpers():
 
 
 def test_load_globals():
+    """Test load_globals"""
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
     filename = 'tests/test_files/1904-66_SIN.fits'
@@ -92,6 +94,7 @@ def test_load_globals():
 
 
 def test_find_and_prior_sources():
+    """Test find sources and prior sources"""
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
     filename = 'tests/test_files/small.fits'
@@ -129,6 +132,7 @@ def test_find_and_prior_sources():
 
 
 def test_find_and_prior_parallel():
+    """Test find/piroirze with parallel operation"""
     log = logging.getLogger("Aegean")
     cores = sf.check_cores(2)
     # don't bother re-running these tests if we have just 1 core
@@ -156,6 +160,7 @@ def test_find_and_prior_parallel():
 
 
 def test_save_files():
+    """Test that we can save files"""
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
     filename = 'tests/test_files/small.fits'
@@ -166,6 +171,7 @@ def test_save_files():
 
 
 def test_save_image():
+    """Test save_image"""
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
     filename = 'tests/test_files/small.fits'
