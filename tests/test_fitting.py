@@ -167,7 +167,7 @@ def test_condon_errs():
     source.ra = 0
     source.dec = 1
     source.a = 10
-    source.b = 10.
+    source.b = 10
     source.pa = 0
     source.local_rms = 0.1
     source.peak_flux = 1
@@ -176,7 +176,10 @@ def test_condon_errs():
     if not (source.err_a == 0): raise AssertionError()
     fitting.condon_errors(source, theta_n=8.)
     if not (source.err_a > 0): raise AssertionError()
-
+    # test that we can get a PA error
+    source.a = 20
+    fitting.condon_errors(source, None)
+    if source.err_pa < 0: raise AssertionError()
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
