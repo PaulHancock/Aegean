@@ -20,6 +20,13 @@ log = logging.getLogger("Aegean")
 log.setLevel(logging.INFO)
 
 
+def test_nulls():
+    if cat.nulls(-1) is not None:
+        raise AssertionError("nulls(-1) is broken")
+    if cat.nulls(0) is None:
+        raise AssertionError("nulls(0) is broken")
+
+
 def test_check_table_formats():
     """Test check_table_formats"""
     files = ','.join(['a.csv', 'a.fits', 'a.vot', 'a.hdf5',  'a.ann', 'a.docx', 'a'])
