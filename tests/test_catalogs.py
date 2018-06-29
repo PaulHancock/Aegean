@@ -183,6 +183,8 @@ def test_write_contours_boxes():
     ms = MarchingSquares(data)
     src = IslandSource()
     src.contour = ms.perimeter
+    src.max_angular_size_anchors = [1, 2, 3, 4]
+    src.pix_mask = [[0, 0], [1, 1]]
     src.extent = [1, 4, 1, 4]
     catalog = [src]
     cat.writeIslandContours('out.reg', catalog, fmt='reg')
