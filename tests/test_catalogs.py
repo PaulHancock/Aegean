@@ -104,6 +104,8 @@ def test_load_save_catalog():
     if not os.path.exists(fout):
         raise AssertionError()
 
+    # again so that we trigger an overwrite
+    cat.save_catalog(fout, catalog, meta=None)
     os.remove(fout)
 
     badfile = open("file.fox", 'w')
