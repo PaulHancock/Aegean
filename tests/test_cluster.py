@@ -73,8 +73,7 @@ def test_vectorized():
         x0 = Xr[0]
         # calculate distance of x0 to all of Xr with vectorized operations:
         dx0all = dist(x0, Xr)
-        for i in range(len(Xr)):
-            xi = Xr[i]
+        for i, xi in enumerate(Xr):
             dx0xi = dist(x0, xi)
             # check equivalence between pairs of sources and vectorized
             if not np.isclose(dx0xi, dx0all[i], atol=0):
