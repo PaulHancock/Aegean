@@ -215,6 +215,18 @@ def test_write_contours_boxes():
 
 def test_write_ann():
     """Test that write_ann *doesn't* do anything"""
+    cat.writeAnn('out.ann', [], fmt='fail')
+    if os.path.exists('out.ann'):
+        raise AssertionError("Shoudn't have written anything")
+
+    src = OutputSource()
+    # remove the parameter a to hit a checkpoint
+    del src.a
+    cat.writeAnn('out.reg', [src], fmt='reg')
+    if not os.path.exists('out_comp.reg'):
+        raise AssertionError()
+    os.remove('out_comp.reg')
+
     # write regular and simple sources for .ann files
     cat.writeAnn('out.ann', [OutputSource()], fmt='ann')
     if not os.path.exists('out_comp.ann'):
@@ -237,6 +249,13 @@ def test_write_ann():
         raise AssertionError()
 
     os.remove('out_simp.reg')
+    cat.writeAnn('out.reg', [IslandSource()], fmt='reg')
+    if not os.path.exists('out_isle.reg'):
+        raise AssertionError()
+
+    os.remove('out_isle.reg')
+    cat.writeAnn('out.ann', [IslandSource()], fmt='ann')
+    cat.writeAnn('out.reg', [IslandSource()], fmt='fail')
 
 
 def test_table_to_source_list():
