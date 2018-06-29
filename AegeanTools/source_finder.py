@@ -1146,20 +1146,13 @@ class SourceFinder(object):
             # now we correct the xo/yo positions to be relative to the sub-image
             self.log.debug("xmxxymyx {0} {1} {2} {3}".format(xmin, xmax, ymin, ymax))
             for i in range(params['components'].value):
-                try:
-                    prefix = "c{0}_".format(i)
-                    params[prefix + 'xo'].value -= xmin
-                    params[prefix + 'xo'].min -= xmin
-                    params[prefix + 'xo'].max -= xmin
-                    params[prefix + 'yo'].value -= ymin
-                    params[prefix + 'yo'].min -= ymin
-                    params[prefix + 'yo'].max -= ymin
-                except Exception as e:
-                    self.log.error(" ARG !")
-                    self.log.info(params)
-                    self.log.info(params['components'].value)
-                    self.log.info("trying to access component {0}".format(i))
-                    raise e
+                prefix = "c{0}_".format(i)
+                params[prefix + 'xo'].value -= xmin
+                params[prefix + 'xo'].min -= xmin
+                params[prefix + 'xo'].max -= xmin
+                params[prefix + 'yo'].value -= ymin
+                params[prefix + 'yo'].min -= ymin
+                params[prefix + 'yo'].max -= ymin
             # self.log.debug(params)
             # don't fit if there are no sources
             if params['components'].value < 1:
