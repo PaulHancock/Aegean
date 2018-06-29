@@ -17,6 +17,7 @@ log.setLevel(logging.INFO)
 
 
 def test_norm_dist():
+    """Test norm_dist"""
     src1 = SimpleSource()
     src1.ra = 0
     src1.dec = 0
@@ -36,6 +37,7 @@ def test_norm_dist():
 
 
 def test_sky_dist():
+    """Test sky_dist"""
     src1 = SimpleSource()
     src1.ra = 0
     src1.dec = 0
@@ -49,6 +51,7 @@ def test_sky_dist():
 
 
 def test_vectorized():
+    """Test that norm_dist and sky_dist can be vectorized"""
     # random data as struct array with interface like SimpleSource
     X = np.random.RandomState(0).rand(20, 6)
     Xr = np.rec.array(X.view([('ra', 'f8'), ('dec', 'f8'),
@@ -77,6 +80,7 @@ def test_vectorized():
 
 
 def test_pairwise_elliptical_binary():
+    """Test pairwise_elliptical_binary distance"""
     src1 = SimpleSource()
     src1.ra = 0
     src1.dec = 0
@@ -93,6 +97,7 @@ def test_pairwise_elliptical_binary():
 
 
 def test_regroup():
+    """Test that regroup does things"""
     # this should throw an attribute error
     try:
         cluster.regroup([1], eps=1)
