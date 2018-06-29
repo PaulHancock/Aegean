@@ -104,27 +104,40 @@ def test_find_and_prior_sources():
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
     filename = 'tests/test_files/small.fits'
+
     # vanilla source finding
     found = sfinder.find_sources_in_image(filename, cores=1)
-    if not (len(found) == 2): raise AssertionError()
+    if not (len(found) == 2):
+        raise AssertionError()
+
+    # source finding but not fitting
+    found = sfinder.find_sources_in_image(filename, cores=1, max_summits=0)
+    if not (len(found) == 2):
+        raise AssertionError()
+
     # now with some options
     aux_files = sf.get_aux_files(filename)
     found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
                                            rmsin=aux_files['rms'], bkgin=aux_files['bkg'],
                                            mask=aux_files['mask'], cores=1, docov=False)
-    if not (len(found2) == 4): raise AssertionError()
+    if not (len(found2) == 4):
+        raise AssertionError()
     isle1 = found2[1]
-    if not (isle1.int_flux > 0): raise AssertionError()
-    if not (isle1.max_angular_size > 0): raise AssertionError()
+    if not (isle1.int_flux > 0):
+        raise AssertionError()
+    if not (isle1.max_angular_size > 0):
+        raise AssertionError()
     # we should have written some output file
-    if not (os.path.exists('dlme')): raise AssertionError()
+    if not (os.path.exists('dlme')):
+        raise AssertionError()
     os.remove('dlme')
 
-    # pprocess is broken in python3 at the moment so just use 1 core.
-    if six.PY3:
-        cores = 1
-    else:
-        cores = 2
+    # # pprocess is broken in python3 at the moment so just use 1 core.
+    # if six.PY3:
+    #     cores = 1
+    # else:
+    #     cores = 2
+    cores = 2
     # this should find one less source as one of the source centers is outside the image.
     priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=False, ratio=1.2, cores=cores, docov=False)
     if not (len(priorized) == 2): raise AssertionError()
@@ -140,10 +153,11 @@ def test_find_and_prior_sources():
 def test_find_and_prior_parallel():
     """Test find/piroirze with parallel operation"""
     log = logging.getLogger("Aegean")
-    cores = sf.check_cores(2)
-    # don't bother re-running these tests if we have just 1 core
-    if cores == 1:
-        return
+    cores = 2
+    # cores = sf.check_cores(2)
+    # # don't bother re-running these tests if we have just 1 core
+    # if cores == 1:
+    #     return
     filename = 'tests/test_files/1904-66_SIN.fits'
     # vanilla source finding
     sfinder = sf.SourceFinder(log=log)
