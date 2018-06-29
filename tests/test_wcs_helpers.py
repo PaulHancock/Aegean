@@ -11,6 +11,7 @@ from numpy.testing import assert_almost_equal
 
 
 def verify_beam(beam):
+    """fail if the given beam is not valid"""
     if beam is None: raise AssertionError()
     if not (beam.a > 0): raise AssertionError()
     if not (beam.b > 0): raise AssertionError()
@@ -18,6 +19,7 @@ def verify_beam(beam):
 
 
 def test_from_header():
+    """Test that we can make a beam from a fitsheader"""
     fname = 'tests/test_files/1904-66_SIN.fits'
     header = fits.getheader(fname)
     helper = WCSHelper.from_header(header)
@@ -28,12 +30,14 @@ def test_from_header():
 
 
 def test_from_file():
+    """Test that we can load from a file"""
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
     if helper.beam is None: raise AssertionError()
 
 
 def test_get_pixbeam():
+    """Test get_pixbeam"""
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
 
@@ -61,6 +65,7 @@ def test_get_pixbeam():
 
 
 def test_sky_sep():
+    """Test sky separation"""
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
     dist = helper.sky_sep([0, 0], [1, 1])
