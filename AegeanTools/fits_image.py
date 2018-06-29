@@ -150,7 +150,7 @@ class FitsImage(object):
     An object that handles the loading and manipulation of a fits file.
     """
 
-    def __init__(self, filename=None, hdu_index=0, beam=None, slice=None):
+    def __init__(self, filename=None, hdu_index=0, beam=None, cube_index=None):
         """
         Parameters
         ----------
@@ -165,7 +165,7 @@ class FitsImage(object):
             If beam is None then it will be created from the fits header.
             Default = None.
 
-        slice : int
+        cube_index : int
             If the input data has 3 dimensions then this will specify the index into the 3rd dimension
             which will be extracted as the image.
             Default = None.
@@ -208,11 +208,11 @@ class FitsImage(object):
         self._pixels = numpy.squeeze(self.hdu.data)
         # if we have a fits cube just use a single slice
         if len(self._pixels.shape) == 3:
-            if slice is None:
-                log.critical("Image is a cube, but no slice is given")
-                raise Exception("Image is a cube, but no slice is given")
-            log.info("Image is a cube, using slice {0}".format(slice))
-            self._pixels = self._pixels[slice, :, :]
+            if cube_index is None:
+                log.critical("Image is a cube, but no cube_index is given")
+                raise Exception("Image is a cube, but no cube_index is given")
+            log.info("Image is a cube, using cube_index {0}".format(cube_index))
+            self._pixels = self._pixels[cube_index, :, :]
         elif len(self._pixels.shape) > 3:
             log.critical("Image has >3 axes.")
             raise Exception("Images with >3 axes not supported.")

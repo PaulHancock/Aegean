@@ -611,7 +611,7 @@ class SourceFinder(object):
     # Setting up 'global' data and calculating bkg/rms
     ##
     def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, bkg=None, cores=1,
-                     do_curve=True, mask=None, lat=None, psf=None, blank=False, docov=True, slice=slice):
+                     do_curve=True, mask=None, lat=None, psf=None, blank=False, docov=True, cube_index=None):
         """
         Populate the global_data object by loading or calculating the various components
 
@@ -660,14 +660,14 @@ class SourceFinder(object):
             True = use covariance matrix in fitting.
             Default = True.
 
-        slice : int
+        cube_index : int
             For an image cube, which slice to use.
 
         """
         # don't reload already loaded data
         if self.global_data.img is not None:
             return
-        img = FitsImage(filename, hdu_index=hdu_index, beam=beam, slice=slice)
+        img = FitsImage(filename, hdu_index=hdu_index, beam=beam, cube_index=cube_index)
         beam = img.beam
 
         debug = logging.getLogger('Aegean').isEnabledFor(logging.DEBUG)
@@ -1408,7 +1408,7 @@ class SourceFinder(object):
     def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, bkg=None, max_summits=None, innerclip=5,
                               outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
                               nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None, blank=False,
-                              docov=True, slice=None):
+                              docov=True, cube_index=None):
         """
         Run the Aegean source finder.
 
@@ -1468,8 +1468,8 @@ class SourceFinder(object):
         docov : bool
             If True then include covariance matrix in the fitting process. (default=True)
 
-        slice : int
-            For image cubes, slice determines which slice is used.
+        cube_index : int
+            For image cubes, cube_index determines which slice is used.
 
         Returns
         -------
@@ -1483,7 +1483,7 @@ class SourceFinder(object):
             if not (cores >= 1): raise AssertionError("cores must be one or more")
 
         self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, bkg=bkg, cores=cores,
-                          verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank, docov=docov, slice=slice)
+                          verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank, docov=docov, cube_index=cube_index)
         global_data = self.global_data
         rmsimg = global_data.rmsimg
         data = global_data.data_pix
@@ -1553,7 +1553,7 @@ class SourceFinder(object):
 
     def priorized_fit_islands(self, filename, catalogue, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1,
                               rms=None, bkg=None, beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=None, outerclip=3,
-                              doregroup=True, docov=True, slice=None):
+                              doregroup=True, docov=True, cube_index=None):
         """
         Take an input catalog, and image, and optional background/noise images
         fit the flux and ra/dec for each of the given sources, keeping the morphology fixed
@@ -1614,7 +1614,7 @@ class SourceFinder(object):
         docov : bool
             If True then include covariance matrix in the fitting process. (default=True)
 
-        slice : int
+        cube_index : int
             For image cubes, slice determines which slice is used.
 
 
@@ -1628,7 +1628,7 @@ class SourceFinder(object):
         from AegeanTools.cluster import regroup
 
         self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, bkg=bkg, cores=cores, verb=True,
-                          do_curve=False, beam=beam, lat=lat, psf=imgpsf, docov=docov, slice=slice)
+                          do_curve=False, beam=beam, lat=lat, psf=imgpsf, docov=docov, cube_index=cube_index)
 
         global_data = self.global_data
         far = 10 * global_data.beam.a  # degrees

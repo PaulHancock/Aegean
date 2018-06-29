@@ -100,7 +100,7 @@ def test_init():
 
     # should be able to supply a beam directly
     beam = fi.Beam(1, 1, 0)
-    im = fi.FitsImage(hdu, beam=beam, slice=0)
+    im = fi.FitsImage(hdu, beam=beam, cube_index=0)
     if not (im.beam is beam): raise AssertionError()
 
     # raise exception if the beam cannot be determined
@@ -113,7 +113,7 @@ def test_init():
     # this should fail
     assert_raises(Exception, fi.FitsImage, hdu)
     # this should be fine
-    im = fi.FitsImage(hdu, slice=0)
+    im = fi.FitsImage(hdu, cube_index=0)
     if not (im.x == im.y == 3): raise AssertionError()
 
     # can't work with 4d data
