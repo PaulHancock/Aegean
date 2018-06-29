@@ -10,6 +10,7 @@ import numpy as np
 
 
 def make_model():
+    """Test that we can make lmfit.Parameter models"""
     model = lmfit.Parameters()
     model.add('c0_amp', 1, vary=True)
     model.add('c0_xo', 5, vary=True)
@@ -22,6 +23,7 @@ def make_model():
 
 
 def test_elliptical_gaussian():
+    """Test our elliptical gaussian creation function"""
     x, y = np.indices((3, 3))
     gauss = fitting.elliptical_gaussian(x, y, amp=1, xo=0, yo=1, sx=1, sy=1, theta=0)
     if np.any(np.isnan(gauss)): raise AssertionError()
@@ -30,6 +32,7 @@ def test_elliptical_gaussian():
 
 
 def test_CandBmatrix():
+    """Test that C and B matricies can be created without error"""
     x, y = map(np.ravel, np.indices((3, 3)))
     C = fitting.Cmatrix(x, y, sx=1, sy=2, theta=0)
     if np.any(np.isnan(C)): raise AssertionError()
@@ -38,6 +41,7 @@ def test_CandBmatrix():
 
 
 def test_hessian_shape():
+    """Test that the hessian has the correct shape"""
     # test a single component model
     model = lmfit.Parameters()
     model.add('c0_amp', 1, vary=True)
@@ -69,7 +73,6 @@ def test_jacobian_shape():
     """
     Test to see if the Jacobian matrix if of the right shape
     This includes a single source model with only 4 variable params
-    :return: True if the test passes
     """
     model = lmfit.Parameters()
     model.add('c0_amp', 1, vary=True)
@@ -97,6 +100,7 @@ def test_jacobian_shape():
 
 
 def test_emp_vs_ana_jacobian():
+    """Test that the empirical and analytic Jacobians agree"""
     model = lmfit.Parameters()
     model.add('c0_amp', 1, vary=True)
     model.add('c0_xo', 5, vary=True)
@@ -127,6 +131,7 @@ def test_emp_vs_ana_jacobian():
 
 
 def test_emp_vs_ana_hessian():
+    """Test that the empirical and analytical Hessians agree"""
     model = lmfit.Parameters()
     model.add('c0_amp', 1, vary=True)
     model.add('c0_xo', 5, vary=True)
@@ -157,6 +162,7 @@ def test_emp_vs_ana_hessian():
 
 
 def test_make_ita():
+    """Test make_ita"""
     noise = np.random.random((10, 10))
     ita = fitting.make_ita(noise)
     if not (ita.shape == (100, 100)): raise AssertionError()
@@ -166,6 +172,7 @@ def test_make_ita():
 
 
 def test_RB_bias():
+    """Test RB_bias"""
     data = np.random.random((4, 4))
     model = make_model()
     bias = fitting.RB_bias(data, model)
@@ -173,12 +180,14 @@ def test_RB_bias():
 
 
 def test_bias_correct():
+    """test that bias_correct does things"""
     data = np.random.random((4, 4))
     model = make_model()
     fitting.bias_correct(model, data)
 
 
 def dont_test_CRB_errs():
+    """Test the CRB errors (not)"""
     x, y = np.indices((3, 3))
     C = fitting.Cmatrix(x.ravel(), y.ravel(), sx=1, sy=2, theta=0)
     model = make_model()
@@ -189,6 +198,7 @@ def dont_test_CRB_errs():
 
 
 def test_condon_errs():
+    """Test that we can create Condon errors"""
     source = models.OutputSource()
     source.ra = 0
     source.dec = 1
