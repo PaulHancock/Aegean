@@ -190,7 +190,7 @@ class FitsImage(object):
             self.wcs = pywcs.WCS(self._header, naxis=2)
         except:
             self.wcs = pywcs.WCS(str(self._header), naxis=2)
-            
+
         self.x = self._header['NAXIS1']
         self.y = self._header['NAXIS2']
 
