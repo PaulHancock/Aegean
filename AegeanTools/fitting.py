@@ -792,35 +792,6 @@ def bias_correct(params, data, acf=None):
     return
 
 
-def CRB_errs(jac, C, B=None):
-    """
-    Calculate minimum errors given by the Cramer-Rao bound
-
-    Parameters
-    ----------
-    jac : 2d-array
-        Jacobian corresponding to the data and model.
-
-    C : 2d-array
-        Data covariance matrix
-
-    B : 2d-array
-        The square root of C. Default = None, which means that it will be calculated from C.
-
-    Returns
-    -------
-    errs : list
-        The uncertainty on each of the parameters.
-    """
-    if B is not None:
-        fim_inv = inv(np.transpose(jac).dot(B).dot(np.transpose(B)).dot(jac))
-    else:
-        fim = np.transpose(jac).dot(inv(C)).dot(jac)
-        fim_inv = inv(fim)
-    errs = np.sqrt(np.diag(fim_inv))
-    return errs
-
-
 def condon_errors(source, theta_n, psf=None):
     """
     Calculate the parameter errors for a fitted source

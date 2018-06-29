@@ -46,14 +46,7 @@ def test_CandBmatrix():
 def test_hessian_shape():
     """Test that the hessian has the correct shape"""
     # test a single component model
-    model = lmfit.Parameters()
-    model.add('c0_amp', 1, vary=True)
-    model.add('c0_xo', 5, vary=True)
-    model.add('c0_yo', 5, vary=True)
-    model.add('c0_sx', 2.001, vary=False)
-    model.add('c0_sy', 2, vary=False)
-    model.add('c0_theta', 0, vary=False)
-    model.add('components', 1, vary=False)
+    model = make_model()
     nvar = 3
     x, y = np.indices((10, 10))
     Hij = fitting.hessian(model, x, y)
@@ -77,14 +70,7 @@ def test_jacobian_shape():
     Test to see if the Jacobian matrix if of the right shape
     This includes a single source model with only 4 variable params
     """
-    model = lmfit.Parameters()
-    model.add('c0_amp', 1, vary=True)
-    model.add('c0_xo', 5, vary=True)
-    model.add('c0_yo', 5, vary=True)
-    model.add('c0_sx', 2.001, vary=False)
-    model.add('c0_sy', 2, vary=False)
-    model.add('c0_theta', 0, vary=False)
-    model.add('components', 1, vary=False)
+    model = make_model()
     nvar = 3
     x, y = np.indices((10, 10))
     Jij = fitting.jacobian(model, x, y)
@@ -104,14 +90,7 @@ def test_jacobian_shape():
 
 def test_emp_vs_ana_jacobian():
     """Test that the empirical and analytic Jacobians agree"""
-    model = lmfit.Parameters()
-    model.add('c0_amp', 1, vary=True)
-    model.add('c0_xo', 5, vary=True)
-    model.add('c0_yo', 5, vary=True)
-    model.add('c0_sx', 2.001, vary=False)
-    model.add('c0_sy', 2, vary=False)
-    model.add('c0_theta', 0, vary=False)
-    model.add('components', 1, vary=False)
+    model = make_model()
 
     x, y = np.indices((10, 10))
     emp_Jij = fitting.emp_jacobian(model, x, y)
@@ -135,14 +114,7 @@ def test_emp_vs_ana_jacobian():
 
 def test_emp_vs_ana_hessian():
     """Test that the empirical and analytical Hessians agree"""
-    model = lmfit.Parameters()
-    model.add('c0_amp', 1, vary=True)
-    model.add('c0_xo', 5, vary=True)
-    model.add('c0_yo', 5, vary=True)
-    model.add('c0_sx', 2.001, vary=False)
-    model.add('c0_sy', 2, vary=False)
-    model.add('c0_theta', 0, vary=False)
-    model.add('components', 1, vary=False)
+    model = make_model()
 
     x, y = np.indices((10, 10))
     emp_Hij = fitting.emp_hessian(model, x, y)
@@ -187,17 +159,6 @@ def test_bias_correct():
     data = np.random.random((4, 4))
     model = make_model()
     fitting.bias_correct(model, data)
-
-
-def dont_test_CRB_errs():
-    """Test the CRB errors (not)"""
-    x, y = np.indices((3, 3))
-    C = fitting.Cmatrix(x.ravel(), y.ravel(), sx=1, sy=2, theta=0)
-    model = make_model()
-    Jij = fitting.jacobian(model, x, y)
-    fitting.CRB_errs(Jij, C)
-    B = fitting.Bmatrix(C)
-    fitting.CRB_errs(Jij, C, B)
 
 
 def test_condon_errs():
