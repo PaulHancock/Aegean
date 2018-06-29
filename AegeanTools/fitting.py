@@ -1455,7 +1455,7 @@ if __name__ == "__main__":
         x, y = np.indices((40, 40))
 
         kwargs = {"interpolation": "nearest", 'aspect': 1, 'vmin': -1, 'vmax': 1}
-        vars = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
+        var_names = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
 
         fig, ax = pyplot.subplots(6, 3, sharex=True, sharey=True, figsize=(3, 6))
 
@@ -1468,7 +1468,7 @@ if __name__ == "__main__":
             im2 = Jana[i, :, :]
             im2 /= np.amax(im2)
             row[0].imshow(im1, **kwargs)
-            row[0].set_ylabel(vars[i])
+            row[0].set_ylabel(var_names[i])
             row[1].imshow(im2, **kwargs)
             row[2].imshow(im1-im2, **kwargs)
             clx(row[0])
