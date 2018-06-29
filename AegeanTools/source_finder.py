@@ -1929,7 +1929,7 @@ def check_cores(cores):
         return 1
     try:
         queue = pprocess.Queue(limit=cores, reuse=1)
-    except:
+    except:  # TODO: figure out what error is being thrown
         cores = 1
     else:
         try:
