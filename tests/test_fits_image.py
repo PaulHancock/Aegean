@@ -16,6 +16,7 @@ log.setLevel(logging.INFO)
 
 
 def test_get_pixinfo():
+    """Test that we can get info from various header styles"""
     header = fits.getheader('tests/test_files/1904-66_SIN.fits')
 
     area, scale = fi.get_pixinfo(header)
@@ -50,6 +51,7 @@ def test_get_pixinfo():
 
 
 def test_get_beam():
+    """Test that we can recover the beam from the fits header"""
     header = fits.getheader('tests/test_files/1904-66_SIN.fits')
     beam = fi.get_beam(header)
     print(beam)
@@ -62,6 +64,7 @@ def test_get_beam():
 
 
 def test_fix_aips_header():
+    """TEst that we can fix an aips generated fits header"""
     header = fits.getheader('tests/test_files/1904-66_SIN.fits')
     # test when this function is not needed
     _ = fi.fix_aips_header(header)
@@ -76,6 +79,7 @@ def test_fix_aips_header():
 
 
 def test_init():
+    """Test that FitsImage __init__ works """
     filename = 'tests/test_files/1904-66_SIN.fits'
     # normal invocation
     _ = fi.FitsImage(filename)
@@ -115,6 +119,7 @@ def test_init():
 
 
 def test_get_background_rms():
+    """Test get_background_rms"""
     filename = 'tests/test_files/1904-66_SIN.fits'
     hdu = fits.open(filename)
     hdu[0].data = np.empty((40, 40))
@@ -123,6 +128,7 @@ def test_get_background_rms():
 
 
 def test_pix2sky_sky2pix():
+    """Test pix2sky and sky2pix are conjugate"""
     filename = 'tests/test_files/1904-66_SIN.fits'
     hdu = fits.open(filename)
     im = fi.FitsImage(hdu)
