@@ -1,9 +1,9 @@
-#! python
+#! /usr/bin/env python
 __author__ = 'Paul Hancock'
-__date__ = ''
 
 
 def test_flags():
+    """Test that the flags import without errors"""
     import AegeanTools.flags
     return
 
