@@ -1,8 +1,10 @@
-#! python
+#! /usr/bin/env python
+"""
+Test catalogues.py
+"""
 from __future__ import print_function
 
 __author__ = 'Paul Hancock'
-__date__ = ''
 
 from AegeanTools import catalogs as cat
 from AegeanTools.models import OutputSource, IslandSource, SimpleSource

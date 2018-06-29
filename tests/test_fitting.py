@@ -1,8 +1,11 @@
-#! python
+#! /usr/bin/env python
+"""
+Test fitting.py
+"""
+
 from __future__ import print_function
 
 __author__ = 'Paul Hancock'
-__date__ = ''
 
 from AegeanTools import fitting, models
 import lmfit

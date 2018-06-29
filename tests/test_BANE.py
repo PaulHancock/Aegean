@@ -1,4 +1,7 @@
-#! python
+#! /usr/bin/env python
+"""
+Test BANE.py
+"""
 from __future__ import print_function
 
 from AegeanTools import BANE

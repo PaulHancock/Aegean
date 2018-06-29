@@ -1,6 +1,10 @@
-#! python
+#! /usr/bin/env python
+"""
+Test fits_interp.py
+"""
+
 __author__ = 'Paul Hancock'
-__date__ = ''
+
 from AegeanTools import fits_interp
 from astropy.io import fits
 import os

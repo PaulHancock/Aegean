@@ -1,8 +1,11 @@
-#! python
-from __future__ import print_function
-__author__ = 'Paul Hancock'
-__date__ = ''
+#! /usr/bin/env python
+"""
+Test regions.py
+"""
 
+from __future__ import print_function
+
+__author__ = 'Paul Hancock'
 
 from AegeanTools.regions import Region
 import numpy as np

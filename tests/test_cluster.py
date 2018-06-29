@@ -1,8 +1,11 @@
-#! python
+#! /usr/bin/env python
+"""
+Test cluster.py
+"""
+
 from __future__ import print_function
 
 __author__ = 'Paul Hancock'
-__date__ = ''
 
 from AegeanTools import cluster
 from AegeanTools.models import SimpleSource

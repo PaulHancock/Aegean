@@ -1,8 +1,11 @@
-#! python
+#! /usr/bin/envy python
+"""
+Test wcs_helpers.py
+"""
+
 from __future__ import print_function
 
 __author__ = 'Paul Hancock'
-__date__ = ''
 
 from AegeanTools.wcs_helpers import WCSHelper
 from astropy.io import fits

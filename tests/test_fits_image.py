@@ -1,14 +1,17 @@
-#! python
+#! /usr/bin/env python
+"""
+Test fits_image.py
+"""
+
 from __future__ import print_function
+
+__author__ = 'Paul Hancock'
 
 from AegeanTools import fits_image as fi
 from astropy.io import fits
 import logging
 import numpy as np
 from numpy.testing import assert_raises, assert_array_almost_equal
-
-__author__ = 'Paul Hancock'
-__date__ = ''
 
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")

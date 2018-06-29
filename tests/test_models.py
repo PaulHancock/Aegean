@@ -1,4 +1,7 @@
 #! /usr/bin/env python
+"""
+Test models.py
+"""
 
 __author__ = 'Paul Hancock'
 

@@ -1,4 +1,8 @@
 #! /usr/bin/env python
+"""
+Test source_finder.py
+"""
+
 __author__ = 'Paul Hancock'
 
 from AegeanTools import source_finder as sf
