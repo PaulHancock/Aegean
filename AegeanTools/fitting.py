@@ -1140,6 +1140,19 @@ def ntwodgaussian_lmfit(params):
     """
 
     def rfunc(x, y):
+        """
+        The residual function required by lmfit
+
+        Parameters
+        ----------
+        x, y : numpy.ndarray
+            The x/y pixel coordinates at which the model/residual is being evaluated
+
+        Returns
+        -------
+        result : numpy.ndarray
+            Data - Model
+        """
         result = None
         for i in range(params['components'].value):
             prefix = "c{0}_".format(i)
