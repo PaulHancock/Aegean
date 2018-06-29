@@ -25,6 +25,9 @@ from time import gmtime, strftime
 # Aegean tools
 from .fits_interp import compress
 
+# global variables for multiprocessing
+ibkg = irms = None
+
 def sigmaclip(arr, lo, hi, reps=3):
     """
     Perform sigma clipping on an array, ignoring non finite values.
