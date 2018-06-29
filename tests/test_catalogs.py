@@ -19,6 +19,7 @@ log.setLevel(logging.INFO)
 
 
 def test_check_table_formats():
+    """Test check_table_formats"""
     files = ','.join(['a.csv', 'a.fits', 'a.vot', 'a.hdf5',  'a.ann', 'a.docx', 'a'])
 
     if cat.check_table_formats(files):
@@ -28,10 +29,12 @@ def test_check_table_formats():
 
 
 def test_show_formats():
+    """Test that show_formats doesn't crash"""
     cat.show_formats()
 
 
 def test_get_table_formats():
+    """Test get_table_formats"""
     formats = cat.get_table_formats()
     for f in formats:
         name = 'a.'+f
@@ -40,6 +43,7 @@ def test_get_table_formats():
 
 
 def test_update_meta_data():
+    """Test that update_meta_data adds the desired keys"""
     meta = None
     meta = cat.update_meta_data(meta)
     if 'PROGRAM' not in meta:
@@ -52,6 +56,7 @@ def test_update_meta_data():
 
 
 def test_load_save_catalog():
+    """Test that we can load and save various file formats"""
     catalog = [OutputSource()]
     for ext in ['csv', 'vot']:
         fout = 'a.'+ext
@@ -108,6 +113,7 @@ def test_load_save_catalog():
 
 
 def test_load_table_write_table():
+    """Test that we can write and load tables with various file formats"""
     catalog = [OutputSource()]
     for fmt in ['csv', 'vo']:
         fout = 'a.'+fmt
@@ -132,6 +138,7 @@ def test_load_table_write_table():
 
 
 def test_write_comp_isl_simp():
+    """Test the writing of components/islands/simples to csv format files"""
     catalog = [OutputSource(), IslandSource(), SimpleSource()]
     catalog[0].galactic = True
     out = 'a.csv'
@@ -151,6 +158,7 @@ def test_write_comp_isl_simp():
 
 
 def dont_test_load_save_fits_tables():
+    """Test that we can load and save fits tables"""
     # The version of astropy on travis breaks on this!
     # probably a bug that will be fixed by astropy later.
     catalog = [OutputSource()]
@@ -165,6 +173,7 @@ def dont_test_load_save_fits_tables():
 
 
 def test_write_contours_boxes():
+    """Test that we can write contour boxes for our island sources"""
     data = np.zeros((5, 5))
     data[1:4, 2] = 1.
     data[2, 1:4] = 1.
@@ -200,6 +209,7 @@ def test_write_contours_boxes():
 
 
 def test_write_ann():
+    """Test that write_ann *doesn't* do anything"""
     # write regular and simple sources for .ann files
     cat.writeAnn('out.ann', [OutputSource()], fmt='ann')
     if not os.path.exists('out_comp.ann'):
@@ -225,12 +235,14 @@ def test_write_ann():
 
 
 def test_table_to_source_list():
+    """Test that we can convert empty tables to an empty source list"""
     slist = cat.table_to_source_list(None)
     if not (slist == []):
         raise AssertionError()
 
 
 def test_writeFITSTable():
+    """Test that we can write a fits table"""
     tab = table.Table.read('tests/test_files/1904_comp.fits')
     outfile = 'dlme.fits'
     tab.meta ={'test':'test'}
