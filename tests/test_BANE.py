@@ -1,4 +1,7 @@
-#! python
+#! /usr/bin/env python
+"""
+Test BANE.py
+"""
 from __future__ import print_function
 
 from AegeanTools import BANE
@@ -79,7 +82,7 @@ def test_filter_image():
         raise AssertionError()
 
     os.remove(bkg)
-    
+
 
 def test_ND_images():
     """Test that ND images are treated correctly"""

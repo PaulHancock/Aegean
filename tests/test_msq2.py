@@ -1,10 +1,14 @@
 #! /usr/bin/env python
+"""
+Test msq2.py
+"""
+
 from __future__ import print_function
+
+__author__ = 'Paul Hancock'
 
 from AegeanTools.msq2 import MarchingSquares
 import numpy as np
-
-__author__ = 'Paul Hancock'
 
 
 def test_defaults():

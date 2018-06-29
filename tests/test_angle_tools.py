@@ -1,7 +1,11 @@
-#! python
+#! /usr/bin/env python
+"""
+Test the angle_tools module
+"""
+
 from __future__ import print_function
+
 __author__ = 'Paul Hancock'
-__date__ = ''
 
 from AegeanTools import angle_tools as at
 from astropy.coordinates import Angle

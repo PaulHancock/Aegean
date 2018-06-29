@@ -177,7 +177,7 @@ def mask_file(regionfile, infile, outfile, negate=False):
     region = cPickle.load(open(regionfile, 'rb'))
     try:
         wcs = pywcs.WCS(im[0].header, naxis=2)
-    except:
+    except:  # TODO: figure out what error is being thrown
         wcs = pywcs.WCS(str(im[0].header), naxis=2)
 
     if len(im[0].data.shape) > 2:

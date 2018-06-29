@@ -11,11 +11,12 @@ install:
   - tar -xvf pprocess-0.5.3.tar
   - cd pprocess-0.5.3
   - if [[ ${TRAVIS_PYTHON_VERSION} == 3.6 ]]; then 2to3 -w .; fi
-  - pip install -e .
+  - pip install .
   - cd ..
-  - pip install -e .
+  - pip install .
   - pip install coveralls
   - pip install codacy-coverage
+  - pip install h5py
 # command to run tests
 script:
   - coverage run setup.py test

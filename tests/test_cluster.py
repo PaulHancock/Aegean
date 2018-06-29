@@ -1,8 +1,11 @@
-#! python
+#! /usr/bin/env python
+"""
+Test cluster.py
+"""
+
 from __future__ import print_function
 
 __author__ = 'Paul Hancock'
-__date__ = ''
 
 from AegeanTools import cluster
 from AegeanTools.models import SimpleSource
@@ -70,14 +73,14 @@ def test_vectorized():
         x0 = Xr[0]
         # calculate distance of x0 to all of Xr with vectorized operations:
         dx0all = dist(x0, Xr)
-        for i in range(len(Xr)):
-            xi = Xr[i]
+        for i, xi in enumerate(Xr):
             dx0xi = dist(x0, xi)
             # check equivalence between pairs of sources and vectorized
-            assert np.isclose(dx0xi, dx0all[i], atol=0)
+            if not np.isclose(dx0xi, dx0all[i], atol=0):
+                raise AssertionError()
             # check equivalence between SimpleSource and numpy.record
-            assert np.isclose(dx0xi, dist(to_ss(x0), to_ss(xi)), atol=0)
-
+            if not np.isclose(dx0xi, dist(to_ss(x0), to_ss(xi)), atol=0):
+                raise AssertionError()
 
 def test_pairwise_elliptical_binary():
     """Test pairwise_elliptical_binary distance"""

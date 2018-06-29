@@ -210,12 +210,6 @@ def emp_jacobian(pars, x, y):
     --------
     :func:`AegeanTools.fitting.jacobian`
     """
-    """
-    :param pars: lmfit.Model
-    :param x: x-values over which the model is evaluated
-    :param y: y-values over which the model is evaluated
-    :return:
-    """
     eps = 1e-5
     matrix = []
     model = ntwodgaussian_lmfit(pars)(x, y)
@@ -798,35 +792,6 @@ def bias_correct(params, data, acf=None):
     return
 
 
-def CRB_errs(jac, C, B=None):
-    """
-    Calculate minimum errors given by the Cramer-Rao bound
-
-    Parameters
-    ----------
-    jac : 2d-array
-        Jacobian corresponding to the data and model.
-
-    C : 2d-array
-        Data covariance matrix
-
-    B : 2d-array
-        The square root of C. Default = None, which means that it will be calculated from C.
-
-    Returns
-    -------
-    errs : list
-        The uncertainty on each of the parameters.
-    """
-    if B is not None:
-        fim_inv = inv(np.transpose(jac).dot(B).dot(np.transpose(B)).dot(jac))
-    else:
-        fim = np.transpose(jac).dot(inv(C)).dot(jac)
-        fim_inv = inv(fim)
-    errs = np.sqrt(np.diag(fim_inv))
-    return errs
-
-
 def condon_errors(source, theta_n, psf=None):
     """
     Calculate the parameter errors for a fitted source
@@ -1079,7 +1044,7 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
             (a, b), e = np.linalg.eig(mat)
             pa = np.degrees(np.arctan2(*e[0]))
             # transform this ellipse into sky coordinates
-            _, dec, major, minor, pa = wcshelper.pix2sky_ellipse([xo, yo], a, b, pa)
+            _, _, major, minor, pa = wcshelper.pix2sky_ellipse([xo, yo], a, b, pa)
 
             # now determine the radius of the ellipse along the ra/dec directions.
             source.err_ra = major*minor / np.hypot(major*np.sin(np.radians(pa)), minor*np.cos(np.radians(pa)))
@@ -1455,7 +1420,7 @@ if __name__ == "__main__":
         x, y = np.indices((40, 40))
 
         kwargs = {"interpolation": "nearest", 'aspect': 1, 'vmin': -1, 'vmax': 1}
-        vars = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
+        var_names = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
 
         fig, ax = pyplot.subplots(6, 3, sharex=True, sharey=True, figsize=(3, 6))
 
@@ -1468,7 +1433,7 @@ if __name__ == "__main__":
             im2 = Jana[i, :, :]
             im2 /= np.amax(im2)
             row[0].imshow(im1, **kwargs)
-            row[0].set_ylabel(vars[i])
+            row[0].set_ylabel(var_names[i])
             row[1].imshow(im2, **kwargs)
             row[2].imshow(im1-im2, **kwargs)
             clx(row[0])

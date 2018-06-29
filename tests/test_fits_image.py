@@ -1,14 +1,17 @@
-#! python
+#! /usr/bin/env python
+"""
+Test fits_image.py
+"""
+
 from __future__ import print_function
+
+__author__ = 'Paul Hancock'
 
 from AegeanTools import fits_image as fi
 from astropy.io import fits
 import logging
 import numpy as np
 from numpy.testing import assert_raises, assert_array_almost_equal
-
-__author__ = 'Paul Hancock'
-__date__ = ''
 
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
@@ -97,7 +100,7 @@ def test_init():
 
     # should be able to supply a beam directly
     beam = fi.Beam(1, 1, 0)
-    im = fi.FitsImage(hdu, beam=beam, slice=0)
+    im = fi.FitsImage(hdu, beam=beam, cube_index=0)
     if not (im.beam is beam): raise AssertionError()
 
     # raise exception if the beam cannot be determined
@@ -110,7 +113,7 @@ def test_init():
     # this should fail
     assert_raises(Exception, fi.FitsImage, hdu)
     # this should be fine
-    im = fi.FitsImage(hdu, slice=0)
+    im = fi.FitsImage(hdu, cube_index=0)
     if not (im.x == im.y == 3): raise AssertionError()
 
     # can't work with 4d data

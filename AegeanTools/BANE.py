@@ -25,6 +25,9 @@ from time import gmtime, strftime
 # Aegean tools
 from .fits_interp import compress
 
+# global variables for multiprocessing
+ibkg = irms = None
+
 def sigmaclip(arr, lo, hi, reps=3):
     """
     Perform sigma clipping on an array, ignoring non finite values.
@@ -390,7 +393,6 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
 
     img_y, img_x = shape
     # initialise some shared memory
-    alen = shape[0]*shape[1]
     if dobkg:
         global ibkg
         bkg = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))

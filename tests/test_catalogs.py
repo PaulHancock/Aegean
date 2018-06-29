@@ -1,8 +1,10 @@
-#! python
+#! /usr/bin/env python
+"""
+Test catalogues.py
+"""
 from __future__ import print_function
 
 __author__ = 'Paul Hancock'
-__date__ = ''
 
 from AegeanTools import catalogs as cat
 from AegeanTools.models import OutputSource, IslandSource, SimpleSource
@@ -16,6 +18,13 @@ import logging
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
 log.setLevel(logging.INFO)
+
+
+def test_nulls():
+    if cat.nulls(-1) is not None:
+        raise AssertionError("nulls(-1) is broken")
+    if cat.nulls(0) is None:
+        raise AssertionError("nulls(0) is broken")
 
 
 def test_check_table_formats():
@@ -95,6 +104,8 @@ def test_load_save_catalog():
     if not os.path.exists(fout):
         raise AssertionError()
 
+    # again so that we trigger an overwrite
+    cat.save_catalog(fout, catalog, meta=None)
     os.remove(fout)
 
     badfile = open("file.fox", 'w')
@@ -123,7 +134,8 @@ def test_load_table_write_table():
         if not len(tab) == len(catalog):
             raise AssertionError()
 
-        os.remove(fout)
+    # by keeping this out of the loop, we make use of the internal remove function
+    os.remove(fout)
 
     cat.save_catalog('a.csv', catalog, meta=None)
     tab = cat.load_table('a_comp.csv')
@@ -180,6 +192,8 @@ def test_write_contours_boxes():
     ms = MarchingSquares(data)
     src = IslandSource()
     src.contour = ms.perimeter
+    src.max_angular_size_anchors = [1, 2, 3, 4]
+    src.pix_mask = [[0, 0], [1, 1]]
     src.extent = [1, 4, 1, 4]
     catalog = [src]
     cat.writeIslandContours('out.reg', catalog, fmt='reg')
@@ -210,6 +224,18 @@ def test_write_contours_boxes():
 
 def test_write_ann():
     """Test that write_ann *doesn't* do anything"""
+    cat.writeAnn('out.ann', [], fmt='fail')
+    if os.path.exists('out.ann'):
+        raise AssertionError("Shoudn't have written anything")
+
+    src = OutputSource()
+    # remove the parameter a to hit a checkpoint
+    del src.a
+    cat.writeAnn('out.reg', [src], fmt='reg')
+    if not os.path.exists('out_comp.reg'):
+        raise AssertionError()
+    os.remove('out_comp.reg')
+
     # write regular and simple sources for .ann files
     cat.writeAnn('out.ann', [OutputSource()], fmt='ann')
     if not os.path.exists('out_comp.ann'):
@@ -232,6 +258,13 @@ def test_write_ann():
         raise AssertionError()
 
     os.remove('out_simp.reg')
+    cat.writeAnn('out.reg', [IslandSource()], fmt='reg')
+    if not os.path.exists('out_isle.reg'):
+        raise AssertionError()
+
+    os.remove('out_isle.reg')
+    cat.writeAnn('out.ann', [IslandSource()], fmt='ann')
+    cat.writeAnn('out.reg', [IslandSource()], fmt='fail')
 
 
 def test_table_to_source_list():

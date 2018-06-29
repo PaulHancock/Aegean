@@ -26,12 +26,12 @@ from astropy.io import fits
 from astropy.io.votable import from_table, parse_single_table
 from astropy.io.votable import writeto as writetoVO
 
-try:
-    import h5py
-
-    hdf5_supported = True
-except ImportError:
-    hdf5_supported = False
+# try:
+#     import h5py
+#
+#     hdf5_supported = True
+# except ImportError:
+#     hdf5_supported = False
 
 import sqlite3
 
@@ -82,7 +82,6 @@ def show_formats():
         "ann": "Kvis annotation",
         "reg": "DS9 regions file",
         "fits": "FITS Binary Table",
-        "hdf5": "HDF-5 format",
         "csv": "Comma separated values",
         "tab": "tabe separated values",
         "tex": "LaTeX table format",
@@ -110,10 +109,10 @@ def get_table_formats():
     fmts = ['reg', 'fits']
     fmts.extend(['vo', 'vot', 'xml'])
     fmts.extend(['csv', 'tab', 'tex', 'html'])
-    if hdf5_supported:
-        fmts.append('hdf5')
-    else:
-        log.info("HDF5 is not supported by your environment")
+    # if hdf5_supported:
+    #     fmts.append('hdf5')
+    # else:
+    #     log.info("HDF5 is not supported by your environment")
     # assume this is always possible -> though it may not be on some systems
     fmts.extend(['db', 'sqlite'])
     return fmts
@@ -383,8 +382,10 @@ def write_catalog(filename, catalog, fmt=None, meta=None, prefix=None):
         pre = prefix + '_'
 
     def writer(filename, catalog, fmt=None):
-        # construct a dict of the data
-        # this method preserves the data types in the VOTable
+        """
+        construct a dict of the data
+        this method preserves the data types in the VOTable
+        """
         tab_dict = {}
         name_list = []
         for name in catalog[0].names:
@@ -624,12 +625,6 @@ def writeAnn(filename, catalog, fmt):
     See Also
     --------
     AegeanTools.catalogs.writeIslandContours
-    """
-    """
-    Input:
-        filename - file to write to
-        catalog - a list of OutputSource or SimpleSource
-        fmt - [.ann|.reg] format to use
     """
     if fmt not in ['reg', 'ann']:
         log.warning("Format not supported for island boxes{0}".format(fmt))
