@@ -383,8 +383,10 @@ def write_catalog(filename, catalog, fmt=None, meta=None, prefix=None):
         pre = prefix + '_'
 
     def writer(filename, catalog, fmt=None):
-        # construct a dict of the data
-        # this method preserves the data types in the VOTable
+        """
+        construct a dict of the data
+        this method preserves the data types in the VOTable
+        """
         tab_dict = {}
         name_list = []
         for name in catalog[0].names:
