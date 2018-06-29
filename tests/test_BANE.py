@@ -82,7 +82,7 @@ def test_filter_image():
         raise AssertionError()
 
     os.remove(bkg)
-    
+
 
 def test_ND_images():
     """Test that ND images are treated correctly"""
