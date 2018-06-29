@@ -77,10 +77,11 @@ def test_vectorized():
             xi = Xr[i]
             dx0xi = dist(x0, xi)
             # check equivalence between pairs of sources and vectorized
-            assert np.isclose(dx0xi, dx0all[i], atol=0)
+            if not np.isclose(dx0xi, dx0all[i], atol=0):
+                raise AssertionError()
             # check equivalence between SimpleSource and numpy.record
-            assert np.isclose(dx0xi, dist(to_ss(x0), to_ss(xi)), atol=0)
-
+            if not np.isclose(dx0xi, dist(to_ss(x0), to_ss(xi)), atol=0):
+                raise AssertionError()
 
 def test_pairwise_elliptical_binary():
     """Test pairwise_elliptical_binary distance"""
