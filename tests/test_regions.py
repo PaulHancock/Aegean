@@ -134,7 +134,7 @@ def test_pickle():
     region.add_circles(np.radians(ra), np.radians(dec), np.radians(radius))
     try:
         import cPickle as pickle
-    except:
+    except ImportError:
         import pickle
     pickle.dump(region, open('out_temp.mim', 'wb'))
     region2 = pickle.load(open('out_temp.mim','rb'))
