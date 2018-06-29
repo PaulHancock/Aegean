@@ -210,12 +210,6 @@ def emp_jacobian(pars, x, y):
     --------
     :func:`AegeanTools.fitting.jacobian`
     """
-    """
-    :param pars: lmfit.Model
-    :param x: x-values over which the model is evaluated
-    :param y: y-values over which the model is evaluated
-    :return:
-    """
     eps = 1e-5
     matrix = []
     model = ntwodgaussian_lmfit(pars)(x, y)
@@ -1079,7 +1073,7 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
             (a, b), e = np.linalg.eig(mat)
             pa = np.degrees(np.arctan2(*e[0]))
             # transform this ellipse into sky coordinates
-            _, dec, major, minor, pa = wcshelper.pix2sky_ellipse([xo, yo], a, b, pa)
+            _, _, major, minor, pa = wcshelper.pix2sky_ellipse([xo, yo], a, b, pa)
 
             # now determine the radius of the ellipse along the ra/dec directions.
             source.err_ra = major*minor / np.hypot(major*np.sin(np.radians(pa)), minor*np.cos(np.radians(pa)))
