@@ -627,12 +627,6 @@ def writeAnn(filename, catalog, fmt):
     --------
     AegeanTools.catalogs.writeIslandContours
     """
-    """
-    Input:
-        filename - file to write to
-        catalog - a list of OutputSource or SimpleSource
-        fmt - [.ann|.reg] format to use
-    """
     if fmt not in ['reg', 'ann']:
         log.warning("Format not supported for island boxes{0}".format(fmt))
         return  # fmt not supported
