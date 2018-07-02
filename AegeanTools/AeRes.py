@@ -75,7 +75,7 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
         if not np.all(np.isfinite([ymin, ymax, xmin, xmax])):
             continue
 
-        if logging.getLogger().isEnabledFor(logging.DEBUG):
+        if logging.getLogger().isEnabledFor(logging.DEBUG):  # pragma: no cover
             logging.debug("Source ({0},{1})".format(src.island, src.source))
             logging.debug(" xo, yo: {0} {1}".format(xo, yo))
             logging.debug(" sx, sy: {0} {1}".format(sx, sy))
