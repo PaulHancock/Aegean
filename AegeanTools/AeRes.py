@@ -1,8 +1,16 @@
-import logging
+#! /usr/bin/env python
+"""
+Aegean Residual (AeRes) has the following capability:
+- convert a catalogue into an image model
+- subtract image model from image
+- write model and residual files
+"""
 
+__author__ = "Paul Hancock"
+
+import logging
 import numpy as np
 from astropy.io import fits
-
 from AegeanTools import catalogs, fitting, wcs_helpers
 
 FWHM2CC = 1 / (2 * np.sqrt(2 * np.log(2)))
