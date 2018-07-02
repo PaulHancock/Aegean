@@ -1,5 +1,12 @@
+2018-07-02
+==========
+General
+- Drop requirement for h5py
+- Drop support for h5py since it doesn't work
+-
+
 2018-06-28
-============
+==========
 BANE
  - multiple changes that allow BANE to be run in memory constrained enviornments
  - force image segmentation to always be in horizontal stripes
