@@ -3,7 +3,12 @@
 General
 - Drop requirement for h5py
 - Drop support for h5py since it doesn't work
--
+
+AeRes
+- refactored functionality into `AegeanTools/AeRes.py`
+- help text is now printed `AeRes` is run without arguments
+- fix a bug that caused by comparing `map` to a `float` in python3 (h/t Tom F.)
+
 
 2018-06-28
 ==========
