@@ -46,17 +46,18 @@ if __name__ == "__main__":
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is AeRes {0}-({1})".format(__version__, __date__))
-    if len(args) < 1:
-        parser.print_help()
-        sys.exit(0)
+
     if options.catalog is None:
         logging.error("input catalog is required")
+        parser.print_help()
         sys.exit(1)
     if options.fitsfile is None:
         logging.error("input fits file is required")
+        parser.print_help()
         sys.exit(1)
     if options.rfile is None:
         logging.error("output residual filename is required")
+        parser.print_help()
         sys.exit(1)
 
     logging.info("Using {0} and {1} to make {2}".format(options.fitsfile, options.catalog, options.rfile))
