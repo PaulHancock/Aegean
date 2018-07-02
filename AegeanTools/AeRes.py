@@ -86,8 +86,8 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
 
         # positions for which we want to make the model
         x, y = np.mgrid[xmin:xmax, ymin:ymax]
-        x = map(int, x.ravel())
-        y = map(int, y.ravel())
+        x = list(map(int, x.ravel()))
+        y = list(map(int, y.ravel()))
 
         # TODO: understand why xo/yo -1 is needed
         model = fitting.elliptical_gaussian(x, y, src.peak_flux, xo-1, yo-1, sx*FWHM2CC, sy*FWHM2CC, theta)
