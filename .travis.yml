@@ -16,7 +16,6 @@ install:
   - pip install .
   - pip install coveralls
   - pip install codacy-coverage
-  - pip install h5py
 # command to run tests
 script:
   - coverage run setup.py test
