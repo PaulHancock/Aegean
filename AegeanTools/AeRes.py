@@ -135,10 +135,10 @@ def make_residual(fitsfile, catalog, rfile, mfile=None, add=False, mask=False, f
         residual = data - model
 
     hdulist[0].data = residual
-    hdulist.writeto(rfile, clobber=True)
+    hdulist.writeto(rfile, overwrite=True)
     logging.info("wrote residual to {0}".format(rfile))
     if mfile is not None:
         hdulist[0].data = model
-        hdulist.writeto(mfile, clobber=True)
+        hdulist.writeto(mfile, overwrite=True)
         logging.info("wrote model to {0}".format(mfile))
     return
