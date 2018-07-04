@@ -237,7 +237,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     with irms.get_lock():
         logging.debug("Writing rms to sharemem")
         for i, row in enumerate(interpolated_rms):
-            irms[i] = np.ctypeslib.as_ctypes(row)
+            irms[i+xmin] = np.ctypeslib.as_ctypes(row)
     logging.debug(" .. done writing rms")
 
     if dobkg:
@@ -252,7 +252,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         with ibkg.get_lock():
             logging.debug("Writing bkg to sharemem")
             for i, row in enumerate(interpolated_bkg):
-                ibkg[i] = np.ctypeslib.as_ctypes(row)
+                ibkg[i+xmin] = np.ctypeslib.as_ctypes(row)
         logging.debug(" .. done writing bkg")
     logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin, xmax, ymin, ymax,
                                                            strftime("%Y-%m-%d %H:%M:%S", gmtime())))
