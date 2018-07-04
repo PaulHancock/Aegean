@@ -3,12 +3,9 @@ from __future__ import print_function
 
 """
 A program to provide a command line interface to the AegeanTools.fits_interp module
-
-@author: Paul Hancock
-
-Created:
-3rd Feb 2015
 """
+
+__author__ = "Paul Hancock"
 
 import logging
 import argparse
