@@ -82,7 +82,7 @@ if __name__ == "__main__":
     group1.add_argument('--lat', dest='lat', type=float, default=None,
                         help='The latitude of the telescope used to collect data.')
     group1.add_argument('--slice', dest='slice', type=int, default=None,
-                        help='If the input data is a cube, then this slice will determine which slice will be processed by aegean')
+                        help='If the input data is a cube, then this slice will determine the array index of the image which will be processed by aegean')
 
 
     # Input
@@ -362,7 +362,7 @@ if __name__ == "__main__":
                                  catpsf=options.catpsf,
                                  stage=options.priorized, ratio=options.ratio, outerclip=options.outerclip,
                                  cores=options.cores, doregroup=options.regroup, docov=options.docov,
-                                 slice=options.slice)
+                                 cube_index=options.slice)
 
     if options.find:
         log.info("Finding sources.")
@@ -375,7 +375,7 @@ if __name__ == "__main__":
                                          doislandflux=options.doislandflux,
                                          nonegative=not options.negative, nopositive=options.nopositive,
                                          mask=options.region, lat=lat, imgpsf=options.imgpsf, blank=options.blank,
-                                         docov=options.docov, slice=options.slice)
+                                         docov=options.docov, cube_index=options.slice)
         if options.blank:
             outname = basename+'_blank.fits'
             sf.save_image(outname)

@@ -1,5 +1,11 @@
 #! /usr/bin/env python
+"""
+Describe sky areas as a collection of HEALPix pixels
+"""
+
 from __future__ import print_function
+
+__author__ = "Paul Hancock"
 
 import os
 import datetime
@@ -9,7 +15,6 @@ from astropy.coordinates import SkyCoord
 import astropy.units as u
 from astropy.io import fits
 
-__author__ = "Paul Hancock"
 
 class Region(object):
     """

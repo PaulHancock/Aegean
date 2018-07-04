@@ -1,13 +1,16 @@
-#! python
+#! /usr/bin/env python
+"""
+Test models.py
+"""
 
 __author__ = 'Paul Hancock'
-__date__ = ''
 
 from AegeanTools import models
 import numpy as np
 
 
 def test_simple_source():
+    """Make a new source without failing"""
     # make a new source without failing
     ss = models.SimpleSource()
     ss.ra = np.float32(12)
@@ -43,14 +46,17 @@ def test_simple_source():
 
 
 def test_global_fitting_data():
+    """Test that GlobalFittingData doesn't crash"""
     models.GlobalFittingData()
 
 
 def test_island_fitting_data():
+    """Test that IslandFittingData doesn't crash"""
     models.IslandFittingData()
 
 
 def test_classify_catalogue():
+    """Test classify_catalogue"""
     ss = []
     isl = []
     out = []

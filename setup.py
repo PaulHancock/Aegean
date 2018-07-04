@@ -1,3 +1,7 @@
+#! /usr/bin/env python
+"""
+Setup for AegeanTools
+"""
 import os
 import sys
 from setuptools import setup
@@ -9,10 +13,12 @@ from setuptools import setup
 
 
 def read(fname):
+    """Read a file"""
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 
 def get_version():
+    """Get the version number of AegeanTools"""
     import AegeanTools
     return AegeanTools.__version__
 

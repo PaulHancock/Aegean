@@ -1,18 +1,24 @@
-#! python
+#! /usr/bin/env python
+"""
+Test fits_interp.py
+"""
+
 __author__ = 'Paul Hancock'
-__date__ = ''
+
 from AegeanTools import fits_interp
 from astropy.io import fits
 import os
 
 
 def test_load_file_or_hdu():
+    """Test that we can 'open' either a file or HDU"""
     fname = 'tests/test_files/1904-66_AIT.fits'
     hdulist = fits.open(fname)
     if not (fits_interp.load_file_or_hdu(hdulist) is hdulist): raise AssertionError()
 
 
 def test_compress():
+    """Test the compression functionality"""
     # return None when the factor is not a positive integer
     if not (fits_interp.compress(None, factor=-1) is None): raise AssertionError()
     if not (fits_interp.compress(None, factor=0.3) is None): raise AssertionError()
@@ -39,6 +45,7 @@ def test_compress():
 
 
 def test_expand():
+    """Test the expand function"""
     fname = 'tests/test_files/1904-66_AIT.fits'
     hdulist = fits.open(fname)
     compressed = fits_interp.compress(hdulist, factor=10)
@@ -63,6 +70,7 @@ def test_expand():
 
 
 def test_fits_interp_compress_then_expand():
+    """Test that we can interp/compress files"""
     # test compression and expansion
     fits_interp.compress("tests/test_files/1904-66_AIT.fits", factor=7, outfile='tests/temp/test.fits')
     fits_interp.expand('tests/temp/test.fits', outfile='tests/temp/test2.fits', method='linear')

@@ -1,4 +1,7 @@
-#! python
+#! /usr/bin/env python
+"""
+Test BANE.py
+"""
 from __future__ import print_function
 
 from AegeanTools import BANE
@@ -14,6 +17,7 @@ log = logging.getLogger("Aegean")
 
 
 def test_sigmaclip():
+    """Test the sigmaclipping"""
     # normal usage case
     data = np.random.random(100)
     data[13] = np.nan
@@ -30,6 +34,7 @@ def test_sigmaclip():
 
 
 def test_optimum_sections():
+    """Test optimum_sections gives correct results"""
     # typical case
     if not BANE.optimum_sections(8, (64, 64)) == (2, 4):
         raise AssertionError()
@@ -40,6 +45,7 @@ def test_optimum_sections():
 
 
 def test_mask_data():
+    """Test the masking of images"""
     data = np.ones((10, 10), dtype=np.float32)
     mask = data.copy()
     mask[3:5, 0:2] = np.nan
@@ -50,6 +56,7 @@ def test_mask_data():
 
 
 def test_filter_image():
+    """Test filter image"""
     # data = np.random.random((30, 30), dtype=np.float32)
     fname = 'tests/test_files/1904-66_SIN.fits'
     outbase = 'dlme'
@@ -75,9 +82,10 @@ def test_filter_image():
         raise AssertionError()
 
     os.remove(bkg)
-    
+
 
 def test_ND_images():
+    """Test that ND images are treated correctly"""
     fbase = 'tests/test_files/small_{0}D.fits'
     outbase = 'dlme'
     rms = outbase + '_rms.fits'
