@@ -167,36 +167,35 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     xmin -= rmin
     xmax -= rmin
 
-    def locations(step_size, xmin, xmax, ymin, ymax):
+    def locations(step, _r_min, _r_max, _c_min, _c_max):
         """
-        Generator function to iterate over a grid of x,y coords
+        Generator function to iterate over a grid of r,c coords
         operates only within the given bounds
         Returns:
-        x, y
+        r, c
         """
 
-        xvals = list(range(xmin, xmax, step_size[0]))
-        if xvals[-1] != xmax:
-            xvals.append(xmax)
-        yvals = list(range(ymin, ymax, step_size[1]))
-        if yvals[-1] != ymax:
-            yvals.append(ymax)
+        rvals = list(range(_r_min, _r_max, step[0]))
+        if rvals[-1] != _r_max:
+            rvals.append(_r_max)
+        cvals = list(range(_c_min, _c_max, step[1]))
+        if cvals[-1] != _c_max:
+            cvals.append(_c_max)
         # initial data
-        for y in yvals:
-            for x in xvals:
-                yield x, y
+        for c in cvals:
+            for r in rvals:
+                yield r, c
 
-    def box(x, y):
+    def box(r, c):
         """
-        calculate the boundaries of the box centered at x,y
+        calculate the boundaries of the box centered at r,c
         with size = box_size
         """
-        # TODO: check that / should be //
-        x_min = int(max(0, x-box_size[0]/2))
-        x_max = int(min(data.shape[0]-1, x+box_size[0]/2))
-        y_min = int(max(0, y-box_size[1]/2))
-        y_max = int(min(data.shape[1]-1, y+box_size[1]/2))
-        return x_min, x_max, y_min, y_max
+        r_min = max(0, r - box_size[0] // 2)
+        r_max = min(data.shape[0] - 1, r + box_size[0] // 2)
+        c_min = max(0, c - box_size[1] // 2)
+        c_max = min(data.shape[1] - 1, c + box_size[1] // 2)
+        return r_min, r_max, c_min, c_max
 
     bkg_points = []
     bkg_values = []
