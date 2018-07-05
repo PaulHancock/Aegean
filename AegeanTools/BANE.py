@@ -111,8 +111,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     filename : string
         Fits file to open
 
-    region : (float, float, float, float)
-        Region within the fits file that is to be processed. (ymin, ymax, xmin, xmax).
+    region : list
+        Region within the fits file that is to be processed. (row_min, row_max).
 
     step_size : (int, int)
         The filtering step size
@@ -131,41 +131,29 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     None
     """
 
-    # Caveat emptor: The code that follows is very difficult to read.
-    # xmax is not x_max, and x,y actually should be y,x
-    # TODO: fix the code below so that the above comment can be removed
+    ymin, ymax = region
+    logging.debug('rows {0}-{1} starting at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
-    ymin, ymax, xmin, xmax = region
-    logging.debug('{0}-{1},{2}-{3} starting at {4}'.format(xmin, xmax, ymin, ymax,
-                                                           strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-
-    cmin = max(0, ymin - box_size[1]//2)
-    cmax = min(shape[1], ymax + box_size[1]//2)
-    rmin = max(0, xmin - box_size[0]//2)
-    rmax = min(shape[0], xmax + box_size[0]//2)
+    # cut out the region of interest plus 1/2 the box size, but clip to the image size
+    data_row_min = max(0, ymin - box_size[0]//2)
+    data_row_max = min(shape[0], ymax + box_size[0]//2)
 
     # Figure out how many axes are in the datafile
     NAXIS = fits.getheader(filename)["NAXIS"]
-    # It seems that I cannot memmap the same file multiple times without errors
+
     with fits.open(filename, memmap=True) as a:
         if NAXIS == 2:
-            data = a[0].section[rmin:rmax, cmin:cmax]
+            data = a[0].section[data_row_min:data_row_max, 0:shape[1]]
         elif NAXIS == 3:
-            data = a[0].section[0, rmin:rmax, cmin:cmax]
+            data = a[0].section[0, data_row_min:data_row_max, 0:shape[1]]
         elif NAXIS == 4:
-            data = a[0].section[0, 0, rmin:rmax, cmin:cmax]
+            data = a[0].section[0, 0, data_row_min:data_row_max, 0:shape[1]]
         else:
             logging.error("Too many NAXIS for me {0}".format(NAXIS))
             logging.error("fix your file to be more sane")
             raise Exception("Too many NAXIS")
 
     logging.debug('data size is {0}'.format(data.shape))
-    # x/y min/max should refer to indices into data
-    # this is the region over which we want to operate
-    ymin -= cmin
-    ymax -= cmin
-    xmin -= rmin
-    xmax -= rmin
 
     def locations(step, _r_min, _r_max, _c_min, _c_max):
         """
@@ -197,14 +185,15 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         c_max = min(data.shape[1] - 1, c + box_size[1] // 2)
         return r_min, r_max, c_min, c_max
 
+    # lists that hold the calculated values and array coordinates
     bkg_points = []
     bkg_values = []
     rms_points = []
     rms_values = []
 
-    for x, y in locations(step_size, xmin, xmax, ymin, ymax):
-        x_min, x_max, y_min, y_max = box(x, y)
-        new = data[x_min:x_max, y_min:y_max]
+    for row, col in locations(step_size, ymin-data_row_min, ymax-data_row_min, 0, shape[1]):
+        r_min, r_max, c_min, c_max = box(row, col)
+        new = data[r_min:r_max, c_min:c_max]
         new = np.ravel(new)
         new = sigmaclip(new, 3, 3)
         # If we are left with (or started with) no data, then just move on
@@ -213,14 +202,14 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
 
         if dobkg:
             bkg = np.median(new)
-            bkg_points.append((x+rmin, y+cmin))  # these coords need to be indices into the larger array
+            bkg_points.append((row + data_row_min, col))  # these coords need to be indices into the larger array
             bkg_values.append(bkg)
         rms = np.std(new)
-        rms_points.append((x+rmin, y+cmin))
+        rms_points.append((row + data_row_min, col))
         rms_values.append(rms)
 
-    ymin, ymax, xmin, xmax = region
-    gx, gy = np.mgrid[xmin:xmax, ymin:ymax]
+    # indices of the shape we want to write to (not the shape of data)
+    gx, gy = np.mgrid[ymin:ymax, 0:shape[1]]
     # If the bkg/rms calculation above didn't yield any points, then our interpolated values are all nans
     if len(rms_points) > 1:
         logging.debug("Interpolating rms")
@@ -232,11 +221,10 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         logging.debug("rms is all nans")
         interpolated_rms = np.empty(gx.shape, dtype=np.float32)*np.nan
 
-    # [xmin, ymin]
     with irms.get_lock():
         logging.debug("Writing rms to sharemem")
         for i, row in enumerate(interpolated_rms):
-            irms[i+xmin] = np.ctypeslib.as_ctypes(row)
+            irms[i + ymin] = np.ctypeslib.as_ctypes(row)
     logging.debug(" .. done writing rms")
 
     if dobkg:
@@ -251,10 +239,9 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         with ibkg.get_lock():
             logging.debug("Writing bkg to sharemem")
             for i, row in enumerate(interpolated_bkg):
-                ibkg[i+xmin] = np.ctypeslib.as_ctypes(row)
+                ibkg[i + ymin] = np.ctypeslib.as_ctypes(row)
         logging.debug(" .. done writing bkg")
-    logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin, xmax, ymin, ymax,
-                                                           strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    logging.debug('rows {0}-{1} finished at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     del bkg_points, bkg_values
     del rms_points, rms_values
 
@@ -366,7 +353,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
 
     args = []
     for ymin, ymax in zip(ymins, ymaxs):
-        region = (0, img_x, ymin, ymax)
+        region = (ymin, ymax)
         args.append((filename, region, step_size, box_size, shape, dobkg))
 
     # start a new process for each task, hopefully to reduce residual memory use
