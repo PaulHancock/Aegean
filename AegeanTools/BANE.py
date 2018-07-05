@@ -503,9 +503,10 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
     rms_out = '_'.join([os.path.expanduser(out_base), 'rms.fits'])
 
 
-    # load the file since we are now going to fiddle with it
-    header = fits.getheader(im_name)
+    # add a comment to the fits header
     header['HISTORY'] = 'BANE {0}-({1})'.format(__version__, __date__)
+
+    # compress
     if compressed:
         hdu = fits.PrimaryHDU(bkg)
         hdu.header = copy.deepcopy(header)
@@ -515,6 +516,8 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         hdulist[0].data = rms
         compress(hdulist, step_size[0], rms_out)
         return
+
+    # mask
     if mask:
         ref = fits.getdata(im_name)
         mask_img(bkg, ref)
