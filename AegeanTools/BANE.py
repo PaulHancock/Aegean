@@ -487,12 +487,11 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         # Answer: The interpolation step peaks at about 5x the normal value.
         tempfile = NamedTemporaryFile(delete=False)
         data = fits.getdata(im_name) - bkg
-        header = fits.getheader(im_name)
         # write 32bit floats to reduce memory overhead
         write_fits(np.array(data, dtype=np.float32), header, tempfile)
         tempfile.close()
         temp_name = tempfile.name
-        del data, header, tempfile, rms
+        del data, tempfile, rms
         logging.info("running second pass to get a better rms")
         junk, rms = filter_mc_sharemem(temp_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, dobkg=False, nslice=nslice)
         del junk
