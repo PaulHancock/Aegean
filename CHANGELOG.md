@@ -2,6 +2,7 @@
 ==========
 Aegean
 - remove h5py comments from the `--version` output
+- fix bug with lmfit version 0.9.11 (issue #70) (h/t James L.)
 
 BANE
 - fix a bug that causes only the first stripe to be written to (repeatedly)
