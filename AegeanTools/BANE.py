@@ -6,8 +6,8 @@ The function filter_image should be imported from elsewhere and run as is.
 """
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.6.0'
-__date__ = '2018-06-28'
+__version__ = 'v1.6.5'
+__date__ = '2018-07-05'
 
 # standard imports
 from astropy.io import fits
@@ -111,8 +111,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     filename : string
         Fits file to open
 
-    region : (float, float, float, float)
-        Region within the fits file that is to be processed. (ymin, ymax, xmin, xmax).
+    region : list
+        Region within the fits file that is to be processed. (row_min, row_max).
 
     step_size : (int, int)
         The filtering step size
@@ -131,81 +131,69 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     None
     """
 
-    # Caveat emptor: The code that follows is very difficult to read.
-    # xmax is not x_max, and x,y actually should be y,x
-    # TODO: fix the code below so that the above comment can be removed
+    ymin, ymax = region
+    logging.debug('rows {0}-{1} starting at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
-    ymin, ymax, xmin, xmax = region
-    logging.debug('{0}-{1},{2}-{3} starting at {4}'.format(xmin, xmax, ymin, ymax,
-                                                           strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-
-    cmin = max(0, ymin - box_size[1]//2)
-    cmax = min(shape[1], ymax + box_size[1]//2)
-    rmin = max(0, xmin - box_size[0]//2)
-    rmax = min(shape[0], xmax + box_size[0]//2)
+    # cut out the region of interest plus 1/2 the box size, but clip to the image size
+    data_row_min = max(0, ymin - box_size[0]//2)
+    data_row_max = min(shape[0], ymax + box_size[0]//2)
 
     # Figure out how many axes are in the datafile
     NAXIS = fits.getheader(filename)["NAXIS"]
-    # It seems that I cannot memmap the same file multiple times without errors
+
     with fits.open(filename, memmap=True) as a:
         if NAXIS == 2:
-            data = a[0].section[rmin:rmax, cmin:cmax]
+            data = a[0].section[data_row_min:data_row_max, 0:shape[1]]
         elif NAXIS == 3:
-            data = a[0].section[0, rmin:rmax, cmin:cmax]
+            data = a[0].section[0, data_row_min:data_row_max, 0:shape[1]]
         elif NAXIS == 4:
-            data = a[0].section[0, 0, rmin:rmax, cmin:cmax]
+            data = a[0].section[0, 0, data_row_min:data_row_max, 0:shape[1]]
         else:
             logging.error("Too many NAXIS for me {0}".format(NAXIS))
             logging.error("fix your file to be more sane")
             raise Exception("Too many NAXIS")
 
     logging.debug('data size is {0}'.format(data.shape))
-    # x/y min/max should refer to indices into data
-    # this is the region over which we want to operate
-    ymin -= cmin
-    ymax -= cmin
-    xmin -= rmin
-    xmax -= rmin
 
-    def locations(step_size, xmin, xmax, ymin, ymax):
+    def locations(step, _r_min, _r_max, _c_min, _c_max):
         """
-        Generator function to iterate over a grid of x,y coords
+        Generator function to iterate over a grid of r,c coords
         operates only within the given bounds
         Returns:
-        x, y
+        r, c
         """
 
-        xvals = list(range(xmin, xmax, step_size[0]))
-        if xvals[-1] != xmax:
-            xvals.append(xmax)
-        yvals = list(range(ymin, ymax, step_size[1]))
-        if yvals[-1] != ymax:
-            yvals.append(ymax)
+        rvals = list(range(_r_min, _r_max, step[0]))
+        if rvals[-1] != _r_max:
+            rvals.append(_r_max)
+        cvals = list(range(_c_min, _c_max, step[1]))
+        if cvals[-1] != _c_max:
+            cvals.append(_c_max)
         # initial data
-        for y in yvals:
-            for x in xvals:
-                yield x, y
+        for c in cvals:
+            for r in rvals:
+                yield r, c
 
-    def box(x, y):
+    def box(r, c):
         """
-        calculate the boundaries of the box centered at x,y
+        calculate the boundaries of the box centered at r,c
         with size = box_size
         """
-        # TODO: check that / should be //
-        x_min = int(max(0, x-box_size[0]/2))
-        x_max = int(min(data.shape[0]-1, x+box_size[0]/2))
-        y_min = int(max(0, y-box_size[1]/2))
-        y_max = int(min(data.shape[1]-1, y+box_size[1]/2))
-        return x_min, x_max, y_min, y_max
+        r_min = max(0, r - box_size[0] // 2)
+        r_max = min(data.shape[0] - 1, r + box_size[0] // 2)
+        c_min = max(0, c - box_size[1] // 2)
+        c_max = min(data.shape[1] - 1, c + box_size[1] // 2)
+        return r_min, r_max, c_min, c_max
 
+    # lists that hold the calculated values and array coordinates
     bkg_points = []
     bkg_values = []
     rms_points = []
     rms_values = []
 
-    for x, y in locations(step_size, xmin, xmax, ymin, ymax):
-        x_min, x_max, y_min, y_max = box(x, y)
-        new = data[x_min:x_max, y_min:y_max]
+    for row, col in locations(step_size, ymin-data_row_min, ymax-data_row_min, 0, shape[1]):
+        r_min, r_max, c_min, c_max = box(row, col)
+        new = data[r_min:r_max, c_min:c_max]
         new = np.ravel(new)
         new = sigmaclip(new, 3, 3)
         # If we are left with (or started with) no data, then just move on
@@ -214,14 +202,14 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
 
         if dobkg:
             bkg = np.median(new)
-            bkg_points.append((x+rmin, y+cmin))  # these coords need to be indices into the larger array
+            bkg_points.append((row + data_row_min, col))  # these coords need to be indices into the larger array
             bkg_values.append(bkg)
         rms = np.std(new)
-        rms_points.append((x+rmin, y+cmin))
+        rms_points.append((row + data_row_min, col))
         rms_values.append(rms)
 
-    ymin, ymax, xmin, xmax = region
-    gx, gy = np.mgrid[xmin:xmax, ymin:ymax]
+    # indices of the shape we want to write to (not the shape of data)
+    gx, gy = np.mgrid[ymin:ymax, 0:shape[1]]
     # If the bkg/rms calculation above didn't yield any points, then our interpolated values are all nans
     if len(rms_points) > 1:
         logging.debug("Interpolating rms")
@@ -233,11 +221,10 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         logging.debug("rms is all nans")
         interpolated_rms = np.empty(gx.shape, dtype=np.float32)*np.nan
 
-    # [xmin, ymin]
     with irms.get_lock():
         logging.debug("Writing rms to sharemem")
         for i, row in enumerate(interpolated_rms):
-            irms[i] = np.ctypeslib.as_ctypes(row)
+            irms[i + ymin] = np.ctypeslib.as_ctypes(row)
     logging.debug(" .. done writing rms")
 
     if dobkg:
@@ -252,75 +239,13 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         with ibkg.get_lock():
             logging.debug("Writing bkg to sharemem")
             for i, row in enumerate(interpolated_bkg):
-                ibkg[i] = np.ctypeslib.as_ctypes(row)
+                ibkg[i + ymin] = np.ctypeslib.as_ctypes(row)
         logging.debug(" .. done writing bkg")
-    logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin, xmax, ymin, ymax,
-                                                           strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    logging.debug('rows {0}-{1} finished at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     del bkg_points, bkg_values
     del rms_points, rms_values
 
     return
-
-
-def gen_factors(m, permute=True):
-    """
-    Generate a list of integer factors of the the input m.
-
-    Parameters
-    ----------
-    m : int
-        The number to factorise
-
-    permute : bool
-        If true then yield both x,y and y,x if x*y=m. Otherwise only yield one of the two. Default = True.
-
-    Yields
-    ------
-    x, y : int
-        Two integers x and y such that x*y=m
-    """
-    # convert to int if people have been naughty
-    n = int(abs(m))
-    # brute force the factors, one of which is always less than sqrt(n)
-    for i in range(1, int(n**0.5+1)):
-        if n % i == 0:
-            yield i, n/i
-            # yield the reverse pair if it is unique
-            if i != n/i and permute:
-                yield n/i, i
-
-
-def optimum_sections(cores, data_shape):
-    """
-    Choose the best sectioning scheme based on the number of corse available and the shape of the data.
-    "Best" here means minimum perimeter.
-
-    Parameters
-    ----------
-    cores : int
-        The number of corse which are going to be doing the processing.
-    data_shape : tuple
-        Shape of the data as (x,y).
-
-    Returns
-    -------
-    nx, ny : int
-        The number of divisions in each dimension.
-    """
-    if cores == 1:
-        return (1, 1)
-    if cores % 1 == 1:
-        cores -= 1
-    x, y = data_shape
-    min_overlap = np.inf
-    best = (1, 1)
-    for (mx, my) in gen_factors(cores):
-        overlap = x*(my-1) + y*(mx-1)
-        if overlap < min_overlap:
-            best = (mx, my)
-            min_overlap = overlap
-    logging.debug("Sectioning chosen to be {0[0]}x{0[1]} for a score of {1}".format(best, min_overlap))
-    return best
 
 
 def mask_img(data, mask_data):
@@ -407,26 +332,15 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
     logging.info("using {0} cores".format(cores))
     logging.info("using {0} stripes".format(nslice))
     # Use a striped sectioning scheme
-    nx = 1
     ny = nslice
 
     # box widths should be multiples of the step_size, and not zero
-    width_x = int(max(img_x/nx/step_size[0], 1) * step_size[0])
     width_y = int(max(img_y/ny/step_size[1], 1) * step_size[1])
 
-    xstart = width_x
     ystart = width_y
-    xend = img_x - img_x % width_x  # the end point of the last "full" box
     yend = img_y - img_y % width_y
 
     # locations of the box edges
-    xmins = [0]
-    xmins.extend(list(range(xstart, xend, width_x)))
-
-    xmaxs = [xstart]
-    xmaxs.extend(list(range(xstart+width_x, xend+1, width_x)))
-    xmaxs[-1] = img_x
-
     ymins = [0]
     ymins.extend(list(range(ystart, yend, width_y)))
 
@@ -434,16 +348,13 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
     ymaxs.extend(list(range(ystart+width_y, yend+1, width_y)))
     ymaxs[-1] = img_y
 
-    logging.debug("xmins {0}".format(xmins))
-    logging.debug("xmaxs {0}".format(xmaxs))
     logging.debug("ymins {0}".format(ymins))
     logging.debug("ymaxs {0}".format(ymaxs))
 
     args = []
-    for xmin, xmax in zip(xmins, xmaxs):
-        for ymin, ymax in zip(ymins, ymaxs):
-            region = [xmin, xmax, ymin, ymax]
-            args.append((filename, region, step_size, box_size, shape, dobkg))
+    for ymin, ymax in zip(ymins, ymaxs):
+        region = (ymin, ymax)
+        args.append((filename, region, step_size, box_size, shape, dobkg))
 
     # start a new process for each task, hopefully to reduce residual memory use
     pool = multiprocessing.Pool(processes=cores, maxtasksperchild=1)
@@ -548,12 +459,11 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         # Answer: The interpolation step peaks at about 5x the normal value.
         tempfile = NamedTemporaryFile(delete=False)
         data = fits.getdata(im_name) - bkg
-        header = fits.getheader(im_name)
         # write 32bit floats to reduce memory overhead
         write_fits(np.array(data, dtype=np.float32), header, tempfile)
         tempfile.close()
         temp_name = tempfile.name
-        del data, header, tempfile, rms
+        del data, tempfile, rms
         logging.info("running second pass to get a better rms")
         junk, rms = filter_mc_sharemem(temp_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, dobkg=False, nslice=nslice)
         del junk
@@ -564,9 +474,10 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
     rms_out = '_'.join([os.path.expanduser(out_base), 'rms.fits'])
 
 
-    # load the file since we are now going to fiddle with it
-    header = fits.getheader(im_name)
+    # add a comment to the fits header
     header['HISTORY'] = 'BANE {0}-({1})'.format(__version__, __date__)
+
+    # compress
     if compressed:
         hdu = fits.PrimaryHDU(bkg)
         hdu.header = copy.deepcopy(header)
@@ -576,6 +487,8 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         hdulist[0].data = rms
         compress(hdulist, step_size[0], rms_out)
         return
+
+    # mask
     if mask:
         ref = fits.getdata(im_name)
         mask_img(bkg, ref)

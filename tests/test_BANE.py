@@ -33,17 +33,6 @@ def test_sigmaclip():
         raise AssertionError()
 
 
-def test_optimum_sections():
-    """Test optimum_sections gives correct results"""
-    # typical case
-    if not BANE.optimum_sections(8, (64, 64)) == (2, 4):
-        raise AssertionError()
-
-    # redundant case
-    if not BANE.optimum_sections(1, (134, 1200)) == (1, 1):
-        raise AssertionError()
-
-
 def test_mask_data():
     """Test the masking of images"""
     data = np.ones((10, 10), dtype=np.float32)

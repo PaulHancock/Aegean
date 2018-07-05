@@ -1,3 +1,13 @@
+2018-07-05
+==========
+Aegean
+- remove h5py comments from the `--version` output
+
+BANE
+- fix a bug that causes only the first stripe to be written to (repeatedly)
+- retire some TODO items related to code clarity
+- update to v1.6.5
+
 2018-07-02
 ==========
 General
