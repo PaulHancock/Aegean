@@ -262,67 +262,6 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     return
 
 
-def gen_factors(m, permute=True):
-    """
-    Generate a list of integer factors of the the input m.
-
-    Parameters
-    ----------
-    m : int
-        The number to factorise
-
-    permute : bool
-        If true then yield both x,y and y,x if x*y=m. Otherwise only yield one of the two. Default = True.
-
-    Yields
-    ------
-    x, y : int
-        Two integers x and y such that x*y=m
-    """
-    # convert to int if people have been naughty
-    n = int(abs(m))
-    # brute force the factors, one of which is always less than sqrt(n)
-    for i in range(1, int(n**0.5+1)):
-        if n % i == 0:
-            yield i, n/i
-            # yield the reverse pair if it is unique
-            if i != n/i and permute:
-                yield n/i, i
-
-
-def optimum_sections(cores, data_shape):
-    """
-    Choose the best sectioning scheme based on the number of corse available and the shape of the data.
-    "Best" here means minimum perimeter.
-
-    Parameters
-    ----------
-    cores : int
-        The number of corse which are going to be doing the processing.
-    data_shape : tuple
-        Shape of the data as (x,y).
-
-    Returns
-    -------
-    nx, ny : int
-        The number of divisions in each dimension.
-    """
-    if cores == 1:
-        return (1, 1)
-    if cores % 1 == 1:
-        cores -= 1
-    x, y = data_shape
-    min_overlap = np.inf
-    best = (1, 1)
-    for (mx, my) in gen_factors(cores):
-        overlap = x*(my-1) + y*(mx-1)
-        if overlap < min_overlap:
-            best = (mx, my)
-            min_overlap = overlap
-    logging.debug("Sectioning chosen to be {0[0]}x{0[1]} for a score of {1}".format(best, min_overlap))
-    return best
-
-
 def mask_img(data, mask_data):
     """
     Take two images of the same shape, and transfer the mask from one to the other.
