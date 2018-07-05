@@ -6,8 +6,8 @@ The function filter_image should be imported from elsewhere and run as is.
 """
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.6.0'
-__date__ = '2018-06-28'
+__version__ = 'v1.6.5'
+__date__ = '2018-07-05'
 
 # standard imports
 from astropy.io import fits
