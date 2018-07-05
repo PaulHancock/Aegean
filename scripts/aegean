@@ -206,12 +206,6 @@ if __name__ == "__main__":
         log.info("Scipy {0} from {1}".format(scipy.__version__, scipy.__file__))
         log.info("AstroPy {0} from {1}".format(astropy.__version__, astropy.__file__))
         log.info("LMFit {0} from {1}".format(lmfit.__version__, lmfit.__file__))
-        try:
-            import h5py
-
-            log.info("h5py {0} from {1}".format(h5py.__version__, h5py.__file__))
-        except ImportError:
-            log.info("h5py not found")
         sys.exit(0)
 
     # check that a valid filename was entered
