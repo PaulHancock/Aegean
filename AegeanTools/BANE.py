@@ -346,26 +346,15 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
     logging.info("using {0} cores".format(cores))
     logging.info("using {0} stripes".format(nslice))
     # Use a striped sectioning scheme
-    nx = 1
     ny = nslice
 
     # box widths should be multiples of the step_size, and not zero
-    width_x = int(max(img_x/nx/step_size[0], 1) * step_size[0])
     width_y = int(max(img_y/ny/step_size[1], 1) * step_size[1])
 
-    xstart = width_x
     ystart = width_y
-    xend = img_x - img_x % width_x  # the end point of the last "full" box
     yend = img_y - img_y % width_y
 
     # locations of the box edges
-    xmins = [0]
-    xmins.extend(list(range(xstart, xend, width_x)))
-
-    xmaxs = [xstart]
-    xmaxs.extend(list(range(xstart+width_x, xend+1, width_x)))
-    xmaxs[-1] = img_x
-
     ymins = [0]
     ymins.extend(list(range(ystart, yend, width_y)))
 
@@ -373,16 +362,13 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
     ymaxs.extend(list(range(ystart+width_y, yend+1, width_y)))
     ymaxs[-1] = img_y
 
-    logging.debug("xmins {0}".format(xmins))
-    logging.debug("xmaxs {0}".format(xmaxs))
     logging.debug("ymins {0}".format(ymins))
     logging.debug("ymaxs {0}".format(ymaxs))
 
     args = []
-    for xmin, xmax in zip(xmins, xmaxs):
-        for ymin, ymax in zip(ymins, ymaxs):
-            region = [xmin, xmax, ymin, ymax]
-            args.append((filename, region, step_size, box_size, shape, dobkg))
+    for ymin, ymax in zip(ymins, ymaxs):
+        region = (0, img_x, ymin, ymax)
+        args.append((filename, region, step_size, box_size, shape, dobkg))
 
     # start a new process for each task, hopefully to reduce residual memory use
     pool = multiprocessing.Pool(processes=cores, maxtasksperchild=1)
