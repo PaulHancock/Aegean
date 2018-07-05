@@ -1356,7 +1356,7 @@ class SourceFinder(object):
                 is_flag |= flags.FITERR
             # get the real (sky) parameter errors
             model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
-            model.covar = result.covar
+
             if self.global_data.dobias and self.global_data.docov:
                 x, y = np.indices(idata.shape)
                 acf = elliptical_gaussian(x, y, 1, 0, 0, pixbeam.a * FWHM2CC * fac, pixbeam.b * FWHM2CC * fac,
