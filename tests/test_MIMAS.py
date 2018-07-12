@@ -5,6 +5,7 @@ Test MIMAS.py
 
 from __future__ import print_function
 from AegeanTools import MIMAS
+from AegeanTools.regions import Region
 import numpy as np
 import os
 
@@ -80,7 +81,40 @@ def test_combine_regions():
 
 
 def test_intersect_regions():
-    """TODO"""
+    """test the intersection of multiple regions"""
+    cap = Region()
+    cap.add_circles(0, np.radians(-90), np.radians(10))
+    cfile = 'cap.mim'
+    MIMAS.save_region(cap, cfile)
+
+    # MIMAS should complain about just one file to load
+    try:
+        MIMAS.intersect_regions([cfile])
+    except Exception as e:
+        pass
+    else:
+        raise AssertionError()
+
+    # intersect a region with itself should produce same area/pixels
+    cap2 = MIMAS.intersect_regions([cfile, cfile])
+    if cap2.get_area() != cap.get_area():
+        raise AssertionError("intersect broken on reflexive test")
+    if not np.all(cap2.demoted == cap.demoted):
+        raise AssertionError("intersect broken on reflexive test")
+
+    # a new region near the equator with no overlap
+    cap2 = Region()
+    cap2.add_circles(0, 0, np.radians(3))
+    c2file = 'cap2.mim'
+    MIMAS.save_region(cap2, c2file)
+
+    # the intersection should have no area
+    i = MIMAS.intersect_regions([cfile, c2file])
+    if not (i.get_area() == 0.):
+        raise AssertionError("intersection doesn't give null result")
+
+    os.remove(cfile)
+    os.remove(c2file)
     return
 
 
