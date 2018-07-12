@@ -131,7 +131,14 @@ def test_save_region():
 
 
 def test_save_as_image():
-    """TODO"""
+    """test save_as_image"""
+    cap = Region()
+    cap.add_circles(0, np.radians(30), np.radians(10))
+    cfile = 'circle.png'
+    MIMAS.save_as_image(cap, cfile)
+    if not os.path.exists(cfile):
+        raise AssertionError("Failed to write file")
+    os.remove(cfile)
     return
 
 
