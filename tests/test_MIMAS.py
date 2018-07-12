@@ -119,7 +119,14 @@ def test_intersect_regions():
 
 
 def test_save_region():
-    """TODO"""
+    """test save_region"""
+    cap = Region()
+    cap.add_circles(0, np.radians(-90), np.radians(10))
+    cfile = 'cap.mim'
+    MIMAS.save_region(cap, cfile)
+    if not os.path.exists(cfile):
+        raise AssertionError("Failed to write file")
+    os.remove(cfile)
     return
 
 
