@@ -202,7 +202,16 @@ def test_intersect():
     b = Region(maxdepth=7)
     b.add_circles(0, np.radians(-90), np.radians(0.5))
     a.intersect(b)
-    if not (a.get_area() == b.get_area()): raise AssertionError("test_intersect FAILED")
+    if not (a.get_area() == b.get_area()):
+        raise AssertionError("test_intersect FAILED")
+
+    a = Region(maxdepth=8)
+    a.add_circles(0, np.radians(75), np.radians(3))
+    c = Region(maxdepth=8)
+    c.add_circles(0, np.radians(90), np.radians(10))
+    a.intersect(c)
+    if not (a.get_area() == 0.):
+        raise AssertionError("test_intersect FAILED")
 
 
 def test_demote():
