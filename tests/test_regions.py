@@ -4,12 +4,11 @@ Test regions.py
 """
 
 from __future__ import print_function
-
-__author__ = 'Paul Hancock'
-
 from AegeanTools.regions import Region
 import numpy as np
 import os
+
+__author__ = 'Paul Hancock'
 
 
 def test_radec2sky():
