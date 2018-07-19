@@ -1,3 +1,8 @@
+2018-07-19
+==========
+Aegean
+- fix a bug that occured when `--find` and `--priorized` were used together (h/t Stefan D.)
+
 2018-07-05
 ==========
 Aegean
