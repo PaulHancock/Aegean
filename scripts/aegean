@@ -331,33 +331,6 @@ if __name__ == "__main__":
 
     sources = []
 
-    if options.priorized > 0:
-        if options.ratio is not None:
-            if options.ratio <= 0:
-                log.error("ratio must be positive definite")
-                sys.exit(1)
-            if options.ratio < 1:
-                log.error("ratio <1 is not advised. Have fun!")
-        if options.input is None:
-            log.error("Must specify input catalog when --priorized is selected")
-            sys.exit(1)
-        if not os.path.exists(options.input):
-            log.error("{0} not found".format(options.input))
-            sys.exit(1)
-        log.info("Priorized fitting of sources in input catalog.")
-
-        log.info("Stage = {0}".format(options.priorized))
-        if options.doislandflux:
-            log.warn("--island requested but not yet supported for priorized fitting")
-        sf.priorized_fit_islands(filename, catalogue=options.input, hdu_index=options.hdu_index,
-                                 rms=options.rms, bkg=options.bkg,
-                                 outfile=options.outfile, bkgin=options.backgroundimg,
-                                 rmsin=options.noiseimg, beam=options.beam, lat=lat, imgpsf=options.imgpsf,
-                                 catpsf=options.catpsf,
-                                 stage=options.priorized, ratio=options.ratio, outerclip=options.outerclip,
-                                 cores=options.cores, doregroup=options.regroup, docov=options.docov,
-                                 cube_index=options.slice)
-
     if options.find:
         log.info("Finding sources.")
         found = sf.find_sources_in_image(filename, outfile=options.outfile, hdu_index=options.hdu_index,
@@ -375,6 +348,34 @@ if __name__ == "__main__":
             sf.save_image(outname)
         if len(found) == 0:
             log.info("No sources found in image")
+
+    if options.priorized > 0:
+        if options.ratio is not None:
+            if options.ratio <= 0:
+                log.error("ratio must be positive definite")
+                sys.exit(1)
+            if options.ratio < 1:
+                log.error("ratio <1 is not advised. Have fun!")
+        if options.input is None:
+            log.error("Must specify input catalog when --priorized is selected")
+            sys.exit(1)
+        if not os.path.exists(options.input):
+            log.error("{0} not found".format(options.input))
+            sys.exit(1)
+        log.info("Priorized fitting of sources in input catalog.")
+
+        log.info("Stage = {0}".format(options.priorized))
+        if options.doislandflux:
+            log.warning("--island requested but not yet supported for priorized fitting")
+        sf.priorized_fit_islands(filename, catalogue=options.input, hdu_index=options.hdu_index,
+                                 rms=options.rms, bkg=options.bkg,
+                                 outfile=options.outfile, bkgin=options.backgroundimg,
+                                 rmsin=options.noiseimg, beam=options.beam, lat=lat, imgpsf=options.imgpsf,
+                                 catpsf=options.catpsf,
+                                 stage=options.priorized, ratio=options.ratio, outerclip=options.outerclip,
+                                 cores=options.cores, doregroup=options.regroup, docov=options.docov,
+                                 cube_index=options.slice)
+
 
     sources = sf.sources
     # if --condon is set then we replace all the errors with those described by Condon'97
