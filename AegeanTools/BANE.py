@@ -1,14 +1,8 @@
 #! /usr/bin/env python
-
 """
 This module contains all of the BANE specific code
 The function filter_image should be imported from elsewhere and run as is.
 """
-
-__author__ = 'Paul Hancock'
-__version__ = 'v1.6.5'
-__date__ = '2018-07-05'
-
 # standard imports
 from astropy.io import fits
 import copy
@@ -21,12 +15,16 @@ from scipy.interpolate import LinearNDInterpolator
 import sys
 from tempfile import NamedTemporaryFile
 from time import gmtime, strftime
-
 # Aegean tools
 from .fits_interp import compress
 
+__author__ = 'Paul Hancock'
+__version__ = 'v1.6.5'
+__date__ = '2018-07-05'
+
 # global variables for multiprocessing
 ibkg = irms = None
+
 
 def sigmaclip(arr, lo, hi, reps=3):
     """
