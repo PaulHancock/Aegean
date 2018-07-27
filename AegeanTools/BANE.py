@@ -52,6 +52,10 @@ def sigmaclip(arr, lo, hi, reps=3):
     clipped : numpy.array
         The clipped array.
         The clipped array may be empty!
+    mean : float
+        The mean of the array, possibly nan
+    std : float
+        The std of the array, possibly nan
 
     Notes
     -----
@@ -60,7 +64,7 @@ def sigmaclip(arr, lo, hi, reps=3):
     clipped = np.array(arr)[np.isfinite(arr)]
 
     if len(clipped) < 1:
-        return clipped
+        return clipped, np.nan, np.nan
 
     std = np.std(clipped)
     mean = np.mean(clipped)
@@ -74,7 +78,7 @@ def sigmaclip(arr, lo, hi, reps=3):
         mean = np.mean(clipped)
         if 2*abs(pstd-std)/(pstd+std) < 0.2:
             break
-    return clipped
+    return clipped, mean, std
 
 
 def _sf2(args):
@@ -193,16 +197,14 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
         r_min, r_max, c_min, c_max = box(row, col)
         new = data[r_min:r_max, c_min:c_max]
         new = np.ravel(new)
-        new = sigmaclip(new, 3, 3)
+        new, bkg, rms = sigmaclip(new, 3, 3)
         # If we are left with (or started with) no data, then just move on
         if len(new) < 1:
             continue
 
         if dobkg:
-            bkg = np.median(new)
             bkg_points.append((row + data_row_min, col))  # these coords need to be indices into the larger array
             bkg_values.append(bkg)
-        rms = np.std(new)
         rms_points.append((row + data_row_min, col))
         rms_values.append(rms)
 
