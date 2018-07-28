@@ -104,7 +104,7 @@ def _sf2(args):
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
-def sigma_filter(filename, region, step_size, box_size, shape):
+def sigma_filter(filename, region, step_size, box_size, shape, sid):
     """
     Calculate the background and rms for a sub region of an image. The results are
     written to shared memory - irms and ibkg.
@@ -125,6 +125,9 @@ def sigma_filter(filename, region, step_size, box_size, shape):
 
     shape : tuple
         The shape of the fits image
+
+    sid : int
+        The slice number
 
     Returns
     -------
@@ -223,26 +226,22 @@ def sigma_filter(filename, region, step_size, box_size, shape):
             ibkg[i + ymin] = np.ctypeslib.as_ctypes(row)
     logging.debug(" .. done writing")
 
-    eid = multiprocessing.current_process()._identity[0] - 1
     # signal that this worker is at the barrier
-    events[eid].set()
+    events[sid].set()
 
-    np.all([e.wait() for e in events])
-    # # wait for neighbour workers to reach the barrier
-    # if eid > 0:
-    #     logging.debug("{0} is waiting for {1}".format(eid, eid-1))
-    #     events[eid-1].wait()
-    # if eid < len(events)-1:
-    #     logging.debug("{0} is waiting for {1}".format(eid, eid + 1))
-    #     events[eid+1].wait()
-    logging.debug("{0} background subtraction".format(eid))
+
+    # wait for neighbour workers to reach the barrier
+    if sid > 0:
+        logging.debug("{0} is waiting for {1}".format(sid, sid-1))
+        events[sid-1].wait()
+    if sid < len(events)-1:
+        logging.debug("{0} is waiting for {1}".format(sid, sid + 1))
+        events[sid+1].wait()
+    logging.debug("{0} background subtraction".format(sid))
 
     for i in range(data_row_max-data_row_min):
             data[i, :] = data[i, :] - ibkg[data_row_min + i]
 
-    # test = fits.open(filename)
-    # test[0].data = data
-    # test.writeto("{0}_{1}".format(eid,filename))
 
     for row, col in locations(step_size, ymin-data_row_min, ymax-data_row_min, 0, shape[1]):
         r_min, r_max, c_min, c_max = box(row, col)
@@ -393,13 +392,13 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
     logging.debug("ymaxs {0}".format(ymaxs))
 
     args = []
-    for ymin, ymax in zip(ymins, ymaxs):
+    for i, (ymin, ymax) in enumerate(zip(ymins, ymaxs)):
         region = (ymin, ymax)
-        args.append((filename, region, step_size, box_size, shape))
+        args.append((filename, region, step_size, box_size, shape, i))
 
     # set up a list of events to synchronise the worker processes
     global events
-    events = [multiprocessing.Event() for _ in range(cores)]
+    events = [multiprocessing.Event() for _ in range(nslice)]
 
     # start a new process for each task, hopefully to reduce residual memory use
     pool = multiprocessing.Pool(processes=cores, maxtasksperchild=1)
