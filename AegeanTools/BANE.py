@@ -19,8 +19,8 @@ from time import gmtime, strftime
 from .fits_interp import compress
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.6.5'
-__date__ = '2018-07-05'
+__version__ = 'v1.7'
+__date__ = '2018-07-28'
 
 # global variables for multiprocessing
 ibkg = irms = None
@@ -316,7 +316,7 @@ def mask_img(data, mask_data):
         logging.info("failed to mask file, not a critical failure")
 
 
-def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, nslice=8):
+def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None):
     """
     Calculate the background and noise images corresponding to the input file.
     The calculation is done via a box-car approach and uses multiple cores and shared memory.
@@ -342,9 +342,6 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
     shape : (int, int)
         The shape of the image in the given file.
 
-    dobkg : bool
-        If True then calculate the background, otherwise assume it is zero.
-
     Returns
     -------
     bkg, rms : numpy.ndarray
@@ -359,14 +356,10 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
 
     img_y, img_x = shape
     # initialise some shared memory
-    if dobkg:
-        global ibkg
-        bkg = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
-        ibkg = multiprocessing.sharedctypes.Array(bkg._type_, bkg, lock=True)
-    else:
-        bkg = None
-        ibkg = None
-    global irms
+    global ibkg, irms
+    bkg = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
+    ibkg = multiprocessing.sharedctypes.Array(bkg._type_, bkg, lock=True)
+
     rms = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
     irms = multiprocessing.sharedctypes.Array(rms._type_, rms, lock=True)
 
@@ -416,7 +409,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
     return bkg, rms
 
 
-def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False, nslice=None):
+def filter_image(im_name, out_base, step_size=None, box_size=None, cores=None, mask=True, compressed=False, nslice=None):
     """
     Create a background and noise image from an input image.
     Resulting images are written to `outbase_bkg.fits` and `outbase_rms.fits`
@@ -431,9 +424,6 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         Tuple of the x,y step size in pixels
     box_size : (int,int)
         The size of the box in piexls
-    twopass : bool
-        Perform a second pass calculation to ensure that the noise is not contaminated by the background.
-        Default = False
     cores : int
         Number of CPU corse to use.
         Default = all available

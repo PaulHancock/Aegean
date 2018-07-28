@@ -62,7 +62,7 @@ def test_filter_image():
         raise AssertionError()
 
     os.remove(bkg)
-    BANE.filter_image(fname, cores=2, out_base=outbase, twopass=True, compressed=True)
+    BANE.filter_image(fname, cores=2, out_base=outbase, compressed=True)
     if not os.path.exists(rms):
         raise AssertionError()
 
