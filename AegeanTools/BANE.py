@@ -353,7 +353,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
 
     if cores is None:
         cores = multiprocessing.cpu_count()
-    if nslice is None:
+    # update nslice if not set or if cores is 1
+    if (nslice is None) or (cores==1):
         nslice = cores
 
     img_y, img_x = shape
