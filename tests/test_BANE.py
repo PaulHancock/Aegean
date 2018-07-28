@@ -92,7 +92,7 @@ def test_ND_images():
         pass
     else:
         raise AssertionError()
-    
+
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
