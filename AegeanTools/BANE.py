@@ -396,7 +396,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
         region = (ymin, ymax)
         args.append((filename, region, step_size, box_size, shape, i))
 
-    # set up a list of events to synchronise the worker processes
+    # set up a list of events to synchronise the workers, one event per strip
     global events
     events = [multiprocessing.Event() for _ in range(len(ymaxs))]
 
