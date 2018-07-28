@@ -398,7 +398,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True, 
 
     # set up a list of events to synchronise the worker processes
     global events
-    events = [multiprocessing.Event() for _ in range(nslice)]
+    events = [multiprocessing.Event() for _ in range(len(ymaxs))]
 
     # start a new process for each task, hopefully to reduce residual memory use
     pool = multiprocessing.Pool(processes=cores, maxtasksperchild=1)
