@@ -89,7 +89,7 @@ def test_ND_images():
     try:
         BANE.filter_image(fname,out_base=outbase)
     except Exception as e:
-        pass
+        e.args
     else:
         raise AssertionError()
 

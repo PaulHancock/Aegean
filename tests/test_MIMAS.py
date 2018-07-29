@@ -91,7 +91,7 @@ def test_intersect_regions():
     try:
         MIMAS.intersect_regions([cfile])
     except Exception as e:
-        pass
+        e.args
     else:
         raise AssertionError()
 

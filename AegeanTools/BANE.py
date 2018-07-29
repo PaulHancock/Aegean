@@ -13,7 +13,6 @@ import numpy as np
 import os
 from scipy.interpolate import LinearNDInterpolator
 import sys
-from tempfile import NamedTemporaryFile
 from time import gmtime, strftime
 # Aegean tools
 from .fits_interp import compress
@@ -140,9 +139,6 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
     # cut out the region of interest plus 1/2 the box size, but clip to the image size
     data_row_min = max(0, ymin - box_size[0]//2)
     data_row_max = min(shape[0], ymax + box_size[0]//2)
-
-    # the index into data of the row ymin
-    data_ymin = ymin - data_row_min
 
     # Figure out how many axes are in the datafile
     NAXIS = fits.getheader(filename)["NAXIS"]
