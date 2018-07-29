@@ -132,7 +132,7 @@ if __name__ == "__main__":
     group4.add_argument('--negative', dest='negative', action="store_true", default=False,
                         help="Report sources with negative fluxes. [default: false]")
     group4.add_argument('--region', dest='region', type=str, default=None,
-                        help="Use this regions file to restrict source finding in this image.")
+                        help="Use this regions file to restrict source finding in this image.\nUse MIMAS region (.mim) files.")
     group4.add_argument('--nocov', dest='docov', action="store_false", default=True,
                         help="Don't use the covariance of the data in the fitting proccess. [Default = False]")
     group4.add_argument('--condon', dest='condon', action="store_true", default=False,
