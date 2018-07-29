@@ -1,3 +1,17 @@
+2018-07-28
+==========
+BANE
+- version is now v1.7.0
+- address a segfault problem that occurs on large images when `--onepass` is not used (#75)
+- making use of `--stripes` greater than 1 requires at least `--cores=2`
+- further reduce memory footprint:
+  - reduce the amount of interpolation stages that are required by 1 per stripe
+  - do background subtraction in the sub-processes to avoid loading the entire image in the main process
+- deprecate options `--onepass`/`--twopass` and set a warning when used
+
+MIMAS
+- fix a bug where `save_region` didn't work in python3
+
 2018-07-19
 ==========
 Aegean
