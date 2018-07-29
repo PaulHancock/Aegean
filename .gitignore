@@ -6,3 +6,9 @@
 *.fits
 .idea
 AegeanTools.egg-info
+.cache
+.eggs
+build/
+dist/
+wiki/
+doc/_build/
