@@ -11,7 +11,7 @@ import multiprocessing
 import multiprocessing.sharedctypes
 import numpy as np
 import os
-from scipy.interpolate import LinearNDInterpolator
+from scipy.interpolate import LinearNDInterpolator, RegularGridInterpolator
 import sys
 from time import gmtime, strftime
 # Aegean tools
@@ -132,49 +132,32 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
     -------
     None
     """
-
+    return
     ymin, ymax = region
     logging.debug('rows {0}-{1} starting at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
     # cut out the region of interest plus 1/2 the box size, but clip to the image size
-    data_row_min = max(0, ymin - box_size[0]//2)
-    data_row_max = min(shape[0], ymax + box_size[0]//2)
+    image_row_min = max(0, ymin - box_size[0]//2)
+    image_row_max = min(shape[0], ymax + box_size[0]//2)
+
+    row_offset = ymin - image_row_min
 
     # Figure out how many axes are in the datafile
     NAXIS = fits.getheader(filename)["NAXIS"]
 
     with fits.open(filename, memmap=True) as a:
         if NAXIS == 2:
-            data = a[0].section[data_row_min:data_row_max, 0:shape[1]]
+            data = a[0].section[image_row_min:image_row_max, 0:shape[1]]
         elif NAXIS == 3:
-            data = a[0].section[0, data_row_min:data_row_max, 0:shape[1]]
+            data = a[0].section[0, image_row_min:image_row_max, 0:shape[1]]
         elif NAXIS == 4:
-            data = a[0].section[0, 0, data_row_min:data_row_max, 0:shape[1]]
+            data = a[0].section[0, 0, image_row_min:image_row_max, 0:shape[1]]
         else:
             logging.error("Too many NAXIS for me {0}".format(NAXIS))
             logging.error("fix your file to be more sane")
             raise Exception("Too many NAXIS")
 
     logging.debug('data size is {0}'.format(data.shape))
-
-    def locations(step, _r_min, _r_max, _c_min, _c_max):
-        """
-        Generator function to iterate over a grid of r,c coords
-        operates only within the given bounds
-        Returns:
-        r, c
-        """
-
-        rvals = list(range(_r_min, _r_max, step[0]))
-        if rvals[-1] != _r_max:
-            rvals.append(_r_max)
-        cvals = list(range(_c_min, _c_max, step[1]))
-        if cvals[-1] != _c_max:
-            cvals.append(_c_max)
-        # initial data
-        for c in cvals:
-            for r in rvals:
-                yield r, c
 
     def box(r, c):
         """
@@ -188,43 +171,46 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
         return r_min, r_max, c_min, c_max
 
     # lists that hold the calculated values and array coordinates
-    bkg_points = []
-    bkg_values = []
-    rms_points = []
-    rms_values = []
-
+    rows = list(range(ymin, ymax, step_size[0]))
+    if rows[-1] != ymax:
+        rows.append(ymax)
+    cols = list(range(0, shape[1], step_size[1]))
+    if cols[-1] != shape[1]:
+        cols.append(shape[1])
+    # initialised an array of values and default to nans
+    vals = np.zeros(shape=(len(rows),len(cols)))*np.nan
+    logging.debug("r: {0}, c:{1}".format(rows,cols))
     # indices of the shape we want to write to (not the shape of data)
+    # TODO: interpolate only a row at a time to reduce memory use?
     gx, gy = np.mgrid[ymin:ymax, 0:shape[1]]
 
-    for row, col in locations(step_size, ymin-data_row_min, ymax-data_row_min, 0, shape[1]):
-        r_min, r_max, c_min, c_max = box(row, col)
-        new = data[r_min:r_max, c_min:c_max]
-        new = np.ravel(new)
-        new, bkg, rms = sigmaclip(new, 3, 3)
-        # If we are left with (or started with) no data, then just move on
-        if len(new) < 1:
-            continue
+    for i, row in enumerate(rows):
+        for j, col in enumerate(cols):
+            r_min, r_max, c_min, c_max = box(row, col)
+            new = data[r_min:r_max, c_min:c_max]
+            new = np.ravel(new)
+            new, bkg, _ = sigmaclip(new, 3, 3)
+            # If we are left with (or started with) no data, then just move on
+            if len(new) < 1:
+                continue
+            vals[i,j] = bkg
 
-        bkg_points.append((row + data_row_min, col))  # these coords need to be indices into the larger array
-        bkg_values.append(bkg)
+    ifunc = RegularGridInterpolator((rows,cols),vals)
+    interpolated = np.array(ifunc((gx, gy)), dtype=np.float32)
+    del ifunc
 
-    if len(bkg_points) > 1:
-        logging.debug("Interpolating bkg")
-        ifunc = LinearNDInterpolator(bkg_points, bkg_values)
-        interpolated_bkg = np.array(ifunc((gx, gy)), dtype=np.float32)
-        del ifunc
-    else:
-        logging.debug("bkg is all nans")
-        interpolated_bkg = np.empty(gx.shape, dtype=np.float32) * np.nan
     with ibkg.get_lock():
         logging.debug("Writing bkg to sharemem")
-        for i, row in enumerate(interpolated_bkg):
-            ibkg[i + ymin] = np.ctypeslib.as_ctypes(row)
-    logging.debug(" .. done writing")
+        for i, row in enumerate(interpolated):
+            pass
+            # ibkg[i + ymin] = np.ctypeslib.as_ctypes(np.ones(len(row), dtype=np.float32))
+            # ibkg[i + ymin] = np.ctypeslib.as_ctypes(row)
+        logging.debug(" .. done writing")
 
     # signal that this worker is at the barrier
     events[sid].set()
 
+    vals[:] = np.nan
 
     # wait for neighbour workers to reach the barrier
     if sid > 0:
@@ -235,36 +221,30 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
         events[sid+1].wait()
     logging.debug("{0} background subtraction".format(sid))
 
-    for i in range(data_row_max-data_row_min):
-            data[i, :] = data[i, :] - ibkg[data_row_min + i]
+    for i in range(image_row_max-image_row_min):
+        data[i, :] = data[i, :] - ibkg[row_offset + i]
+
+    for i, row in enumerate(rows):
+        for j, col in enumerate(cols):
+            r_min, r_max, c_min, c_max = box(row, col)
+            new = data[r_min:r_max, c_min:c_max]
+            new = np.ravel(new)
+            new, _, rms = sigmaclip(new, 3, 3)
+            if len(new) < 1:
+                continue
+            vals[i,j] = rms
 
 
-    for row, col in locations(step_size, ymin-data_row_min, ymax-data_row_min, 0, shape[1]):
-        r_min, r_max, c_min, c_max = box(row, col)
-        new = data[r_min:r_max, c_min:c_max]
-        new = np.ravel(new)
-        new, bkg, rms = sigmaclip(new, 3, 3)
-        # If we are left with (or started with) no data, then just move on
-        if len(new) < 1:
-            continue
-
-        rms_points.append((row + data_row_min, col))
-        rms_values.append(rms)
-
-    if len(rms_points) > 1:
-        logging.debug("Interpolating rms")
-        ifunc = LinearNDInterpolator(rms_points, rms_values)
-        # force 32 bit floats
-        interpolated_rms = np.array(ifunc((gx, gy)), dtype=np.float32)
-        del ifunc
-    else:
-        logging.debug("rms is all nans")
-        interpolated_rms = np.empty(gx.shape, dtype=np.float32)*np.nan
+    logging.debug("Interpolating rms")
+    ifunc = RegularGridInterpolator((rows,cols),vals)
+    interpolated = np.array(ifunc((gx, gy)), dtype=np.float32)
+    del ifunc
 
     with irms.get_lock():
         logging.debug("Writing rms to sharemem")
-        for i, row in enumerate(interpolated_rms):
-            irms[i + ymin] = np.ctypeslib.as_ctypes(row)
+        for i, row in enumerate(interpolated):
+            pass
+            # irms[i + ymin] = np.ctypeslib.as_ctypes(row)
     logging.debug(" .. done writing rms")
 
     ##
@@ -278,9 +258,6 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
     #     pass
 
     logging.debug('rows {0}-{1} finished at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-    del bkg_points, bkg_values
-    del rms_points, rms_values
-
     return
 
 
@@ -353,12 +330,12 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None)
     img_y, img_x = shape
     # initialise some shared memory
     global ibkg, irms
-    bkg = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
+    bkg = np.ctypeslib.as_ctypes(np.ones(shape, dtype=np.float32))
     ibkg = multiprocessing.sharedctypes.Array(bkg._type_, bkg, lock=True)
 
-    rms = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
+    rms = np.ctypeslib.as_ctypes(np.ones(shape, dtype=np.float32))
     irms = multiprocessing.sharedctypes.Array(rms._type_, rms, lock=True)
-
+    return bkg, rms
     logging.info("using {0} cores".format(cores))
     logging.info("using {0} stripes".format(nslice))
     # Use a striped sectioning scheme
