@@ -21,15 +21,15 @@ def test_sigmaclip():
     # normal usage case
     data = np.random.random(100)
     data[13] = np.nan
-    if not len(BANE.sigmaclip(data, 3, 4, reps=4)[0]) > 0:
+    if not len(BANE.sigmaclip(data, 3, 4, reps=4)) > 0:
         raise AssertionError()
 
     # test list where all elements get clipped
-    if not len(BANE.sigmaclip([-10, 10], 1, 2, reps=2)[0]) == 0:
+    if not len(BANE.sigmaclip([-10, 10], 1, 2, reps=2)) == 0:
         raise AssertionError()
 
     # test empty list
-    if not len(BANE.sigmaclip([], 0, 3)[0]) == 0:
+    if not len(BANE.sigmaclip([], 0, 3)) == 0:
         raise AssertionError()
 
 
@@ -62,7 +62,7 @@ def test_filter_image():
         raise AssertionError()
 
     os.remove(bkg)
-    BANE.filter_image(fname, cores=2, out_base=outbase, compressed=True)
+    BANE.filter_image(fname, cores=2, out_base=outbase, twopass=True, compressed=True)
     if not os.path.exists(rms):
         raise AssertionError()
 
@@ -89,10 +89,10 @@ def test_ND_images():
     try:
         BANE.filter_image(fname,out_base=outbase)
     except Exception as e:
-        e.args
+        pass
     else:
         raise AssertionError()
-
+    
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
