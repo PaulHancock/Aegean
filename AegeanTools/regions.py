@@ -3,7 +3,7 @@
 Describe sky areas as a collection of HEALPix pixels
 """
 
-from __future__ import print_function, division
+from __future__ import print_function
 
 __author__ = "Paul Hancock"
 
@@ -181,7 +181,7 @@ class Region(object):
                         # remove the four pixels from this level
                         self.pixeldict[d].difference_update(nset)
                         # add a new pixel to the next level up
-                        self.pixeldict[d-1].add(p//4)
+                        self.pixeldict[d-1].add(p/4)
         self.demoted = set()
         return
 
@@ -243,7 +243,7 @@ class Region(object):
             for d in range(self.maxdepth+1, other.maxdepth+1):
                 for p in other.pixeldict[d]:
                     # promote this pixel to self.maxdepth
-                    pp = p//4**(d-self.maxdepth)
+                    pp = p/4**(d-self.maxdepth)
                     self.pixeldict[self.maxdepth].add(pp)
         if renorm:
             self._renorm()
