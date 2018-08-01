@@ -13,6 +13,7 @@ import multiprocessing.sharedctypes
 import numpy as np
 import os
 from scipy.interpolate import LinearNDInterpolator
+from scipy.interpolate import RegularGridInterpolator
 import sys
 from time import gmtime, strftime
 # Aegean tools
@@ -173,6 +174,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
     cols = list(range(0, shape[1], step_size[1]))
     cols.append(shape[1])
 
+    vals = np.zeros(shape=(len(rows),len(cols)))
+
     # lists that hold the calculated values and array coordinates
     bkg_points = []
     bkg_values = []
@@ -188,17 +191,28 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
             # If we are left with (or started with) no data, then just move on
             if len(new) < 1:
                 continue
-                # these coords need to be indices into the larger array
+            # these coords need to be indices into the larger array
             bkg_points.append((row + data_row_min, col))
             bkg_values.append(bkg)
+            vals[i,j] = bkg
 
     # indices of the shape we want to write to (not the shape of data)
     gx, gy = np.mgrid[ymin:ymax, 0:shape[1]]
+    gr, gc = np.mgrid[ymin-data_row_min:ymax-data_row_min, 0:shape[1]]
 
     if len(bkg_points) > 1:
         logging.debug("Interpolating bkg")
-        ifunc = LinearNDInterpolator(bkg_points, bkg_values)
-        interpolated_bkg = np.array(ifunc((gx, gy)), dtype=np.float32)
+        # ifunc = LinearNDInterpolator(bkg_points, bkg_values)
+        ifunc = RegularGridInterpolator((rows,cols), vals)
+        try:
+            interpolated_bkg = np.array(ifunc((gr, gc)), dtype=np.float32)
+        except ValueError as e:
+            logging.debug("rows {0}".format(rows))
+            logging.debug("cols {0}".format(cols))
+            logging.debug("vals {0}".format(vals))
+            logging.debug("gr {0}".format(gr))
+            logging.debug("gc {0}".format(gc))
+            raise e
         del ifunc
     else:
         logging.debug("bkg is all nans")
@@ -222,6 +236,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
     for i in range(data_row_max - data_row_min):
         data[i, :] = data[i, :] - ibkg[data_row_min + i]
 
+    vals[:] = 0
     for i, row in enumerate(rows):
         for j, col in enumerate(cols):
             r_min, r_max, c_min, c_max = box(row, col)
@@ -234,13 +249,23 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
 
             rms_points.append((row + data_row_min, col))
             rms_values.append(rms)
+            vals[i,j] = rms
 
     # If the rms calculation above didn't yield any points, then our interpolated values are all nans
     if len(rms_points) > 1:
         logging.debug("Interpolating rms")
-        ifunc = LinearNDInterpolator(rms_points, rms_values)
+        #ifunc = LinearNDInterpolator(rms_points, rms_values)
         # force 32 bit floats
-        interpolated_rms = np.array(ifunc((gx, gy)), dtype=np.float32)
+        ifunc = RegularGridInterpolator((rows,cols), vals)
+        try:
+            interpolated_rms = np.array(ifunc((gr, gc)), dtype=np.float32)
+        except ValueError as e:
+            logging.debug("rows {0}".format(rows))
+            logging.debug("cols {0}".format(cols))
+            logging.debug("vals {0}".format(vals))
+            logging.debug("gr {0}".format(gr))
+            logging.debug("gc {0}".format(gc))
+            raise e
         del ifunc
     else:
         logging.debug("rms is all nans")
