@@ -24,7 +24,7 @@ __date__ = '2018-08-01'
 
 # global variables for multiprocessing
 ibkg = irms = None
-events = []
+bkg_events = []
 
 def sigmaclip(arr, lo, hi, reps=3):
     """
@@ -193,15 +193,15 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
     del ifunc
     logging.debug(" .. done writing bkg")
     # signal that the bkg is done for this region
-    events[sid].set()
+    bkg_events[sid].set()
 
     # wait for neighbour workers to reach the barrier
     if sid > 0:
         logging.debug("{0} is waiting for {1}".format(sid, sid - 1))
-        events[sid - 1].wait()
-    if sid < len(events) - 1:
+        bkg_events[sid - 1].wait()
+    if sid < len(bkg_events) - 1:
         logging.debug("{0} is waiting for {1}".format(sid, sid + 1))
-        events[sid + 1].wait()
+        bkg_events[sid + 1].wait()
 
     logging.debug("{0} background subtraction".format(sid))
     for i in range(data_row_max - data_row_min):
@@ -323,8 +323,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None)
     logging.debug("ymaxs {0}".format(ymaxs))
 
     # create an event per stripe
-    global events
-    events = [multiprocessing.Event() for _ in range(len(ymaxs))]
+    global bkg_events
+    bkg_events = [multiprocessing.Event() for _ in range(len(ymaxs))]
 
     args = []
     for i, region in enumerate(zip(ymins, ymaxs)):
@@ -343,8 +343,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None)
     pool.join()
 
     # cast back to regular np arrays
-    rms = np.array(irms)
-    bkg = np.array(ibkg)
+    rms = np.array(irms, dtype=np.float32)
+    bkg = np.array(ibkg, dtype=np.float32)
     return bkg, rms
 
 
@@ -420,10 +420,6 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, cores=None, m
     logging.info("on data shape {0}".format(shape))
     bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, nslice=nslice)
     logging.info("done")
-
-    # force float 32s to avoid bloated files
-    bkg = np.array(bkg, dtype=np.float32)
-    rms = np.array(rms, dtype=np.float32)
 
     bkg_out = '_'.join([os.path.expanduser(out_base), 'bkg.fits'])
     rms_out = '_'.join([os.path.expanduser(out_base), 'rms.fits'])
