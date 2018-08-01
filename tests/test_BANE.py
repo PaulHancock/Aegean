@@ -20,17 +20,16 @@ log = logging.getLogger("Aegean")
 def test_sigmaclip():
     """Test the sigmaclipping"""
     # normal usage case
-    data = np.random.random(100)
-    data[13] = np.nan
-    if not len(BANE.sigmaclip(data, 3, 4, reps=4)[0]) > 0:
+    data = np.ones(100)
+    if not BANE.sigmaclip(data, 3, 4, reps=4)[0] == 1. :
         raise AssertionError()
 
-    # test list where all elements get clipped
-    if not len(BANE.sigmaclip([-10, 10], 1, 2, reps=2)[0]) == 0:
+    data[13] = np.nan
+    if not BANE.sigmaclip(data, 3, 4, reps=4)[0] == 1.:
         raise AssertionError()
 
     # test empty list
-    if not len(BANE.sigmaclip([], 0, 3)[0]) == 0:
+    if not np.isnan(BANE.sigmaclip([], 0, 3)[0]):
         raise AssertionError()
 
 

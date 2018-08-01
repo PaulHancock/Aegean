@@ -49,9 +49,6 @@ def sigmaclip(arr, lo, hi, reps=3):
 
     Returns
     -------
-    clipped : numpy.array
-        The clipped array.
-        The clipped array may be empty!
     mean : float
         The mean of the array, possibly nan
     std : float
@@ -64,7 +61,7 @@ def sigmaclip(arr, lo, hi, reps=3):
     clipped = np.array(arr)[np.isfinite(arr)]
 
     if len(clipped) < 1:
-        return clipped, np.nan, np.nan
+        return np.nan, np.nan
 
     std = np.std(clipped)
     mean = np.mean(clipped)
@@ -78,7 +75,7 @@ def sigmaclip(arr, lo, hi, reps=3):
         mean = np.mean(clipped)
         if 2*abs(pstd-std)/(pstd+std) < 0.2:
             break
-    return clipped, mean, std
+    return mean, std
 
 
 def _sf2(args):
@@ -182,7 +179,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
             r_min, r_max, c_min, c_max = box(row, col)
             new = data[r_min:r_max, c_min:c_max]
             new = np.ravel(new)
-            _, bkg, _ = sigmaclip(new, 3, 3)
+            bkg, _ = sigmaclip(new, 3, 3)
             vals[i,j] = bkg
 
     # indices of all the pixels within our region
@@ -217,7 +214,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
             r_min, r_max, c_min, c_max = box(row, col)
             new = data[r_min:r_max, c_min:c_max]
             new = np.ravel(new)
-            _, _ , rms = sigmaclip(new, 3, 3)
+            _ , rms = sigmaclip(new, 3, 3)
             vals[i,j] = rms
 
     logging.debug("Interpolating rm to sharemem rms")
