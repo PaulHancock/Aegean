@@ -190,14 +190,13 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
 
     logging.debug("Interpolating bkg")
     ifunc = RegularGridInterpolator((rows,cols), vals)
-    interpolated_bkg = np.array(ifunc((gr, gc)), dtype=np.float32)
+    interpolated = np.array(ifunc((gr, gc)), dtype=np.float32)
     del ifunc
 
     logging.debug("Writing bkg to sharemem")
-    for i, row in enumerate(interpolated_bkg):
+    for i, row in enumerate(interpolated):
         ibkg[i + ymin] = np.ctypeslib.as_ctypes(row)
     logging.debug(" .. done writing bkg")
-
     # signal that the bkg is done for this region
     events[sid].set()
 
@@ -226,20 +225,16 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
 
     logging.debug("Interpolating rms")
     ifunc = RegularGridInterpolator((rows,cols), vals)
-    interpolated_rms = np.array(ifunc((gr, gc)), dtype=np.float32)
+    interpolated = np.array(ifunc((gr, gc)), dtype=np.float32)
     del ifunc
 
     logging.debug("Writing rms to sharemem")
-    for i, row in enumerate(interpolated_rms):
+    for i, row in enumerate(interpolated):
         # if domask:
         #     mask = np.where(np.bitwise_not(np.isfinite(data[i + ymin-data_row_min,:])))[0]
         #     row[mask] = np.nan
         irms[i + ymin] = np.ctypeslib.as_ctypes(row)
     logging.debug(" .. done writing rms")
-
-    ##
-    # Apply mask
-    ##
 
     logging.debug('rows {0}-{1} finished at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     return
