@@ -168,11 +168,13 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
         c_max = min(data.shape[1] - 1, c + box_size[1] // 2)
         return r_min, r_max, c_min, c_max
 
+    # set up a grid of rows/cols at which we will compute the bkg/rms
     rows = list(range(ymin-data_row_min, ymax-data_row_min, step_size[0]))
     rows.append(ymax-data_row_min)
     cols = list(range(0, shape[1], step_size[1]))
     cols.append(shape[1])
 
+    # store the computed bkg/rms in this smaller array
     vals = np.zeros(shape=(len(rows),len(cols)))
 
     for i, row in enumerate(rows):
@@ -180,12 +182,10 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
             r_min, r_max, c_min, c_max = box(row, col)
             new = data[r_min:r_max, c_min:c_max]
             new = np.ravel(new)
-            new, bkg, _ = sigmaclip(new, 3, 3)
-            if len(new) < 1:
-                continue
+            _, bkg, _ = sigmaclip(new, 3, 3)
             vals[i,j] = bkg
 
-    # indices of the shape we want to write to (not the shape of data)
+    # indices of all the pixels within our region
     gr, gc = np.mgrid[ymin-data_row_min:ymax-data_row_min, 0:shape[1]]
 
     logging.debug("Interpolating bkg")
@@ -199,7 +199,9 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
             ibkg[i + ymin] = np.ctypeslib.as_ctypes(row)
     logging.debug(" .. done writing bkg")
 
+    # signal that the bkg is done for this region
     events[sid].set()
+
     # wait for neighbour workers to reach the barrier
     if sid > 0:
         logging.debug("{0} is waiting for {1}".format(sid, sid - 1))
@@ -207,20 +209,20 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
     if sid < len(events) - 1:
         logging.debug("{0} is waiting for {1}".format(sid, sid + 1))
         events[sid + 1].wait()
-    logging.debug("{0} background subtraction".format(sid))
 
+    logging.debug("{0} background subtraction".format(sid))
     for i in range(data_row_max - data_row_min):
         data[i, :] = data[i, :] - ibkg[data_row_min + i]
 
+    # reset/recycle the vals array
     vals[:] = 0
+
     for i, row in enumerate(rows):
         for j, col in enumerate(cols):
             r_min, r_max, c_min, c_max = box(row, col)
             new = data[r_min:r_max, c_min:c_max]
             new = np.ravel(new)
-            new, _ , rms = sigmaclip(new, 3, 3)
-            if len(new) < 1:
-                continue
+            _, _ , rms = sigmaclip(new, 3, 3)
             vals[i,j] = rms
 
     # If the rms calculation above didn't yield any points, then our interpolated values are all nans
