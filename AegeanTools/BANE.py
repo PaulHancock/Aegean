@@ -231,6 +231,9 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
 
     logging.debug("Writing rms to sharemem")
     for i, row in enumerate(interpolated_rms):
+        # if domask:
+        #     mask = np.where(np.bitwise_not(np.isfinite(data[i + ymin-data_row_min,:])))[0]
+        #     row[mask] = np.nan
         irms[i + ymin] = np.ctypeslib.as_ctypes(row)
     logging.debug(" .. done writing rms")
 
