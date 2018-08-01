@@ -188,14 +188,12 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
     # indices of all the pixels within our region
     gr, gc = np.mgrid[ymin-data_row_min:ymax-data_row_min, 0:shape[1]]
 
-    logging.debug("Interpolating bkg")
+    logging.debug("Interpolating bkg to sharemem")
     ifunc = RegularGridInterpolator((rows,cols), vals)
-    interpolated = np.array(ifunc((gr, gc)), dtype=np.float32)
-    del ifunc
-
-    logging.debug("Writing bkg to sharemem")
-    for i, row in enumerate(interpolated):
+    for i in range(gr.shape[0]):
+        row = np.array(ifunc((gr[i],gc[i])), dtype=np.float32)
         ibkg[i + ymin] = np.ctypeslib.as_ctypes(row)
+    del ifunc
     logging.debug(" .. done writing bkg")
     # signal that the bkg is done for this region
     events[sid].set()
@@ -211,7 +209,6 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
     logging.debug("{0} background subtraction".format(sid))
     for i in range(data_row_max - data_row_min):
         data[i, :] = data[i, :] - ibkg[data_row_min + i]
-
     # reset/recycle the vals array
     vals[:] = 0
 
@@ -223,17 +220,12 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
             _, _ , rms = sigmaclip(new, 3, 3)
             vals[i,j] = rms
 
-    logging.debug("Interpolating rms")
+    logging.debug("Interpolating rm to sharemem rms")
     ifunc = RegularGridInterpolator((rows,cols), vals)
-    interpolated = np.array(ifunc((gr, gc)), dtype=np.float32)
-    del ifunc
-
-    logging.debug("Writing rms to sharemem")
-    for i, row in enumerate(interpolated):
-        # if domask:
-        #     mask = np.where(np.bitwise_not(np.isfinite(data[i + ymin-data_row_min,:])))[0]
-        #     row[mask] = np.nan
+    for i in range(gr.shape[0]):
+        row = np.array(ifunc((gr[i],gc[i])), dtype=np.float32)
         irms[i + ymin] = np.ctypeslib.as_ctypes(row)
+    del ifunc
     logging.debug(" .. done writing rms")
 
     logging.debug('rows {0}-{1} finished at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
