@@ -25,6 +25,27 @@ __date__ = '2018-08-01'
 # global variables for multiprocessing
 ibkg = irms = None
 bkg_events = []
+mask_events = []
+
+
+def barrier(events, sid, kind='neighbour'):
+    """
+    act as a multiprocessing barrier
+    """
+    events[sid].set()
+    # only wait for the neighbours
+    if kind=='neighbour':
+        if sid > 0:
+            logging.debug("{0} is waiting for {1}".format(sid, sid - 1))
+            events[sid - 1].wait()
+        if sid < len(bkg_events) - 1:
+            logging.debug("{0} is waiting for {1}".format(sid, sid + 1))
+            events[sid + 1].wait()
+    # wait for all
+    else:
+        [e.wait() for e in events]
+    return
+
 
 def sigmaclip(arr, lo, hi, reps=3):
     """
@@ -192,16 +213,18 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
         ibkg[i + ymin] = np.ctypeslib.as_ctypes(row)
     del ifunc
     logging.debug(" .. done writing bkg")
-    # signal that the bkg is done for this region
-    bkg_events[sid].set()
 
-    # wait for neighbour workers to reach the barrier
-    if sid > 0:
-        logging.debug("{0} is waiting for {1}".format(sid, sid - 1))
-        bkg_events[sid - 1].wait()
-    if sid < len(bkg_events) - 1:
-        logging.debug("{0} is waiting for {1}".format(sid, sid + 1))
-        bkg_events[sid + 1].wait()
+    barrier(bkg_events, sid)
+    ## signal that the bkg is done for this region
+    #bkg_events[sid].set()
+    #
+    ## wait for neighbour workers to reach the barrier
+    #if sid > 0:
+    #    logging.debug("{0} is waiting for {1}".format(sid, sid - 1))
+    #    bkg_events[sid - 1].wait()
+    #if sid < len(bkg_events) - 1:
+    #    logging.debug("{0} is waiting for {1}".format(sid, sid + 1))
+    #    bkg_events[sid + 1].wait()
 
     logging.debug("{0} background subtraction".format(sid))
     for i in range(data_row_max - data_row_min):
@@ -325,6 +348,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None)
     # create an event per stripe
     global bkg_events
     bkg_events = [multiprocessing.Event() for _ in range(len(ymaxs))]
+    mask_events = [multiprocessing.Event() for _ in range(len(ymaxs))]
 
     args = []
     for i, region in enumerate(zip(ymins, ymaxs)):
