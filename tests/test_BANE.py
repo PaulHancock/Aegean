@@ -5,6 +5,7 @@ Test BANE.py
 from __future__ import print_function
 
 from AegeanTools import BANE
+from astropy.io import fits
 import numpy as np
 import os
 
@@ -53,7 +54,7 @@ def test_filter_image():
     bkg = outbase + '_bkg.fits'
     # hdu = fits.getheader(fname)
     # shape = hdu[0]['NAXIS1'], hdu[0]['NAXIS2']
-    BANE.filter_image(fname, step_size=[10, 10], box_size=[100, 100], cores=1, out_base=outbase)
+    BANE.filter_image(fname, step_size=(10, 10), box_size=(100, 100), cores=2, out_base=outbase)
     if not os.path.exists(rms):
         raise AssertionError()
 
@@ -89,9 +90,36 @@ def test_ND_images():
     try:
         BANE.filter_image(fname,out_base=outbase)
     except Exception as e:
-        e.args
+        pass
     else:
         raise AssertionError()
+
+
+def test_quantitative():
+    """Test that the images are equal to a pre-calculated version"""
+    fbase = 'tests/test_files/1904-66_SIN'
+    outbase = 'dlme'
+    BANE.filter_image(fbase+'.fits', out_base=outbase, cores=2, nslice=2)
+
+    rms = outbase + '_rms.fits'
+    bkg = outbase + '_bkg.fits'
+    ref_rms = fbase + '_rms.fits'
+    ref_bkg = fbase + '_bkg.fits'
+
+    r1 = fits.getdata(rms)
+    r2 = fits.getdata(ref_rms)
+    b1 = fits.getdata(bkg)
+    b2 = fits.getdata(ref_bkg)
+    os.remove(rms)
+    os.remove(bkg)
+
+    if not np.allclose(r1, r2, atol=0.01, equal_nan=True):
+        raise AssertionError("rms is wrong")
+
+    if not np.allclose(b1, b2, atol=0.003, equal_nan=True):
+        raise AssertionError("bkg is wrong")
+
+    return
 
 
 if __name__ == "__main__":
