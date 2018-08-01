@@ -121,7 +121,7 @@ def _sf2(args):
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
-def sigma_filter(filename, region, step_size, box_size, shape, sid):
+def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
     """
     Calculate the background and rms for a sub region of an image. The results are
     written to shared memory - irms and ibkg.
@@ -142,6 +142,9 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
 
     shape : tuple
         The shape of the fits image
+
+    domask : bool
+        If true then copy the data mask to the output.
 
     sid : int
         The stripe number
@@ -212,19 +215,10 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
         row = np.array(ifunc((gr[i],gc[i])), dtype=np.float32)
         ibkg[i + ymin] = np.ctypeslib.as_ctypes(row)
     del ifunc
-    logging.debug(" .. done writing bkg")
+    logging.debug(" ... done writing bkg")
 
+    # signal that the bkg is done for this region, and wait for neighbours
     barrier(bkg_events, sid)
-    ## signal that the bkg is done for this region
-    #bkg_events[sid].set()
-    #
-    ## wait for neighbour workers to reach the barrier
-    #if sid > 0:
-    #    logging.debug("{0} is waiting for {1}".format(sid, sid - 1))
-    #    bkg_events[sid - 1].wait()
-    #if sid < len(bkg_events) - 1:
-    #    logging.debug("{0} is waiting for {1}".format(sid, sid + 1))
-    #    bkg_events[sid + 1].wait()
 
     logging.debug("{0} background subtraction".format(sid))
     for i in range(data_row_max - data_row_min):
@@ -248,39 +242,20 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
     del ifunc
     logging.debug(" .. done writing rms")
 
+    if domask:
+        barrier(mask_events, sid)
+        logging.debug("applying mask")
+        for i in range(gr.shape[0]):
+            mask = np.where(np.bitwise_not(np.isfinite(data[i + ymin-data_row_min,:])))[0]
+            for m in mask:
+                ibkg[i+ymin][m] = np.nan
+                irms[i+ymin][m] = np.nan
+        logging.debug(" ... done applying mask")
     logging.debug('rows {0}-{1} finished at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     return
 
 
-def mask_img(data, mask_data):
-    """
-    Take two images of the same shape, and transfer the mask from one to the other.
-    Masking is done via any not finite values. The mask value is numpy.nan.
-
-    Parameters
-    ----------
-    data : numpy.ndarray
-        A 2d array of data that is to be masked. This array is modified in place.
-    mask_data : numpy.ndarray
-        A 2d array of data that contains some not finite value which are to be used to mask the input data.
-
-    Returns
-    -------
-    None
-    """
-    mask = np.where(np.isnan(mask_data))
-    # If the input image has more than 2 dimensions then the mask has too many dimensions
-    # our data has only 2d so we use just the last two dimensions of the mask.
-    if len(mask) > 2:
-        mask = mask[-2], mask[-1]
-        logging.debug("mask = {0}".format(mask))
-    try:
-        data[mask] = np.NaN
-    except IndexError:
-        logging.info("failed to mask file, not a critical failure")
-
-
-def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None):
+def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None, domask=True):
     """
     Calculate the background and noise images corresponding to the input file.
     The calculation is done via a box-car approach and uses multiple cores and shared memory.
@@ -305,6 +280,9 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None)
 
     shape : (int, int)
         The shape of the image in the given file.
+
+    domask : bool
+        True(Default) = copy data mask to output.
 
     Returns
     -------
@@ -346,13 +324,13 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None)
     logging.debug("ymaxs {0}".format(ymaxs))
 
     # create an event per stripe
-    global bkg_events
+    global bkg_events, mask_events
     bkg_events = [multiprocessing.Event() for _ in range(len(ymaxs))]
     mask_events = [multiprocessing.Event() for _ in range(len(ymaxs))]
 
     args = []
     for i, region in enumerate(zip(ymins, ymaxs)):
-        args.append((filename, region, step_size, box_size, shape, i))
+        args.append((filename, region, step_size, box_size, shape, domask, i))
 
     # start a new process for each task, hopefully to reduce residual memory use
     pool = multiprocessing.Pool(processes=cores, maxtasksperchild=1)
@@ -442,7 +420,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, cores=None, m
 
     logging.info("using grid_size {0}, box_size {1}".format(step_size,box_size))
     logging.info("on data shape {0}".format(shape))
-    bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, nslice=nslice)
+    bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, nslice=nslice, domask=mask)
     logging.info("done")
 
     bkg_out = '_'.join([os.path.expanduser(out_base), 'bkg.fits'])
@@ -463,12 +441,6 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, cores=None, m
         compress(hdulist, step_size[0], rms_out)
         return
 
-    # mask
-    if mask:
-        ref = fits.getdata(im_name)
-        mask_img(bkg, ref)
-        mask_img(rms, ref)
-        del ref
     write_fits(bkg, header, bkg_out)
     write_fits(rms, header, rms_out)
 

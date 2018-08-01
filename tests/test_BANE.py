@@ -33,17 +33,6 @@ def test_sigmaclip():
         raise AssertionError()
 
 
-def test_mask_data():
-    """Test the masking of images"""
-    data = np.ones((10, 10), dtype=np.float32)
-    mask = data.copy()
-    mask[3:5, 0:2] = np.nan
-    BANE.mask_img(data, mask)
-    # check that the nan regions overlap
-    if not np.all(np.isnan(data) == np.isnan(mask)):
-        raise AssertionError()
-
-
 def test_filter_image():
     """Test filter image"""
     # data = np.random.random((30, 30), dtype=np.float32)
