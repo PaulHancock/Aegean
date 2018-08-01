@@ -344,10 +344,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None,
     pool.close()
     pool.join()
 
-    # cast back to regular np arrays
-    rms = np.array(irms, dtype=np.float32)
-    bkg = np.array(ibkg, dtype=np.float32)
-    return bkg, rms
+    return ibkg, irms
 
 
 def filter_image(im_name, out_base, step_size=None, box_size=None, cores=None, mask=True, compressed=False, nslice=None):
