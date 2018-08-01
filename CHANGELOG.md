@@ -1,4 +1,4 @@
-2018-07-28
+2018-08-01
 ==========
 BANE
 - version is now v1.7.0
@@ -6,7 +6,7 @@ BANE
 - making use of `--stripes` greater than 1 requires at least `--cores=2`
 - further reduce memory footprint:
   - reduce the amount of interpolation stages that are required by 1 per stripe
-  - do background subtraction in the sub-processes to avoid loading the entire image in the main process
+  - do background subtraction and masking in the sub-processes to avoid loading the entire image in the main process
 - deprecate options `--onepass`/`--twopass` and set a warning when used
 
 MIMAS
