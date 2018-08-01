@@ -193,10 +193,9 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
     interpolated_bkg = np.array(ifunc((gr, gc)), dtype=np.float32)
     del ifunc
 
-    with ibkg.get_lock():
-        logging.debug("Writing bkg to sharemem")
-        for i, row in enumerate(interpolated_bkg):
-            ibkg[i + ymin] = np.ctypeslib.as_ctypes(row)
+    logging.debug("Writing bkg to sharemem")
+    for i, row in enumerate(interpolated_bkg):
+        ibkg[i + ymin] = np.ctypeslib.as_ctypes(row)
     logging.debug(" .. done writing bkg")
 
     # signal that the bkg is done for this region
@@ -225,16 +224,14 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
             _, _ , rms = sigmaclip(new, 3, 3)
             vals[i,j] = rms
 
-    # If the rms calculation above didn't yield any points, then our interpolated values are all nans
     logging.debug("Interpolating rms")
     ifunc = RegularGridInterpolator((rows,cols), vals)
     interpolated_rms = np.array(ifunc((gr, gc)), dtype=np.float32)
     del ifunc
 
-    with irms.get_lock():
-        logging.debug("Writing rms to sharemem")
-        for i, row in enumerate(interpolated_rms):
-            irms[i + ymin] = np.ctypeslib.as_ctypes(row)
+    logging.debug("Writing rms to sharemem")
+    for i, row in enumerate(interpolated_rms):
+        irms[i + ymin] = np.ctypeslib.as_ctypes(row)
     logging.debug(" .. done writing rms")
 
     ##
