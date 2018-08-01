@@ -157,25 +157,6 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
 
     logging.debug('data size is {0}'.format(data.shape))
 
-    def locations(step, _r_min, _r_max, _c_min, _c_max):
-        """
-        Generator function to iterate over a grid of r,c coords
-        operates only within the given bounds
-        Returns:
-        r, c
-        """
-
-        rvals = list(range(_r_min, _r_max, step[0]))
-        if rvals[-1] != _r_max:
-            rvals.append(_r_max)
-        cvals = list(range(_c_min, _c_max, step[1]))
-        if cvals[-1] != _c_max:
-            cvals.append(_c_max)
-        # initial data
-        for c in cvals:
-            for r in rvals:
-                yield r, c
-
     def box(r, c):
         """
         calculate the boundaries of the box centered at r,c
@@ -187,23 +168,29 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
         c_max = min(data.shape[1] - 1, c + box_size[1] // 2)
         return r_min, r_max, c_min, c_max
 
+    rows = list(range(ymin-data_row_min, ymax-data_row_min, step_size[0]))
+    rows.append(ymax-data_row_min)
+    cols = list(range(0, shape[1], step_size[1]))
+    cols.append(shape[1])
+
     # lists that hold the calculated values and array coordinates
     bkg_points = []
     bkg_values = []
     rms_points = []
     rms_values = []
 
-    for row, col in locations(step_size, ymin-data_row_min, ymax-data_row_min, 0, shape[1]):
-        r_min, r_max, c_min, c_max = box(row, col)
-        new = data[r_min:r_max, c_min:c_max]
-        new = np.ravel(new)
-        new, bkg, _ = sigmaclip(new, 3, 3)
-        # If we are left with (or started with) no data, then just move on
-        if len(new) < 1:
-            continue
-
-        bkg_points.append((row + data_row_min, col))  # these coords need to be indices into the larger array
-        bkg_values.append(bkg)
+    for i, row in enumerate(rows):
+        for j, col in enumerate(cols):
+            r_min, r_max, c_min, c_max = box(row, col)
+            new = data[r_min:r_max, c_min:c_max]
+            new = np.ravel(new)
+            new, bkg, _ = sigmaclip(new, 3, 3)
+            # If we are left with (or started with) no data, then just move on
+            if len(new) < 1:
+                continue
+                # these coords need to be indices into the larger array
+            bkg_points.append((row + data_row_min, col))
+            bkg_values.append(bkg)
 
     # indices of the shape we want to write to (not the shape of data)
     gx, gy = np.mgrid[ymin:ymax, 0:shape[1]]
@@ -235,17 +222,18 @@ def sigma_filter(filename, region, step_size, box_size, shape, sid):
     for i in range(data_row_max - data_row_min):
         data[i, :] = data[i, :] - ibkg[data_row_min + i]
 
-    for row, col in locations(step_size, ymin-data_row_min, ymax-data_row_min, 0, shape[1]):
-        r_min, r_max, c_min, c_max = box(row, col)
-        new = data[r_min:r_max, c_min:c_max]
-        new = np.ravel(new)
-        new, _ , rms = sigmaclip(new, 3, 3)
-        # If we are left with (or started with) no data, then just move on
-        if len(new) < 1:
-            continue
+    for i, row in enumerate(rows):
+        for j, col in enumerate(cols):
+            r_min, r_max, c_min, c_max = box(row, col)
+            new = data[r_min:r_max, c_min:c_max]
+            new = np.ravel(new)
+            new, _ , rms = sigmaclip(new, 3, 3)
+            # If we are left with (or started with) no data, then just move on
+            if len(new) < 1:
+                continue
 
-        rms_points.append((row + data_row_min, col))
-        rms_values.append(rms)
+            rms_points.append((row + data_row_min, col))
+            rms_values.append(rms)
 
     # If the rms calculation above didn't yield any points, then our interpolated values are all nans
     if len(rms_points) > 1:
