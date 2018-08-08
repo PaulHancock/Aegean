@@ -7,6 +7,7 @@ __author__ = 'Paul Hancock'
 
 from AegeanTools import fits_interp
 from astropy.io import fits
+import numpy as np
 import os
 
 
@@ -48,9 +49,17 @@ def test_expand():
     """Test the expand function"""
     fname = 'tests/test_files/1904-66_AIT.fits'
     hdulist = fits.open(fname)
+    hdulist[0].data[:] = 1.0
     compressed = fits_interp.compress(hdulist, factor=10)
+    expanded = fits_interp.expand(compressed)
+
     # the uncompressed hdu list is missing header keys so test that this gives the expected result
-    if not (fits_interp.expand(compressed) is hdulist): raise AssertionError()
+    if not (expanded is hdulist):
+        raise AssertionError()
+
+    # ensure that the interpolation isn't completely incorrect
+    if not np.all(expanded[0].data == 1.0):
+        raise AssertionError("image is not all 1.0")
 
     # now mix up the CDELT and CD keys
     compressed = fits_interp.compress(fname, factor=10)  # reload because we pass references
@@ -58,7 +67,8 @@ def test_expand():
     del compressed[0].header['CDELT1']
     compressed[0].header['CD2_2'] = compressed[0].header['CDELT2']
     del compressed[0].header['CDELT2']
-    if not (isinstance(fits_interp.expand(compressed), fits.HDUList)): raise AssertionError()
+    if not (isinstance(fits_interp.expand(compressed), fits.HDUList)):
+        raise AssertionError("CD1_1/CD2_2 doesn't work")
 
     # now strip CD2_2 and we should return None
     compressed = fits_interp.compress(fname, factor=10)
