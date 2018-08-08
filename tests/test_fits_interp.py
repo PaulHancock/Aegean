@@ -83,7 +83,7 @@ def test_fits_interp_compress_then_expand():
     """Test that we can interp/compress files"""
     # test compression and expansion
     fits_interp.compress("tests/test_files/1904-66_AIT.fits", factor=7, outfile='tests/temp/test.fits')
-    fits_interp.expand('tests/temp/test.fits', outfile='tests/temp/test2.fits', method='linear')
+    fits_interp.expand('tests/temp/test.fits', outfile='tests/temp/test2.fits')
     # cleanup
     os.remove('tests/temp/test.fits')
     os.remove('tests/temp/test2.fits')
