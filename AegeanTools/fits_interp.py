@@ -122,12 +122,10 @@ def compress(datafile, factor, outfile=None):
     return hdulist
 
 
-def expand(datafile, outfile=None, method='linear'):
+def expand(datafile, outfile=None):
     """
     Expand and interpolate the given data file using the given method.
     Datafile can be a filename or an HDUList
-    interpolation is carried out by scipy.interpolate.griddata so method can be any valid method
-    accepted by that function.
 
     It is assumed that the file has been compressed and that there are `BN_?` keywords in the
     fits header that describe how the compression was done.
@@ -140,9 +138,6 @@ def expand(datafile, outfile=None, method='linear'):
     outfile : str
         filename to write to (default = None)
 
-    method : str
-        interpolation method (default='linear').
-
     Returns
     -------
     hdulist : HDUList
@@ -152,10 +147,6 @@ def expand(datafile, outfile=None, method='linear'):
     --------
     :func:`AegeanTools.fits_interp.compress`
 
-    Notes
-    -----
-    Methods other than 'linear' can be supplied and will be passed to the interpolator, however
-    testing shows that only the linear interpolation works on large images. ymmv!
     """
     hdulist = load_file_or_hdu(datafile)
 
@@ -176,7 +167,6 @@ def expand(datafile, outfile=None, method='linear'):
 
     # Do the interpolation
     hdulist[0].data = np.array(RegularGridInterpolator((rows,cols), data)((gx, gy)), dtype=np.float32)
-    # hdulist[0].data = np.array(griddata(points, values, (gx, gy), method=method), dtype=np.float32)
 
     # update the fits keywords so that the WCS is correct
     header['CRPIX1'] = (header['CRPIX1'] - 1) * factor + 1
@@ -198,7 +188,6 @@ def expand(datafile, outfile=None, method='linear'):
         logging.error("Error: Can't find CDELT2 or CD2_2")
         return None
 
-    header['BN_INTP'] = (method, 'BANE interpolation method')
     header['HISTORY'] = 'Expanded by factor {0}'.format(factor)
 
     # don't need these any more so delete them.
