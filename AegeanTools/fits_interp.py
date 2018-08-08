@@ -10,7 +10,7 @@ __date__ = '23/08/2017'
 
 import numpy as np
 from astropy.io import fits
-from scipy.interpolate import griddata
+from scipy.interpolate import griddata, RegularGridInterpolator
 import logging
 
 
@@ -167,20 +167,16 @@ def expand(datafile, outfile=None, method='linear'):
 
     factor = header['BN_CFAC']
     (gx, gy) = np.mgrid[0:header['BN_NPX2'], 0:header['BN_NPX1']]
-    # Extract the data and create the array of indices
-    values = np.ravel(data)
-    grid = np.indices(data.shape)
     # fix the last column of the grid to account for residuals
     lcx = header['BN_RPX2']
     lcy = header['BN_RPX1']
 
-    grid[0, :] += int(lcx/factor)
-    grid[1, :] += int(lcy/factor)
-    grid *= factor
-    points = list(zip(np.ravel(grid[0]), np.ravel(grid[1])))
+    rows = (np.arange(data.shape[0]) + int(lcx/factor))*factor
+    cols = (np.arange(data.shape[1]) + int(lcy/factor))*factor
 
     # Do the interpolation
-    hdulist[0].data = np.array(griddata(points, values, (gx, gy), method=method), dtype=np.float32)
+    hdulist[0].data = np.array(RegularGridInterpolator((rows,cols), data)((gx, gy)), dtype=np.float32)
+    # hdulist[0].data = np.array(griddata(points, values, (gx, gy), method=method), dtype=np.float32)
 
     # update the fits keywords so that the WCS is correct
     header['CRPIX1'] = (header['CRPIX1'] - 1) * factor + 1
