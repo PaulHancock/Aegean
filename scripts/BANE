@@ -25,9 +25,8 @@ if __name__=="__main__":
                       help='The [x,y] size of the box over which the rms/bkg is calculated. Default = 5*grid.')
     parser.add_option('--cores', dest='cores', type='int',
                       help='Number of cores to use. Default = all available.')
-    parser.add_option('--onepass', dest='twopass', action='store_false', help='the opposite of twopass. default=False')
-    parser.add_option('--twopass', dest='twopass', action='store_true',
-                      help='Calculate the bkg and rms in a two passes instead of one. (when the bkg changes rapidly)')
+    parser.add_option('--onepass', dest='twopass', action='store_true', help='DEPRECATED')
+    parser.add_option('--twopass', dest='twopass', action='store_true', help='DEPRECATED')
     parser.add_option('--nomask', dest='mask', action='store_false', default=True,
                       help="Don't mask the output array [default = mask]")
     parser.add_option('--noclobber', dest='clobber', action='store_false', default=True,
@@ -73,6 +72,6 @@ if __name__=="__main__":
             sys.exit(1)
 
     BANE.filter_image(im_name=filename, out_base=options.out_base, step_size=options.step_size,
-                      box_size=options.box_size, twopass=options.twopass, cores=options.cores,
+                      box_size=options.box_size, cores=options.cores,
                       mask=options.mask, compressed=options.compress, nslice=options.stripes)
 
