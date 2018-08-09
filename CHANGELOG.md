@@ -1,3 +1,10 @@
+2018-08-08
+==========
+SR6
+- interpolation is now the same as that performed by BANE and is always linear
+- peak memory use is reduced
+- deprecated option ``-i MODE`` which selected the interpolation method
+
 2018-08-01
 ==========
 BANE
