@@ -603,7 +603,7 @@ class SourceFinder(object):
     # Setting up 'global' data and calculating bkg/rms
     ##
     def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, bkg=None, cores=1,
-                     do_curve=True, mask=None, lat=None, psf=None, blank=False, docov=True, cube_index=None):
+                     do_curve=False, mask=None, lat=None, psf=None, blank=False, docov=True, cube_index=None):
         """
         Populate the global_data object by loading or calculating the various components
 
@@ -1296,7 +1296,20 @@ class SourceFinder(object):
         beam = global_data.psfhelper.get_psf_pix(midra, middec)
         del middec, midra
 
-        icurve = dcurve[xmin:xmax, ymin:ymax]
+        # icurve = dcurve[xmin:xmax, ymin:ymax]
+        s1 = slice(max(xmin-1,0), min(xmax+1,global_data.data_pix.shape[0]))
+        s2 = slice(max(ymin-1,0), min(ymax+1,global_data.data_pix.shape[1]))
+
+        icurve = np.zeros(shape=(s1.stop-s1.start, s2.stop-s2.start), dtype=np.int8)
+        peaks = scipy.ndimage.filters.maximum_filter(self.global_data.data_pix[s1, s2], size=3)
+        pmask = np.where(peaks == self.global_data.data_pix[s1, s2])
+        troughs = scipy.ndimage.filters.minimum_filter(self.global_data.data_pix[s1, s2], size=3)
+        tmask = np.where(troughs == self.global_data.data_pix[s1, s2])
+        icurve[pmask] = -1
+        icurve[tmask] = 1
+        icurve = icurve[xmin-s1.start:xmax-s1.stop, ymin-s2.start:ymax-s2.stop]
+        del peaks, pmask, troughs, tmask
+        
         rms = rmsimg[xmin:xmax, ymin:ymax]
 
         is_flag = 0
