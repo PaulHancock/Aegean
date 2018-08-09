@@ -4,14 +4,13 @@
 A module to allow fits files to be shrunk in size using decimation, and to be
 grown in size using interpolation.
 """
-
-__author__ = 'Paul Hancock'
-__date__ = '23/08/2017'
-
 import numpy as np
 from astropy.io import fits
-from scipy.interpolate import griddata, RegularGridInterpolator
+from scipy.interpolate import  RegularGridInterpolator
 import logging
+
+__author__ = 'Paul Hancock'
+__date__ = '2018-08-09'
 
 
 def load_file_or_hdu(filename):
