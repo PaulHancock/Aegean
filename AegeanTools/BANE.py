@@ -23,7 +23,7 @@ from .fits_interp import compress
 
 __author__ = 'Paul Hancock'
 __version__ = 'v1.7.0'
-__date__ = '2018-08-01'
+__date__ = '2018-08-09'
 
 # global variables for multiprocessing
 ibkg = irms = None
