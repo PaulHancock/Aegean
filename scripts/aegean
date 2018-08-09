@@ -65,7 +65,7 @@ def check_projection(filename, options):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='aegean', prefix_chars='-')
     parser.add_argument('image', nargs='?', default=None)
-    group1 = parser.add_argument_group('Configuration Options')
+    group1 = parser.add_argument_group('Configuration Options:')
 
     group1.add_argument("--find", dest='find', action='store_true', default=False,
                         help='Source finding mode. [default: true, unless --save or --measure are selected]')
@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
 
     # Input
-    group2 = parser.add_argument_group("Input Options")
+    group2 = parser.add_argument_group("Input Options:")
     group2.add_argument("--forcerms", dest='rms', type=float, default=None,
                         help="Assume a single image noise of rms. [default: None]")
     group2.add_argument("--forcebkg", dest='bkg', type=float, default=None,
@@ -104,7 +104,7 @@ if __name__ == "__main__":
                              "using the input filename as a hint. [default: don't do this]")
 
     # Output
-    group3 = parser.add_argument_group("Output Options")
+    group3 = parser.add_argument_group("Output Options:")
     group3.add_argument("--out", dest='outfile', default=None, type=str,
                         help="Destination of Aegean catalog output. [default: No output]")
     group3.add_argument("--table", dest='tables', default=None, type=str,
@@ -117,7 +117,7 @@ if __name__ == "__main__":
                         help='Prepend each column name with "prefix_". Default = prepend nothing')
 
     # SF config options
-    group4 = parser.add_argument_group("Source finding/fitting configuration options")
+    group4 = parser.add_argument_group("Source finding/fitting configuration options:")
     group4.add_argument("--maxsummits", dest='max_summits', type=float, default=None,
                         help="If more than *maxsummits* summits are detected in an island, no fitting is done, " +
                              "only estimation. [default: no limit]")
@@ -132,14 +132,14 @@ if __name__ == "__main__":
     group4.add_argument('--negative', dest='negative', action="store_true", default=False,
                         help="Report sources with negative fluxes. [default: false]")
     group4.add_argument('--region', dest='region', type=str, default=None,
-                        help="Use this regions file to restrict source finding in this image.\nUse MIMAS region (.mim) files.")
+                        help="Use this regions file to restrict source finding in this image.")
     group4.add_argument('--nocov', dest='docov', action="store_false", default=True,
                         help="Don't use the covariance of the data in the fitting proccess. [Default = False]")
     group4.add_argument('--condon', dest='condon', action="store_true", default=False,
                         help="replace errors with those suggested by Condon'97. [Default = False]")
 
     # priorized fitting
-    group5 = parser.add_argument_group("Priorized Fitting config options","in addition to the above source fitting options")
+    group5 = parser.add_argument_group("Priorized Fitting config options:","in addition to the above source fitting options")
     group5.add_argument('--priorized', dest='priorized', default=0, type=int,
                         help="Enable priorized fitting level n=[1,2,3]. 1=fit flux, 2=fit flux/position, 3=fit flux/position/shape. " + 
                              "See the GitHub wiki for more details." )
