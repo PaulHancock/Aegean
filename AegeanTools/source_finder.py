@@ -1686,6 +1686,10 @@ class SourceFinder(object):
                 self.log.info("Using catalog PSF from input catalog")
                 psf_helper = None
             for i, src in enumerate(input_sources):
+                if (src.psf_a <=0) or (src.psf_b <=0):
+                    src_mask[i] = False
+                    self.log.info("Excluding source ({0.island},{0.source}) due to psf_a/b <=0".format(src))
+                    continue
                 if has_psf:
                     catbeam = Beam(src.psf_a / 3600, src.psf_b / 3600, src.psf_pa)
                 else:
