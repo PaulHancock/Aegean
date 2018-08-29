@@ -5,8 +5,6 @@ The Aegean source finding program.
 
 from __future__ import print_function
 
-__author__ = "Paul Hancock"
-
 # standard imports
 import sys
 import six
@@ -37,16 +35,13 @@ from . import flags
 # need Region in the name space in order to be able to unpickle it
 from .regions import Region
 
-if six.PY2:
-    import cPickle
-else:
-    import _pickle as cPickle
-
 # multiple cores support
 import pprocess
 import multiprocessing
 
 from .__init__ import __version__, __date__
+
+__author__ = "Paul Hancock"
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -680,7 +675,7 @@ class SourceFinder(object):
                 self.global_data.region = mask
             elif os.path.exists(mask):
                 self.log.info("Loading mask from {0}".format(mask))
-                self.global_data.region = cPickle.load(open(mask, 'rb'))
+                self.global_data.region = Region.load(mask)
             else:
                 self.log.error("File {0} not found for loading".format(mask))
                 self.global_data.region = None

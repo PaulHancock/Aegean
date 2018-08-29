@@ -8,16 +8,11 @@ http://arxiv.org/abs/1505.02937
 
 from __future__ import print_function
 
-__author__ = "Paul Hancock"
-__version__ = 'v1.3.0'
-__date__ = '2018-05-05'
-
 import logging
 import numpy as np
 
 import os
 import re
-import six
 from astropy.coordinates import Angle, SkyCoord
 import astropy.units as u
 from astropy.io import fits as pyfits
@@ -25,11 +20,10 @@ from astropy.wcs import wcs as pywcs
 from .regions import Region
 from .catalogs import load_table, write_table
 
-# seems like this fails sometimes
-if six.PY2:
-    import cPickle
-else:
-    import _pickle as cPickle
+__author__ = "Paul Hancock"
+__version__ = 'v1.3.1'
+__date__ = '2018-08-29'
+
 
 # globals
 filewcs = None
@@ -174,7 +168,7 @@ def mask_file(regionfile, infile, outfile, negate=False):
     if not os.path.exists(infile): raise AssertionError("Cannot locate fits file {0}".format(infile))
     im = pyfits.open(infile)
     if not os.path.exists(regionfile): raise AssertionError("Cannot locate region file {0}".format(regionfile))
-    region = cPickle.load(open(regionfile, 'rb'))
+    region = Region.load(regionfile)
     try:
         wcs = pywcs.WCS(im[0].header, naxis=2)
     except:  # TODO: figure out what error is being thrown
@@ -265,7 +259,7 @@ def mask_catalog(regionfile, infile, outfile, negate=False, racol='ra', deccol='
     :func:`AegeanTools.catalogs.load_table`
     """
     logging.info("Loading region from {0}".format(regionfile))
-    region = cPickle.load(open(regionfile, 'rb'))
+    region = Region.load(regionfile)
     logging.info("Loading catalog from {0}".format(infile))
     table = load_table(infile)
     masked_table = mask_table(region, table, negate=negate, racol=racol, deccol=deccol)
@@ -286,7 +280,7 @@ def mim2reg(mimfile, regfile):
         Output file.
 
     """
-    region = cPickle.load(open(mimfile, 'rb'))
+    region = Region.load(mimfile)
     region.write_reg(regfile)
     logging.info("Converted {0} -> {1}".format(mimfile, regfile))
     return
@@ -304,7 +298,7 @@ def mim2fits(mimfile, fitsfile):
     fitsfile : str
         Output file.
     """
-    region = cPickle.load(open(mimfile, 'rb'))
+    region = Region.load(mimfile)
     region.write_fits(fitsfile, moctool='MIMAS {0}-{1}'.format(__version__, __date__))
     logging.info("Converted {0} -> {1}".format(mimfile, fitsfile))
     return
@@ -466,12 +460,12 @@ def combine_regions(container):
     # add/rem all the regions from files
     for r in container.add_region:
         logging.info("adding region from {0}".format(r))
-        r2 = cPickle.load(open(r[0], 'rb'))
+        r2 = Region.load(r[0])
         region.union(r2)
 
     for r in container.rem_region:
         logging.info("removing region from {0}".format(r))
-        r2 = cPickle.load(open(r[0], 'rb'))
+        r2 = Region.load(r[0])
         region.without(r2)
 
 
@@ -534,8 +528,8 @@ def intersect_regions(flist):
     """
     if len(flist) < 2:
         raise Exception("Require at least two regions to perform intersection")
-    a = cPickle.load(open(flist[0], 'rb'))
-    for b in [cPickle.load(open(f, 'rb')) for f in flist[1:]]:
+    a = Region.load(flist[0])
+    for b in [Region.load(f) for f in flist[1:]]:
         a.intersect(b)
     return a
 
@@ -552,7 +546,7 @@ def save_region(region, filename):
     filename : str
         Output file name.
     """
-    cPickle.dump(region, open(filename, 'wb'), protocol=2)
+    region.save(filename)
     logging.info("Wrote {0}".format(filename))
     return
 
