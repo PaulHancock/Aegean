@@ -22,8 +22,8 @@ from time import gmtime, strftime
 from .fits_interp import compress
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.7.0'
-__date__ = '2018-08-09'
+__version__ = 'v1.8.0'
+__date__ = '2018-09-15'
 
 # global variables for multiprocessing
 ibkg = irms = None
@@ -179,6 +179,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
             logging.error("fix your file to be more sane")
             raise Exception("Too many NAXIS")
 
+    row_len = shape[1]
+
     logging.debug('data size is {0}'.format(data.shape))
 
     def box(r, c):
@@ -213,10 +215,12 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
     gr, gc = np.mgrid[ymin-data_row_min:ymax-data_row_min, 0:shape[1]]
 
     logging.debug("Interpolating bkg to sharemem")
-    ifunc = RegularGridInterpolator((rows,cols), vals)
+    ifunc = RegularGridInterpolator((rows, cols), vals)
     for i in range(gr.shape[0]):
-        row = np.array(ifunc((gr[i],gc[i])), dtype=np.float32)
-        ibkg[i + ymin] = np.ctypeslib.as_ctypes(row)
+        row = np.array(ifunc((gr[i], gc[i])), dtype=np.float32)
+        start_idx = np.ravel_multi_index((ymin+i, 0), shape)
+        end_idx = start_idx + row_len
+        ibkg[start_idx:end_idx] = row  # np.ctypeslib.as_ctypes(row)
     del ifunc
     logging.debug(" ... done writing bkg")
 
@@ -225,7 +229,9 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
 
     logging.debug("{0} background subtraction".format(sid))
     for i in range(data_row_max - data_row_min):
-        data[i, :] = data[i, :] - ibkg[data_row_min + i]
+        start_idx = np.ravel_multi_index((data_row_min + i, 0), shape)
+        end_idx = start_idx + row_len
+        data[i, :] = data[i, :] - ibkg[start_idx:end_idx]
     # reset/recycle the vals array
     vals[:] = 0
 
@@ -238,10 +244,12 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
             vals[i,j] = rms
 
     logging.debug("Interpolating rm to sharemem rms")
-    ifunc = RegularGridInterpolator((rows,cols), vals)
+    ifunc = RegularGridInterpolator((rows, cols), vals)
     for i in range(gr.shape[0]):
-        row = np.array(ifunc((gr[i],gc[i])), dtype=np.float32)
-        irms[i + ymin] = np.ctypeslib.as_ctypes(row)
+        row = np.array(ifunc((gr[i], gc[i])), dtype=np.float32)
+        start_idx = np.ravel_multi_index((ymin+i, 0), shape)
+        end_idx = start_idx + row_len
+        irms[start_idx:end_idx] = row  # np.ctypeslib.as_ctypes(row)
     del ifunc
     logging.debug(" .. done writing rms")
 
@@ -250,9 +258,10 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
         logging.debug("applying mask")
         for i in range(gr.shape[0]):
             mask = np.where(np.bitwise_not(np.isfinite(data[i + ymin-data_row_min,:])))[0]
-            for m in mask:
-                ibkg[i+ymin][m] = np.nan
-                irms[i+ymin][m] = np.nan
+            for j in mask:
+                idx = np.ravel_multi_index((i + ymin,j),shape)
+                ibkg[idx] = np.nan
+                irms[idx] = np.nan
         logging.debug(" ... done applying mask")
     logging.debug('rows {0}-{1} finished at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     return
@@ -301,12 +310,14 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None,
     img_y, img_x = shape
     # initialise some shared memory
     global ibkg
-    bkg = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
-    ibkg = multiprocessing.sharedctypes.Array(bkg._type_, bkg, lock=True)
+    # bkg = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
+    # ibkg = multiprocessing.sharedctypes.Array(bkg._type_, bkg, lock=True)
+    ibkg = multiprocessing.Array('f', img_y*img_x)
 
     global irms
-    rms = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
-    irms = multiprocessing.sharedctypes.Array(rms._type_, rms, lock=True)
+    #rms = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
+    #irms = multiprocessing.sharedctypes.Array(rms._type_, rms, lock=True)
+    irms = multiprocessing.Array('f', img_y * img_x)
 
     logging.info("using {0} cores".format(cores))
     logging.info("using {0} stripes".format(nslice))
@@ -346,8 +357,10 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None,
         sys.exit(1)
     pool.close()
     pool.join()
-
-    return ibkg, irms
+    bkg = np.reshape(np.array(ibkg[:], dtype=np.float32), shape)
+    rms = np.reshape(np.array(irms[:], dtype=np.float32), shape)
+    del ibkg, irms
+    return bkg, rms
 
 
 def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False, nslice=None):
