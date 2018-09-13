@@ -1,3 +1,9 @@
+2018-09-13
+==========
+BANE
+- version is now v1.8.0
+- Fixed a segfault that could occur on image of a particular size (usually 4k x 4k)
+
 2018-08-08
 ==========
 SR6
