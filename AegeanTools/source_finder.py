@@ -40,6 +40,8 @@ import multiprocessing
 from .__init__ import __version__, __date__
 __author__ = "Paul Hancock"
 
+__author__ = "Paul Hancock"
+
 header = """#Aegean version {0}
 # on dataset: {1}"""
 
@@ -672,7 +674,7 @@ class SourceFinder(object):
                 self.global_data.region = mask
             elif os.path.exists(mask):
                 self.log.info("Loading mask from {0}".format(mask))
-                self.global_data.region = cPickle.load(open(mask, 'rb'))
+                self.global_data.region = Region.load(mask)
             else:
                 self.log.error("File {0} not found for loading".format(mask))
                 self.global_data.region = None
@@ -1691,6 +1693,10 @@ class SourceFinder(object):
                 self.log.info("Using catalog PSF from input catalog")
                 psf_helper = None
             for i, src in enumerate(input_sources):
+                if (src.psf_a <=0) or (src.psf_b <=0):
+                    src_mask[i] = False
+                    self.log.info("Excluding source ({0.island},{0.source}) due to psf_a/b <=0".format(src))
+                    continue
                 if has_psf:
                     catbeam = Beam(src.psf_a / 3600, src.psf_b / 3600, src.psf_pa)
                 else:
