@@ -1,14 +1,18 @@
-#! python
+#! /usr/bin/env python
+"""
+Test msq2.py
+"""
+
 from __future__ import print_function
+
+__author__ = 'Paul Hancock'
 
 from AegeanTools.msq2 import MarchingSquares
 import numpy as np
 
-__author__ = 'Paul Hancock'
-__date__ = ''
-
 
 def test_defaults():
+    """Test that we can do a basic task"""
     # make a + shape from ones on a background of nan
     data = np.zeros((5, 5))*np.nan
     data[1:4, 2] = 1
@@ -20,6 +24,7 @@ def test_defaults():
 
 
 def test_multi_islands():
+    """Test with two islands"""
     # make a C and a + on a background of zeros
     data = np.zeros((7, 9), dtype=np.int)
     data[1, [1, 2, 3]] = 1

@@ -1,8 +1,11 @@
-#! python
+#! /usr/bin/env python
+"""
+Test cluster.py
+"""
+
 from __future__ import print_function
 
 __author__ = 'Paul Hancock'
-__date__ = ''
 
 from AegeanTools import cluster
 from AegeanTools.models import SimpleSource
@@ -17,16 +20,19 @@ log.setLevel(logging.INFO)
 
 
 def test_norm_dist():
+    """Test norm_dist"""
     src1 = SimpleSource()
     src1.ra = 0
     src1.dec = 0
     src1.a = 1.
     src1.b = 1.
+    src1.pa = 0.
     src2 = SimpleSource()
     src2.ra = 0
     src2.dec = 1/3600.
     src2.a = 1
     src2.b = 1
+    src2.pa = 0.
     if not cluster.norm_dist(src1, src1) == 0:
         raise AssertionError()
     if not cluster.norm_dist(src1, src2) == 1/math.sqrt(2):
@@ -34,6 +40,7 @@ def test_norm_dist():
 
 
 def test_sky_dist():
+    """Test sky_dist"""
     src1 = SimpleSource()
     src1.ra = 0
     src1.dec = 0
@@ -46,12 +53,43 @@ def test_sky_dist():
         raise AssertionError()
 
 
+def test_vectorized():
+    """Test that norm_dist and sky_dist can be vectorized"""
+    # random data as struct array with interface like SimpleSource
+    X = np.random.RandomState(0).rand(20, 6)
+    Xr = np.rec.array(X.view([('ra', 'f8'), ('dec', 'f8'),
+                              ('a', 'f8'), ('b', 'f8'),
+                              ('pa', 'f8'),
+                              ('peak_flux', 'f8')]).ravel())
+
+    def to_ss(x):
+        "Convert numpy.rec to SimpleSource"
+        out = SimpleSource()
+        for f in Xr.dtype.names:
+            setattr(out, f, getattr(x, f))
+        return out
+
+    for dist in [cluster.norm_dist, cluster.sky_dist]:
+        x0 = Xr[0]
+        # calculate distance of x0 to all of Xr with vectorized operations:
+        dx0all = dist(x0, Xr)
+        for i, xi in enumerate(Xr):
+            dx0xi = dist(x0, xi)
+            # check equivalence between pairs of sources and vectorized
+            if not np.isclose(dx0xi, dx0all[i], atol=0):
+                raise AssertionError()
+            # check equivalence between SimpleSource and numpy.record
+            if not np.isclose(dx0xi, dist(to_ss(x0), to_ss(xi)), atol=0):
+                raise AssertionError()
+
 def test_pairwise_elliptical_binary():
+    """Test pairwise_elliptical_binary distance"""
     src1 = SimpleSource()
     src1.ra = 0
     src1.dec = 0
     src1.a = 1.
     src1.b = 1.
+    src1.pa = 0.
     src2 = deepcopy(src1)
     src2.dec = 1/3600.
     src3 = deepcopy(src1)
@@ -62,6 +100,7 @@ def test_pairwise_elliptical_binary():
 
 
 def test_regroup():
+    """Test that regroup does things"""
     # this should throw an attribute error
     try:
         cluster.regroup([1], eps=1)

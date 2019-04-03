@@ -1,17 +1,16 @@
-#! python
+#! /usr/bin/env python
 
 """
 A module to allow fits files to be shrunk in size using decimation, and to be
 grown in size using interpolation.
 """
-
-__author__ = 'Paul Hancock'
-__date__ = '23/08/2017'
-
 import numpy as np
 from astropy.io import fits
-from scipy.interpolate import griddata
+from scipy.interpolate import  RegularGridInterpolator
 import logging
+
+__author__ = 'Paul Hancock'
+__date__ = '2018-08-09'
 
 
 def load_file_or_hdu(filename):
@@ -117,17 +116,15 @@ def compress(datafile, factor, outfile=None):
     hdulist[0].data = np.array(new_data, dtype=np.float32)
     hdulist[0].header = header
     if outfile is not None:
-        hdulist.writeto(outfile, clobber=True)
+        hdulist.writeto(outfile, overwrite=True)
         logging.info("Wrote: {0}".format(outfile))
     return hdulist
 
 
-def expand(datafile, outfile=None, method='linear'):
+def expand(datafile, outfile=None):
     """
     Expand and interpolate the given data file using the given method.
     Datafile can be a filename or an HDUList
-    interpolation is carried out by scipy.interpolate.griddata so method can be any valid method
-    accepted by that function.
 
     It is assumed that the file has been compressed and that there are `BN_?` keywords in the
     fits header that describe how the compression was done.
@@ -140,9 +137,6 @@ def expand(datafile, outfile=None, method='linear'):
     outfile : str
         filename to write to (default = None)
 
-    method : str
-        interpolation method (default='linear').
-
     Returns
     -------
     hdulist : HDUList
@@ -152,10 +146,6 @@ def expand(datafile, outfile=None, method='linear'):
     --------
     :func:`AegeanTools.fits_interp.compress`
 
-    Notes
-    -----
-    Methods other than 'linear' can be supplied and will be passed to the interpolator, however
-    testing shows that only the linear interpolation works on large images. ymmv!
     """
     hdulist = load_file_or_hdu(datafile)
 
@@ -167,20 +157,15 @@ def expand(datafile, outfile=None, method='linear'):
 
     factor = header['BN_CFAC']
     (gx, gy) = np.mgrid[0:header['BN_NPX2'], 0:header['BN_NPX1']]
-    # Extract the data and create the array of indices
-    values = np.ravel(data)
-    grid = np.indices(data.shape)
     # fix the last column of the grid to account for residuals
     lcx = header['BN_RPX2']
     lcy = header['BN_RPX1']
 
-    grid[0, :] += int(lcx/factor)
-    grid[1, :] += int(lcy/factor)
-    grid *= factor
-    points = list(zip(np.ravel(grid[0]), np.ravel(grid[1])))
+    rows = (np.arange(data.shape[0]) + int(lcx/factor))*factor
+    cols = (np.arange(data.shape[1]) + int(lcy/factor))*factor
 
     # Do the interpolation
-    hdulist[0].data = np.array(griddata(points, values, (gx, gy), method=method), dtype=np.float32)
+    hdulist[0].data = np.array(RegularGridInterpolator((rows,cols), data)((gx, gy)), dtype=np.float32)
 
     # update the fits keywords so that the WCS is correct
     header['CRPIX1'] = (header['CRPIX1'] - 1) * factor + 1
@@ -202,13 +187,12 @@ def expand(datafile, outfile=None, method='linear'):
         logging.error("Error: Can't find CDELT2 or CD2_2")
         return None
 
-    header['BN_INTP'] = (method, 'BANE interpolation method')
     header['HISTORY'] = 'Expanded by factor {0}'.format(factor)
 
     # don't need these any more so delete them.
     del header['BN_CFAC'], header['BN_NPX1'], header['BN_NPX2'], header['BN_RPX1'], header['BN_RPX2']
     hdulist[0].header = header
     if outfile is not None:
-        hdulist.writeto(outfile, clobber=True)
+        hdulist.writeto(outfile, overwrite=True)
         logging.info("Wrote: {0}".format(outfile))
     return hdulist

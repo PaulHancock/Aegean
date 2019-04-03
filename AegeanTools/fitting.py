@@ -1,9 +1,9 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 Provide fitting routines and helper fucntions to Aegean
 """
+
+from __future__ import print_function
 
 __author__ = "Paul Hancock"
 
@@ -15,13 +15,15 @@ import lmfit
 from .angle_tools import gcd, bear
 
 # Other AegeanTools
-# from models import OutputSource, IslandSource
 from . import flags
+
 
 # join the Aegean logger
 import logging
-
 log = logging.getLogger('Aegean')
+
+# ERR_MASK is used to indicate that the err_x value is not able to be determined
+ERR_MASK = -1.0
 
 
 # Modelling and fitting functions
@@ -207,12 +209,6 @@ def emp_jacobian(pars, x, y):
     See Also
     --------
     :func:`AegeanTools.fitting.jacobian`
-    """
-    """
-    :param pars: lmfit.Model
-    :param x: x-values over which the model is evaluated
-    :param y: y-values over which the model is evaluated
-    :return:
     """
     eps = 1e-5
     matrix = []
@@ -796,35 +792,6 @@ def bias_correct(params, data, acf=None):
     return
 
 
-def CRB_errs(jac, C, B=None):
-    """
-    Calculate minimum errors given by the Cramer-Rao bound
-
-    Parameters
-    ----------
-    jac : 2d-array
-        Jacobian corresponding to the data and model.
-
-    C : 2d-array
-        Data covariance matrix
-
-    B : 2d-array
-        The square root of C. Default = None, which means that it will be calculated from C.
-
-    Returns
-    -------
-    errs : list
-        The uncertainty on each of the parameters.
-    """
-    if B is not None:
-        fim_inv = inv(np.transpose(jac).dot(B).dot(np.transpose(B)).dot(jac))
-    else:
-        fim = np.transpose(jac).dot(inv(C)).dot(jac)
-        fim_inv = inv(fim)
-    errs = np.sqrt(np.diag(fim_inv))
-    return errs
-
-
 def condon_errors(source, theta_n, psf=None):
     """
     Calculate the parameter errors for a fitted source
@@ -837,7 +804,7 @@ def condon_errors(source, theta_n, psf=None):
     source : :class:`AegeanTools.models.SimpleSource`
         The source which was fit.
 
-    theta_n : float
+    theta_n : float or None
         A measure of the beam sampling. (See Condon'97).
 
     psf : :class:`AegeanTools.fits_image.Beam`
@@ -867,7 +834,7 @@ def condon_errors(source, theta_n, psf=None):
             print(beam, theta_n)
 
     if theta_n is None:
-        source.err_a = source.err_b = source.err_peak_flux = source.err_pa = source.err_int_flux = 0
+        source.err_a = source.err_b = source.err_peak_flux = source.err_pa = source.err_int_flux = 0.0
         return
 
     smoothing = major * minor / (theta_n ** 2)
@@ -887,10 +854,10 @@ def condon_errors(source, theta_n, psf=None):
     source.err_dec = np.sqrt(err_xo2 * np.cos(phi)**2 + err_yo2 * np.sin(phi)**2)
 
     if (major == 0) or (minor == 0):
-        source.err_pa = -1
+        source.err_pa = ERR_MASK
     # if major/minor are very similar then we should not be able to figure out what pa is.
     elif abs(2 * (major-minor) / (major+minor)) < 0.01:
-        source.err_pa = -1
+        source.err_pa = ERR_MASK
     else:
         source.err_pa = np.degrees(np.sqrt(4 / rho2('pa')) * (major * minor / (major ** 2 - minor ** 2)))
 
@@ -925,8 +892,8 @@ def errors(source, model, wcshelper):
 
     # if the source wasn't fit then all errors are -1
     if source.flags & (flags.NOTFIT | flags.FITERR):
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
-        source.err_ra = source.err_dec = source.err_int_flux = -1
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = ERR_MASK
+        source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
         return source
     # copy the errors from the model
     prefix = "c{0}_".format(source.source)
@@ -952,8 +919,8 @@ def errors(source, model, wcshelper):
     # It is possible for this to fail, even if the ra/dec conversion works elsewhere
     if not all(np.isfinite(ref)):
         source.flags |= flags.WCSERR
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
-        source.err_ra = source.err_dec = source.err_int_flux = -1
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = ERR_MASK
+        source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
         return source
 
     # position errors
@@ -972,7 +939,7 @@ def errors(source, model, wcshelper):
             [xo + sx * np.cos(np.radians(theta + err_theta)), yo + sy * np.sin(np.radians(theta + err_theta))])
         source.err_pa = abs(bear(ref[0], ref[1], off1[0], off1[1]) - bear(ref[0], ref[1], off2[0], off2[1]))
     else:
-        source.err_pa = -1
+        source.err_pa = ERR_MASK
 
     if model[prefix + 'sx'].vary and model[prefix + 'sy'].vary \
             and all(np.isfinite([err_sx, err_sy])):
@@ -988,14 +955,14 @@ def errors(source, model, wcshelper):
             [xo + sx * np.cos(np.radians(theta + 90)), yo + (sy + err_sy) * np.sin(np.radians(theta + 90))])
         source.err_b = gcd(ref[0], ref[1], offset[0], offset[1]) * 3600
     else:
-        source.err_a = source.err_b = -1
+        source.err_a = source.err_b = ERR_MASK
 
     sqerr = 0
     sqerr += (source.err_peak_flux / source.peak_flux) ** 2 if source.err_peak_flux > 0 else 0
     sqerr += (source.err_a / source.a) ** 2 if source.err_a > 0 else 0
     sqerr += (source.err_b / source.b) ** 2 if source.err_b > 0 else 0
     if sqerr == 0:
-        source.err_int_flux = -1
+        source.err_int_flux = ERR_MASK
     else:
         source.err_int_flux = abs(source.int_flux * np.sqrt(sqerr))
 
@@ -1028,8 +995,8 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
 
     # if the source wasn't fit then all errors are -1
     if source.flags & (flags.NOTFIT | flags.FITERR):
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
-        source.err_ra = source.err_dec = source.err_int_flux = -1
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = ERR_MASK
+        source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
         return source
     # copy the errors/values from the model
     prefix = "c{0}_".format(source.source)
@@ -1053,8 +1020,8 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
     # check for inf/nan errors -> these sources have poor fits.
     if not all(a is not None and np.isfinite(a) for a in pix_errs):
         source.flags |= flags.FITERR
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
-        source.err_ra = source.err_dec = source.err_int_flux = -1
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = ERR_MASK
+        source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
         return source
 
     # calculate the reference coordinate
@@ -1063,8 +1030,8 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
     # It is possible for this to fail, even if the ra/dec conversion works elsewhere
     if not all(np.isfinite(ref)):
         source.flags |= flags.WCSERR
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = -1
-        source.err_ra = source.err_dec = source.err_int_flux = -1
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = ERR_MASK
+        source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
         return source
 
     # calculate position errors by transforming the error ellipse
@@ -1072,12 +1039,12 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
         # determine the error ellipse from the Jacobian
         mat = model.covar[1:3, 1:3]
         if not(np.all(np.isfinite(mat))):
-            source.err_ra = source.err_dec = -1
+            source.err_ra = source.err_dec = ERR_MASK
         else:
             (a, b), e = np.linalg.eig(mat)
             pa = np.degrees(np.arctan2(*e[0]))
             # transform this ellipse into sky coordinates
-            _, dec, major, minor, pa = wcshelper.pix2sky_ellipse([xo, yo], a, b, pa)
+            _, _, major, minor, pa = wcshelper.pix2sky_ellipse([xo, yo], a, b, pa)
 
             # now determine the radius of the ellipse along the ra/dec directions.
             source.err_ra = major*minor / np.hypot(major*np.sin(np.radians(pa)), minor*np.cos(np.radians(pa)))
@@ -1094,7 +1061,7 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
         # scale the initial theta error by this amount
         source.err_pa = abs(bear(ref[0], ref[1], off1[0], off1[1]) - bear(ref[0], ref[1], off2[0], off2[1])) * err_theta
     else:
-        source.err_pa = -1
+        source.err_pa = ERR_MASK
 
     if model[prefix + 'sx'].vary and model[prefix + 'sy'].vary:
         # major axis error
@@ -1111,8 +1078,7 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
             [xo + sx * np.cos(np.radians(theta + 90)), yo + (sy + 0.1) * np.sin(np.radians(theta + 90))])
         source.err_b = gcd(ref[0], ref[1], offset[0], offset[1])/0.1*err_sy * 3600
     else:
-        source.err_a = source.err_b = -1
-
+        source.err_a = source.err_b = ERR_MASK
     sqerr = 0
     sqerr += (source.err_peak_flux / source.peak_flux) ** 2 if source.err_peak_flux > 0 else 0
     sqerr += (source.err_a / source.a) ** 2 if source.err_a > 0 else 0
@@ -1139,6 +1105,19 @@ def ntwodgaussian_lmfit(params):
     """
 
     def rfunc(x, y):
+        """
+        Compute the model given by params, at pixel coordinates x,y
+
+        Parameters
+        ----------
+        x, y : numpy.ndarray
+            The x/y pixel coordinates at which the model is being evaluated
+
+        Returns
+        -------
+        result : numpy.ndarray
+            Model
+        """
         result = None
         for i in range(params['components'].value):
             prefix = "c{0}_".format(i)
@@ -1200,6 +1179,19 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     mask = np.where(np.isfinite(data))
 
     def residual(params, **kwargs):
+        """
+        The residual function required by lmfit
+
+        Parameters
+        ----------
+        params: lmfit.Params
+            The parameters of the model being fit
+
+        Returns
+        -------
+        result : numpy.ndarray
+            Model - Data
+        """
         f = ntwodgaussian_lmfit(params)  # A function describing the model
         model = f(*mask)  # The actual model
         if B is None:
@@ -1304,6 +1296,9 @@ if __name__ == "__main__":
         params.add('components', value=1, vary=False)
 
         def rmlabels(ax):
+            """
+            Remove tick labels from a plot
+            """
             ax.set_xticks([])
             ax.set_yticks([])
 
@@ -1425,7 +1420,7 @@ if __name__ == "__main__":
         x, y = np.indices((40, 40))
 
         kwargs = {"interpolation": "nearest", 'aspect': 1, 'vmin': -1, 'vmax': 1}
-        vars = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
+        var_names = ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']
 
         fig, ax = pyplot.subplots(6, 3, sharex=True, sharey=True, figsize=(3, 6))
 
@@ -1438,7 +1433,7 @@ if __name__ == "__main__":
             im2 = Jana[i, :, :]
             im2 /= np.amax(im2)
             row[0].imshow(im1, **kwargs)
-            row[0].set_ylabel(vars[i])
+            row[0].set_ylabel(var_names[i])
             row[1].imshow(im2, **kwargs)
             row[2].imshow(im1-im2, **kwargs)
             clx(row[0])

@@ -4,15 +4,16 @@
 This module contains all of the BANE specific code
 The function filter_image should be imported from elsewhere and run as is.
 """
-
+from __future__ import division
 # standard imports
 from astropy.io import fits
 import copy
 import logging
 import multiprocessing
+import multiprocessing.sharedctypes
 import numpy as np
 import os
-from scipy.interpolate import LinearNDInterpolator
+from scipy.interpolate import RegularGridInterpolator
 import sys
 from tempfile import NamedTemporaryFile
 from time import gmtime, strftime
@@ -21,8 +22,33 @@ from time import gmtime, strftime
 from .fits_interp import compress
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.4.6'
-__date__ = '2016-09-01'
+__version__ = 'v1.8.0'
+__date__ = '2018-09-15'
+
+# global variables for multiprocessing
+ibkg = irms = None
+bkg_events = []
+mask_events = []
+
+
+def barrier(events, sid, kind='neighbour'):
+    """
+    act as a multiprocessing barrier
+    """
+    events[sid].set()
+    # only wait for the neighbours
+    if kind=='neighbour':
+        if sid > 0:
+            logging.debug("{0} is waiting for {1}".format(sid, sid - 1))
+            events[sid - 1].wait()
+        if sid < len(bkg_events) - 1:
+            logging.debug("{0} is waiting for {1}".format(sid, sid + 1))
+            events[sid + 1].wait()
+    # wait for all
+    else:
+        [e.wait() for e in events]
+    return
+
 
 def sigmaclip(arr, lo, hi, reps=3):
     """
@@ -47,9 +73,10 @@ def sigmaclip(arr, lo, hi, reps=3):
 
     Returns
     -------
-    clipped : numpy.array
-        The clipped array.
-        The clipped array may be empty!
+    mean : float
+        The mean of the array, possibly nan
+    std : float
+        The std of the array, possibly nan
 
     Notes
     -----
@@ -58,7 +85,7 @@ def sigmaclip(arr, lo, hi, reps=3):
     clipped = np.array(arr)[np.isfinite(arr)]
 
     if len(clipped) < 1:
-        return clipped
+        return np.nan, np.nan
 
     std = np.std(clipped)
     mean = np.mean(clipped)
@@ -72,7 +99,7 @@ def sigmaclip(arr, lo, hi, reps=3):
         mean = np.mean(clipped)
         if 2*abs(pstd-std)/(pstd+std) < 0.2:
             break
-    return clipped
+    return mean, std
 
 
 def _sf2(args):
@@ -88,10 +115,16 @@ def _sf2(args):
     -------
     None
     """
-    return sigma_filter(*args)
+    # an easier to debug traceback when multiprocessing
+    # thanks to https://stackoverflow.com/a/16618842/1710603
+    try:
+        return sigma_filter(*args)
+    except:
+        import traceback
+        raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
-def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
+def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
     """
     Calculate the background and rms for a sub region of an image. The results are
     written to shared memory - irms and ibkg.
@@ -101,8 +134,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     filename : string
         Fits file to open
 
-    region : (float, float, float, float)
-        Region within the fits file that is to be processed. (ymin, ymax, xmin, xmax).
+    region : list
+        Region within the fits file that is to be processed. (row_min, row_max).
 
     step_size : (int, int)
         The filtering step size
@@ -113,230 +146,128 @@ def sigma_filter(filename, region, step_size, box_size, shape, dobkg=True):
     shape : tuple
         The shape of the fits image
 
-    dobkg : bool
-        Do a background calculation. If false then only the rms is calculated. Default = True.
+    domask : bool
+        If true then copy the data mask to the output.
+
+    sid : int
+        The stripe number
 
     Returns
     -------
     None
     """
 
-    # Caveat emptor: The code that follows is very difficult to read.
-    # xmax is not x_max, and x,y actually should be y,x
-    # TODO: fix the code below so that the above comment can be removed
+    ymin, ymax = region
+    logging.debug('rows {0}-{1} starting at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
-    ymin, ymax, xmin, xmax = region
-    logging.debug('{0}x{1},{2}x{3} starting at {4}'.format(xmin, xmax, ymin, ymax,
-                                                           strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-
-    cmin = max(0, ymin - box_size[1]//2)
-    cmax = min(shape[1], ymax + box_size[1]//2)
-    rmin = max(0, xmin - box_size[0]//2)
-    rmax = min(shape[0], xmax + box_size[0]//2)
+    # cut out the region of interest plus 1/2 the box size, but clip to the image size
+    data_row_min = max(0, ymin - box_size[0]//2)
+    data_row_max = min(shape[0], ymax + box_size[0]//2)
 
     # Figure out how many axes are in the datafile
     NAXIS = fits.getheader(filename)["NAXIS"]
-    # It seems that I cannot memmap the same file multiple times without errors
-    with fits.open(filename, memmap=False) as a:
+
+    with fits.open(filename, memmap=True) as a:
         if NAXIS == 2:
-            data = a[0].section[rmin:rmax, cmin:cmax]
+            data = a[0].section[data_row_min:data_row_max, 0:shape[1]]
         elif NAXIS == 3:
-            data = a[0].section[0, rmin:rmax, cmin:cmax]
+            data = a[0].section[0, data_row_min:data_row_max, 0:shape[1]]
         elif NAXIS == 4:
-            data = a[0].section[0, 0, rmin:rmax, cmin:cmax]
+            data = a[0].section[0, 0, data_row_min:data_row_max, 0:shape[1]]
         else:
             logging.error("Too many NAXIS for me {0}".format(NAXIS))
             logging.error("fix your file to be more sane")
-            sys.exit(1)
+            raise Exception("Too many NAXIS")
 
-    # x/y min/max should refer to indices into data
-    # this is the region over which we want to operate
-    ymin -= cmin
-    ymax -= cmin
-    xmin -= rmin
-    xmax -= rmin
+    row_len = shape[1]
 
-    def locations(step_size, xmin, xmax, ymin, ymax):
+    logging.debug('data size is {0}'.format(data.shape))
+
+    def box(r, c):
         """
-        Generator function to iterate over a grid of x,y coords
-        operates only within the given bounds
-        Returns:
-        x, y
-        """
-
-        xvals = list(range(xmin, xmax, step_size[0]))
-        if xvals[-1] != xmax:
-            xvals.append(xmax)
-        yvals = list(range(ymin, ymax, step_size[1]))
-        if yvals[-1] != ymax:
-            yvals.append(ymax)
-        # initial data
-        for y in yvals:
-            for x in xvals:
-                yield x, y
-
-    def box(x, y):
-        """
-        calculate the boundaries of the box centered at x,y
+        calculate the boundaries of the box centered at r,c
         with size = box_size
         """
-        x_min = int(max(0, x-box_size[0]/2))
-        x_max = int(min(data.shape[0]-1, x+box_size[0]/2))
-        y_min = int(max(0, y-box_size[1]/2))
-        y_max = int(min(data.shape[1]-1, y+box_size[1]/2))
-        return x_min, x_max, y_min, y_max
+        r_min = max(0, r - box_size[0] // 2)
+        r_max = min(data.shape[0] - 1, r + box_size[0] // 2)
+        c_min = max(0, c - box_size[1] // 2)
+        c_max = min(data.shape[1] - 1, c + box_size[1] // 2)
+        return r_min, r_max, c_min, c_max
 
-    bkg_points = []
-    bkg_values = []
-    rms_points = []
-    rms_values = []
+    # set up a grid of rows/cols at which we will compute the bkg/rms
+    rows = list(range(ymin-data_row_min, ymax-data_row_min, step_size[0]))
+    rows.append(ymax-data_row_min)
+    cols = list(range(0, shape[1], step_size[1]))
+    cols.append(shape[1])
 
-    for x, y in locations(step_size, xmin, xmax, ymin, ymax):
-        x_min, x_max, y_min, y_max = box(x, y)
-        new = data[x_min:x_max, y_min:y_max]
-        new = np.ravel(new)
-        new = sigmaclip(new, 3, 3)
-        # If we are left with (or started with) no data, then just move on
-        if len(new) < 1:
-            continue
+    # store the computed bkg/rms in this smaller array
+    vals = np.zeros(shape=(len(rows),len(cols)))
 
-        if dobkg:
-            bkg = np.median(new)
-            bkg_points.append((x+rmin, y+cmin))  # these coords need to be indices into the larger array
-            bkg_values.append(bkg)
-        rms = np.std(new)
-        rms_points.append((x+rmin, y+cmin))
-        rms_values.append(rms)
+    for i, row in enumerate(rows):
+        for j, col in enumerate(cols):
+            r_min, r_max, c_min, c_max = box(row, col)
+            new = data[r_min:r_max, c_min:c_max]
+            new = np.ravel(new)
+            bkg, _ = sigmaclip(new, 3, 3)
+            vals[i,j] = bkg
 
-    ymin, ymax, xmin, xmax = region
-    gx, gy = np.mgrid[xmin:xmax, ymin:ymax]
-    # If the bkg/rms calculation above didn't yield any points, then our interpolated values are all nans
-    if len(rms_points) > 1:
-        logging.debug("Interpolating rms")
-        ifunc = LinearNDInterpolator(rms_points, rms_values)
-        # force 32 bit floats
-        interpolated_rms = np.array(ifunc((gx, gy)), dtype=np.float32)
-        del ifunc
-    else:
-        interpolated_rms = np.empty((len(gx), len(gy)), dtype=np.float32)*np.nan
-    with irms.get_lock():
-        logging.debug("Writing rms to sharemem")
-        for i, row in enumerate(interpolated_rms):
-            start_idx = np.ravel_multi_index((xmin + i, ymin), shape)
-            end_idx = start_idx + len(row)
-            irms[start_idx:end_idx] = row
+    # indices of all the pixels within our region
+    gr, gc = np.mgrid[ymin-data_row_min:ymax-data_row_min, 0:shape[1]]
+
+    logging.debug("Interpolating bkg to sharemem")
+    ifunc = RegularGridInterpolator((rows, cols), vals)
+    for i in range(gr.shape[0]):
+        row = np.array(ifunc((gr[i], gc[i])), dtype=np.float32)
+        start_idx = np.ravel_multi_index((ymin+i, 0), shape)
+        end_idx = start_idx + row_len
+        ibkg[start_idx:end_idx] = row  # np.ctypeslib.as_ctypes(row)
+    del ifunc
+    logging.debug(" ... done writing bkg")
+
+    # signal that the bkg is done for this region, and wait for neighbours
+    barrier(bkg_events, sid)
+
+    logging.debug("{0} background subtraction".format(sid))
+    for i in range(data_row_max - data_row_min):
+        start_idx = np.ravel_multi_index((data_row_min + i, 0), shape)
+        end_idx = start_idx + row_len
+        data[i, :] = data[i, :] - ibkg[start_idx:end_idx]
+    # reset/recycle the vals array
+    vals[:] = 0
+
+    for i, row in enumerate(rows):
+        for j, col in enumerate(cols):
+            r_min, r_max, c_min, c_max = box(row, col)
+            new = data[r_min:r_max, c_min:c_max]
+            new = np.ravel(new)
+            _ , rms = sigmaclip(new, 3, 3)
+            vals[i,j] = rms
+
+    logging.debug("Interpolating rm to sharemem rms")
+    ifunc = RegularGridInterpolator((rows, cols), vals)
+    for i in range(gr.shape[0]):
+        row = np.array(ifunc((gr[i], gc[i])), dtype=np.float32)
+        start_idx = np.ravel_multi_index((ymin+i, 0), shape)
+        end_idx = start_idx + row_len
+        irms[start_idx:end_idx] = row  # np.ctypeslib.as_ctypes(row)
+    del ifunc
     logging.debug(" .. done writing rms")
 
-    if dobkg:
-        if len(bkg_points)>1:
-            logging.debug("Interpolating bkg")
-            ifunc = LinearNDInterpolator(bkg_points, bkg_values)
-            interpolated_bkg = np.array(ifunc((gx, gy)), dtype=np.float32)
-            del ifunc
-        else:
-            interpolated_bkg = np.empty((len(gx), len(gy)), dtype=np.float32)*np.nan
-        with ibkg.get_lock():
-            logging.debug("Writing bkg to sharemem")
-            for i, row in enumerate(interpolated_bkg):
-                start_idx = np.ravel_multi_index((xmin + i, ymin), shape)
-                end_idx = start_idx + len(row)
-                ibkg[start_idx:end_idx] = row
-        logging.debug(" .. done writing bkg")
-    logging.debug('{0}x{1},{2}x{3} finished at {4}'.format(xmin, xmax, ymin, ymax,
-                                                           strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    if domask:
+        barrier(mask_events, sid)
+        logging.debug("applying mask")
+        for i in range(gr.shape[0]):
+            mask = np.where(np.bitwise_not(np.isfinite(data[i + ymin-data_row_min,:])))[0]
+            for j in mask:
+                idx = np.ravel_multi_index((i + ymin,j),shape)
+                ibkg[idx] = np.nan
+                irms[idx] = np.nan
+        logging.debug(" ... done applying mask")
+    logging.debug('rows {0}-{1} finished at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     return
 
 
-def gen_factors(m, permute=True):
-    """
-    Generate a list of integer factors of the the input m.
-
-    Parameters
-    ----------
-    m : int
-        The number to factorise
-
-    permute : bool
-        If true then yield both x,y and y,x if x*y=m. Otherwise only yield one of the two. Default = True.
-
-    Yields
-    ------
-    x, y : int
-        Two integers x and y such that x*y=m
-    """
-    # convert to int if people have been naughty
-    n = int(abs(m))
-    # brute force the factors, one of which is always less than sqrt(n)
-    for i in range(1, int(n**0.5+1)):
-        if n % i == 0:
-            yield i, n/i
-            # yield the reverse pair if it is unique
-            if i != n/i and permute:
-                yield n/i, i
-
-
-def optimum_sections(cores, data_shape):
-    """
-    Choose the best sectioning scheme based on the number of corse available and the shape of the data.
-    "Best" here means minimum perimeter.
-
-    Parameters
-    ----------
-    cores : int
-        The number of corse which are going to be doing the processing.
-    data_shape : tuple
-        Shape of the data as (x,y).
-
-    Returns
-    -------
-    nx, ny : int
-        The number of divisions in each dimension.
-    """
-    if cores == 1:
-        return (1, 1)
-    if cores % 1 == 1:
-        cores -= 1
-    x, y = data_shape
-    min_overlap = np.inf
-    best = (1, 1)
-    for (mx, my) in gen_factors(cores):
-        overlap = x*(my-1) + y*(mx-1)
-        if overlap < min_overlap:
-            best = (mx, my)
-            min_overlap = overlap
-    logging.debug("Sectioning chosen to be {0[0]}x{0[1]} for a score of {1}".format(best, min_overlap))
-    return best
-
-
-def mask_img(data, mask_data):
-    """
-    Take two images of the same shape, and transfer the mask from one to the other.
-    Masking is done via any not finite values. The mask value is numpy.nan.
-
-    Parameters
-    ----------
-    data : numpy.ndarray
-        A 2d array of data that is to be masked. This array is modified in place.
-    mask_data : numpy.ndarray
-        A 2d array of data that contains some not finite value which are to be used to mask the input data.
-
-    Returns
-    -------
-    None
-    """
-    mask = np.where(np.isnan(mask_data))
-    # If the input image has more than 2 dimensions then the mask has too many dimensions
-    # our data has only 2d so we use just the last two dimensions of the mask.
-    if len(mask) > 2:
-        mask = mask[-2], mask[-1]
-        logging.debug("mask = {0}".format(mask))
-    try:
-        data[mask] = np.NaN
-    except IndexError:
-        logging.info("failed to mask file, not a critical failure")
-
-
-def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
+def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None, domask=True):
     """
     Calculate the background and noise images corresponding to the input file.
     The calculation is done via a box-car approach and uses multiple cores and shared memory.
@@ -355,11 +286,15 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
     cores : int
         Number of cores to use. If None then use all available.
 
+    nslice : int
+        The image will be divided into this many horizontal stripes for processing.
+        Default = None = equal to cores
+
     shape : (int, int)
         The shape of the image in the given file.
 
-    dobkg : bool
-        If True then calculate the background, otherwise assume it is zero.
+    domask : bool
+        True(Default) = copy data mask to output.
 
     Returns
     -------
@@ -369,74 +304,66 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, dobkg=True):
 
     if cores is None:
         cores = multiprocessing.cpu_count()
+    if (nslice is None) or (cores==1):
+        nslice = cores
 
     img_y, img_x = shape
     # initialise some shared memory
-    alen = shape[0]*shape[1]
-    if dobkg:
-        global ibkg
-        ibkg = multiprocessing.Array('f', alen)
-    else:
-        ibkg = None
+    global ibkg
+    # bkg = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
+    # ibkg = multiprocessing.sharedctypes.Array(bkg._type_, bkg, lock=True)
+    ibkg = multiprocessing.Array('f', img_y*img_x)
+
     global irms
-    irms = multiprocessing.Array('f', alen)
+    #rms = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
+    #irms = multiprocessing.sharedctypes.Array(rms._type_, rms, lock=True)
+    irms = multiprocessing.Array('f', img_y * img_x)
 
     logging.info("using {0} cores".format(cores))
-    nx, ny = optimum_sections(cores, shape)
+    logging.info("using {0} stripes".format(nslice))
 
-    # box widths should be multiples of the step_size, and not zero
-    width_x = int(max(img_x/nx/step_size[0], 1) * step_size[0])
-    width_y = int(max(img_y/ny/step_size[1], 1) * step_size[1])
+    if nslice > 1:
+        # box widths should be multiples of the step_size, and not zero
+        width_y = int(max(img_y/nslice/step_size[1], 1) * step_size[1])
 
-    xstart = width_x
-    ystart = width_y
-    xend = img_x - img_x % width_x  # the end point of the last "full" box
-    yend = img_y - img_y % width_y
+        # locations of the box edges
+        ymins = list(range(0, img_y, width_y))
+        ymaxs = list(range(width_y, img_y, width_y))
+        ymaxs.append(img_y)
+    else:
+        ymins = [0]
+        ymaxs = [img_y]
 
-    # locations of the box edges
-    xmins = [0]
-    xmins.extend(list(range(xstart, xend, width_x)))
+    logging.debug("ymins {0}".format(ymins))
+    logging.debug("ymaxs {0}".format(ymaxs))
 
-    xmaxs = [xstart]
-    xmaxs.extend(list(range(xstart+width_x, xend+1, width_x)))
-    xmaxs[-1] = img_x
-
-    ymins = [0]
-    ymins.extend(list(range(ystart, yend, width_y)))
-
-    ymaxs = [ystart]
-    ymaxs.extend(list(range(ystart+width_y, yend+1, width_y)))
-    ymaxs[-1] = img_y
+    # create an event per stripe
+    global bkg_events, mask_events
+    bkg_events = [multiprocessing.Event() for _ in range(len(ymaxs))]
+    mask_events = [multiprocessing.Event() for _ in range(len(ymaxs))]
 
     args = []
-    for xmin, xmax in zip(xmins, xmaxs):
-        for ymin, ymax in zip(ymins, ymaxs):
-            region = [xmin, xmax, ymin, ymax]
-            args.append((filename, region, step_size, box_size, shape, dobkg))
+    for i, region in enumerate(zip(ymins, ymaxs)):
+        args.append((filename, region, step_size, box_size, shape, domask, i))
 
-    pool = multiprocessing.Pool(processes=cores)
-    pool.map(_sf2, args)
+    # start a new process for each task, hopefully to reduce residual memory use
+    pool = multiprocessing.Pool(processes=cores, maxtasksperchild=1)
+    try:
+        # chunksize=1 ensures that we only send a single task to each process
+        pool.map_async(_sf2, args, chunksize=1).get(timeout=10000000)
+    except KeyboardInterrupt:
+        logging.error("Caught keyboard interrupt")
+        pool.close()
+        sys.exit(1)
     pool.close()
     pool.join()
-
-    # reshape our 1d arrays back into a 2d image
-    if dobkg:
-        logging.debug("reshaping bkg")
-        interpolated_bkg = np.reshape(np.array(ibkg[:], dtype=np.float32), shape)
-        logging.debug(" bkg is {0}".format(interpolated_bkg.dtype))
-        logging.debug(" ... done at {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-    else:
-        interpolated_bkg = None
-    del ibkg
-    logging.debug("reshaping rms")
-    interpolated_rms = np.reshape(np.array(irms[:], dtype=np.float32), shape)
-    logging.debug(" ... done at {0}".format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-    del irms
-
-    return interpolated_bkg, interpolated_rms
+    bkg = np.reshape(np.array(ibkg[:], dtype=np.float32), shape)
+    rms = np.reshape(np.array(irms[:], dtype=np.float32), shape)
+    del ibkg, irms
+    return bkg, rms
 
 
-def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False):
+def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False, nslice=None):
     """
     Create a background and noise image from an input image.
     Resulting images are written to `outbase_bkg.fits` and `outbase_rms.fits`
@@ -457,6 +384,9 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
     cores : int
         Number of CPU corse to use.
         Default = all available
+    nslice : int
+        The image will be divided into this many horizontal stripes for processing.
+        Default = None = equal to cores
     mask : bool
         Mask the output array to contain np.nna wherever the input array is nan or not finite.
         Default = true
@@ -506,37 +436,17 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 
     logging.info("using grid_size {0}, box_size {1}".format(step_size,box_size))
     logging.info("on data shape {0}".format(shape))
-    bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape)
+    bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, nslice=nslice, domask=mask)
     logging.info("done")
-
-    # force float 32s to avoid bloated files
-    bkg = np.array(bkg, dtype=np.float32)
-    rms = np.array(rms, dtype=np.float32)
-
-    if twopass:
-        # TODO: check what this does for our memory usage
-        # Answer: The interpolation step peaks at about 5x the normal value.
-        tempfile = NamedTemporaryFile(delete=False)
-        data = fits.getdata(im_name) - bkg
-        header = fits.getheader(im_name)
-        # write 32bit floats to reduce memory overhead
-        write_fits(np.array(data, dtype=np.float32), header, tempfile)
-        tempfile.close()
-        temp_name = tempfile.name
-        del data, header, tempfile, rms
-        logging.info("running second pass to get a better rms")
-        junk, rms = filter_mc_sharemem(temp_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, dobkg=False)
-        del junk
-        rms = np.array(rms, dtype=np.float32)
-        os.remove(temp_name)
 
     bkg_out = '_'.join([os.path.expanduser(out_base), 'bkg.fits'])
     rms_out = '_'.join([os.path.expanduser(out_base), 'rms.fits'])
 
 
-    # load the file since we are now going to fiddle with it
-    header = fits.getheader(im_name)
+    # add a comment to the fits header
     header['HISTORY'] = 'BANE {0}-({1})'.format(__version__, __date__)
+
+    # compress
     if compressed:
         hdu = fits.PrimaryHDU(bkg)
         hdu.header = copy.deepcopy(header)
@@ -546,11 +456,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         hdulist[0].data = rms
         compress(hdulist, step_size[0], rms_out)
         return
-    if mask:
-        ref = fits.getdata(im_name)
-        mask_img(bkg, ref)
-        mask_img(rms, ref)
-        del ref
+
     write_fits(bkg, header, bkg_out)
     write_fits(rms, header, rms_out)
 
@@ -580,6 +486,6 @@ def write_fits(data, header, file_name):
     hdu = fits.PrimaryHDU(data)
     hdu.header = header
     hdulist = fits.HDUList([hdu])
-    hdulist.writeto(file_name, clobber=True)
+    hdulist.writeto(file_name, overwrite=True)
     logging.info("Wrote {0}".format(file_name))
     return

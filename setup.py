@@ -1,3 +1,7 @@
+#! /usr/bin/env python
+"""
+Setup for AegeanTools
+"""
 import os
 import sys
 from setuptools import setup
@@ -9,19 +13,22 @@ from setuptools import setup
 
 
 def read(fname):
+    """Read a file"""
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 
 def get_version():
+    """Get the version number of AegeanTools"""
     import AegeanTools
     return AegeanTools.__version__
 
 
 reqs = ['numpy>=1.10',
         'scipy>=0.16',
-        'astropy>=1.0',
+        'astropy>=2.0, <3',
         'pprocess>=0.5',
-        'healpy >=1.10']
+        'healpy >=1.10',
+        'six>=1.11']
 
 if sys.version_info < (2, 7):
     reqs.append('lmfit==0.9.1')
@@ -36,7 +43,7 @@ setup(
     author="Paul Hancock",
     author_email="Mr.Paul.Hancock@gmail.com",
     description="The Aegean source finding program, and associated tools.",
-    # license = "BSD",
+    # license = "LGPL",
     # keywords="example documentation tutorial",
     url="https://github.com/PaulHancock/Aegean",
     long_description=read('README.md'),

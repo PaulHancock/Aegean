@@ -1,21 +1,26 @@
-#! python
+#! /usr/bin/env python
+"""
+Test models.py
+"""
 
 __author__ = 'Paul Hancock'
-__date__ = ''
 
 from AegeanTools import models
 import numpy as np
 
 
 def test_simple_source():
+    """Make a new source without failing"""
     # make a new source without failing
     ss = models.SimpleSource()
     ss.ra = np.float32(12)
+    ss.dec = ss.peak_flux = ss.err_peak_flux = ss.a = ss.b = ss.pa = 0.
+    ss.local_rms = ss.background = ss.peak_pixel = 0.
     ss._sanitise()
     if not (isinstance(ss.ra, np.float64)): raise AssertionError()
     # convert to string without failing
     a = "{0}".format(ss)
-    if not (a == ' 12.0000000   0.0000000  0.000000  0.000000  0.00  0.00    0.0 000000'): raise AssertionError()
+    if not (a == ' 12.0000000   0.0000000  0.000000  0.000000  0.00  0.00    0.0 0000000'): raise AssertionError()
     if not (ss.__repr__() == ss.__str__()): raise AssertionError()
     if not (np.all(ss.as_list()[:-1] == [0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0])): raise AssertionError()
     isl = models.IslandSource()
@@ -41,14 +46,17 @@ def test_simple_source():
 
 
 def test_global_fitting_data():
+    """Test that GlobalFittingData doesn't crash"""
     models.GlobalFittingData()
 
 
 def test_island_fitting_data():
+    """Test that IslandFittingData doesn't crash"""
     models.IslandFittingData()
 
 
 def test_classify_catalogue():
+    """Test classify_catalogue"""
     ss = []
     isl = []
     out = []

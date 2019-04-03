@@ -1,9 +1,9 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 The Aegean source finding program.
 """
+
+from __future__ import print_function
 
 # standard imports
 import sys
@@ -35,16 +35,13 @@ from . import flags
 # need Region in the name space in order to be able to unpickle it
 from .regions import Region
 
-if six.PY2:
-    import cPickle
-else:
-    import _pickle as cPickle
-
 # multiple cores support
 import pprocess
 import multiprocessing
 
 from .__init__ import __version__, __date__
+
+__author__ = "Paul Hancock"
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -608,8 +605,8 @@ class SourceFinder(object):
     ##
     # Setting up 'global' data and calculating bkg/rms
     ##
-    def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, cores=1,
-                     do_curve=True, mask=None, lat=None, psf=None, blank=False, docov=True, slice=slice):
+    def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, bkg=None, cores=1,
+                     do_curve=True, mask=None, lat=None, psf=None, blank=False, docov=True, cube_index=None):
         """
         Populate the global_data object by loading or calculating the various components
 
@@ -630,9 +627,9 @@ class SourceFinder(object):
         verb : bool
             Verbose. Write extra lines to INFO level log.
 
-        rms : float
-            A float that represents a constant rms level for the entire image.
-            Default = None, which causes the rms to be loaded or calculated.
+        rms, bkg : float
+            A float that represents a constant rms/bkg levels for the entire image.
+            Default = None, which causes the rms/bkg to be loaded or calculated.
 
         cores : int
             Number of cores to use if different from what is autodetected.
@@ -658,14 +655,14 @@ class SourceFinder(object):
             True = use covariance matrix in fitting.
             Default = True.
 
-        slice : int
+        cube_index : int
             For an image cube, which slice to use.
 
         """
         # don't reload already loaded data
         if self.global_data.img is not None:
             return
-        img = FitsImage(filename, hdu_index=hdu_index, beam=beam, slice=slice)
+        img = FitsImage(filename, hdu_index=hdu_index, beam=beam, cube_index=cube_index)
         beam = img.beam
 
         debug = logging.getLogger('Aegean').isEnabledFor(logging.DEBUG)
@@ -678,7 +675,7 @@ class SourceFinder(object):
                 self.global_data.region = mask
             elif os.path.exists(mask):
                 self.log.info("Loading mask from {0}".format(mask))
-                self.global_data.region = cPickle.load(open(mask, 'rb'))
+                self.global_data.region = Region.load(mask)
             else:
                 self.log.error("File {0} not found for loading".format(mask))
                 self.global_data.region = None
@@ -711,11 +708,7 @@ class SourceFinder(object):
         if not (rmsin and bkgin):
             if verb:
                 self.log.info("Calculating background and rms data")
-            self._make_bkg_rms(mesh_size=20, forced_rms=rms, cores=cores)
-
-        # if a forced rms was supplied use that instead
-        if rms is not None:
-            self.global_data.rmsimg = np.ones(self.global_data.data_pix.shape) * rms
+            self._make_bkg_rms(mesh_size=20, forced_rms=rms, forced_bkg=bkg, cores=cores)
 
         # replace the calculated images with input versions, if the user has supplied them.
         if bkgin:
@@ -748,7 +741,7 @@ class SourceFinder(object):
             SimpleSource.galactic = True
         return
 
-    def save_background_files(self, image_filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, rms=None, cores=1,
+    def save_background_files(self, image_filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, rms=None, bkg=None, cores=1,
                               outbase=None):
         """
         Generate and save the background and RMS maps as FITS files.
@@ -770,9 +763,9 @@ class SourceFinder(object):
             Beam object representing the synthsized beam. Will replace what is in the FITS header.
 
 
-        rms : float
-            A float that represents a constant rms level for the entire image.
-            Default = None, which causes the rms to be loaded or calculated.
+        rms, bkg : float
+            A float that represents a constant rms/bkg level for the entire image.
+            Default = None, which causes the rms/bkg to be loaded or calculated.
 
         cores : int
             Number of cores to use if different from what is autodetected.
@@ -784,7 +777,7 @@ class SourceFinder(object):
 
         self.log.info("Saving background / RMS maps")
         # load image, and load/create background/rms images
-        self.load_globals(image_filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms,
+        self.load_globals(image_filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms, bkg=bkg,
                           cores=cores, do_curve=True)
         img = self.global_data.img
         bkgimg, rmsimg = self.global_data.bkgimg, self.global_data.rmsimg
@@ -812,19 +805,19 @@ class SourceFinder(object):
         snr_out = outbase + '_snr.fits'
 
         new_hdu.data = bkgimg
-        new_hdu.writeto(background_out, clobber=True)
+        new_hdu.writeto(background_out, overwrite=True)
         self.log.info("Wrote {0}".format(background_out))
 
         new_hdu.data = rmsimg
-        new_hdu.writeto(noise_out, clobber=True)
+        new_hdu.writeto(noise_out, overwrite=True)
         self.log.info("Wrote {0}".format(noise_out))
 
         new_hdu.data = curve
-        new_hdu.writeto(curve_out, clobber=True)
+        new_hdu.writeto(curve_out, overwrite=True)
         self.log.info("Wrote {0}".format(curve_out))
 
         new_hdu.data = self.global_data.data_pix / rmsimg
-        new_hdu.writeto(snr_out, clobber=True)
+        new_hdu.writeto(snr_out, overwrite=True)
         self.log.info("Wrote {0}".format(snr_out))
         return
 
@@ -845,11 +838,11 @@ class SourceFinder(object):
         for c in ['CRPIX3', 'CRPIX4', 'CDELT3', 'CDELT4', 'CRVAL3', 'CRVAL4', 'CTYPE3', 'CTYPE4']:
             if c in hdu.header:
                 del hdu.header[c]
-        hdu.writeto(outname, clobber=True)
+        hdu.writeto(outname, overwrite=True)
         self.log.info("Wrote {0}".format(outname))
         return
 
-    def _make_bkg_rms(self, mesh_size=20, forced_rms=None, cores=None):
+    def _make_bkg_rms(self, mesh_size=20, forced_rms=None, forced_bkg=None, cores=None):
         """
         Calculate an rms image and a bkg image.
 
@@ -858,18 +851,29 @@ class SourceFinder(object):
         mesh_size : int
             Number of beams per box default = 20
 
-        forced_rms : bool
+        forced_rms : float
             The rms of the image.
-            If None:  calculate the rms and bkg levels (default).
-            Otherwise assume zero background and constant rms
+            If None:  calculate the rms level (default).
+            Otherwise assume a constant rms.
+
+        forced_bkg : float
+            The background level of the image.
+            If None: calculate the background level (default).
+            Otherwise assume a constant background.
 
         cores: int
             Number of cores to use if different from what is autodetected.
 
         """
-        if forced_rms:
-            self.global_data.bkgimg[:] = 0
+        if (forced_rms is not None):
+            self.log.info("Forcing rms = {0}".format(forced_rms))
             self.global_data.rmsimg[:] = forced_rms
+        if (forced_bkg is not None):
+            self.log.info("Forcing bkg = {0}".format(forced_bkg))
+            self.global_data.bkgimg[:] = forced_bkg
+
+        # If we known both the rms and the bkg then there is nothing to compute
+        if (forced_rms is not None) and (forced_bkg is not None):
             return
 
         data = self.global_data.data_pix
@@ -941,15 +945,14 @@ class SourceFinder(object):
                 for ymin, ymax in zip(ymins, ymaxs):
                     queue.append(self._estimate_bkg_rms(xmin, xmax, ymin, ymax))
 
-        # construct the bkg and rms images
-        if self.global_data.rmsimg is None:
-            self.global_data.rmsimg = np.empty(data.shape, dtype=self.global_data.dtype)
-        if self.global_data.bkgimg is None:
-            self.global_data.bkgimg = np.empty(data.shape, dtype=self.global_data.dtype)
-
+        # only copy across the bkg/rms if they are not already set
+        # queue can only be traversed once so we have to put the if inside the loop
         for ymin, ymax, xmin, xmax, bkg, rms in queue:
-            self.global_data.bkgimg[ymin:ymax, xmin:xmax] = bkg
-            self.global_data.rmsimg[ymin:ymax, xmin:xmax] = rms
+            if (forced_rms is None):
+                self.global_data.rmsimg[ymin:ymax, xmin:xmax] = rms
+            if (forced_rms is None):
+                self.global_data.bkgimg[ymin:ymax, xmin:xmax] = bkg
+
         return
 
     def _estimate_bkg_rms(self, xmin, xmax, ymin, ymax):
@@ -1138,20 +1141,13 @@ class SourceFinder(object):
             # now we correct the xo/yo positions to be relative to the sub-image
             self.log.debug("xmxxymyx {0} {1} {2} {3}".format(xmin, xmax, ymin, ymax))
             for i in range(params['components'].value):
-                try:
-                    prefix = "c{0}_".format(i)
-                    params[prefix + 'xo'].value -= xmin
-                    params[prefix + 'xo'].min -= xmin
-                    params[prefix + 'xo'].max -= xmin
-                    params[prefix + 'yo'].value -= ymin
-                    params[prefix + 'yo'].min -= ymin
-                    params[prefix + 'yo'].max -= ymin
-                except Exception as e:
-                    self.log.error(" ARG !")
-                    self.log.info(params)
-                    self.log.info(params['components'].value)
-                    self.log.info("trying to access component {0}".format(i))
-                    raise e
+                prefix = "c{0}_".format(i)
+                params[prefix + 'xo'].value -= xmin
+                params[prefix + 'xo'].min -= xmin
+                params[prefix + 'xo'].max -= xmin
+                params[prefix + 'yo'].value -= ymin
+                params[prefix + 'yo'].min -= ymin
+                params[prefix + 'yo'].max -= ymin
             # self.log.debug(params)
             # don't fit if there are no sources
             if params['components'].value < 1:
@@ -1249,14 +1245,20 @@ class SourceFinder(object):
             island_data = IslandFittingData(inum, i=idata, offsets=offsets, doislandflux=False, scalars=(4, 4, None))
             new_src = self.result_to_components(result, model, island_data, src.flags)
 
-            # preserve the uuid so we can do exact matching between catalogs
+
             for ns, s in zip(new_src, included_sources):
+                # preserve the uuid so we can do exact matching between catalogs
                 ns.uuid = s.uuid
+
+                # flag the sources as having been priorized
+                ns.flags |= flags.PRIORIZED
+
                 # if the position wasn't fit then copy the errors from the input catalog
                 if stage < 2:
                     ns.err_ra = s.err_ra
                     ns.err_dec = s.err_dec
                     ns.flags |= flags.FIXED2PSF
+
                 # if the shape wasn't fit then copy the errors from the input catalog
                 if stage < 3:
                     ns.err_a = s.err_a
@@ -1349,7 +1351,7 @@ class SourceFinder(object):
                 is_flag |= flags.FITERR
             # get the real (sky) parameter errors
             model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
-            model.covar = result.covar
+
             if self.global_data.dobias and self.global_data.docov:
                 x, y = np.indices(idata.shape)
                 acf = elliptical_gaussian(x, y, 1, 0, 0, pixbeam.a * FWHM2CC * fac, pixbeam.b * FWHM2CC * fac,
@@ -1391,10 +1393,10 @@ class SourceFinder(object):
             sources.extend(res)
         return sources
 
-    def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, max_summits=None, innerclip=5,
+    def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, bkg=None, max_summits=None, innerclip=5,
                               outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
                               nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None, blank=False,
-                              docov=True, slice=None):
+                              docov=True, cube_index=None):
         """
         Run the Aegean source finder.
 
@@ -1454,8 +1456,8 @@ class SourceFinder(object):
         docov : bool
             If True then include covariance matrix in the fitting process. (default=True)
 
-        slice : int
-            For image cubes, slice determines which slice is used.
+        cube_index : int
+            For image cubes, cube_index determines which slice is used.
 
         Returns
         -------
@@ -1468,8 +1470,8 @@ class SourceFinder(object):
         if cores is not None:
             if not (cores >= 1): raise AssertionError("cores must be one or more")
 
-        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, cores=cores,
-                          verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank, docov=docov, slice=slice)
+        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, bkg=bkg, cores=cores,
+                          verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank, docov=docov, cube_index=cube_index)
         global_data = self.global_data
         rmsimg = global_data.rmsimg
         data = global_data.data_pix
@@ -1538,8 +1540,8 @@ class SourceFinder(object):
         return sources
 
     def priorized_fit_islands(self, filename, catalogue, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1,
-                              rms=None, beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=None, outerclip=3,
-                              doregroup=True, docov=True, slice=None):
+                              rms=None, bkg=None, beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=None, outerclip=3,
+                              doregroup=True, docov=True, cube_index=None):
         """
         Take an input catalog, and image, and optional background/noise images
         fit the flux and ra/dec for each of the given sources, keeping the morphology fixed
@@ -1600,7 +1602,7 @@ class SourceFinder(object):
         docov : bool
             If True then include covariance matrix in the fitting process. (default=True)
 
-        slice : int
+        cube_index : int
             For image cubes, slice determines which slice is used.
 
 
@@ -1613,8 +1615,8 @@ class SourceFinder(object):
 
         from AegeanTools.cluster import regroup
 
-        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
-                          do_curve=False, beam=beam, lat=lat, psf=imgpsf, docov=docov, slice=slice)
+        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, bkg=bkg, cores=cores, verb=True,
+                          do_curve=False, beam=beam, lat=lat, psf=imgpsf, docov=docov, cube_index=cube_index)
 
         global_data = self.global_data
         far = 10 * global_data.beam.a  # degrees
@@ -1629,6 +1631,18 @@ class SourceFinder(object):
             self.log.debug("No input sources for priorized fitting")
             return []
 
+        # reject sources with missing params
+        ok = True
+        for param in ['ra', 'dec', 'peak_flux', 'a', 'b', 'pa']:
+            if np.isnan(getattr(input_sources[0], param)):
+                self.log.info("Source 0, is missing param '{0}'".format(param))
+                ok = False
+        if not ok:
+            self.log.error("Missing parameters! Not fitting.")
+            self.log.error("Maybe your table is missing or mis-labeled columns?")
+            return []
+        del ok
+
         src_mask = np.ones(len(input_sources), dtype=bool)
 
         # check to see if the input catalog contains psf information
@@ -1636,19 +1650,29 @@ class SourceFinder(object):
 
         # the input sources are the initial conditions for our fits.
         # Expand each source size if needed.
+
+        # If ratio is provided we just the psf by this amount
         if ratio is not None:
             self.log.info("Using ratio of {0} to scale input source shapes".format(ratio))
             far *= ratio
             for i, src in enumerate(input_sources):
+                # Sources with an unknown psf are rejected as they are either outside the image
+                # or outside the region covered by the psf
                 skybeam = global_data.psfhelper.get_beam(src.ra, src.dec)
                 if skybeam is None:
                     src_mask[i] = False
+                    self.log.info("Excluding source ({0.island},{0.source}) due to lack of psf knowledge".format(src))
                     continue
+                # the new source size is the previous size, convolved with the expanded psf
                 src.a = np.sqrt(src.a ** 2 + (skybeam.a * 3600) ** 2 * (1 - 1 / ratio ** 2))
                 src.b = np.sqrt(src.b ** 2 + (skybeam.b * 3600) ** 2 * (1 - 1 / ratio ** 2))
                 # source with funky a/b are also rejected
                 if not np.all(np.isfinite((src.a, src.b))):
+                    self.log.info("Excluding source ({0.island},{0.source}) due to funky psf ({0.a},{0.b},{0.pa})".format(src))
                     src_mask[i] = False
+
+        # if we know the psf from the input catalogue (has_psf), or if it was provided via a psf map
+        # then we use that psf.
         elif catpsf is not None or has_psf:
             if catpsf is not None:
                 self.log.info("Using catalog PSF from {0}".format(catpsf))
@@ -1657,8 +1681,12 @@ class SourceFinder(object):
                 self.log.info("Using catalog PSF from input catalog")
                 psf_helper = None
             for i, src in enumerate(input_sources):
+                if (src.psf_a <=0) or (src.psf_b <=0):
+                    src_mask[i] = False
+                    self.log.info("Excluding source ({0.island},{0.source}) due to psf_a/b <=0".format(src))
+                    continue
                 if has_psf:
-                    catbeam = Beam(src.a * 3600, src.b * 3600, src.pa)
+                    catbeam = Beam(src.psf_a / 3600, src.psf_b / 3600, src.psf_pa)
                 else:
                     catbeam = psf_helper.get_beam(src.ra, src.dec)
                 imbeam = global_data.psfhelper.get_beam(src.ra, src.dec)
@@ -1667,7 +1695,14 @@ class SourceFinder(object):
                     src_mask[i] = False
                     self.log.info("Excluding source ({0.island},{0.source}) due to lack of psf knowledge".format(src))
                     continue
+
+                # TODO: The following assumes that the various psf's are scaled versions of each other
+                # and makes no account for differing position angles. This needs to be checked and/or addressed.
+
+                # deconvolve the source shape from the catalogue psf
                 src.a = (src.a / 3600) ** 2 - catbeam.a ** 2 + imbeam.a ** 2  # degrees
+
+                # clip the minimum source shape to be the image psf
                 if src.a < 0:
                     src.a = imbeam.a * 3600  # arcsec
                 else:
@@ -1683,6 +1718,11 @@ class SourceFinder(object):
 
         self.log.info("{0} sources in catalog".format(len(input_sources)))
         self.log.info("{0} sources accepted".format(sum(src_mask)))
+
+        if len(src_mask) < 1:
+            self.log.debug("No sources accepted for priorized fitting")
+            return []
+
         input_sources = input_sources[src_mask]
         # redo the grouping if required
         if doregroup:
@@ -1881,7 +1921,7 @@ def check_cores(cores):
         return 1
     try:
         queue = pprocess.Queue(limit=cores, reuse=1)
-    except:
+    except:  # TODO: figure out what error is being thrown
         cores = 1
     else:
         try:

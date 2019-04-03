@@ -40,7 +40,7 @@ Credit
 =====
 If you use Aegean or any of the AegeanTools for your research please give credit by citing:
 - Paper 1, [Hancock et al 2012, MNRAS, 422, 1812](http://adsabs.harvard.edu/abs/2012MNRAS.422.1812H)
-- Paper 2, [Hancock et al 2018, PASA, accepted](https://arxiv.org/abs/1801.05548)
+- Paper 2, [Hancock et al 2018, PASA, 35, 11H](http://adsabs.harvard.edu/abs/2018PASA...35...11H)
 
 Until there is a more appropriate method for crediting software development and maintainance, please also consider including me as a co-author on publications which rely on Aegean or AegeanTools.
 
@@ -54,4 +54,7 @@ Status
 [![Documentation Status](https://readthedocs.org/projects/aegeantools/badge/?version=latest)](http://aegeantools.readthedocs.io/en/latest/?badge=latest)
  
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/014fb9c86b3f42b49ad94cd4384cfa78)](https://www.codacy.com/app/mr.paul.hancock/Aegean?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=PaulHancock/Aegean&amp;utm_campaign=Badge_Grade)
+
+[![DOI](https://zenodo.org/badge/22051760.svg)](https://zenodo.org/badge/latestdoi/22051760) - latest release
+
 

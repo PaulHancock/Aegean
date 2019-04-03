@@ -1,7 +1,11 @@
-#! python
+#! /usr/bin/env python
+"""
+Test the angle_tools module
+"""
+
 from __future__ import print_function
+
 __author__ = 'Paul Hancock'
-__date__ = ''
 
 from AegeanTools import angle_tools as at
 from astropy.coordinates import Angle
@@ -11,6 +15,7 @@ from numpy.testing import assert_approx_equal, assert_almost_equal
 
 
 def test_ra2dec():
+    """Test ra2dec against astropy conversion"""
     # Test against the astropy calculations
     for ra in ['14:21:45.003', '-12 04 22', '-00 01 12.003']:
         ans = at.ra2dec(ra)
@@ -19,6 +24,7 @@ def test_ra2dec():
 
 
 def test_dec2dec():
+    """Test dec2dec against astropy conversion"""
     # Test against the astropy calculations
     for dec in ['+14:21:45.003', '-99 04 22', '-00 01 23.456', '00 01']:
         ans = at.dec2dec(dec)
@@ -27,6 +33,7 @@ def test_dec2dec():
 
 
 def test_dec2dms():
+    """Test conversion of dec to DMS strings"""
     for dec, dstr in [(-0.12345, "-00:07:24.42"),
                       (80.0, "+80:00:00.00"),
                       (np.nan, "XX:XX:XX.XX"),
@@ -37,6 +44,7 @@ def test_dec2dms():
 
 
 def test_dec2hms():
+    """Test conversion of RA to HMS strings"""
     for dec, dstr in [(-15, "23:00:00.00"),
                       (15, "01:00:00.00"),
                       (23.5678, "01:34:16.27"),
@@ -48,6 +56,7 @@ def test_dec2hms():
 
 
 def test_gcd():
+    """Test the calculation of great circle distance"""
     for ra1, dec1, ra2, dec2, dist in [(0, 0, 0, 1, 1),  # simple 1 deg offset
                                        (0, -90, 180, 90, 180),  # pole to pole
                                        (120, 89, 300, 89, 2.),  # over the pole
@@ -59,6 +68,7 @@ def test_gcd():
 
 
 def test_bear():
+    """Test bearing calculation"""
     for ra1, dec1, ra2, dec2, bear in [(0, 0, 0, 1, 0),
                                        (0, 0, 180, 90, 0),
                                        (0, 0, 179.99999, 0, 90),
@@ -69,6 +79,7 @@ def test_bear():
 
 
 def test_translate():
+    """Test the translate function"""
     for (ra1, dec1), (r, theta), (ra2, dec2) in [((0, 0), (1, 0), (0, 1)),
                                                  ((45, 89.75), (0.5, 0), (225, 89.75)),  # over the pole
                                                  ((12, -45), (-1, 180), (12, -44))  # negative r
@@ -78,6 +89,7 @@ def test_translate():
 
 
 def test_dist_rhumb():
+    """Test rhumb distance calculation"""
     for ra1, dec1, ra2, dec2, dist in [(0, 0, 0, 1, 1),
                                        (0, 0, 180, 0, 180)
                                        ]:
@@ -86,6 +98,7 @@ def test_dist_rhumb():
 
 
 def test_bear_rhumb():
+    """Test rhumb bearing calculation"""
     for ra1, dec1, ra2, dec2, bear in [(0, 0, 0, 1, 0),
                                        (0, 0, 180, 0, 90)
                                        ]:
@@ -94,6 +107,7 @@ def test_bear_rhumb():
 
 
 def test_translate_rhumb():
+    """Test translate along rhumb line"""
     for (ra1, dec1), (r, theta), (ra2, dec2) in [((0, 0), (1, 0), (0, 1)),
                                                  ((12, -45), (-1, 180), (12, -44))  # negative r
                                        ]:

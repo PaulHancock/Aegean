@@ -1,8 +1,13 @@
-#! python
+#! /usr/bin/env python
+"""
+Test source_finder.py
+"""
+
 __author__ = 'Paul Hancock'
-__date__ = ''
 
 from AegeanTools import source_finder as sf
+from AegeanTools.fits_image import Beam
+from AegeanTools import flags
 from copy import deepcopy
 import numpy as np
 import logging
@@ -15,12 +20,14 @@ log.setLevel(logging.INFO)
 
 
 def test_misc():
+    """Test some random things"""
     sf.IslandFittingData()
     sf.DummyLM()
     sf.SourceFinder(ignored=None, log=log)
 
 
 def test_helpers():
+    """Test the helper functions"""
     # fix shape
     src = sf.OutputSource()
     src.a = 1
@@ -51,6 +58,7 @@ def test_helpers():
 
 
 def test_load_globals():
+    """Test load_globals"""
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
     filename = 'tests/test_files/1904-66_SIN.fits'
@@ -61,6 +69,18 @@ def test_load_globals():
     del sfinder
     sfinder = sf.SourceFinder(log=log)
     sfinder.load_globals(filename, bkgin=aux_files['bkg'], rms=1, mask=aux_files['mask'])
+    # region isn't available due to healpy not being installed/required
+    if sfinder.global_data.region is None: raise AssertionError()
+
+    del sfinder
+    sfinder = sf.SourceFinder(log=log)
+    sfinder.load_globals(filename, bkgin=aux_files['bkg'], bkg=0, mask=aux_files['mask'])
+    # region isn't available due to healpy not being installed/required
+    if sfinder.global_data.region is None: raise AssertionError()
+
+    del sfinder
+    sfinder = sf.SourceFinder(log=log)
+    sfinder.load_globals(filename, bkgin=aux_files['bkg'], rms=1, bkg=0, mask=aux_files['mask'])
     # region isn't available due to healpy not being installed/required
     if sfinder.global_data.region is None: raise AssertionError()
 
@@ -80,23 +100,36 @@ def test_load_globals():
 
 
 def test_find_and_prior_sources():
+    """Test find sources and prior sources"""
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
     filename = 'tests/test_files/small.fits'
+
     # vanilla source finding
     found = sfinder.find_sources_in_image(filename, cores=1)
-    if not (len(found) == 2): raise AssertionError()
+    if not (len(found) == 2):
+        raise AssertionError()
+
+    # source finding but not fitting
+    found = sfinder.find_sources_in_image(filename, cores=1, max_summits=0)
+    if not (len(found) == 2):
+        raise AssertionError()
+
     # now with some options
     aux_files = sf.get_aux_files(filename)
     found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
                                            rmsin=aux_files['rms'], bkgin=aux_files['bkg'],
                                            mask=aux_files['mask'], cores=1, docov=False)
-    if not (len(found2) == 4): raise AssertionError()
+    if not (len(found2) == 4):
+        raise AssertionError()
     isle1 = found2[1]
-    if not (isle1.int_flux > 0): raise AssertionError()
-    if not (isle1.max_angular_size > 0): raise AssertionError()
+    if not (isle1.int_flux > 0):
+        raise AssertionError()
+    if not (isle1.max_angular_size > 0):
+        raise AssertionError()
     # we should have written some output file
-    if not (os.path.exists('dlme')): raise AssertionError()
+    if not (os.path.exists('dlme')):
+        raise AssertionError()
     os.remove('dlme')
 
     # pprocess is broken in python3 at the moment so just use 1 core.
@@ -117,11 +150,14 @@ def test_find_and_prior_sources():
 
 
 def test_find_and_prior_parallel():
+    """Test find/piroirze with parallel operation"""
     log = logging.getLogger("Aegean")
-    cores = sf.check_cores(2)
-    # don't bother re-running these tests if we have just 1 core
-    if cores == 1:
+
+    # pprocess is broken in python3 at the moment so just use 1 core.
+    if six.PY3:
         return
+    cores = 2
+
     filename = 'tests/test_files/1904-66_SIN.fits'
     # vanilla source finding
     sfinder = sf.SourceFinder(log=log)
@@ -144,6 +180,7 @@ def test_find_and_prior_parallel():
 
 
 def test_save_files():
+    """Test that we can save files"""
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
     filename = 'tests/test_files/small.fits'
@@ -154,6 +191,7 @@ def test_save_files():
 
 
 def test_save_image():
+    """Test save_image"""
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
     filename = 'tests/test_files/small.fits'
@@ -162,6 +200,33 @@ def test_save_image():
     sfinder.save_image(bfile)
     if not (os.path.exists(bfile)): raise AssertionError()
     os.remove(bfile)
+
+
+def test_esimate_lmfit_parinfo():
+    """Test estimate_lmfit_parinfo"""
+    log = logging.getLogger("Aegean")
+    # log.setLevel(logging.DEBUG)
+    sfinder = sf.SourceFinder(log=log)
+
+    data = np.zeros(shape=(3, 3))
+    rmsimg = np.ones(shape=(3, 3))
+    beam = Beam(1, 1, 0)
+
+    # should hit isnegative
+    data[1, 1] = -6
+    # should hit outerclip is None
+    outerclip = None
+    # should run error because curve is the wrong shape
+    curve = np.zeros((3, 4))
+    try:
+        sfinder.estimate_lmfit_parinfo(data=data, rmsimg=rmsimg, curve=curve,
+                                        beam=beam, innerclip=5, outerclip=outerclip)
+    except AssertionError as e:
+        e.message = 'Passed'
+    else:
+        raise AssertionError("estimate_lmfit_parinfo should err when curve.shape != data.shape")
+
+    return
 
 
 if __name__ == "__main__":

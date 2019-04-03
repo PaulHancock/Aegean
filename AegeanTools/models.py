@@ -1,10 +1,10 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 Different types of sources that Aegean is able to fit
 
 """
+
+from __future__ import print_function
 
 __author__ = "Paul Hancock"
 
@@ -47,26 +47,26 @@ class SimpleSource(object):
     --------
     :module:`AegeanTools.flags`
     """
-    header = "#RA           DEC          Flux      err     a     b         pa  flags\n" + \
-             "#                        Jy/beam   Jy/beam   ''    ''        deg WNCPES\n" + \
-             "#======================================================================="
+    header = "#RA           DEC          Flux      err     a     b         pa     flags\n" + \
+             "#                        Jy/beam   Jy/beam   ''    ''        deg  ZWNCPES\n" + \
+             "#========================================================================"
 
-    formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.a:5.2f} {0.b:5.2f} {0.pa:6.1f} {0.flags:06b}"
+    formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.a:5.2f} {0.b:5.2f} {0.pa:6.1f} {0.flags:07b}"
     names = ['background', 'local_rms', 'ra', 'dec', 'peak_flux', 'err_peak_flux', 'flags', 'peak_pixel', 'a', 'b',
              'pa', 'uuid']
     galactic = False
     def __init__(self):
-        self.background = 0.0
-        self.local_rms = 0.0
-        self.ra = 0.0
-        self.dec = 0.0
-        self.peak_flux = 0.0
-        self.err_peak_flux = 0.0
-        self.flags = 0
-        self.peak_pixel = 0.0
-        self.a = 0.0
-        self.b = 0.0
-        self.pa = 0.0
+        self.background = np.nan
+        self.local_rms = np.nan
+        self.ra = np.nan
+        self.dec = np.nan
+        self.peak_flux = np.nan
+        self.err_peak_flux = np.nan
+        self.flags = 0x0
+        self.peak_pixel = np.nan
+        self.a = np.nan
+        self.b = np.nan
+        self.pa = np.nan
         self.uuid = str(uuid.uuid4())
 
 
@@ -189,19 +189,19 @@ class IslandSource(SimpleSource):
         #ra = None # degrees
         #dec = None # degrees
         #peak_flux = None # Jy/beam
-        self.int_flux = 0.0  # Jy
-        self.err_int_flux = 0.0  # Jy
-        self.x_width = 0
-        self.y_width = 0
-        self.max_angular_size = 0
-        self.pa = 0
-        self.pixels = 0
-        self.area = 0
-        self.beam_area = 0  # at the brightest pixel
-        self.components = 0
-        self.eta = 0.0
+        self.int_flux = np.nan  # Jy
+        self.err_int_flux = np.nan  # Jy
+        self.x_width = np.nan
+        self.y_width = np.nan
+        self.max_angular_size = np.nan
+        self.pa = np.nan
+        self.pixels = np.nan
+        self.area = np.nan
+        self.beam_area = np.nan  # at the brightest pixel
+        self.components = np.nan
+        self.eta = np.nan
         # not included in 'names' and thus not included by default in most output
-        self.extent = 0
+        self.extent = np.nan
         self.contour = []
         self.max_angular_size_anchors = []
         self.pix_mask = [] # the ra/dec of all the non masked pixels in this island.
@@ -296,16 +296,16 @@ class OutputSource(SimpleSource):
 
     """
     #header for the output
-    header = "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err   flags\n" + \
-             "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   WNCPES\n" + \
-             "#==========================================================================================================================================================================================="
+    header = "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err    flags\n" + \
+             "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   ZWNCPES\n" + \
+             "#============================================================================================================================================================================================"
 
     #formatting strings for making nice output
     formatter = "({0.island:04d},{0.source:02d}) {0.background: 8.6f} {0.local_rms: 8.6f} " + \
                 "{0.ra_str:12s} {0.dec_str:12s} {0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} {0.err_dec: 9.7f} " + \
                 "{0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} {0.err_int_flux: 8.6f} " + \
                 "{0.a:5.2f} {0.err_a:5.2f} {0.b:5.2f} {0.err_b:5.2f} " + \
-                "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:06b}"
+                "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:07b}"
     names = ['island', 'source', 'background', 'local_rms', 'ra_str', 'dec_str', 'ra', 'err_ra', 'dec', 'err_dec',
              'peak_flux', 'err_peak_flux', 'int_flux', 'err_int_flux', 'a', 'err_a', 'b', 'err_b', 'pa', 'err_pa',
              'flags','residual_mean','residual_std','uuid','psf_a','psf_b','psf_pa']
@@ -319,26 +319,26 @@ class OutputSource(SimpleSource):
         self.ra_str = ''  #str
         self.dec_str = ''  #str
         #ra = None # degrees
-        self.err_ra = 0.0  # degrees
+        self.err_ra = np.nan  # degrees
         #dec = None # degrees
-        self.err_dec = 0.0
+        self.err_dec = np.nan
         #peak_flux = None # Jy/beam
         #err_peak_flux = None # Jy/beam
-        self.int_flux = 0.0  #Jy
-        self.err_int_flux = 0.0  #Jy
+        self.int_flux = np.nan  #Jy
+        self.err_int_flux = np.nan  #Jy
         #self.a = 0.0 # major axis (arcsecs)
-        self.err_a = 0.0  # arcsecs
+        self.err_a = np.nan  # arcsecs
         #self.b = 0.0 # minor axis (arcsecs)
-        self.err_b = 0.0  # arcsecs
+        self.err_b = np.nan  # arcsecs
         #self.pa = 0.0 # position angle (degrees - WHAT??)
-        self.err_pa = 0.0  # degrees
+        self.err_pa = np.nan  # degrees
         self.flags = 0x0
-        self.residual_mean = 0
-        self.residual_std = 0
+        self.residual_mean = np.nan
+        self.residual_std = np.nan
         #
-        self.psf_a = 0
-        self.psf_b = 0
-        self.psf_pa = 0
+        self.psf_a = np.nan
+        self.psf_b = np.nan
+        self.psf_pa = np.nan
 
     def __str__(self):
         self._sanitise()

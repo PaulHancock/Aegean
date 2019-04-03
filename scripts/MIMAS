@@ -13,7 +13,7 @@ http://arxiv.org/abs/1505.02937
 
 import argparse
 import sys
-from AegeanTools import MIMAS
+from AegeanTools import MIMAS, __citation__
 
 
 if __name__ == "__main__":
@@ -90,7 +90,14 @@ if __name__ == "__main__":
                         default=False, help='Save the region as a fits image')
     group4.add_argument('--debug', dest='debug', action='store_true', help='debug mode [default=False]', default=False)
     group4.add_argument('--version', action='version', version='%(prog)s '+MIMAS.__version__+"-({0})".format(MIMAS.__date__))
+    group4.add_argument('--cite', dest='cite', action="store_true", default=False,
+                        help='Show citation information.')
+
     results = parser.parse_args()
+
+    if results.cite:
+        print(__citation__)
+        sys.exit(0)
 
     # TODO: see if there is an 'argparse' way of detecting no input
     if len(sys.argv) <= 1:
@@ -123,13 +130,16 @@ if __name__ == "__main__":
         sys.exit()
 
     if results.area is not None:
-        region = MIMAS.pickle.load(open(results.area))
+        region = MIMAS.cPickle.load(open(results.area))
         print("{0} represents an area of {1} deg^2".format(results.area, region.get_area()))
         sys.exit()
 
     if len(results.intersect) > 0:
         if len(results.intersect) == 1:
             print("intersections requires at least two regions")
+            sys.exit(1)
+        elif results.outfile is None:
+            print("outfile is required")
             sys.exit(1)
         else:
             region = MIMAS.intersect_regions(results.intersect)
