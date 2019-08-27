@@ -614,7 +614,7 @@ class PSFHelper(WCSHelper):
             The area of the beam in square pixels.
         """
 
-	parea = abs(self.wcshelper.pixscale[0] * self.wcshelper.pixscale[1])  # in deg**2 at reference coords
+        parea = abs(self.wcshelper.pixscale[0] * self.wcshelper.pixscale[1])  # in deg**2 at reference coords
         barea = self.get_beamarea_deg2(ra, dec)
         return barea / parea
 
