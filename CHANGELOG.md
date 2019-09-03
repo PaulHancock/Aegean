@@ -1,3 +1,9 @@
+2019-09-03
+==========
+Aegean
+- Fix a bug that caused int/peak flux ratios to be not 1 in some cases
+- Island integrated fluxes are now computed in the same way as components
+
 2018-09-13
 ==========
 BANE
