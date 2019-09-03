@@ -584,13 +584,13 @@ class SourceFinder(object):
                                                                        positions[1][0]))
 
             # integrated flux
-            beam_area = global_data.psfhelper.get_beamarea_deg2(source.ra, source.dec)  # beam in deg^2
-            # get_beamarea_pix(source.ra, source.dec)  # beam is in pix^2
+            beam_area_pix = global_data.psfhelper.get_beamarea_pix(source.ra, source.dec)
+            beam_area = global_data.psfhelper.get_beamarea_deg2(source.ra, source.dec)
             isize = source.pixels  # number of non zero pixels
             self.log.debug("- pixels used {0}".format(isize))
             source.int_flux = np.nansum(kappa_sigma)  # total flux Jy/beam
             self.log.debug("- sum of pixles {0}".format(source.int_flux))
-            source.int_flux *= beam_area  # total flux in Jy
+            source.int_flux *= (4.*np.log(2.) / beam_area_pix)  # total flux in Jy
             self.log.debug("- integrated flux {0}".format(source.int_flux))
             eta = erf(np.sqrt(-1 * np.log(abs(source.local_rms * outerclip / source.peak_flux)))) ** 2
             self.log.debug("- eta {0}".format(eta))
