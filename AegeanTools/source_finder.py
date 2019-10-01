@@ -2,9 +2,7 @@
 """
 The Aegean source finding program.
 """
-
 from __future__ import print_function
-
 # standard imports
 import sys
 import six
@@ -15,11 +13,9 @@ import copy
 import logging
 import logging.config
 import lmfit
-
 import scipy
 from scipy.special import erf
 from scipy.ndimage import label, find_objects
-
 # AegeanTools
 from .fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit, \
                      bias_correct, elliptical_gaussian
@@ -31,15 +27,20 @@ from .catalogs import load_table, table_to_source_list
 from .models import SimpleSource, OutputSource, IslandSource, island_itergen, \
     GlobalFittingData, IslandFittingData, DummyLM
 from . import flags
-
 # need Region in the name space in order to be able to unpickle it
 from .regions import Region
+
+if six.PY2:
+    import cPickle
+else:
+    import _pickle as cPickle
 
 # multiple cores support
 import pprocess
 import multiprocessing
 
 from .__init__ import __version__, __date__
+__author__ = "Paul Hancock"
 
 __author__ = "Paul Hancock"
 

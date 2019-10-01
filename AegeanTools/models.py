@@ -5,11 +5,11 @@ Different types of sources that Aegean is able to fit
 """
 
 from __future__ import print_function
+import numpy as np
+import uuid
 
 __author__ = "Paul Hancock"
 
-import numpy as np
-import uuid
 
 class SimpleSource(object):
     """
@@ -55,6 +55,7 @@ class SimpleSource(object):
     names = ['background', 'local_rms', 'ra', 'dec', 'peak_flux', 'err_peak_flux', 'flags', 'peak_pixel', 'a', 'b',
              'pa', 'uuid']
     galactic = False
+
     def __init__(self):
         self.background = np.nan
         self.local_rms = np.nan
@@ -68,8 +69,6 @@ class SimpleSource(object):
         self.b = np.nan
         self.pa = np.nan
         self.uuid = str(uuid.uuid4())
-
-
 
     def _sanitise(self):
         """
