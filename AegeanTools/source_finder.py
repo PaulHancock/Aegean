@@ -1300,18 +1300,24 @@ class SourceFinder(object):
         beam = global_data.psfhelper.get_psf_pix(midra, middec)
         del middec, midra
 
-        # icurve = dcurve[xmin:xmax, ymin:ymax]
-        s1 = slice(max(xmin-1,0), min(xmax+1,global_data.data_pix.shape[0]))
-        s2 = slice(max(ymin-1,0), min(ymax+1,global_data.data_pix.shape[1]))
-
-        icurve = np.zeros(shape=(s1.stop-s1.start, s2.stop-s2.start), dtype=np.int8)
-        peaks = scipy.ndimage.filters.maximum_filter(self.global_data.data_pix[s1, s2], size=3)
-        pmask = np.where(peaks == self.global_data.data_pix[s1, s2])
-        troughs = scipy.ndimage.filters.minimum_filter(self.global_data.data_pix[s1, s2], size=3)
-        tmask = np.where(troughs == self.global_data.data_pix[s1, s2])
+        # the curvature needs a buffer of 1 pixel to correctly identify local min/max
+        # on the edge of the region. We need a 1 pix buffer (if available)
+        buffx = [xmin - max(xmin-1,0), min(xmax+1, global_data.data_pix.shape[0]) - xmax]
+        buffy = [ymin - max(ymin-1,0), min(ymax+1, global_data.data_pix.shape[1]) - ymax]
+        icurve = np.zeros(shape=(xmax-xmin + buffx[0] + buffx[1], ymax-ymin + buffy[0] + buffy[1]), dtype=np.int8)
+        # compute peaks and convert to +/-1
+        peaks = scipy.ndimage.filters.maximum_filter(self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]], size=3)
+        pmask = np.where(peaks == self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]])
+        troughs = scipy.ndimage.filters.minimum_filter(self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]], size=3)
+        tmask = np.where(troughs == self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]])
         icurve[pmask] = -1
         icurve[tmask] = 1
-        icurve = icurve[xmin-s1.start:xmax-s1.stop, ymin-s2.start:ymax-s2.stop]
+        # icurve and idata need to be the same size so we crop icurve based on the buffers that we computed
+        icurve = icurve[buffx[0]:icurve.shape[0]-buffx[1], buffy[0]:icurve.shape[1]-buffy[1]]
         del peaks, pmask, troughs, tmask
         
         rms = rmsimg[xmin:xmax, ymin:ymax]
@@ -1324,7 +1330,6 @@ class SourceFinder(object):
 
         self.log.debug("=====")
         self.log.debug("Island ({0})".format(isle_num))
-
         params = self.estimate_lmfit_parinfo(idata, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
                                              max_summits=max_summits)
 
