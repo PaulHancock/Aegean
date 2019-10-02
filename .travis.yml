@@ -1,5 +1,5 @@
 language: python
-dist: trusty
+dist: xenial
 cache: pip
 python:
   - "2.7.14"
