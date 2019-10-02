@@ -10,6 +10,7 @@ Copyright (C) 2005, 2006, 2007, 2008, 2009, 2013, 2014,
 Copyright (C) 2013 Yaroslav Halchenko <debian@onerussian.com>
 
 Adapted to work with python 3.7 by Paul Hancock 2019
+see <http://www.boddie.org.uk/python/pprocess.html> for the original version
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -25,7 +26,7 @@ You should have received a copy of the GNU Lesser General Public License along
 with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-__version__ = "0.5.4"
+__version__ = "0.5.4-aegean"
 
 import os
 import sys
