@@ -152,17 +152,13 @@ def test_find_and_prior_sources():
 def test_find_and_prior_parallel():
     """Test find/piroirze with parallel operation"""
     log = logging.getLogger("Aegean")
-
-    # pprocess is broken in python3 at the moment so just use 1 core.
-    if six.PY3:
-        return
     cores = 2
 
     filename = 'tests/test_files/1904-66_SIN.fits'
     # vanilla source finding
     sfinder = sf.SourceFinder(log=log)
     found = sfinder.find_sources_in_image(filename, cores=cores)
-    if not (len(found) == 68): raise AssertionError()
+    if not (len(found) == 66): raise AssertionError('found {0} sources'.format(len(found)))
     # now with some options
     aux_files = sf.get_aux_files(filename)
 
