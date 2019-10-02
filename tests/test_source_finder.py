@@ -132,11 +132,7 @@ def test_find_and_prior_sources():
         raise AssertionError()
     os.remove('dlme')
 
-    # pprocess is broken in python3 at the moment so just use 1 core.
-    if six.PY3:
-        cores = 1
-    else:
-        cores = 2
+    cores = 2
     # this should find one less source as one of the source centers is outside the image.
     priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=False, ratio=1.2, cores=cores, docov=False)
     if not (len(priorized) == 2): raise AssertionError()
