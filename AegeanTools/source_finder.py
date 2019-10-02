@@ -1934,10 +1934,6 @@ def check_cores(cores):
 
     """
     cores = min(multiprocessing.cpu_count(), cores)
-    if six.PY3:
-        log = logging.getLogger("Aegean")
-        log.info("Multi-cores not supported in python 3+, using one core")
-        return 1
     try:
         queue = pprocess.Queue(limit=cores, reuse=1)
     except:  # TODO: figure out what error is being thrown
