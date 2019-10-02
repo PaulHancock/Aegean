@@ -29,7 +29,6 @@ from .models import SimpleSource, OutputSource, IslandSource, island_itergen, \
 from . import flags
 # need Region in the name space in order to be able to unpickle it
 from .regions import Region
-
 if six.PY2:
     import cPickle
 else:
@@ -40,7 +39,6 @@ import pprocess
 import multiprocessing
 
 from .__init__ import __version__, __date__
-__author__ = "Paul Hancock"
 
 __author__ = "Paul Hancock"
 
