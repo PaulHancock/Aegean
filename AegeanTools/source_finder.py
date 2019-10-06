@@ -57,7 +57,7 @@ def find_islands(im, bkg, rms,
     """
     This function designed to be run as a stand alone process
 
-    parameters
+    Parameters
     ----------
     im, bkg, rms : np.ndarray
         Image, background, and rms maps
@@ -66,7 +66,7 @@ def find_islands(im, bkg, rms,
         The seed clip which is used to create islands, and flood clip which is used to grow islands.
         The units are in SNR.
 
-    returns
+    Returns
     -------
     islands : [AegeanTools.island, ...]
         a list of islands
@@ -83,7 +83,7 @@ def estimate_parinfo_image(islands,
     The source sizes will be initialised as the psf of the image, which is either
     determined by the WCS of the image file or the psf map if one is supplied.
 
-    parameters
+    Parameters
     ----------
     islands : [AegeanTools.models.Island, ... ]
         A list of islands which will be converted into groups of sources
@@ -97,7 +97,7 @@ def estimate_parinfo_image(islands,
     psf : str or None
         The filename for the psf map (optional)
 
-    returns
+    Returns
     --------
     sources : [lmfit.Parameters, ... ]
         The initial estimate of parameters for the components within each island.
@@ -115,7 +115,7 @@ def priorized_islands_parinfo(sources,
     Turn a list of sources into a set of islands and parameter estimates which can then be
     characterised.
 
-    parameters
+    Parameters
     ----------
     sources : [AegeanTools.models.SimpleSource, ... ]
         A list of sources in the catalogue.
@@ -135,7 +135,7 @@ def priorized_islands_parinfo(sources,
             2 - Fit for flux and position. Shape parameters are fixed.
             3 - Fit for flux, position, and shape.
 
-    returns
+    Returns
     -------
     islands : [AegeanTools.island, ...]
         a list of islands
@@ -154,7 +154,7 @@ def characterise_islands(islands,
     Do the source characterisation based on the initial estimate of the island properties.
 
 
-    parameters
+    Parameters
     ----------
     islands : [lmfit.Parameters, ... ]
         The initial estimate of parameters for the components within each island.
@@ -179,7 +179,7 @@ def characterise_islands(islands,
     do_islandfit : bool
         If True, then also characterise islands as well as components. Default=False.
 
-    returns
+    Returns
     -------
     sources : [AegeanTools.models.SimpleSource, ... ]
         A list of characterised sources of type SimpleSource, OutputSource, or IslandSource.
@@ -194,7 +194,7 @@ def save_catalogue(sources,
     """
     Write a catalogue of sources
 
-    parameters
+    Parameters
     ----------
     sources : [AegeanTools.models.SimpleSource, ... ]
         A list of characterised sources of type SimpleSource, OutputSource, or IslandSource.
@@ -207,7 +207,7 @@ def save_catalogue(sources,
             #TODO add a bunch of options
             'auto' or None - infer from filename extension
 
-    returns
+    Returns
     -------
     None
     """
