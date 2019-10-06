@@ -471,7 +471,7 @@ class SourceFinder(object):
                     xpeak, ypeak = np.unravel_index(np.nanargmax(summit), summit.shape)
             except ValueError as e:
                 if "All-NaN" in e.message:
-                    self.log.warn("Summit of nan's detected - this shouldn't happen")
+                    self.log.warning("Summit of nan's detected - this shouldn't happen")
                     continue
                 else:
                     raise e
@@ -1721,7 +1721,7 @@ class SourceFinder(object):
             # ignore empty islands
             # This should now be impossible to trigger
             if np.size(i) < 1:
-                self.log.warn("Empty island detected, this should be imposisble.")
+                self.log.warning("Empty island detected, this should be imposisble.")
                 continue
             isle_num += 1
             scalars = (innerclip, outerclip, max_summits)
@@ -2116,8 +2116,8 @@ def scope2lat(telescope):
         return scopes[telescope.upper()]
     else:
         log = logging.getLogger("Aegean")
-        log.warn("Telescope {0} is unknown".format(telescope))
-        log.warn("integrated fluxes may be incorrect")
+        log.warning("Telescope {0} is unknown".format(telescope))
+        log.warning("integrated fluxes may be incorrect")
         return None
 
 
