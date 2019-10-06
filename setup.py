@@ -44,6 +44,7 @@ setup(
     description="The Aegean source finding program, and associated tools.",
     url="https://github.com/PaulHancock/Aegean",
     long_description=read('README.md'),
+    long_description_content_type='text/markdown',
     packages=['AegeanTools'],
     install_requires=reqs,
     scripts=['scripts/aegean', 'scripts/BANE', 'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS'],
