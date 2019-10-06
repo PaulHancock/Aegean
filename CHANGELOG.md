@@ -1,5 +1,5 @@
-2019-10-06
-==========
+v 2.1.0
+=======
 General
 - Begin preparation for a major update (Aegean 3.0)
 - Include `pprocess.py` and update it to support python3
