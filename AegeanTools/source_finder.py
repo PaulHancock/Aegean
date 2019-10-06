@@ -86,10 +86,6 @@ def find_islands(im, bkg, rms,
     # mask of pixles that are above the flood_clip
     a = snr >= flood_clip
 
-    if not np.any(a):
-        log.debug("There are no pixels above the clipping limit")
-        return []
-
     # segmentation via scipy
     l, n = label(a)
     f = find_objects(l)
@@ -111,6 +107,7 @@ def find_islands(im, bkg, rms,
                 continue
             island = PixelIsland()
             island.calc_bounding_box(np.array(np.nan_to_num(data_box), dtype=bool), offsets=[xmin, ymin])
+            #island.calc_bounding_box(np.array(np.nan_to_num(data_box), dtype=bool), offsets=[0,0])
             islands.append(island)
 
     return islands
