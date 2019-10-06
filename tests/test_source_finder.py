@@ -227,8 +227,13 @@ def test_find_islands():
     bkg = np.zeros_like(im)
     rms = np.ones_like(im)
 
+<<<<<<< HEAD
     # test with no islands and no logger
     islands = sf.find_islands(im, bkg, rms)
+=======
+    # test with no islands
+    islands = sf.find_islands(im, bkg, rms, log=log)
+>>>>>>> add test for find_islands
     if len(islands) != 0:
         return AssertionError("Found islands where non existed")
 
@@ -237,18 +242,25 @@ def test_find_islands():
     # and have some pixels masked or below the clipping threshold
     im[5,5] = np.nan
     im[4,4] = 0
+<<<<<<< HEAD
     # make the border nans
     im[0:3,:] = im[-1:,:] = np.nan
     im[:,0] = im[:,-1] = np.nan
+=======
+>>>>>>> add test for find_islands
 
     islands = sf.find_islands(im, bkg, rms, log=log)
     if len(islands) != 1:
         raise AssertionError("Incorrect number of islands found {0}, expecting 1".format(len(islands)))
     if not isinstance(islands[0], models.PixelIsland):
+<<<<<<< HEAD
         raise AssertionError("Islands[0] is not a PixelIsland but instead a {0}".format(type(islands[0])))
     correct_box = [[3, 6], [3, 6]]
     if not np.all( islands[0].bounding_box == correct_box):
         raise AssertionError("Bounding box incorrect, should be {0}, but is {1}".format(correct_box,islands[0].bounding_box))
+=======
+        raise AssertionError("islands[0] is not a PixelIsland but instead a {0}".format(type(islands[0])))
+>>>>>>> add test for find_islands
 
     # add another island that is between the seed/flood thresholds
     im[7:9,2:5] = 4.5
@@ -258,6 +270,7 @@ def test_find_islands():
 
     return
 
+<<<<<<< HEAD
 
 def test_estimate_parinfo_image():
     """Test"""
@@ -308,6 +321,8 @@ def test_estimate_parinfo_image():
         raise AssertionError("FIXED2PSF flag not detected")
 
 
+=======
+>>>>>>> add test for find_islands
 if __name__ == "__main__":
     #test_find_islands()
     #test_estimate_parinfo_image()
