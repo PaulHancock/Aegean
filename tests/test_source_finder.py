@@ -7,7 +7,7 @@ __author__ = 'Paul Hancock'
 
 from AegeanTools import source_finder as sf
 from AegeanTools.fits_image import Beam
-from AegeanTools import models
+from AegeanTools import models, flags
 from copy import deepcopy
 import numpy as np
 import logging
@@ -237,12 +237,18 @@ def test_find_islands():
     # and have some pixels masked or below the clipping threshold
     im[5,5] = np.nan
     im[4,4] = 0
+    # make the border nans
+    im[0:3,:] = im[-1:,:] = np.nan
+    im[:,0] = im[:,-1] = np.nan
 
     islands = sf.find_islands(im, bkg, rms, log=log)
     if len(islands) != 1:
         raise AssertionError("Incorrect number of islands found {0}, expecting 1".format(len(islands)))
     if not isinstance(islands[0], models.PixelIsland):
-        raise AssertionError("islands[0] is not a PixelIsland but instead a {0}".format(type(islands[0])))
+        raise AssertionError("Islands[0] is not a PixelIsland but instead a {0}".format(type(islands[0])))
+    correct_box = [[3, 6], [3, 6]]
+    if not np.all( islands[0].bounding_box == correct_box):
+        raise AssertionError("Bounding box incorrect, should be {0}, but is {1}".format(correct_box,islands[0].bounding_box))
 
     # add another island that is between the seed/flood thresholds
     im[7:9,2:5] = 4.5
@@ -252,7 +258,61 @@ def test_find_islands():
 
     return
 
+
+def test_estimate_parinfo_image():
+    """Test"""
+    log = logging.getLogger("Aegean")
+    #log.setLevel(logging.DEBUG)
+
+    im = np.zeros(shape=(10, 10), dtype=np.float32) * np.nan
+    bkg = np.zeros_like(im)
+    rms = np.ones_like(im)
+
+    im[2:5, 2:5] = 6.
+    im[3,3] = 8.
+
+    islands = sf.find_islands(im, bkg, rms, log=log)
+    sources = sf.estimate_parinfo_image(islands, im=im, rms=rms, wcs=None, log=log)
+
+    if len(sources) != 1:
+        raise AssertionError("Incorrect number of sources found {0}, expecting 1".format(len(sources)))
+    if not sources[0]['components'].value == 1:
+        raise AssertionError("Found {0} components, expecting 1".format(sources[0]['components'].value))
+    if not sources[0]['c0_amp'].value == 8.0:
+        raise AssertionError("c0_amp is not 8.0 (is {0})".format(sources[0]['c0_amp'].value))
+
+    # test on a negative island
+    im *= -1.
+    islands = sf.find_islands(im, bkg, rms, log=log)
+    sources = sf.estimate_parinfo_image(islands, im=im, rms=rms, wcs=None, log=log)
+
+    if len(sources) != 1:
+        raise AssertionError("Incorrect number of sources found {0}, expecting 1".format(len(sources)))
+    if not sources[0]['components'].value == 1:
+        raise AssertionError("Found {0} components, expecting 1".format(sources[0]['components'].value))
+    if not sources[0]['c0_amp'].value == -8.0:
+        raise AssertionError("c0_amp is not -8.0 (is {0})".format(sources[0]['c0_amp'].value))
+
+    # test on a small island
+    im[:,:] = np.nan
+    im[2:4,2:4] = 6.
+    im[3,3] = 8.
+
+    islands = sf.find_islands(im, bkg, rms, log=log)
+    sources = sf.estimate_parinfo_image(islands, im=im, rms=rms, wcs=None, log=log)
+    if len(sources) != 1:
+        raise AssertionError("Incorrect number of sources found {0}, expecting 1".format(len(sources)))
+    if not sources[0]['components'].value == 1:
+        raise AssertionError("Found {0} components, expecting 1".format(sources[0]['components'].value))
+    if not (sources[0]['c0_flags'].value & flags.FIXED2PSF):
+        raise AssertionError("FIXED2PSF flag not detected")
+
+
 if __name__ == "__main__":
+    #test_find_islands()
+    #test_estimate_parinfo_image()
+    #import sys
+    #sys.exit()
     # introspect and run all the functions starting with 'test'
     for f in dir():
         if f.startswith('test'):
