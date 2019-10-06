@@ -24,7 +24,7 @@ from .fits_image import FitsImage, Beam
 from .msq2 import MarchingSquares
 from .angle_tools import dec2hms, dec2dms, gcd, bear
 from .catalogs import load_table, table_to_source_list
-from .models import SimpleSource, OutputSource, IslandSource, island_itergen, \
+from .models import SimpleSource, ComponentSource, IslandSource, island_itergen, \
     GlobalFittingData, IslandFittingData, DummyLM
 from .models import PixelIsland
 from . import flags
@@ -222,7 +222,7 @@ def characterise_islands(islands,
     Returns
     -------
     sources : [AegeanTools.models.SimpleSource, ... ]
-        A list of characterised sources of type SimpleSource, OutputSource, or IslandSource.
+        A list of characterised sources of type SimpleSource, ComponentSource, or IslandSource.
     """
     sources = []
     return sources
@@ -237,7 +237,7 @@ def save_catalogue(sources,
     Parameters
     ----------
     sources : [AegeanTools.models.SimpleSource, ... ]
-        A list of characterised sources of type SimpleSource, OutputSource, or IslandSource.
+        A list of characterised sources of type SimpleSource, ComponentSource, or IslandSource.
 
     output : str
         Output filename
@@ -630,7 +630,7 @@ class SourceFinder(object):
         j = 0
         for j in range(model['components'].value):
             src_flags = is_flag
-            source = OutputSource()
+            source = ComponentSource()
             source.island = isle_num
             source.source = j
             self.log.debug(" component {0}".format(j))
@@ -1747,7 +1747,7 @@ class SourceFinder(object):
         # Write the output to the output file
         if outfile:
             print(header.format("{0}-({1})".format(__version__, __date__), filename), file=outfile)
-            print(OutputSource.header, file=outfile)
+            print(ComponentSource.header, file=outfile)
 
         sources = []
         for srcs in queue:
@@ -1781,7 +1781,7 @@ class SourceFinder(object):
             Image filename or HDUList.
 
         catalogue : str or list
-            Input catalogue file name or list of OutputSource objects.
+            Input catalogue file name or list of ComponentSource objects.
 
         hdu_index : int
             The index of the FITS HDU (extension).
@@ -1991,11 +1991,11 @@ class SourceFinder(object):
         # Write the output to the output file
         if outfile:
             print(header.format("{0}-({1})".format(__version__, __date__), filename), file=outfile)
-            print(OutputSource.header, file=outfile)
+            print(ComponentSource.header, file=outfile)
 
         components = 0
         for source in sources:
-            if isinstance(source, OutputSource):
+            if isinstance(source, ComponentSource):
                 components += 1
                 if outfile:
                     print(str(source), file=outfile)

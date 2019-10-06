@@ -239,7 +239,7 @@ class IslandSource(SimpleSource):
         return self.__gt__(other) or self.__eq__(other)
 
 
-class OutputSource(SimpleSource):
+class ComponentSource(SimpleSource):
     """
     A Gaussian component, aka a source, that was measured by Aegean.
 
@@ -584,13 +584,13 @@ def classify_catalog(catalog):
     Parameters
     ----------
     catalog : iterable
-        A list or iterable object of {SimpleSource, IslandSource, OutputSource} objects, possibly mixed.
+        A list or iterable object of {SimpleSource, IslandSource, ComponentSource} objects, possibly mixed.
         Any other objects will be silently ignored.
 
     Returns
     -------
     components : list
-        List of sources of type OutputSource
+        List of sources of type ComponentSource
 
     islands : list
         List of sources of type IslandSource
@@ -602,7 +602,7 @@ def classify_catalog(catalog):
     islands = []
     simples = []
     for source in catalog:
-        if isinstance(source, OutputSource):
+        if isinstance(source, ComponentSource):
             components.append(source)
         elif isinstance(source, IslandSource):
             islands.append(source)
@@ -619,7 +619,7 @@ def island_itergen(catalog):
     Parameters
     ----------
     catalog : iterable
-        A list or iterable of :class:`AegeanTools.models.OutputSource` objects.
+        A list or iterable of :class:`AegeanTools.models.ComponentSource` objects.
 
     Yields
     ------
