@@ -20,16 +20,6 @@ You can install via pip using
 
 Or you can clone or download the repository and then use `python setup.py install` or `pip install .`
 
-**Notes for installing on python 3**:
-pprocess has not (yet) been updated for python 3. The 2to3 conversion tool does what you need:
-```
-wget http://www.boddie.org.uk/python/downloads/pprocess-0.5.3.tar.gz
-gunzip pprocess-0.5.3.tar.gz
-tar -xvf pprocess-0.5.3.tar
-cd pprocess-0.5.3
-2to3 -w .
-pip install .
-```
 
 
 Help
