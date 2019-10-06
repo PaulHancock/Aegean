@@ -26,6 +26,7 @@ from .angle_tools import dec2hms, dec2dms, gcd, bear
 from .catalogs import load_table, table_to_source_list
 from .models import SimpleSource, OutputSource, IslandSource, island_itergen, \
     GlobalFittingData, IslandFittingData, DummyLM
+from .models import PixelIsland
 from . import flags
 # need Region in the name space in order to be able to unpickle it
 from .regions import Region
@@ -50,28 +51,66 @@ header = """#Aegean version {0}
 CC2FHWM = (2 * math.sqrt(2 * math.log(2)))
 FWHM2CC = 1 / CC2FHWM
 
+# dummy logger
+log = logging.getLogger('dummy')
+log.addHandler(logging.NullHandler())
+
 
 def find_islands(im, bkg, rms,
-                 section,
-                 seed_clip=5., flood_clip=4.):
+                 seed_clip=5., flood_clip=4.,
+                 log=log):
     """
     This function designed to be run as a stand alone process
 
     Parameters
     ----------
-    im, bkg, rms : np.ndarray
+    im, bkg, rms : `numpy.ndarray`
         Image, background, and rms maps
 
     seed_clip, flood_clip : float
         The seed clip which is used to create islands, and flood clip which is used to grow islands.
         The units are in SNR.
 
+    log : `logging.Logger` or None
+        For handling logs (or not)
+
     Returns
     -------
-    islands : [AegeanTools.island, ...]
+    islands : [`AegeanTools.models.PixelIsland`, ...]
         a list of islands
     """
+    # compute SNR image
+    snr = abs(im - bkg) / rms
+
+    # mask of pixles that are above the flood_clip
+    a = snr >= flood_clip
+
+    # segmentation via scipy
+    l, n = label(a)
+    f = find_objects(l)
+
+    if n == 0:
+        log.debug("There are no pixels above the clipping limit")
+        return []
+    log.debug("{1} Found {0} islands total above flood limit".format(n, im.shape))
+
     islands = []
+    for i in range(n):
+        xmin, xmax = f[i][0].start, f[i][0].stop
+        ymin, ymax = f[i][1].start, f[i][1].stop
+        if np.any(snr[xmin:xmax, ymin:ymax] > seed_clip):  # obey seed clip constraint
+            data_box = copy.copy(im[xmin:xmax, ymin:ymax])  # copy so that we don't blank the master data
+            data_box[np.where(
+                snr[xmin:xmax, ymin:ymax] < seed_clip)] = np.nan  # blank pixels that are outside the outerclip
+            data_box[np.where(l[xmin:xmax, ymin:ymax] != i + 1)] = np.nan  # blank out other summits
+            # check if there are any pixels left unmasked
+            if not np.any(np.isfinite(data_box)):
+                # self.log.info("{1} Island {0} has no non-masked pixels".format(i,data.shape))
+                continue
+            island = PixelIsland()
+            island.calc_bounding_box(np.array(np.nan_to_num(data_box), dtype=bool), offsets=[0,0])
+            islands.append(island)
+
     return islands
 
 
@@ -88,10 +127,10 @@ def estimate_parinfo_image(islands,
     islands : [AegeanTools.models.Island, ... ]
         A list of islands which will be converted into groups of sources
 
-    im, bkg : np.ndarray
+    im, bkg : `numpy.ndarray`
         The image and background maps
 
-    wcs : astropy.wcs.WCS
+    wcs : `astropy.wcs.WCS`
         A wcs object valid for the image map
 
     psf : str or None
@@ -99,7 +138,7 @@ def estimate_parinfo_image(islands,
 
     Returns
     --------
-    sources : [lmfit.Parameters, ... ]
+    sources : [`lmfit.Parameters`, ... ]
         The initial estimate of parameters for the components within each island.
     """
     sources = []
