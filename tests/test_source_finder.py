@@ -237,6 +237,9 @@ def test_find_islands():
     # and have some pixels masked or below the clipping threshold
     im[5,5] = np.nan
     im[4,4] = 0
+    # make the border nans
+    im[0:3,:] = im[-1:,:] = np.nan
+    im[:,0] = im[:,-1] = np.nan
 
     islands = sf.find_islands(im, bkg, rms, log=log)
     if len(islands) != 1:
