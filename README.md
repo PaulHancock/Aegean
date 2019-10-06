@@ -12,7 +12,7 @@ Programs included:
 
 Installing
 =====
-AegeanTools is built and tested on python 2.7, and 3.6.
+AegeanTools is built and tested on python 2.7.14, and 3.7.
 
 You can install via pip using 
 `pip install git+https://github.com/PaulHancock/Aegean.git` (latest)
