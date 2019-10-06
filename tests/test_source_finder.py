@@ -7,12 +7,11 @@ __author__ = 'Paul Hancock'
 
 from AegeanTools import source_finder as sf
 from AegeanTools.fits_image import Beam
-from AegeanTools import flags
+from AegeanTools import models
 from copy import deepcopy
 import numpy as np
 import logging
 import os
-import six
 
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
@@ -220,6 +219,38 @@ def test_esimate_lmfit_parinfo():
 
     return
 
+
+# for 3.0 functionality
+
+def test_find_islands():
+    im = np.ones((10,10), dtype=np.float32)
+    bkg = np.zeros_like(im)
+    rms = np.ones_like(im)
+
+    # test with no islands
+    islands = sf.find_islands(im, bkg, rms, log=log)
+    if len(islands) != 0:
+        return AssertionError("Found islands where non existed")
+
+    # now set just one island
+    im[3:6,3:6] *= 10
+    # and have some pixels masked or below the clipping threshold
+    im[5,5] = np.nan
+    im[4,4] = 0
+
+    islands = sf.find_islands(im, bkg, rms, log=log)
+    if len(islands) != 1:
+        raise AssertionError("Incorrect number of islands found {0}, expecting 1".format(len(islands)))
+    if not isinstance(islands[0], models.PixelIsland):
+        raise AssertionError("islands[0] is not a PixelIsland but instead a {0}".format(type(islands[0])))
+
+    # add another island that is between the seed/flood thresholds
+    im[7:9,2:5] = 4.5
+    islands = sf.find_islands(im, bkg, rms, log=log)
+    if len(islands) != 1:
+        raise AssertionError("Incorrect number of islands found {0}, expecting 1".format(len(islands)))
+
+    return
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
