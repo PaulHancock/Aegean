@@ -5,11 +5,11 @@ Different types of sources that Aegean is able to fit
 """
 
 from __future__ import print_function
+import numpy as np
+import uuid
 
 __author__ = "Paul Hancock"
 
-import numpy as np
-import uuid
 
 class SimpleSource(object):
     """
@@ -55,6 +55,7 @@ class SimpleSource(object):
     names = ['background', 'local_rms', 'ra', 'dec', 'peak_flux', 'err_peak_flux', 'flags', 'peak_pixel', 'a', 'b',
              'pa', 'uuid']
     galactic = False
+
     def __init__(self):
         self.background = np.nan
         self.local_rms = np.nan
@@ -68,8 +69,6 @@ class SimpleSource(object):
         self.b = np.nan
         self.pa = np.nan
         self.uuid = str(uuid.uuid4())
-
-
 
     def _sanitise(self):
         """
@@ -464,6 +463,60 @@ class GlobalFittingData(object):
         self.wcshelper = None
         self.psfhelper = None
         self.blank = False
+        return
+
+
+class PixelIsland(object):
+    """
+    An island of pixels within an image or cube
+
+    Attributes
+    ----------
+    dim : int
+        The number of dimensions of this island. dim >=2, default is 2 (ra/dec).
+
+    bounding_box : [(min, max), (min, max), ...]
+        A bounding box for this island. len(bounding_box)==dim.
+
+    mask : np.array(dtype=bool)
+        A mask that represents the island within the bounding box.
+    """
+
+    def __init__(self):
+        self.dim = 2
+        self.bounding_box = [None] * self.dim
+        self.mask = None
+        self.partial = False
+        return
+
+    def set_mask(self, data):
+        """
+
+        Parameters
+        ----------
+        data : np.array(dtype=bool)
+        """
+        if len(data.shape) != self.dim:
+            raise AssertionError("mask shape {0} is of the wrong dimension. Expecting {1}".format(data.shape, self.dim))
+        self.mask = data
+        return
+
+    def calc_bounding_box(self, data, offsets):
+        """
+        Compute the bounding box for a data cube of dimension dim.
+        The bounding box will be the smallest nd-cube that bounds the non-zero entries of the cube.
+        Parameters
+        ----------
+        data : np.ndarray
+            Data array with dimension equal to self.dim
+
+        offsets : [xmin, ymin, ...]
+            The offset between the image zero index and the zero index of data. len(offsets)==dim
+        """
+        if len(offsets)!=self.dim:
+            raise AssertionError("{0} offsets were passed but {1} are required".format(len(offsets),self.dim))
+        self.set_mask(data)
+        # self.bounding_box = ?
         return
 
 

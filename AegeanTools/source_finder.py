@@ -2,9 +2,7 @@
 """
 The Aegean source finding program.
 """
-
 from __future__ import print_function
-
 # standard imports
 import sys
 import six
@@ -15,11 +13,9 @@ import copy
 import logging
 import logging.config
 import lmfit
-
 import scipy
 from scipy.special import erf
 from scipy.ndimage import label, find_objects
-
 # AegeanTools
 from .fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit, \
                      bias_correct, elliptical_gaussian
@@ -31,12 +27,16 @@ from .catalogs import load_table, table_to_source_list
 from .models import SimpleSource, OutputSource, IslandSource, island_itergen, \
     GlobalFittingData, IslandFittingData, DummyLM
 from . import flags
-
 # need Region in the name space in order to be able to unpickle it
 from .regions import Region
 
+if six.PY2:
+    import cPickle
+else:
+    import _pickle as cPickle
+
 # multiple cores support
-import pprocess
+from . import pprocess
 import multiprocessing
 
 from .__init__ import __version__, __date__
@@ -49,6 +49,171 @@ header = """#Aegean version {0}
 # constants
 CC2FHWM = (2 * math.sqrt(2 * math.log(2)))
 FWHM2CC = 1 / CC2FHWM
+
+
+def find_islands(im, bkg, rms,
+                 section,
+                 seed_clip=5., flood_clip=4.):
+    """
+    This function designed to be run as a stand alone process
+
+    Parameters
+    ----------
+    im, bkg, rms : np.ndarray
+        Image, background, and rms maps
+
+    seed_clip, flood_clip : float
+        The seed clip which is used to create islands, and flood clip which is used to grow islands.
+        The units are in SNR.
+
+    Returns
+    -------
+    islands : [AegeanTools.island, ...]
+        a list of islands
+    """
+    islands = []
+    return islands
+
+
+def estimate_parinfo_image(islands,
+                           im, bkg, wcs,
+                           psf=None):
+    """
+    Estimate the initial parameters for fitting for each of the islands of pixels.
+    The source sizes will be initialised as the psf of the image, which is either
+    determined by the WCS of the image file or the psf map if one is supplied.
+
+    Parameters
+    ----------
+    islands : [AegeanTools.models.Island, ... ]
+        A list of islands which will be converted into groups of sources
+
+    im, bkg : np.ndarray
+        The image and background maps
+
+    wcs : astropy.wcs.WCS
+        A wcs object valid for the image map
+
+    psf : str or None
+        The filename for the psf map (optional)
+
+    Returns
+    --------
+    sources : [lmfit.Parameters, ... ]
+        The initial estimate of parameters for the components within each island.
+    """
+    sources = []
+    return sources
+
+
+def priorized_islands_parinfo(sources,
+                              im, wcs,
+                              psf=None,
+                              stage=3,
+                              ):
+    """
+    Turn a list of sources into a set of islands and parameter estimates which can then be
+    characterised.
+
+    Parameters
+    ----------
+    sources : [AegeanTools.models.SimpleSource, ... ]
+        A list of sources in the catalogue.
+
+    im : np.ndarray
+        The image map
+
+    wcs : astropy.wcs.WCS
+        A wcs object valid for the image map
+
+    psf : str or None
+        The filename for the psf map (optional)
+
+    stage : int
+        The priorized fitting stage which determines what parameters are fit/fixed. One of:
+            1 - Fit for flux only. All other params are fixed.
+            2 - Fit for flux and position. Shape parameters are fixed.
+            3 - Fit for flux, position, and shape.
+
+    Returns
+    -------
+    islands : [AegeanTools.island, ...]
+        a list of islands
+
+    sources : [lmfit.Parameters, ... ]
+        The initial estimate of parameters for the components within each island.
+    """
+
+
+def characterise_islands(islands,
+                         im, bkg, rms,
+                         err_type='best',
+                         psf=None,
+                         do_islandfit=False):
+    """
+    Do the source characterisation based on the initial estimate of the island properties.
+
+
+    Parameters
+    ----------
+    islands : [lmfit.Parameters, ... ]
+        The initial estimate of parameters for the components within each island.
+
+    im, bkg, rms : np.ndarray
+        The image, background, and noise maps
+
+    err_type : str or None
+        The method for calculating uncertainties on parameters:
+            'best' - Uncertainties measured based on covariance matrix of the fit and of the data
+                See Hancock et al. 2018 for a description of this process.
+            'condon' - Uncertainties are *calculated* based on Condon'98 (?year)
+            'raw' - uncertainties directly from the covariance matrix only
+            'none' or None - No uncertainties, all will be set to -1.
+
+    wcs : astropy.wcs.WCS
+        A wcs object valid for the image map
+
+    psf : str or None
+        The filename for the psf map (optional)
+
+    do_islandfit : bool
+        If True, then also characterise islands as well as components. Default=False.
+
+    Returns
+    -------
+    sources : [AegeanTools.models.SimpleSource, ... ]
+        A list of characterised sources of type SimpleSource, OutputSource, or IslandSource.
+    """
+    sources = []
+    return sources
+
+
+def save_catalogue(sources,
+                   output,
+                   format=None):
+    """
+    Write a catalogue of sources
+
+    Parameters
+    ----------
+    sources : [AegeanTools.models.SimpleSource, ... ]
+        A list of characterised sources of type SimpleSource, OutputSource, or IslandSource.
+
+    output : str
+        Output filename
+
+    format : str
+        A descriptor of the output format. Options are:
+            #TODO add a bunch of options
+            'auto' or None - infer from filename extension
+
+    Returns
+    -------
+    None
+    """
+    # determine file format
+    # write catalogue based on source type and file format
+    return
 
 
 class SourceFinder(object):
@@ -606,7 +771,7 @@ class SourceFinder(object):
     # Setting up 'global' data and calculating bkg/rms
     ##
     def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, bkg=None, cores=1,
-                     do_curve=True, mask=None, lat=None, psf=None, blank=False, docov=True, cube_index=None):
+                     do_curve=False, mask=None, lat=None, psf=None, blank=False, docov=True, cube_index=None):
         """
         Populate the global_data object by loading or calculating the various components
 
@@ -1299,7 +1464,26 @@ class SourceFinder(object):
         beam = global_data.psfhelper.get_psf_pix(midra, middec)
         del middec, midra
 
-        icurve = dcurve[xmin:xmax, ymin:ymax]
+        # the curvature needs a buffer of 1 pixel to correctly identify local min/max
+        # on the edge of the region. We need a 1 pix buffer (if available)
+        buffx = [xmin - max(xmin-1,0), min(xmax+1, global_data.data_pix.shape[0]) - xmax]
+        buffy = [ymin - max(ymin-1,0), min(ymax+1, global_data.data_pix.shape[1]) - ymax]
+        icurve = np.zeros(shape=(xmax-xmin + buffx[0] + buffx[1], ymax-ymin + buffy[0] + buffy[1]), dtype=np.int8)
+        # compute peaks and convert to +/-1
+        peaks = scipy.ndimage.filters.maximum_filter(self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]], size=3)
+        pmask = np.where(peaks == self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]])
+        troughs = scipy.ndimage.filters.minimum_filter(self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]], size=3)
+        tmask = np.where(troughs == self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]])
+        icurve[pmask] = -1
+        icurve[tmask] = 1
+        # icurve and idata need to be the same size so we crop icurve based on the buffers that we computed
+        icurve = icurve[buffx[0]:icurve.shape[0]-buffx[1], buffy[0]:icurve.shape[1]-buffy[1]]
+        del peaks, pmask, troughs, tmask
+        
         rms = rmsimg[xmin:xmax, ymin:ymax]
 
         is_flag = 0
@@ -1310,7 +1494,6 @@ class SourceFinder(object):
 
         self.log.debug("=====")
         self.log.debug("Island ({0})".format(isle_num))
-
         params = self.estimate_lmfit_parinfo(idata, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
                                              max_summits=max_summits)
 
@@ -1915,10 +2098,6 @@ def check_cores(cores):
 
     """
     cores = min(multiprocessing.cpu_count(), cores)
-    if six.PY3:
-        log = logging.getLogger("Aegean")
-        log.info("Multi-cores not supported in python 3+, using one core")
-        return 1
     try:
         queue = pprocess.Queue(limit=cores, reuse=1)
     except:  # TODO: figure out what error is being thrown
