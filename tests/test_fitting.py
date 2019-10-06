@@ -163,7 +163,7 @@ def test_bias_correct():
 
 def test_condon_errs():
     """Test that we can create Condon errors"""
-    source = models.OutputSource()
+    source = models.ComponentSource()
     source.ra = 0
     source.dec = 1
     source.a = 10

@@ -31,11 +31,11 @@ def test_simple_source():
     if isl >= ss: raise AssertionError()
     if not (isl == isl2): raise AssertionError()
     if isl != isl2: raise AssertionError()
-    out = models.OutputSource()
+    out = models.ComponentSource()
     out.source = 1
-    out2 = models.OutputSource()
+    out2 = models.ComponentSource()
     out2.source = 2
-    out3 = models.OutputSource()
+    out3 = models.ComponentSource()
     out3.island = 1
     if not (out < out2): raise AssertionError()
     if not (out3 > out2): raise AssertionError()
@@ -67,9 +67,9 @@ def test_classify_catalogue():
         b = models.IslandSource()
         b.island = i
         isl.append(b)
-        c = models.OutputSource()
+        c = models.ComponentSource()
         c.island = i
-        d = models.OutputSource()
+        d = models.ComponentSource()
         d.island = i
         d.source = 1
         out.extend([c, d])

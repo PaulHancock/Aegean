@@ -17,7 +17,7 @@ import six
 from time import gmtime, strftime
 
 # Other AegeanTools
-from .models import OutputSource, classify_catalog
+from .models import ComponentSource, classify_catalog
 
 # input/output table formats
 from astropy.table.table import Table
@@ -149,7 +149,7 @@ def save_catalog(filename, catalog, meta=None, prefix=None):
 
     Each type of source will be in a separate file:
 
-    - base_comp.ext :class:`AegeanTools.models.OutputSource`
+    - base_comp.ext :class:`AegeanTools.models.ComponentSource`
     - base_isle.ext :class:`AegeanTools.models.IslandSource`
     - base_simp.ext :class:`AegeanTools.models.SimpleSource`
 
@@ -162,7 +162,7 @@ def save_catalog(filename, catalog, meta=None, prefix=None):
         Name of file to write, format is determined by extension.
 
     catalog : list
-        A list of sources to write. Sources must be of type :class:`AegeanTools.models.OutputSource`,
+        A list of sources to write. Sources must be of type :class:`AegeanTools.models.ComponentSource`,
         :class:`AegeanTools.models.SimpleSource`, or :class:`AegeanTools.models.IslandSource`.
 
     prefix : str
@@ -299,12 +299,12 @@ def write_table(table, filename):
     return
 
 
-def table_to_source_list(table, src_type=OutputSource):
+def table_to_source_list(table, src_type=ComponentSource):
     """
     Convert a table of data into a list of sources.
 
     A single table must have consistent source types given by src_type. src_type should be one of
-    :class:`AegeanTools.models.OutputSource`, :class:`AegeanTools.models.SimpleSource`,
+    :class:`AegeanTools.models.ComponentSource`, :class:`AegeanTools.models.SimpleSource`,
     or :class:`AegeanTools.models.IslandSource`.
 
 
@@ -314,7 +314,7 @@ def table_to_source_list(table, src_type=OutputSource):
         Table of sources
 
     src_type : class
-        Sources must be of type :class:`AegeanTools.models.OutputSource`,
+        Sources must be of type :class:`AegeanTools.models.ComponentSource`,
         :class:`AegeanTools.models.SimpleSource`, or :class:`AegeanTools.models.IslandSource`.
 
     Returns
@@ -347,7 +347,7 @@ def write_catalog(filename, catalog, fmt=None, meta=None, prefix=None):
     """
     Write a catalog (list of sources) to a file with format determined by extension.
 
-    Sources must be of type :class:`AegeanTools.models.OutputSource`,
+    Sources must be of type :class:`AegeanTools.models.ComponentSource`,
     :class:`AegeanTools.models.SimpleSource`, or :class:`AegeanTools.models.IslandSource`.
 
     Parameters
@@ -357,7 +357,7 @@ def write_catalog(filename, catalog, fmt=None, meta=None, prefix=None):
         the different types of sources that are being written.
 
     catalog : list
-        A list of source objects. Sources must be of type :class:`AegeanTools.models.OutputSource`,
+        A list of source objects. Sources must be of type :class:`AegeanTools.models.ComponentSource`,
         :class:`AegeanTools.models.SimpleSource`, or :class:`AegeanTools.models.IslandSource`.
 
     fmt : str
@@ -602,7 +602,7 @@ def writeAnn(filename, catalog, fmt):
     Uses ra/dec from catalog.
     Draws ellipses if bmaj/bmin/pa are in catalog. Draws 30" circles otherwise.
 
-    Only :class:`AegeanTools.models.OutputSource` will appear in the annotation file
+    Only :class:`AegeanTools.models.ComponentSource` will appear in the annotation file
     unless there are none, in which case :class:`AegeanTools.models.SimpleSource` (if present)
     will be written. If any :class:`AegeanTools.models.IslandSource` objects are present then
     an island contours file will be written.
@@ -721,7 +721,7 @@ def writeDB(filename, catalog, meta=None):
         Output filename
 
     catalog : list
-        List of sources of type :class:`AegeanTools.models.OutputSource`,
+        List of sources of type :class:`AegeanTools.models.ComponentSource`,
         :class:`AegeanTools.models.SimpleSource`, or :class:`AegeanTools.models.IslandSource`.
 
     meta : dict

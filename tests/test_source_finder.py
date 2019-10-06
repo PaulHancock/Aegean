@@ -28,7 +28,7 @@ def test_misc():
 def test_helpers():
     """Test the helper functions"""
     # fix shape
-    src = sf.OutputSource()
+    src = sf.ComponentSource()
     src.a = 1
     src.b = 2
     src.pa = 90
