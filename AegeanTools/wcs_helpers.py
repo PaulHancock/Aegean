@@ -573,7 +573,7 @@ class PSFHelper(WCSHelper):
         # get the beam from the psf image data
         psf = self.get_psf_pix(ra, dec)
         if not np.all(np.isfinite(psf)):
-            log.warn("PSF requested, returned Null")
+            log.warning("PSF requested, returned Null")
             return None
         return Beam(psf[0], psf[1], psf[2])
 

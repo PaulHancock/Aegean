@@ -63,7 +63,7 @@ def check_table_formats(files):
         ext = ext[1:].lower()
         if ext not in formats:
             cont = False
-            log.warn("Format not supported for {0} ({1})".format(t, ext))
+            log.warning("Format not supported for {0} ({1})".format(t, ext))
     if not cont:
         log.error("Invalid table format specified.")
     return cont
