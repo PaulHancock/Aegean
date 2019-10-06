@@ -16,6 +16,7 @@ import lmfit
 import scipy
 from scipy.special import erf
 from scipy.ndimage import label, find_objects
+from scipy.ndimage.filters import minimum_filter, maximum_filter
 # AegeanTools
 from .fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit, \
                      bias_correct, elliptical_gaussian
@@ -109,15 +110,15 @@ def find_islands(im, bkg, rms,
                 # self.log.info("{1} Island {0} has no non-masked pixels".format(i,data.shape))
                 continue
             island = PixelIsland()
-            island.calc_bounding_box(np.array(np.nan_to_num(data_box), dtype=bool), offsets=[0,0])
+            island.calc_bounding_box(np.array(np.nan_to_num(data_box), dtype=bool), offsets=[xmin, ymin])
             islands.append(island)
 
     return islands
 
 
 def estimate_parinfo_image(islands,
-                           im, bkg, wcs,
-                           psf=None):
+                           im, rms, wcs, max_summits=None,
+                           psf=None, log=log):
     """
     Estimate the initial parameters for fitting for each of the islands of pixels.
     The source sizes will be initialised as the psf of the image, which is either
@@ -128,8 +129,8 @@ def estimate_parinfo_image(islands,
     islands : [AegeanTools.models.Island, ... ]
         A list of islands which will be converted into groups of sources
 
-    im, bkg : `numpy.ndarray`
-        The image and background maps
+    im, rms : `numpy.ndarray`
+        The image and noise maps
 
     wcs : `astropy.wcs.WCS`
         A wcs object valid for the image map
@@ -137,12 +138,227 @@ def estimate_parinfo_image(islands,
     psf : str or None
         The filename for the psf map (optional)
 
+    max_summits : int
+        The maximum number of summits that will be fit. Any in addition to this will
+        be estimated but their parameters will have vary=False.
+
+    log : `logging.Logger` or None
+        For handling logs (or not)
+
     Returns
     --------
     sources : [`lmfit.Parameters`, ... ]
         The initial estimate of parameters for the components within each island.
     """
+    debug_on = log.isEnabledFor(logging.DEBUG)
     sources = []
+
+    for island in islands:
+        # set flags to be empty
+        is_flag = 0x0
+        [rmin, rmax], [cmin, cmax] =island.bounding_box
+        i_data = im[rmin:rmax, cmin:cmax]
+        i_rms = rms[rmin:rmax, cmin:cmax]
+
+        # the curvature needs a buffer of 1 pixel to correctly identify local min/max
+        # on the edge of the region. We need a 1 pix buffer (if available)
+        buffx = [rmin - max(rmin-1,0), min(rmax+1, im.shape[0]) - rmax]
+        buffy = [cmin - max(cmin-1,0), min(cmax+1, im.shape[1]) - cmax]
+        i_curve = np.zeros(shape=(rmax-rmin + buffx[0] + buffx[1], cmax-cmin + buffy[0] + buffy[1]),
+                          dtype=np.int8)
+        # compute peaks and convert to +/-1
+        peaks = maximum_filter(im[rmin-buffx[0]:rmax+buffx[1],
+                                  cmin-buffy[0]:cmax+buffy[0]], size=3)
+        pmask = np.where(peaks == im[rmin-buffx[0]:rmax+buffx[1],
+                                     cmin-buffy[0]:cmax+buffy[0]])
+        troughs = minimum_filter(im[rmin-buffx[0]:rmax+buffx[1],
+                                    cmin-buffy[0]:cmax+buffy[0]], size=3)
+        tmask = np.where(troughs == im[rmin-buffx[0]:rmax+buffx[1],
+                                       cmin-buffy[0]:cmax+buffy[0]])
+        i_curve[pmask] = -1
+        i_curve[tmask] = 1
+        # i_curve and im need to be the same size so we crop i_curve based on the buffers that we computed
+        i_curve = i_curve[buffx[0]:i_curve.shape[0]-buffx[1], buffy[0]:i_curve.shape[1]-buffy[1]]
+        del peaks, pmask, troughs, tmask, buffx, buffy
+
+        # apply the island mask
+        i_data[np.where(np.bitwise_not(island.mask))] = np.nan
+
+        isnegative = max(i_data[np.where(np.isfinite(i_data) & island.mask)]) < 0
+
+
+        # For small islands we can't do a 6 param fit
+        # Don't count the NaN values as part of the island
+        non_nan_pix = len(i_data[np.where(np.isfinite(i_data))].ravel())
+        if 4 <= non_nan_pix <= 6:
+            log.debug("FIXED2PSF")
+            is_flag |= flags.FIXED2PSF
+        elif non_nan_pix < 4:
+            log.debug("FITERRSMALL!")
+            is_flag |= flags.FITERRSMALL
+        else:
+            is_flag = 0
+        if debug_on:
+            log.debug(" - size {0}".format(len(i_data.ravel())))
+
+        if min(i_data.shape) <= 2 or (is_flag & flags.FITERRSMALL) or (is_flag & flags.FIXED2PSF):
+            # 1d islands or small islands only get one source
+            if debug_on:
+                log.debug("Tiny summit detected")
+                log.debug("{0}".format(i_data))
+            # and are constrained to be point sources
+            is_flag |= flags.FIXED2PSF
+            summits = [[slice(0,i_data.shape[0]), slice(0,i_data.shape[1])]]
+            n = 1
+        else:
+            if isnegative:
+                # the summit should be able to include all pixels within the island not just those above innerclip
+                kappa_sigma = np.where(i_curve > 0.5, np.where(np.isfinite(i_data),i_data, np.nan), np.nan)
+            else:
+                kappa_sigma = np.where(i_curve < -0.5, np.where(np.isfinite(i_data), i_data, np.nan), np.nan)
+
+            # count the number of peaks and their locations
+            l, n = label(kappa_sigma)
+            summits = find_objects(l)
+
+        if n < 1:
+            log.debug("Island has no summits")
+            continue
+
+        params = lmfit.Parameters()
+        summits_considered = 0
+        summits_accepted = 0
+        #TODO: figure out how to sort the components in flux order
+
+        for i in range(n):
+            # x/y min/max are indices of the summit within the island
+            xmin, xmax = summits[i][0].start, summits[i][0].stop
+            ymin, ymax = summits[i][1].start, summits[i][1].stop
+            summits_considered += 1
+            summit_flag = is_flag
+
+            summit = i_data[xmin:xmax, ymin:ymax]
+
+            if debug_on:
+                log.debug(
+                    "Summit({0}) - shape: {1} x:[{2}-{3}] y:[{4}-{5}]".format(i, summit.shape, ymin, ymax, xmin, xmax))
+            try:
+                if isnegative:
+                    xpeak, ypeak = np.unravel_index(np.nanargmin(summit), summit.shape)
+                else:
+                    xpeak, ypeak = np.unravel_index(np.nanargmax(summit), summit.shape)
+                amp = summit[xpeak,ypeak]
+            except ValueError as e:
+                if "All-NaN" in e.message:
+                    log.warning("Summit of nan's detected - this shouldn't happen")
+                    continue
+                else:
+                    raise e
+
+            if debug_on:
+                log.debug(" - max is {0:f}".format(amp))
+                log.debug(" - peak at {0},{1}".format(xpeak, ypeak))
+
+            # xo/yo are the index of the peak within the island
+            yo = ypeak + ymin
+            xo = xpeak + xmin
+
+            # allow amp to be 5% or 3 sigma higher
+            # NOTE: the 5% should depend on the beam sampling
+            if amp > 0:
+                amp_min, amp_max = 0.95 * min(3 * i_rms[xo, yo], amp), amp * 1.05 + 3 * i_rms[xo, yo]
+            else:
+                amp_max, amp_min = 0.95 * max(-3 * i_rms[xo, yo], amp), amp * 1.05 - 3 * i_rms[xo, yo]
+
+            if debug_on:
+                log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
+
+            # TODO: figure out the pixbeam things here
+            # pixbeam = global_data.psfhelper.get_pixbeam_pixel(yo + offsets[0], xo + offsets[1])
+            # if pixbeam is None:
+            #    log.debug(" Summit has invalid WCS/Beam - Skipping.")
+            #    continue
+            # Dummy the pixbeam for now
+            from . import fits_image
+            pixbeam = fits_image.Beam(1,1,0)
+
+            # set a square limit based on the size of the pixbeam
+            xo_lim = 0.5 * np.hypot(pixbeam.a, pixbeam.b)
+            yo_lim = xo_lim
+            yo_min, yo_max = yo - yo_lim, yo + yo_lim
+            xo_min, xo_max = xo - xo_lim, xo + xo_lim
+
+            # the size of the island
+            xsize = i_data.shape[0]
+            ysize = i_data.shape[1]
+
+            # initial shape is the psf
+            sx = pixbeam.a * FWHM2CC
+            sy = pixbeam.b * FWHM2CC
+
+            # lmfit does silly things if we start with these two parameters being equal
+            sx = max(sx, sy * 1.01)
+
+            # constraints are based on the shape of the island
+            # sx,sy can become flipped so we set the min/max account for this
+            sx_min, sx_max = sy * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * FWHM2CC, sx * 1.1)
+            sy_min, sy_max = sy * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * FWHM2CC, sx * 1.1)
+
+            theta = pixbeam.pa  # Degrees
+            flag = summit_flag
+
+
+            # check to see if we are going to fit this component
+            if max_summits is not None:
+                maxxed = (i>=max_summits)
+            else:
+                maxxed = False
+
+            # components that are not fit need appropriate flags
+            if maxxed:
+                summit_flag |= flags.NOTFIT
+                summit_flag |= flags.FIXED2PSF
+
+            if debug_on:
+                log.debug(" - var val min max | min max")
+                log.debug(" - amp {0} {1} {2} ".format(amp, amp_min, amp_max))
+                log.debug(" - xo {0} {1} {2} ".format(xo, xo_min, xo_max))
+                log.debug(" - yo {0} {1} {2} ".format(yo, yo_min, yo_max))
+                log.debug(" - sx {0} {1} {2} | {3} {4}".format(sx, sx_min, sx_max, sx_min * CC2FHWM,
+                                                               sx_max * CC2FHWM))
+                log.debug(" - sy {0} {1} {2} | {3} {4}".format(sy, sy_min, sy_max, sy_min * CC2FHWM,
+                                                               sy_max * CC2FHWM))
+                log.debug(" - theta {0} {1} {2}".format(theta, -180, 180))
+                log.debug(" - flags {0}".format(flag))
+                log.debug(" - fit?  {0}".format(not maxxed))
+
+            # TODO: figure out how incorporate the circular constraint on sx/sy
+            prefix = "c{0}_".format(i)
+            params.add(prefix + 'amp', value=amp, min=amp_min, max=amp_max, vary=not maxxed)
+            params.add(prefix + 'xo', value=xo, min=float(xo_min), max=float(xo_max), vary=not maxxed)
+            params.add(prefix + 'yo', value=yo, min=float(yo_min), max=float(yo_max), vary=not maxxed)
+
+            if summit_flag & flags.FIXED2PSF > 0:
+                psf_vary = False
+            else:
+                psf_vary = not maxxed
+            params.add(prefix + 'sx', value=sx, min=sx_min, max=sx_max, vary=psf_vary)
+            params.add(prefix + 'sy', value=sy, min=sy_min, max=sy_max, vary=psf_vary)
+            params.add(prefix + 'theta', value=theta, vary=psf_vary)
+            params.add(prefix + 'flags', value=summit_flag, vary=False)
+
+            summits_accepted += 1
+
+        if debug_on:
+            log.debug("Estimated sources: {0}".format(summits_accepted))
+        # remember how many components are fit.
+        params.add('components', value=summits_accepted, vary=False)
+        # params.components=i
+        if params['components'].value < 1:
+            log.debug("Considered {0} summits, accepted {1}".format(summits_considered, summits_accepted))
+
+        sources.append(params)
+
     return sources
 
 
