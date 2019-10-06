@@ -1,3 +1,15 @@
+2019-10-06
+==========
+General
+- Begin preparation for a major update (Aegean 3.0)
+- Include `pprocess.py` and update it to support python3
+- Update testing to include python 3.7 on ubuntu 16.04
+- Remove old an unused `Test` directory and files (saves space for installs)
+
+Aegean
+- Allow multi-core processing in python3
+- Do curvature calculation on islands instead of entire image (small speed improvement)
+
 2019-09-03
 ==========
 Aegean
