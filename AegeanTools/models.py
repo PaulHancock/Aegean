@@ -482,9 +482,9 @@ class PixelIsland(object):
         A mask that represents the island within the bounding box.
     """
 
-    def __init__(self):
-        self.dim = 2
-        self.bounding_box = [None] * self.dim
+    def __init__(self, dim=2):
+        self.dim = dim
+        self.bounding_box = [[0,0]] * self.dim
         self.mask = None
         self.partial = False
         return
@@ -516,7 +516,14 @@ class PixelIsland(object):
         if len(offsets)!=self.dim:
             raise AssertionError("{0} offsets were passed but {1} are required".format(len(offsets),self.dim))
         self.set_mask(data)
-        # self.bounding_box = ?
+        # set the bounding box one dimension at a time
+        for i in range(self.dim):
+            # look for 'rows' that have non-zero entries
+            ndrow = np.any(data, axis=i)
+            rmin, rmax = np.where(ndrow)[0][[0, -1]]
+            self.bounding_box[i][0] = offsets[i] + rmin
+            self.bounding_box[i][1] = offsets[i] + rmax + 1
+
         return
 
 
