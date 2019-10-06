@@ -227,8 +227,8 @@ def test_find_islands():
     bkg = np.zeros_like(im)
     rms = np.ones_like(im)
 
-    # test with no islands
-    islands = sf.find_islands(im, bkg, rms, log=log)
+    # test with no islands and no logger
+    islands = sf.find_islands(im, bkg, rms)
     if len(islands) != 0:
         return AssertionError("Found islands where non existed")
 
