@@ -51,6 +51,171 @@ CC2FHWM = (2 * math.sqrt(2 * math.log(2)))
 FWHM2CC = 1 / CC2FHWM
 
 
+def find_islands(im, bkg, rms,
+                 section,
+                 seed_clip=5., flood_clip=4.):
+    """
+    This function designed to be run as a stand alone process
+
+    parameters
+    ----------
+    im, bkg, rms : np.ndarray
+        Image, background, and rms maps
+
+    seed_clip, flood_clip : float
+        The seed clip which is used to create islands, and flood clip which is used to grow islands.
+        The units are in SNR.
+
+    returns
+    -------
+    islands : [AegeanTools.island, ...]
+        a list of islands
+    """
+    islands = []
+    return islands
+
+
+def estimate_parinfo_image(islands,
+                           im, bkg, wcs,
+                           psf=None):
+    """
+    Estimate the initial parameters for fitting for each of the islands of pixels.
+    The source sizes will be initialised as the psf of the image, which is either
+    determined by the WCS of the image file or the psf map if one is supplied.
+
+    parameters
+    ----------
+    islands : [AegeanTools.models.Island, ... ]
+        A list of islands which will be converted into groups of sources
+
+    im, bkg : np.ndarray
+        The image and background maps
+
+    wcs : astropy.wcs.WCS
+        A wcs object valid for the image map
+
+    psf : str or None
+        The filename for the psf map (optional)
+
+    returns
+    --------
+    sources : [lmfit.Parameters, ... ]
+        The initial estimate of parameters for the components within each island.
+    """
+    sources = []
+    return sources
+
+
+def priorized_islands_parinfo(sources,
+                              im, wcs,
+                              psf=None,
+                              stage=3,
+                              ):
+    """
+    Turn a list of sources into a set of islands and parameter estimates which can then be
+    characterised.
+
+    parameters
+    ----------
+    sources : [AegeanTools.models.SimpleSource, ... ]
+        A list of sources in the catalogue.
+
+    im : np.ndarray
+        The image map
+
+    wcs : astropy.wcs.WCS
+        A wcs object valid for the image map
+
+    psf : str or None
+        The filename for the psf map (optional)
+
+    stage : int
+        The priorized fitting stage which determines what parameters are fit/fixed. One of:
+            1 - Fit for flux only. All other params are fixed.
+            2 - Fit for flux and position. Shape parameters are fixed.
+            3 - Fit for flux, position, and shape.
+
+    returns
+    -------
+    islands : [AegeanTools.island, ...]
+        a list of islands
+
+    sources : [lmfit.Parameters, ... ]
+        The initial estimate of parameters for the components within each island.
+    """
+
+
+def characterise_islands(islands,
+                         im, bkg, rms,
+                         err_type='best',
+                         psf=None,
+                         do_islandfit=False):
+    """
+    Do the source characterisation based on the initial estimate of the island properties.
+
+
+    parameters
+    ----------
+    islands : [lmfit.Parameters, ... ]
+        The initial estimate of parameters for the components within each island.
+
+    im, bkg, rms : np.ndarray
+        The image, background, and noise maps
+
+    err_type : str or None
+        The method for calculating uncertainties on parameters:
+            'best' - Uncertainties measured based on covariance matrix of the fit and of the data
+                See Hancock et al. 2018 for a description of this process.
+            'condon' - Uncertainties are *calculated* based on Condon'98 (?year)
+            'raw' - uncertainties directly from the covariance matrix only
+            'none' or None - No uncertainties, all will be set to -1.
+
+    wcs : astropy.wcs.WCS
+        A wcs object valid for the image map
+
+    psf : str or None
+        The filename for the psf map (optional)
+
+    do_islandfit : bool
+        If True, then also characterise islands as well as components. Default=False.
+
+    returns
+    -------
+    sources : [AegeanTools.models.SimpleSource, ... ]
+        A list of characterised sources of type SimpleSource, OutputSource, or IslandSource.
+    """
+    sources = []
+    return sources
+
+
+def save_catalogue(sources,
+                   output,
+                   format=None):
+    """
+    Write a catalogue of sources
+
+    parameters
+    ----------
+    sources : [AegeanTools.models.SimpleSource, ... ]
+        A list of characterised sources of type SimpleSource, OutputSource, or IslandSource.
+
+    output : str
+        Output filename
+
+    format : str
+        A descriptor of the output format. Options are:
+            #TODO add a bunch of options
+            'auto' or None - infer from filename extension
+
+    returns
+    -------
+    None
+    """
+    # determine file format
+    # write catalogue based on source type and file format
+    return
+
+
 class SourceFinder(object):
     """
     The Aegean source finding algorithm
