@@ -63,6 +63,47 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     return amp * np.exp(exp)
 
 
+def elliptical_gaussian_with_alpha(x, y, v, amp, xo, yo, vo, sx, sy, theta, alpha, beta=None):
+    """
+    Generate a model 2d Gaussian with spectral terms.
+    Evaluate this model at the given locations x,y,dv.
+
+    amp is the amplitude at the reference frequency vo
+
+    The model is:
+    S(x,v) = amp (v/vo) ** (alpha + beta *log(v/vo))
+
+    When beta is none it is ignored.
+
+    Parameters
+    ----------
+    x, y, v : numeric or array-like
+        locations at which to evaluate the gaussian
+    amp : float
+        Peak value.
+    xo, yo, vo: float
+        Center of the gaussian.
+    sx, sy : float
+        major/minor axes in sigmas
+    theta : float
+        position angle (degrees) CCW from x-axis
+
+    alpha, beta: float
+        The spectral terms of the fit.
+
+    Returns
+    -------
+    data : numeric or array-like
+        Gaussian function evaluated at the x,y locations.
+    """
+    exponent = alpha
+    if beta is not None:
+        exponent += beta * np.log10(v/vo)
+    snu = amp * (v/vo) ** (exponent)
+    gauss = elliptical_gaussian(x,y,snu,xo,yo,sx,sy,theta)
+    return gauss
+
+
 def Cmatrix(x, y, sx, sy, theta):
     """
     Construct a correlation matrix corresponding to the data.
