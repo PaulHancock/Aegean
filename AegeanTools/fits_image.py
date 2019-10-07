@@ -5,144 +5,17 @@ Tools for interacting with fits images (HUDLists)
 
 from __future__ import print_function
 
-__author__= "Paul Hancock"
-
 import numpy
 import astropy.wcs as pywcs
 import scipy.stats
 import logging
 from .fits_interp import expand
+from .wcs_helpers import get_pixinfo, get_beam
+
+__author__= "Paul Hancock"
 
 # Join the Aegean logger
 log = logging.getLogger("Aegean")
-
-
-def get_pixinfo(header):
-    """
-    Return some pixel information based on the given hdu header
-    pixarea - the area of a single pixel in deg2
-    pixscale - the side lengths of a pixel (assuming they are square)
-
-    Parameters
-    ----------
-    header : HDUHeader or dict
-        FITS header information
-
-    Returns
-    -------
-    pixarea : float
-        The are of a single pixel at the reference location, in square degrees.
-
-    pixscale : (float, float)
-        The pixel scale in degrees, at the reference location.
-
-    Notes
-    -----
-    The reference location is not always at the image center, and the pixel scale/area may
-    change over the image, depending on the projection.
-    """
-    if all(a in header for a in ["CDELT1", "CDELT2"]):
-        pixarea = abs(header["CDELT1"]*header["CDELT2"])
-        pixscale = (header["CDELT1"], header["CDELT2"])
-    elif all(a in header for a in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]):
-        pixarea = abs(header["CD1_1"]*header["CD2_2"]
-                    - header["CD1_2"]*header["CD2_1"])
-        pixscale = (header["CD1_1"], header["CD2_2"])
-        if not (header["CD1_2"] == 0 and header["CD2_1"] == 0):
-            log.warning("Pixels don't appear to be square -> pixscale is wrong")
-    elif all(a in header for a in ["CD1_1", "CD2_2"]):
-        pixarea = abs(header["CD1_1"]*header["CD2_2"])
-        pixscale = (header["CD1_1"], header["CD2_2"])
-    else:
-        log.critical("cannot determine pixel area, using zero EVEN THOUGH THIS IS WRONG!")
-        pixarea = 0
-        pixscale = (0, 0)
-    return pixarea, pixscale
-
-
-def get_beam(header):
-    """
-    Create a :class:`AegeanTools.fits_image.Beam` object from a fits header.
-
-    BPA may be missing but will be assumed to be zero.
-
-    if BMAJ or BMIN are missing then return None instead of a beam object.
-
-    Parameters
-    ----------
-    header : HDUHeader
-        The fits header.
-
-    Returns
-    -------
-    beam : :class:`AegeanTools.fits_image.Beam`
-        Beam object, with a, b, and pa in degrees.
-    """
-
-    if "BPA" not in header:
-        log.warning("BPA not present in fits header, using 0")
-        bpa = 0
-    else:
-        bpa = header["BPA"]
-
-    if "BMAJ" not in header:
-        log.warning("BMAJ not present in fits header.")
-        bmaj = None
-    else:
-        bmaj = header["BMAJ"]
-
-    if "BMIN" not in header:
-        log.warning("BMIN not present in fits header.")
-        bmin = None
-    else:
-        bmin = header["BMIN"]
-    if None in [bmaj, bmin, bpa]:
-        return None
-    beam = Beam(bmaj, bmin, bpa)
-    return beam
-
-
-def fix_aips_header(header):
-    """
-    Search through an image header. If the keywords BMAJ/BMIN/BPA are not set,
-    but there are AIPS history cards, then we can populate the BMAJ/BMIN/BPA.
-    Fix the header if possible, otherwise don't. Either way, don't complain.
-
-
-    Parameters
-    ----------
-    header : HDUHeader
-        Fits header which may or may not have AIPS history cards.
-
-    Returns
-    -------
-    header : HDUHeader
-        A header which has BMAJ, BMIN, and BPA keys, as well as a new HISTORY card.
-    """
-    if 'BMAJ' in header and 'BMIN' in header and 'BPA' in header:
-        # The header already has the required keys so there is nothing to do
-        return header
-    aips_hist = [a for a in header['HISTORY'] if a.startswith("AIPS")]
-    if len(aips_hist) == 0:
-        # There are no AIPS history items to process
-        return header
-    for a in aips_hist:
-        if "BMAJ" in a:
-            # this line looks like
-            # 'AIPS   CLEAN BMAJ=  1.2500E-02 BMIN=  1.2500E-02 BPA=   0.00'
-            words = a.split()
-            bmaj = float(words[3])
-            bmin = float(words[5])
-            bpa = float(words[7])
-            break
-    else:
-        # there are AIPS cards but there is no BMAJ/BMIN/BPA
-        return header
-    header['BMAJ'] = bmaj
-    header['BMIN'] = bmin
-    header['BPA'] = bpa
-    header['HISTORY'] = 'Beam information AIPS->fits by AegeanTools'
-    return header
 
 
 class FitsImage(object):
@@ -160,7 +33,7 @@ class FitsImage(object):
         hdu_index : int
             The index of the FITS HDU. Default = 0.
 
-        beam : Beam
+        beam : AegeanTools.wcs_helpers.Beam
             The synthesized beam for this image, using sky coordinates.
             If beam is None then it will be created from the fits header.
             Default = None.
@@ -324,19 +197,3 @@ class FitsImage(object):
         return [float(pixbox[0][0]), float(pixbox[0][1])]
 
 
-class Beam(object):
-    """
-    Small class to hold the properties of the beam.
-    Properties are a,b,pa. No assumptions are made as to the units, but both a and b have to be >0.
-    """
-    def __init__(self, a, b, pa, pixa=None, pixb=None):
-        if not (a > 0): raise AssertionError("major axis must be >0")
-        if not (b > 0): raise AssertionError("minor axis must be >0")
-        self.a = a
-        self.b = b
-        self.pa = pa
-        self.pixa = pixa
-        self.pixb = pixb
-    
-    def __str__(self):
-        return "a={0} b={1} pa={2}".format(self.a, self.b, self.pa)

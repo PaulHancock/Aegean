@@ -30,7 +30,7 @@ except ImportError:
     region_available = False
 
 from AegeanTools.source_finder import scope2lat, get_aux_files
-from AegeanTools.fits_image import Beam
+from AegeanTools.wcs_helpers import Beam
 from AegeanTools.catalogs import show_formats, check_table_formats, save_catalog
 from AegeanTools import fitting
 import multiprocessing

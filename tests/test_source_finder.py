@@ -6,7 +6,7 @@ Test source_finder.py
 __author__ = 'Paul Hancock'
 
 from AegeanTools import source_finder as sf
-from AegeanTools.fits_image import Beam
+from AegeanTools.wcs_helpers import Beam
 from AegeanTools import models, flags
 from copy import deepcopy
 import numpy as np
