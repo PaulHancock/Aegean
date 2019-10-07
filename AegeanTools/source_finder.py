@@ -18,10 +18,12 @@ from scipy.special import erf
 from scipy.ndimage import label, find_objects
 from scipy.ndimage.filters import minimum_filter, maximum_filter
 # AegeanTools
+import AegeanTools.wcs_helpers
 from .fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit, \
                      bias_correct, elliptical_gaussian
 from .wcs_helpers import WCSHelper, PSFHelper
-from .fits_image import FitsImage, Beam
+from .fits_image import FitsImage
+from AegeanTools.wcs_helpers import Beam
 from .msq2 import MarchingSquares
 from .angle_tools import dec2hms, dec2dms, gcd, bear
 from .catalogs import load_table, table_to_source_list
@@ -281,7 +283,7 @@ def estimate_parinfo_image(islands,
             #    continue
             # Dummy the pixbeam for now
             from . import fits_image
-            pixbeam = fits_image.Beam(1,1,0)
+            pixbeam = AegeanTools.wcs_helpers.Beam(1, 1, 0)
 
             # set a square limit based on the size of the pixbeam
             xo_lim = 0.5 * np.hypot(pixbeam.a, pixbeam.b)

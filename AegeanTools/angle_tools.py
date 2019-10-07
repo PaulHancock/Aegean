@@ -22,7 +22,7 @@ def ra2dec(ra):
 
     Parameters
     ----------
-    ra : string
+    ra : str
         A string separated representing the RA.
         Expected format is `hh:mm[:ss.s]`
         Colons can be replaced with any whit space character.
@@ -41,7 +41,7 @@ def dec2dec(dec):
 
     Parameters
     ----------
-    dec : string
+    dec : str
         A string separated representing the Dec.
         Expected format is `[+- ]hh:mm[:ss.s]`
         Colons can be replaced with any whit space character.
@@ -70,7 +70,7 @@ def dec2dms(x):
 
     Returns
     -------
-    dms : string
+    dms : str
         String of format [+-]DD:MM:SS.SS
         or XX:XX:XX.XX if x is not finite.
     """
@@ -187,7 +187,7 @@ def translate(ra, dec, r, theta):
 
     Returns
     -------
-    ra, dec : float
+    ra, dec : (float, float)
         The translated position (degrees).
     """
     factor = np.sin(np.radians(dec)) * np.cos(np.radians(r))

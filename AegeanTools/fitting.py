@@ -848,7 +848,7 @@ def condon_errors(source, theta_n, psf=None):
     theta_n : float or None
         A measure of the beam sampling. (See Condon'97).
 
-    psf : :class:`AegeanTools.fits_image.Beam`
+    psf : :class:`AegeanTools.wcs_helpers.Beam`
         The psf at the location of the source.
 
     Returns

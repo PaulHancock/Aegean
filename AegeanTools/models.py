@@ -426,7 +426,7 @@ class GlobalFittingData(object):
     hdu_header : HDUHeader
         FITS header for the input image.
 
-    beam : :class:`AegeanTools.fits_image.Beam`
+    beam : :class:`AegeanTools.wcs_helpers.Beam`
         The synthesized beam of the input image.
 
     data_pix : 2d-array

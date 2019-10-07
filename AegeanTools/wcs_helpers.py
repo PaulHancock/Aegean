@@ -7,24 +7,26 @@ to make them a lot easier to use.
 
 from __future__ import print_function
 
-__author__ = 'Paul Hancock'
-
 import astropy.wcs as pywcs
 from astropy.io import fits
 import numpy as np
 
 # AegeanTools
 from .angle_tools import gcd, bear, translate
-from .fits_image import Beam, get_beam, get_pixinfo
 
 # join the Aegean logger
 import logging
+
+__author__ = 'Paul Hancock'
+
 log = logging.getLogger('Aegean')
 
 
 class WCSHelper(object):
     """
     A wrapper around astropy.wcs that provides extra functionality, and hides the c/fortran indexing troubles.
+
+    Additionally allow psf information to be described in a map instead of the fits header of the image.
 
     Useful functions not provided by astropy.wcs
 
@@ -33,14 +35,14 @@ class WCSHelper(object):
     - the ability to change the beam according to dec-lat
     """
 
-    def __init__(self, wcs, beam, pixscale, refpix, lat=None):
+    def __init__(self, wcs, beam, pixscale, refpix, lat=None, psf=None):
         """
         Parameters
         ----------
-        wcs : astropy.wcs
+        wcs : :class:`astropy.wcs.WCS`
             WCS object
 
-        beam : :class:`AegeanTools.fits_image.Beam`
+        beam : :class:`AegeanTools.wcs_helpers.Beam`
             The synthesized beam.
 
         pixscale : (float, float)
@@ -51,6 +53,9 @@ class WCSHelper(object):
 
         lat : float
             The latitude of the telescope
+
+        psf : str
+            Filename for a psf map
         """
         self.wcs = wcs
         self.beam = beam
@@ -68,7 +73,7 @@ class WCSHelper(object):
         header : `astropy.fits.HDUHeader` or string
             The header to be used to create the WCS helper
 
-        beam : :class:`AegeanTools.fits_image.Beam` or None
+        beam : :class:`AegeanTools.wcs_helpers.Beam` or None
             The synthesized beam. If the supplied beam is None then one is constructed form the header.
 
         lat : float
@@ -106,7 +111,7 @@ class WCSHelper(object):
         filename : string
             The file to be read
 
-        beam : :class:`AegeanTools.fits_image.Beam` or None
+        beam : :class:`AegeanTools.wcs_helpers.Beam` or None
             The synthesized beam. If the supplied beam is None then one is constructed form the header.
 
         Returns
@@ -173,7 +178,7 @@ class WCSHelper(object):
 
         Returns
         -------
-        x, y : float
+        x, y : (float, float)
             The pixel coordinates of the origin.
         r, theta : float
             The magnitude (pixels) and angle (degrees) of the vector.
@@ -195,7 +200,7 @@ class WCSHelper(object):
 
         Parameters
         ----------
-        pixel : (int,int)
+        pixel : (float, float)
             origin of vector in pixel coordinates
         r : float
             magnitude of vector in pixels
@@ -204,15 +209,15 @@ class WCSHelper(object):
 
         Returns
         -------
-        ra, dec : float
+        ra, dec : (float, float)
             The (ra, dec) of the origin point (degrees).
-        r, pa : float
+        r, pa : (float, float)
             The magnitude and position angle of the vector (degrees).
         """
         ra1, dec1 = self.pix2sky(pixel)
         x, y = pixel
-        a = [x + r * np.cos(np.radians(theta)),
-             y + r * np.sin(np.radians(theta))]
+        a = (x + r * np.cos(np.radians(theta)),
+             y + r * np.sin(np.radians(theta)))
         locations = self.pix2sky(a)
         ra2, dec2 = locations
         a = gcd(ra1, dec1, ra2, dec2)
@@ -232,9 +237,9 @@ class WCSHelper(object):
 
         Returns
         -------
-        x,y : float
+        x, y : (float, float)
             The (x, y) pixel coordinates of the ellipse center.
-        sx, sy : float
+        sx, sy : (float, float)
             The major and minor axes (FWHM) in pixels.
         theta : float
             The rotation angle of the ellipse (degrees).
@@ -276,10 +281,10 @@ class WCSHelper(object):
 
         Returns
         -------
-        ra, dec : float
+        ra, dec : (float, float)
             The (ra, dec) coordinates of the center of the ellipse (degrees).
 
-        a, b : float
+        a, b : (float, float)
             The semi-major and semi-minor axis of the ellipse (degrees).
 
         pa : float
@@ -287,14 +292,14 @@ class WCSHelper(object):
         """
         ra, dec = self.pix2sky(pixel)
         x, y = pixel
-        v_sx = [x + sx * np.cos(np.radians(theta)),
-                y + sx * np.sin(np.radians(theta))]
+        v_sx = (x + sx * np.cos(np.radians(theta)),
+                y + sx * np.sin(np.radians(theta)))
         ra2, dec2 = self.pix2sky(v_sx)
         major = gcd(ra, dec, ra2, dec2)
         pa = bear(ra, dec, ra2, dec2)
 
-        v_sy = [x + sy * np.cos(np.radians(theta - 90)),
-                y + sy * np.sin(np.radians(theta - 90))]
+        v_sy = (x + sy * np.cos(np.radians(theta - 90)),
+                y + sy * np.sin(np.radians(theta - 90)))
         ra2, dec2 = self.pix2sky(v_sy)
         minor = gcd(ra, dec, ra2, dec2)
         pa2 = bear(ra, dec, ra2, dec2) - 90
@@ -317,7 +322,7 @@ class WCSHelper(object):
 
         Returns
         -------
-        beam : :class:`AegeanTools.fits_image.Beam`
+        beam : :class:`AegeanTools.wcs_helpers.Beam`
             A beam object, with a/b/pa in pixel coordinates.
         """
         ra, dec = self.pix2sky((x, y))
@@ -334,7 +339,7 @@ class WCSHelper(object):
 
         Returns
         -------
-        beam : :class:`AegeanTools.fits_image.Beam`
+        beam : :class:`AegeanTools.wcs_helpers.Beam`
             A beam object, with a/b/pa in sky coordinates
         """
         # check to see if we need to scale the major axis based on the declination
@@ -356,7 +361,7 @@ class WCSHelper(object):
 
         Returns
         -------
-        beam : :class:`AegeanTools.fits_image.Beam`
+        beam : :class:`AegeanTools.wcs_helpers.Beam`
             A beam object, with a/b/pa in pixel coordinates.
         """
 
@@ -588,7 +593,7 @@ class PSFHelper(WCSHelper):
 
         Returns
         -------
-        beam : :class:`AegeanTools.fits_image.Beam`
+        beam : :class:`AegeanTools.wcs_helpers.Beam`
             The psf at the given location.
         """
         if self.data is None:
@@ -637,3 +642,151 @@ class PSFHelper(WCSHelper):
         if beam is None:
             return 0
         return beam.a * beam.b * np.pi
+
+class Beam(object):
+    """
+    Small class to hold the properties of the beam.
+    Properties are a,b,pa. No assumptions are made as to the units, but both a and b have to be >0.
+    """
+    def __init__(self, a, b, pa):
+        if not (a > 0): raise AssertionError("major axis must be >0")
+        if not (b > 0): raise AssertionError("minor axis must be >0")
+        self.a = a
+        self.b = b
+        self.pa = pa
+
+    def __str__(self):
+        return "a={0} b={1} pa={2}".format(self.a, self.b, self.pa)
+
+
+
+def get_pixinfo(header):
+    """
+    Return some pixel information based on the given hdu header
+    pixarea - the area of a single pixel in deg2
+    pixscale - the side lengths of a pixel (assuming they are square)
+
+    Parameters
+    ----------
+    header : :class:`astropy.io.fits.HDUHeader`
+        FITS header information
+
+    Returns
+    -------
+    pixarea : float
+        The are of a single pixel at the reference location, in square degrees.
+
+    pixscale : (float, float)
+        The pixel scale in degrees, at the reference location.
+
+    Notes
+    -----
+    The reference location is not always at the image center, and the pixel scale/area may
+    change over the image, depending on the projection.
+    """
+    if all(a in header for a in ["CDELT1", "CDELT2"]):
+        pixarea = abs(header["CDELT1"]*header["CDELT2"])
+        pixscale = (header["CDELT1"], header["CDELT2"])
+    elif all(a in header for a in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]):
+        pixarea = abs(header["CD1_1"]*header["CD2_2"]
+                    - header["CD1_2"]*header["CD2_1"])
+        pixscale = (header["CD1_1"], header["CD2_2"])
+        if not (header["CD1_2"] == 0 and header["CD2_1"] == 0):
+            log.warning("Pixels don't appear to be square -> pixscale is wrong")
+    elif all(a in header for a in ["CD1_1", "CD2_2"]):
+        pixarea = abs(header["CD1_1"]*header["CD2_2"])
+        pixscale = (header["CD1_1"], header["CD2_2"])
+    else:
+        log.critical("cannot determine pixel area, using zero EVEN THOUGH THIS IS WRONG!")
+        pixarea = 0
+        pixscale = (0, 0)
+    return pixarea, pixscale
+
+
+def get_beam(header):
+    """
+    Create a :class:`AegeanTools.wcs_helpers.Beam` object from a fits header.
+
+    BPA may be missing but will be assumed to be zero.
+
+    if BMAJ or BMIN are missing then return None instead of a beam object.
+
+    Parameters
+    ----------
+    header : :class:`astropy.io.fits.HDUHeader`
+        The fits header.
+
+    Returns
+    -------
+    beam : :class:`AegeanTools.wcs_helpers.Beam`
+        Beam object, with a, b, and pa in degrees.
+    """
+
+    if "BPA" not in header:
+        log.warning("BPA not present in fits header, using 0")
+        bpa = 0
+    else:
+        bpa = header["BPA"]
+
+    if "BMAJ" not in header:
+        log.warning("BMAJ not present in fits header.")
+        bmaj = None
+    else:
+        bmaj = header["BMAJ"]
+
+    if "BMIN" not in header:
+        log.warning("BMIN not present in fits header.")
+        bmin = None
+    else:
+        bmin = header["BMIN"]
+    if None in [bmaj, bmin, bpa]:
+        return None
+    beam = Beam(bmaj, bmin, bpa)
+    return beam
+
+
+def fix_aips_header(header):
+    """
+    Search through an image header. If the keywords BMAJ/BMIN/BPA are not set,
+    but there are AIPS history cards, then we can populate the BMAJ/BMIN/BPA.
+    Fix the header if possible, otherwise don't. Either way, don't complain.
+
+
+    Parameters
+    ----------
+    header : :class:`astropy.io.fits.HDUHeader`
+        Fits header which may or may not have AIPS history cards.
+
+    Returns
+    -------
+    header : :class:`astropy.io.fits.HDUHeader`
+        A header which has BMAJ, BMIN, and BPA keys, as well as a new HISTORY card.
+    """
+    if 'BMAJ' in header and 'BMIN' in header and 'BPA' in header:
+        # The header already has the required keys so there is nothing to do
+        return header
+    aips_hist = [a for a in header['HISTORY'] if a.startswith("AIPS")]
+    if len(aips_hist) == 0:
+        # There are no AIPS history items to process
+        return header
+    for a in aips_hist:
+        if "BMAJ" in a:
+            # this line looks like
+            # 'AIPS   CLEAN BMAJ=  1.2500E-02 BMIN=  1.2500E-02 BPA=   0.00'
+            words = a.split()
+            bmaj = float(words[3])
+            bmin = float(words[5])
+            bpa = float(words[7])
+            break
+    else:
+        # there are AIPS cards but there is no BMAJ/BMIN/BPA
+        return header
+    header['BMAJ'] = bmaj
+    header['BMIN'] = bmin
+    header['BPA'] = bpa
+    header['HISTORY'] = 'Beam information AIPS->fits by AegeanTools'
+    return header
+
+
+
+
