@@ -71,7 +71,7 @@ def test_sky_sep():
     """Test sky separation"""
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
-    dist = helper.sky_sep([0, 0], [1, 1])
+    dist = helper.sky_sep((0, 0), (1, 1))
     if not (dist > 0): raise AssertionError()
 
 
@@ -85,7 +85,7 @@ def test_vector_round_trip():
     initial = [1, 45]  # r,theta = 1,45 (degrees)
     ref = helper.refpix
     ra, dec, dist, ang = helper.pix2sky_vec(ref, *initial)
-    _, _ , r, theta = helper.sky2pix_vec([ra, dec], dist, ang)
+    _, _ , r, theta = helper.sky2pix_vec((ra, dec), dist, ang)
     if not ((abs(r - initial[0]) < 1e-9) and (abs(theta - initial[1]) < 1e-9)): raise AssertionError()
 
 
@@ -106,8 +106,8 @@ def test_ellipse_round_trip():
     for _, (ra, dec) in enumerate(zip(ras.ravel(), decs.ravel())):
         if ra < 0:
             ra += 360
-        x, y, sx, sy, theta = helper.sky2pix_ellipse([ra, dec], a, b, pa)
-        ra_f, dec_f, major, minor, pa_f = helper.pix2sky_ellipse([x, y], sx, sy, theta)
+        x, y, sx, sy, theta = helper.sky2pix_ellipse((ra, dec), a, b, pa)
+        ra_f, dec_f, major, minor, pa_f = helper.pix2sky_ellipse((x, y), sx, sy, theta)
         assert_almost_equal(ra, ra_f)
         assert_almost_equal(dec, dec_f)
         if not (abs(a-major)/a < 0.05): raise AssertionError()
