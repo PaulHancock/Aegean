@@ -31,7 +31,7 @@ class WCSHelper(object):
     - the ability to change the beam according to dec-lat
     """
 
-    def __init__(self, wcs, beam, pixscale, refpix, lat=None, psf=None):
+    def __init__(self, wcs, beam, pixscale, refpix, lat=None, psf_file=None):
         """
         Parameters
         ----------
@@ -50,7 +50,7 @@ class WCSHelper(object):
         lat : float
             The latitude of the telescope
 
-        psf : str
+        psf_file : str
             Filename for a psf map
         """
         self.wcs = wcs
@@ -58,7 +58,7 @@ class WCSHelper(object):
         self.pixscale = pixscale
         self.refpix = refpix
         self.lat = lat
-        self.psf_file = psf
+        self.psf_file = psf_file
         self._psf_map = None
         self._psf_wcs = None
 
