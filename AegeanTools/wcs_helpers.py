@@ -199,7 +199,7 @@ class WCSHelper(object):
 
         Returns
         -------
-        x, y : (float, float)
+        x, y : float
             The pixel coordinates of the origin.
         r, theta : float
             The magnitude (pixels) and angle (degrees) of the vector.
@@ -230,9 +230,9 @@ class WCSHelper(object):
 
         Returns
         -------
-        ra, dec : (float, float)
+        ra, dec : float
             The (ra, dec) of the origin point (degrees).
-        r, pa : (float, float)
+        r, pa : float
             The magnitude and position angle of the vector (degrees).
         """
         ra1, dec1 = self.pix2sky(pixel)
@@ -258,9 +258,9 @@ class WCSHelper(object):
 
         Returns
         -------
-        x, y : (float, float)
+        x, y : float
             The (x, y) pixel coordinates of the ellipse center.
-        sx, sy : (float, float)
+        sx, sy : float
             The major and minor axes (FWHM) in pixels.
         theta : float
             The rotation angle of the ellipse (degrees).
@@ -302,10 +302,10 @@ class WCSHelper(object):
 
         Returns
         -------
-        ra, dec : (float, float)
+        ra, dec : float
             The (ra, dec) coordinates of the center of the ellipse (degrees).
 
-        a, b : (float, float)
+        a, b : float
             The semi-major and semi-minor axis of the ellipse (degrees).
 
         pa : float
