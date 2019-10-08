@@ -29,6 +29,38 @@ class WCSHelper(object):
     - sky2pix/pix2sky functions for vectors and ellipses.
     - functions for calculating the beam in sky/pixel coords
     - the ability to change the beam according to dec-lat
+
+    This class tracks both the synthesized beam of the image (beam) and the point spread function (psf).
+    You may think that these things are the same and interchangeable but they are not always.
+    The beam is defined in the wcs of the image header, while the psf can be defined by
+    providing a new image file with 3 dimensions (ra, dec, psf) where the psf is (a, b, pa).
+    # TODO: Check that the above is consistent with the code, and adjust until they are.
+
+    Attributes
+    ----------
+    wcs : :class:`astropy.wcs.WCS`
+        WCS object
+
+    beam : :class:`AegeanTools.wcs_helpers.Beam`
+        The synthesized beam.
+
+    pixscale : (float, float)
+        The pixel scale at the reference location (degrees)
+
+    refpix : (float, float)
+        The reference location in pixel coordinates
+
+    lat : float
+        The latitude of the telescope
+
+    psf_file : str
+        Filename for a psf map
+
+    psf_map : :class:`np.ndarray`
+        A map of the psf as a function of sky position.
+
+    psf_wcs : :class:`np.ndarray`
+        The WCS object for the psf map
     """
 
     def __init__(self, wcs, beam, pixscale, refpix, lat=None, psf_file=None):
@@ -85,7 +117,7 @@ class WCSHelper(object):
         return self._psf_wcs
 
     @classmethod
-    def from_header(cls, header, beam=None, lat=None):
+    def from_header(cls, header, beam=None, lat=None, psf_file=None):
         """
         Create a new WCSHelper class from the given header.
 
@@ -99,6 +131,9 @@ class WCSHelper(object):
 
         lat : float
             The latitude of the telescope.
+
+        psf_file : str
+            Filename for a psf map
 
         Returns
         -------
@@ -120,10 +155,10 @@ class WCSHelper(object):
 
         _, pixscale = get_pixinfo(header)
         refpix = (header['CRPIX1'], header['CRPIX2'])
-        return cls(wcs, beam, pixscale, refpix, lat)
+        return cls(wcs, beam, pixscale, refpix, lat=lat, psf_file=psf_file)
 
     @classmethod
-    def from_file(cls, filename, beam=None):
+    def from_file(cls, filename, beam=None, psf_file=None):
         """
         Create a new WCSHelper class from a given fits file.
 
@@ -135,13 +170,16 @@ class WCSHelper(object):
         beam : :class:`AegeanTools.wcs_helpers.Beam` or None
             The synthesized beam. If the supplied beam is None then one is constructed form the header.
 
+        psf_file : str
+            Filename for a psf map
+
         Returns
         -------
         obj : :class:`AegeanTools.wcs_helpers.WCSHelper`
             A helper object
         """
         header = fits.getheader(filename)
-        return cls.from_header(header, beam)
+        return cls.from_header(header, beam, psf_file=psf_file)
 
     def pix2sky(self, pixel):
         """
