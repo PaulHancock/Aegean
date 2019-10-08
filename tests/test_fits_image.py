@@ -6,14 +6,13 @@ Test fits_image.py
 from __future__ import print_function
 
 import AegeanTools.wcs_helpers
-
-__author__ = 'Paul Hancock'
-
 from AegeanTools import fits_image as fi
 from astropy.io import fits
 import logging
 import numpy as np
 from numpy.testing import assert_raises, assert_array_almost_equal
+
+__author__ = 'Paul Hancock'
 
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
