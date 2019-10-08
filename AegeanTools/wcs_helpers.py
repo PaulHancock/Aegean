@@ -7,15 +7,11 @@ to make them a lot easier to use.
 
 from __future__ import print_function
 
-import astropy.wcs as pywcs
+from astropy.wcs import WCS
 from astropy.io import fits
 import numpy as np
-
-# AegeanTools
-from .angle_tools import gcd, bear, translate
-
-# join the Aegean logger
 import logging
+from .angle_tools import gcd, bear, translate
 
 __author__ = 'Paul Hancock'
 
@@ -62,6 +58,23 @@ class WCSHelper(object):
         self.pixscale = pixscale
         self.refpix = refpix
         self.lat = lat
+        self.psf_file = psf
+        self._psf_map = None
+        self._psf_wcs = None
+
+    # This construct gives us an attribute 'self.psf_map' which is only loaded on demand
+    @property
+    def psf_map(self):
+        if self._psf_map is None:
+            # use memory mapping to avoid loading large files, when only a small subset of the pixels are actually needed
+            self._psf_map = fits.open(self.psf_file, memmap=True)
+        return self._psf_map
+
+    @property
+    def psf_wcs(self):
+        if self._psf_wcs is None:
+            self._psf_wcs = WCS(fits.getheader(self.psf_file))
+        return self._psf_wcs
 
     @classmethod
     def from_header(cls, header, beam=None, lat=None):
@@ -85,9 +98,9 @@ class WCSHelper(object):
             A helper object.
         """
         try:
-            wcs = pywcs.WCS(header, naxis=2)
+            wcs = WCS(header, naxis=2)
         except:  # TODO: figure out what error is being thrown
-            wcs = pywcs.WCS(str(header), naxis=2)
+            wcs = WCS(str(header), naxis=2)
 
         if beam is None:
             beam = get_beam(header)
@@ -469,9 +482,9 @@ class PSFHelper(WCSHelper):
                 log.critical("PSF file needs to have 3 dimensions, only {0} found".format(len(data.shape)))
                 raise Exception("Invalid PSF file {0}".format(psffile))
             try:
-                wcs = pywcs.WCS(header, naxis=2)
+                wcs = WCS(header, naxis=2)
             except:
-                wcs = pywcs.WCS(str(header), naxis=2)
+                wcs = WCS(str(header), naxis=2)
         self.wcshelper = wcshelper
         self.data = data
         self.wcs = wcs
@@ -521,7 +534,7 @@ class PSFHelper(WCSHelper):
 
         Returns
         -------
-        a, b, pa : float
+        a, b, pa : (float, float, float)
             The psf semi-major axis (pixels), semi-minor axis (pixels), and rotation angle (degrees).
             If a psf is defined then it is the psf that is returned, otherwise the image
             restoring beam is returned.
