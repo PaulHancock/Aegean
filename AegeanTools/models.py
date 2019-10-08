@@ -441,9 +441,6 @@ class GlobalFittingData(object):
     wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
         A helper object for WCS operations, created from `hdu_header`.
 
-    psfhelper : :class:`AegeanTools.wcs_helpers.PSFHelper`
-        A helper objects for tracking the changes in PSF over the image.
-
     blank : bool
         If true, then the input image will be blanked at the location of each of
         the measured islands.
