@@ -2,15 +2,15 @@
 """
 Test wcs_helpers.py
 """
-
 from __future__ import print_function
-
-__author__ = 'Paul Hancock'
 
 from AegeanTools.wcs_helpers import WCSHelper
 from astropy.io import fits
 import numpy as np
 from numpy.testing import assert_almost_equal
+
+__author__ = 'Paul Hancock'
+
 
 
 def verify_beam(beam):
