@@ -68,12 +68,20 @@ class WCSHelper(object):
         if self._psf_map is None:
             # use memory mapping to avoid loading large files, when only a small subset of the pixels are actually needed
             self._psf_map = fits.open(self.psf_file, memmap=True)
+            if len(self._psf_map.shape) != 3:
+                log.critical("PSF file needs to have 3 dimensions, found {0}".format(len(self._psf_map.shape)))
+                raise Exception("Invalid PSF file {0}".format(self.psf_file))
         return self._psf_map
 
     @property
     def psf_wcs(self):
         if self._psf_wcs is None:
-            self._psf_wcs = WCS(fits.getheader(self.psf_file))
+            header = fits.getheader(self.psf_file)
+            try:
+                wcs = WCS(header, naxis=2)
+            except:
+                wcs = WCS(str(header), naxis=2)
+            self._psf_wcs = wcs
         return self._psf_wcs
 
     @classmethod
@@ -324,6 +332,61 @@ class WCSHelper(object):
         minor *= abs(np.cos(np.radians(defect)))
         return ra, dec, major, minor, pa
 
+    def get_psf_sky(self, ra, dec):
+        """
+        Determine the local psf at a given sky location.
+        The psf is returned in degrees.
+
+
+        Parameters
+        ----------
+        ra, dec : float
+            The sky position (degrees).
+
+        Returns
+        -------
+        a, b, pa : float
+            The psf semi-major axis, semi-minor axis, and position angle in (degrees).
+            If a psf is defined then it is the psf that is returned, otherwise the image
+            restoring beam is returned.
+        """
+        # If we don't have a psf map then we just fall back to using the beam
+        # from the fits header (including ZA scaling)
+        if self.psf_file is None:
+            beam = self.get_beam(ra, dec)
+            return beam.a, beam.b, beam.pa
+
+        x, y = self.sky2pix((ra, dec))
+        # We leave the interpolation in the hands of whoever is making these images
+        # clamping the x,y coords at the image boundaries just makes sense
+        x = int(np.clip(x, 0, self._psf_map.shape[1] - 1))
+        y = int(np.clip(y, 0, self._psf_map.shape[2] - 1))
+        psf_sky = self._psf_map[:, x, y]
+        return psf_sky
+
+    def get_psf_pix(self, ra, dec):
+        """
+        Determine the local psf (a,b,pa) at a given sky location.
+        The psf is in pixel coordinates.
+
+        Parameters
+        ----------
+        ra, dec : float
+            The sky position (degrees).
+
+
+        Returns
+        -------
+        a, b, pa : (float, float, float)
+            The psf semi-major axis (pixels), semi-minor axis (pixels), and rotation angle (degrees).
+            If a psf is defined then it is the psf that is returned, otherwise the image
+            restoring beam is returned.
+
+        """
+        psf_sky = self.get_psf_sky(ra, dec)
+        psf_pix = self.sky2pix_ellipse((ra, dec), psf_sky[0], psf_sky[1], psf_sky[2])[2:]
+        return psf_pix
+
     def get_pixbeam_pixel(self, x, y):
         """
         Determine the beam in pixels at the given location in pixel coordinates.
@@ -355,6 +418,13 @@ class WCSHelper(object):
         beam : :class:`AegeanTools.wcs_helpers.Beam`
             A beam object, with a/b/pa in sky coordinates
         """
+        # get the psf from the psf map
+        if self.psf_file is not None:
+            psf = self.get_psf_sky(ra, dec)
+            if not all(np.isfinite(psf)):
+                return None
+            return Beam(psf[0], psf[1], psf[2])
+
         # check to see if we need to scale the major axis based on the declination
         if self.lat is None:
             factor = 1
@@ -377,7 +447,15 @@ class WCSHelper(object):
         beam : :class:`AegeanTools.wcs_helpers.Beam`
             A beam object, with a/b/pa in pixel coordinates.
         """
+        # get the psf from the psf map
+        if self.psf_file is not None:
+            psf = self.get_psf_pix(ra, dec)
+            if not np.all(np.isfinite(psf)):
+                log.warning("PSF requested, returned Null")
+                return None
+            return Beam(psf[0], psf[1], psf[2])
 
+        # get the psf from the fits header
         if ra is None:
             ra, dec = self.pix2sky(self.refpix)
         pos = [ra, dec]
@@ -412,10 +490,10 @@ class WCSHelper(object):
         area : float
             The beam area in square degrees.
         """
-        barea = abs(self.beam.a * self.beam.b * np.pi)  # in deg**2 at reference coords
-        if self.lat is not None:
-            barea /= np.cos(np.radians(dec - self.lat))
-        return barea
+        beam = self.get_beam(ra, dec)
+        if beam is None:
+            return 0
+        return beam.a * beam.b * np.pi
 
     def get_beamarea_pix(self, ra, dec):
         """
@@ -456,206 +534,6 @@ class WCSHelper(object):
         return sep
 
 
-class PSFHelper(WCSHelper):
-    """
-    An extension of the :class:`AegeanTools.wcs_helpers.WCSHelper` class that also includes information about the
-    point spread function over the sky.
-
-    This allows for the distinction between the point spread function (what a point source looks like) and
-    the synthesized beam in an image. These two can differ at low radio frequencies when the ionosphere is
-    not playing nice.
-    """
-
-    # This __init__ overwrites that of the parent class without calling 'super'.
-    # It might be naughty but it beats rewriting many of the get_X functions that I want to replicate.
-    def __init__(self, psffile, wcshelper):
-        if psffile is None:  # in this case this class should be transparent
-            data = None
-            wcs = wcshelper.wcs
-        else:
-            log.info("Loading PSF data from {0}".format(psffile))
-            header = fits.getheader(psffile)
-            data = fits.getdata(psffile)
-            # the psf image has to have three dimensions
-            # and they need to be ra/dec/beam
-            if len(data.shape) != 3:
-                log.critical("PSF file needs to have 3 dimensions, only {0} found".format(len(data.shape)))
-                raise Exception("Invalid PSF file {0}".format(psffile))
-            try:
-                wcs = WCS(header, naxis=2)
-            except:
-                wcs = WCS(str(header), naxis=2)
-        self.wcshelper = wcshelper
-        self.data = data
-        self.wcs = wcs
-
-    def get_psf_sky(self, ra, dec):
-        """
-        Determine the local psf at a given sky location.
-        The psf is returned in degrees.
-
-
-        Parameters
-        ----------
-        ra, dec : float
-            The sky position (degrees).
-
-        Returns
-        -------
-        a, b, pa : float
-            The psf semi-major axis, semi-minor axis, and position angle in (degrees).
-            If a psf is defined then it is the psf that is returned, otherwise the image
-            restoring beam is returned.
-        """
-        # If we don't have a psf map then we just fall back to using the beam
-        # from the fits header (including ZA scaling)
-        if self.data is None:
-            beam = self.wcshelper.get_beam(ra, dec)
-            return beam.a, beam.b, beam.pa
-
-        x, y = self.sky2pix([ra, dec])
-        # We leave the interpolation in the hands of whoever is making these images
-        # clamping the x,y coords at the image boundaries just makes sense
-        x = int(np.clip(x, 0, self.data.shape[1] - 1))
-        y = int(np.clip(y, 0, self.data.shape[2] - 1))
-        psf_sky = self.data[:, x, y]
-        return psf_sky
-
-    def get_psf_pix(self, ra, dec):
-        """
-        Determine the local psf (a,b,pa) at a given sky location.
-        The psf is in pixel coordinates.
-
-        Parameters
-        ----------
-        ra, dec : float
-            The sky position (degrees).
-
-
-        Returns
-        -------
-        a, b, pa : (float, float, float)
-            The psf semi-major axis (pixels), semi-minor axis (pixels), and rotation angle (degrees).
-            If a psf is defined then it is the psf that is returned, otherwise the image
-            restoring beam is returned.
-
-        """
-        psf_sky = self.get_psf_sky(ra, dec)
-        psf_pix = self.wcshelper.sky2pix_ellipse([ra, dec], psf_sky[0], psf_sky[1], psf_sky[2])[2:]
-        return psf_pix
-
-    def get_pixbeam_pixel(self, x, y):
-        """
-        Get the psf at the location specified in pixel coordinates.
-        The psf is also in pixel coordinates.
-
-        Parameters
-        ----------
-        x, y : float
-            The image position in pixels.
-
-        Returns
-        -------
-        a, b, pa : float
-            The psf semi-major axis (pixels), semi-minor axis (pixels), and rotation angle (degrees).
-            If a psf is defined then it is the psf that is returned, otherwise the image
-            restoring beam is returned.
-
-        """
-        # overriding the WCSHelper function of the same name means that we now calculate the
-        # psf at the coordinates of the x/y pixel in the image WCS, rather than the psfimage WCS
-        ra, dec = self.wcshelper.pix2sky([x, y])
-        return self.get_pixbeam(ra, dec)
-
-    def get_pixbeam(self, ra, dec):
-        """
-        Get the psf at the location specified in pixel coordinates.
-        The psf is also in pixel coordinates.
-
-        Parameters
-        ----------
-        ra, dec : float
-            The sky position (degrees).
-
-        Returns
-        -------
-        a, b, pa : float
-            The psf semi-major axis (pixels), semi-minor axis (pixels), and rotation angle (degrees).
-            If a psf is defined then it is the psf that is returned, otherwise the image
-            restoring beam is returned.
-
-        """
-        # If there is no psf image then just use the fits header (plus lat scaling) from the wcshelper
-        if self.data is None:
-            return self.wcshelper.get_pixbeam(ra, dec)
-        # get the beam from the psf image data
-        psf = self.get_psf_pix(ra, dec)
-        if not np.all(np.isfinite(psf)):
-            log.warning("PSF requested, returned Null")
-            return None
-        return Beam(psf[0], psf[1], psf[2])
-
-    def get_beam(self, ra, dec):
-        """
-        Get the psf as a :class:`AegeanTools.fits_image.Beam` object.
-
-        Parameters
-        ----------
-        ra, dec : float
-            The sky position (degrees).
-
-        Returns
-        -------
-        beam : :class:`AegeanTools.wcs_helpers.Beam`
-            The psf at the given location.
-        """
-        if self.data is None:
-            return self.wcshelper.beam
-        else:
-            psf = self.get_psf_sky(ra, dec)
-            if not all(np.isfinite(psf)):
-                return None
-            return Beam(psf[0], psf[1], psf[2])
-
-    def get_beamarea_pix(self, ra, dec):
-        """
-        Calculate the area of the beam in square pixels.
-
-        Parameters
-        ----------
-        ra, dec : float
-            The sky position (degrees).
-
-        Returns
-        -------
-        area : float
-            The area of the beam in square pixels.
-        """
-
-        parea = abs(self.wcshelper.pixscale[0] * self.wcshelper.pixscale[1])  # in deg**2 at reference coords
-        barea = self.get_beamarea_deg2(ra, dec)
-        return barea / parea
-
-    def get_beamarea_deg2(self, ra, dec):
-
-        """
-        Calculate the area of the beam in square degrees.
-
-        Parameters
-        ----------
-        ra, dec : float
-            The sky position (degrees).
-
-        Returns
-        -------
-        area : float
-            The area of the beam in square degrees.
-        """
-        beam = self.get_beam(ra, dec)
-        if beam is None:
-            return 0
-        return beam.a * beam.b * np.pi
-
 class Beam(object):
     """
     Small class to hold the properties of the beam.
@@ -670,7 +548,6 @@ class Beam(object):
 
     def __str__(self):
         return "a={0} b={1} pa={2}".format(self.a, self.b, self.pa)
-
 
 
 def get_pixinfo(header):
@@ -799,7 +676,3 @@ def fix_aips_header(header):
     header['BPA'] = bpa
     header['HISTORY'] = 'Beam information AIPS->fits by AegeanTools'
     return header
-
-
-
-
