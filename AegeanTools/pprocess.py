@@ -34,13 +34,17 @@ import select
 import socket
 import platform
 import errno
-
 from time import sleep
 from warnings import warn
-
 import pickle
+import logging
+
+logging.basicConfig(format="%(process)d:%(module)s:%(levelname)s %(message)s")
+log = logging.getLogger("pprocess")
+log.setLevel(logging.WARNING)
 
 # Special values.
+report_all_errs = True
 
 class Undefined: pass
 
@@ -1194,14 +1198,16 @@ def start(callable, *args, **kw):
     process, supply a channel as the 'channel' parameter in the given 'callable'
     so that it may send data back to the creating process.
     """
-
     channel = create()
     if channel.pid == 0:
         try:
             try:
                 callable(channel, *args, **kw)
             except:
+                # force errs to be reported as they occur instead of when we access the results
                 exc_type, exc_value, exc_traceback = sys.exc_info()
+                if report_all_errs:
+                    log.error(exc_value, exc_info=True)
                 channel.send(exc_value)
         finally:
             exit(channel)
