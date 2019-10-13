@@ -96,12 +96,6 @@ def make_catalogue():
 
     return cat
 
-def add_catalogue_image(catalogue, image):
-    """
-
-    """
-    for c in catalogue:
-        image += AeRes.make_model()
 
 if __name__=="__main__":
     # configure logging
