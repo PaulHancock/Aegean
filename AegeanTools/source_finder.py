@@ -21,7 +21,7 @@ from scipy.ndimage.filters import minimum_filter, maximum_filter
 import AegeanTools.wcs_helpers
 from .fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit, \
                      bias_correct, elliptical_gaussian
-from .wcs_helpers import WCSHelper, PSFHelper
+from .wcs_helpers import WCSHelper
 from .fits_image import FitsImage
 from AegeanTools.wcs_helpers import Beam
 from .msq2 import MarchingSquares
@@ -119,9 +119,7 @@ def find_islands(im, bkg, rms,
     return islands
 
 
-def estimate_parinfo_image(islands,
-                           im, rms, wcs, max_summits=None,
-                           psf=None, log=log):
+def estimate_parinfo_image(islands, im, rms, wcshelper, max_summits=None, log=log):
     """
     Estimate the initial parameters for fitting for each of the islands of pixels.
     The source sizes will be initialised as the psf of the image, which is either
@@ -132,14 +130,11 @@ def estimate_parinfo_image(islands,
     islands : [AegeanTools.models.Island, ... ]
         A list of islands which will be converted into groups of sources
 
-    im, rms : `numpy.ndarray`
+    im, rms : :class:`numpy.ndarray`
         The image and noise maps
 
-    wcs : `astropy.wcs.WCS`
+    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
         A wcs object valid for the image map
-
-    psf : str or None
-        The filename for the psf map (optional)
 
     max_summits : int
         The maximum number of summits that will be fit. Any in addition to this will
@@ -159,7 +154,7 @@ def estimate_parinfo_image(islands,
     for island in islands:
         # set flags to be empty
         is_flag = 0x0
-        [rmin, rmax], [cmin, cmax] =island.bounding_box
+        [rmin, rmax], [cmin, cmax] = island.bounding_box
         i_data = im[rmin:rmax, cmin:cmax]
         i_rms = rms[rmin:rmax, cmin:cmax]
 
@@ -276,14 +271,11 @@ def estimate_parinfo_image(islands,
             if debug_on:
                 log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
 
-            # TODO: figure out the pixbeam things here
-            # pixbeam = global_data.psfhelper.get_pixbeam_pixel(yo + offsets[0], xo + offsets[1])
-            # if pixbeam is None:
-            #    log.debug(" Summit has invalid WCS/Beam - Skipping.")
-            #    continue
-            # Dummy the pixbeam for now
-            from . import fits_image
-            pixbeam = AegeanTools.wcs_helpers.Beam(1, 1, 0)
+            # TODO: double check the yo/xo that seem reversed
+            pixbeam = wcshelper.get_pixbeam_pixel(yo + cmin, xo + rmin)
+            if pixbeam is None:
+                log.debug(" Summit has invalid WCS/Beam - Skipping.")
+                continue
 
             # set a square limit based on the size of the pixbeam
             xo_lim = 0.5 * np.hypot(pixbeam.a, pixbeam.b)
@@ -356,8 +348,8 @@ def estimate_parinfo_image(islands,
             log.debug("Estimated sources: {0}".format(summits_accepted))
         # remember how many components are fit.
         params.add('components', value=summits_accepted, vary=False)
-        # params.components=i
-        if params['components'].value < 1:
+
+        if params['components'].value < n:
             log.debug("Considered {0} summits, accepted {1}".format(summits_considered, summits_accepted))
 
         sources.append(params)
@@ -1104,8 +1096,9 @@ class SourceFinder(object):
                 self.log.error("File {0} not found for loading".format(mask))
                 self.global_data.region = None
 
-        self.global_data.wcshelper = WCSHelper.from_header(img.get_hdu_header(), beam, lat)
-        self.global_data.psfhelper = PSFHelper(psf, self.global_data.wcshelper)
+        self.global_data.wcshelper = WCSHelper.from_header(img.get_hdu_header(), beam,
+                                                           lat=lat, psf_file=psf)
+        self.global_data.psfhelper = self.global_data.wcshelper
 
         self.global_data.beam = self.global_data.wcshelper.beam
         self.global_data.img = img
@@ -1130,6 +1123,7 @@ class SourceFinder(object):
 
         # if either of rms or bkg images are not supplied then calculate them both
         if not (rmsin and bkgin):
+
             if verb:
                 self.log.info("Calculating background and rms data")
             self._make_bkg_rms(mesh_size=20, forced_rms=rms, forced_bkg=bkg, cores=cores)
@@ -1936,7 +1930,13 @@ class SourceFinder(object):
 
         island_group = []
         group_size = 20
+        islands = find_islands(im=data, bkg=np.zeros_like(data), rms=rmsimg,
+                               seed_clip=innerclip, flood_clip=outerclip,
+                               log=self.log)
         for i, xmin, xmax, ymin, ymax in self._gen_flood_wrap(data, rmsimg, innerclip, outerclip, domask=True):
+        #for island in islands:
+        #    i = island.mask
+        #    [[xmin,xmax], [ymin,ymax]] = island.bounding_box
             # ignore empty islands
             # This should now be impossible to trigger
             if np.size(i) < 1:
@@ -2118,7 +2118,8 @@ class SourceFinder(object):
         elif catpsf is not None or has_psf:
             if catpsf is not None:
                 self.log.info("Using catalog PSF from {0}".format(catpsf))
-                psf_helper = PSFHelper(catpsf, None)  # might need to set the WCSHelper to be not None
+                #TODO determine if the following needs to be adjusted
+                psf_helper = WCSHelper(None, beam=catpsf) #PSFHelper(catpsf, None)  # might need to set the WCSHelper to be not None
             else:
                 self.log.info("Using catalog PSF from input catalog")
                 psf_helper = None
