@@ -5,8 +5,20 @@
 """
 
 from AegeanTools import pprocess
+import numpy as np
 import traceback
 import sys
+import time
+
+N = 10
+delay = 0.005
+
+def calculate(i, j):
+    """
+    A supposedly time-consuming calculation on 'results' using 'i' and 'j'.
+    """
+    time.sleep(delay)
+    return  (i*N + j ) *2
 
 def make_stupid_err(m):
     m**m
@@ -39,6 +51,44 @@ def test_traceback2():
         if 'pow()' not in repr(e):
             raise AssertionError("Type Error not raised properly")
     return
+
+
+def test_calc_queue():
+    """
+    Test a queue which creates list
+    """
+    queue = pprocess.Queue(limit=4)
+    calc = queue.manage(pprocess.MakeParallel(calculate))
+    #results = list(range(N*N))
+    answers = list(range(0,2*N*N,2))
+
+    for i in range(0, N):
+        for j in range(0, N):
+            calc(i, j)
+
+    results = list([q for q in queue])
+
+    if not np.all(results == answers):
+        raise AssertionError("Calc queue failed to give correct results")
+
+
+def test_calc_map():
+    """
+    Test a map which creates a list
+    """
+    pmap = pprocess.Map(limit=4)
+    calc = pmap.manage(pprocess.MakeParallel(calculate))
+    answers = list(range(0,2*N*N,2))
+
+    for i in range(0,N):
+        for j in range(0,N):
+            calc(i,j)
+
+    results = sorted([m for m in pmap])
+
+    if not np.all(results == answers):
+        raise AssertionError("Calc map failed to give correct results")
+
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
