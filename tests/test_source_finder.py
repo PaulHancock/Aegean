@@ -6,7 +6,7 @@ Test source_finder.py
 __author__ = 'Paul Hancock'
 
 from AegeanTools import source_finder as sf
-from AegeanTools.wcs_helpers import Beam, WCSHelper
+from AegeanTools.wcs_helpers import Beam
 from AegeanTools import models, flags
 from copy import deepcopy
 import numpy as np
@@ -318,6 +318,10 @@ def test_estimate_parinfo_image():
 
 
 if __name__ == "__main__":
+    #test_find_islands()
+    #test_estimate_parinfo_image()
+    #import sys
+    #sys.exit()
     # introspect and run all the functions starting with 'test'
     for f in  dir(): #['test_find_islands', 'test_estimate_parinfo_image', 'test_find_and_prior_sources']:
         if f.startswith('test'):
