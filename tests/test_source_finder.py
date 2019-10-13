@@ -6,7 +6,7 @@ Test source_finder.py
 __author__ = 'Paul Hancock'
 
 from AegeanTools import source_finder as sf
-from AegeanTools.wcs_helpers import Beam
+from AegeanTools.wcs_helpers import Beam, WCSHelper
 from AegeanTools import models, flags
 from copy import deepcopy
 import numpy as np
@@ -147,7 +147,7 @@ def test_find_and_prior_sources():
 def test_find_and_prior_parallel():
     """Test find/piroirze with parallel operation"""
     log = logging.getLogger("Aegean")
-    cores = 2
+    cores = 1
 
     filename = 'tests/test_files/1904-66_SIN.fits'
     # vanilla source finding
@@ -264,6 +264,8 @@ def test_estimate_parinfo_image():
     log = logging.getLogger("Aegean")
     #log.setLevel(logging.DEBUG)
 
+    wcshelper = WCSHelper.from_file(filename='tests/test_files/1904-66_SIN.fits')
+
     im = np.zeros(shape=(10, 10), dtype=np.float32) * np.nan
     bkg = np.zeros_like(im)
     rms = np.ones_like(im)
@@ -272,7 +274,7 @@ def test_estimate_parinfo_image():
     im[3,3] = 8.
 
     islands = sf.find_islands(im, bkg, rms, log=log)
-    sources = sf.estimate_parinfo_image(islands, im=im, rms=rms, wcs=None, log=log)
+    sources = sf.estimate_parinfo_image(islands, im=im, rms=rms, wcshelper=wcshelper, log=log)
 
     if len(sources) != 1:
         raise AssertionError("Incorrect number of sources found {0}, expecting 1".format(len(sources)))
@@ -284,7 +286,7 @@ def test_estimate_parinfo_image():
     # test on a negative island
     im *= -1.
     islands = sf.find_islands(im, bkg, rms, log=log)
-    sources = sf.estimate_parinfo_image(islands, im=im, rms=rms, wcs=None, log=log)
+    sources = sf.estimate_parinfo_image(islands, im=im, rms=rms, wcshelper=wcshelper, log=log)
 
     if len(sources) != 1:
         raise AssertionError("Incorrect number of sources found {0}, expecting 1".format(len(sources)))
@@ -299,7 +301,7 @@ def test_estimate_parinfo_image():
     im[3,3] = 8.
 
     islands = sf.find_islands(im, bkg, rms, log=log)
-    sources = sf.estimate_parinfo_image(islands, im=im, rms=rms, wcs=None, log=log)
+    sources = sf.estimate_parinfo_image(islands, im=im, rms=rms, wcshelper=wcshelper, log=log)
     if len(sources) != 1:
         raise AssertionError("Incorrect number of sources found {0}, expecting 1".format(len(sources)))
     if not sources[0]['components'].value == 1:
