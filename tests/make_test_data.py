@@ -32,7 +32,12 @@ def make_noise_image():
         A wcs object that is valid for this image.
     """
     np.random.seed(seed)
-    image = np.random.random(size=imsize)*noise
+    image = np.random.random(size=imsize)
+    # force zero mean and unit variance
+    image -= np.mean(image)
+    image /= np.std(image)
+    # make rms = noise
+    image *= noise
     image = gaussian_filter(image, sigma=pix_per_beam*FWHM2CC)
     image = np.array(image, dtype=np.float32)
 
