@@ -10,8 +10,8 @@ import traceback
 import sys
 import time
 
-N = 10
-delay = 0.005
+N = 5
+delay = 0.5
 
 def calculate(i, j):
     """
@@ -66,9 +66,11 @@ def test_calc_queue():
         for j in range(0, N):
             calc(i, j)
 
-    results = list([q for q in queue])
+    results = sorted([q for q in queue])
 
     if not np.all(results == answers):
+        print(results)
+        print(answers)
         raise AssertionError("Calc queue failed to give correct results")
 
 
