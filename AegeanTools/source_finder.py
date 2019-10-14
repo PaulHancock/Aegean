@@ -67,7 +67,7 @@ def find_islands(im, bkg, rms,
 
     Parameters
     ----------
-    im, bkg, rms : `numpy.ndarray`
+    im, bkg, rms : :class:`numpy.ndarray`
         Image, background, and rms maps
 
     seed_clip, flood_clip : float
@@ -79,7 +79,7 @@ def find_islands(im, bkg, rms,
 
     Returns
     -------
-    islands : [`AegeanTools.models.PixelIsland`, ...]
+    islands : [:class:`AegeanTools.models.PixelIsland`, ...]
         a list of islands
     """
     # compute SNR image
