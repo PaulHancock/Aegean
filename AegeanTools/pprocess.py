@@ -44,7 +44,7 @@ log = logging.getLogger("pprocess")
 log.setLevel(logging.WARNING)
 
 # Special values.
-report_all_errs = True
+report_all_errs = False
 
 class Undefined: pass
 
