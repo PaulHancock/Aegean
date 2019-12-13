@@ -1,6 +1,9 @@
 #! /usr/bin/env python
-from __future__ import print_function
+"""
+Describe sky areas as a collection of HEALPix pixels
+"""
 
+from __future__ import print_function
 import os
 import datetime
 import healpy as hp
@@ -8,8 +11,15 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 from astropy.io import fits
+import six
+
+if six.PY2:
+    import cPickle
+else:
+    import _pickle as cPickle
 
 __author__ = "Paul Hancock"
+
 
 class Region(object):
     """
@@ -35,6 +45,36 @@ class Region(object):
         self.maxdepth = maxdepth
         self.pixeldict = dict((i, set()) for i in range(1, maxdepth+1))
         self.demoted = set()
+        return
+
+    @classmethod
+    def load(cls, mimfile):
+        """
+        Create a region object from the given file.
+
+        Parameters
+        ----------
+        mimfile : str
+            File to load.
+
+        Returns
+        -------
+        region : `AegeanTools.regions.Region`
+            A region object
+        """
+        reg = cPickle.load(open(mimfile, 'rb'))
+        return reg
+
+    def save(self, mimfile):
+        """
+        Save this region to a file
+
+        Parameters
+        ----------
+        mimfile : str
+            File to write
+        """
+        cPickle.dump(self, open(mimfile,'wb'), protocol=2)
         return
 
     def __repr__(self):

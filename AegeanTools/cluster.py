@@ -1,12 +1,12 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 Cluster and crossmatch tools and analysis functions.
 
 Includes:
 - DBSCAN clustering
 """
+
+from __future__ import print_function
 
 __author__= "Paul Hancock"
 
@@ -251,7 +251,7 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
             log.error("catalog is not understood.")
             log.error("catalog: Should be a list of objects with the following properties[units]:\n" +
                       "ra[deg],dec[deg], a[arcsec],b[arcsec],pa[deg], peak_flux[any]")
-            raise
+            raise e
 
     log.info("Regrouping islands within catalog")
     log.debug("Calculating distances")

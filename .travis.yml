@@ -1,19 +1,12 @@
 language: python
-dist: trusty
+dist: xenial
 cache: pip
 python:
   - "2.7.14"
-  - "3.6"
+  - "3.7"
 # command to install dependencies
 install:
-  - wget http://www.boddie.org.uk/python/downloads/pprocess-0.5.3.tar.gz
-  - gunzip pprocess-0.5.3.tar.gz
-  - tar -xvf pprocess-0.5.3.tar
-  - cd pprocess-0.5.3
-  - if [[ ${TRAVIS_PYTHON_VERSION} == 3.6 ]]; then 2to3 -w .; fi
-  - pip install -e .
-  - cd ..
-  - pip install -e .
+  - pip install .
   - pip install coveralls
   - pip install codacy-coverage
 # command to run tests

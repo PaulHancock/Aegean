@@ -1,10 +1,8 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 The Aegean source finding program.
 """
-
+from __future__ import print_function
 # standard imports
 import sys
 import six
@@ -15,11 +13,9 @@ import copy
 import logging
 import logging.config
 import lmfit
-
 import scipy
 from scipy.special import erf
 from scipy.ndimage import label, find_objects
-
 # AegeanTools
 from .fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit, \
                      bias_correct, elliptical_gaussian
@@ -31,7 +27,6 @@ from .catalogs import load_table, table_to_source_list
 from .models import SimpleSource, OutputSource, IslandSource, island_itergen, \
     GlobalFittingData, IslandFittingData, DummyLM
 from . import flags
-
 # need Region in the name space in order to be able to unpickle it
 from .regions import Region
 
@@ -41,10 +36,12 @@ else:
     import _pickle as cPickle
 
 # multiple cores support
-import pprocess
+from . import pprocess
 import multiprocessing
 
 from .__init__ import __version__, __date__
+
+__author__ = "Paul Hancock"
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -52,6 +49,171 @@ header = """#Aegean version {0}
 # constants
 CC2FHWM = (2 * math.sqrt(2 * math.log(2)))
 FWHM2CC = 1 / CC2FHWM
+
+
+def find_islands(im, bkg, rms,
+                 section,
+                 seed_clip=5., flood_clip=4.):
+    """
+    This function designed to be run as a stand alone process
+
+    Parameters
+    ----------
+    im, bkg, rms : np.ndarray
+        Image, background, and rms maps
+
+    seed_clip, flood_clip : float
+        The seed clip which is used to create islands, and flood clip which is used to grow islands.
+        The units are in SNR.
+
+    Returns
+    -------
+    islands : [AegeanTools.island, ...]
+        a list of islands
+    """
+    islands = []
+    return islands
+
+
+def estimate_parinfo_image(islands,
+                           im, bkg, wcs,
+                           psf=None):
+    """
+    Estimate the initial parameters for fitting for each of the islands of pixels.
+    The source sizes will be initialised as the psf of the image, which is either
+    determined by the WCS of the image file or the psf map if one is supplied.
+
+    Parameters
+    ----------
+    islands : [AegeanTools.models.Island, ... ]
+        A list of islands which will be converted into groups of sources
+
+    im, bkg : np.ndarray
+        The image and background maps
+
+    wcs : astropy.wcs.WCS
+        A wcs object valid for the image map
+
+    psf : str or None
+        The filename for the psf map (optional)
+
+    Returns
+    --------
+    sources : [lmfit.Parameters, ... ]
+        The initial estimate of parameters for the components within each island.
+    """
+    sources = []
+    return sources
+
+
+def priorized_islands_parinfo(sources,
+                              im, wcs,
+                              psf=None,
+                              stage=3,
+                              ):
+    """
+    Turn a list of sources into a set of islands and parameter estimates which can then be
+    characterised.
+
+    Parameters
+    ----------
+    sources : [AegeanTools.models.SimpleSource, ... ]
+        A list of sources in the catalogue.
+
+    im : np.ndarray
+        The image map
+
+    wcs : astropy.wcs.WCS
+        A wcs object valid for the image map
+
+    psf : str or None
+        The filename for the psf map (optional)
+
+    stage : int
+        The priorized fitting stage which determines what parameters are fit/fixed. One of:
+            1 - Fit for flux only. All other params are fixed.
+            2 - Fit for flux and position. Shape parameters are fixed.
+            3 - Fit for flux, position, and shape.
+
+    Returns
+    -------
+    islands : [AegeanTools.island, ...]
+        a list of islands
+
+    sources : [lmfit.Parameters, ... ]
+        The initial estimate of parameters for the components within each island.
+    """
+
+
+def characterise_islands(islands,
+                         im, bkg, rms,
+                         err_type='best',
+                         psf=None,
+                         do_islandfit=False):
+    """
+    Do the source characterisation based on the initial estimate of the island properties.
+
+
+    Parameters
+    ----------
+    islands : [lmfit.Parameters, ... ]
+        The initial estimate of parameters for the components within each island.
+
+    im, bkg, rms : np.ndarray
+        The image, background, and noise maps
+
+    err_type : str or None
+        The method for calculating uncertainties on parameters:
+            'best' - Uncertainties measured based on covariance matrix of the fit and of the data
+                See Hancock et al. 2018 for a description of this process.
+            'condon' - Uncertainties are *calculated* based on Condon'98 (?year)
+            'raw' - uncertainties directly from the covariance matrix only
+            'none' or None - No uncertainties, all will be set to -1.
+
+    wcs : astropy.wcs.WCS
+        A wcs object valid for the image map
+
+    psf : str or None
+        The filename for the psf map (optional)
+
+    do_islandfit : bool
+        If True, then also characterise islands as well as components. Default=False.
+
+    Returns
+    -------
+    sources : [AegeanTools.models.SimpleSource, ... ]
+        A list of characterised sources of type SimpleSource, OutputSource, or IslandSource.
+    """
+    sources = []
+    return sources
+
+
+def save_catalogue(sources,
+                   output,
+                   format=None):
+    """
+    Write a catalogue of sources
+
+    Parameters
+    ----------
+    sources : [AegeanTools.models.SimpleSource, ... ]
+        A list of characterised sources of type SimpleSource, OutputSource, or IslandSource.
+
+    output : str
+        Output filename
+
+    format : str
+        A descriptor of the output format. Options are:
+            #TODO add a bunch of options
+            'auto' or None - infer from filename extension
+
+    Returns
+    -------
+    None
+    """
+    # determine file format
+    # write catalogue based on source type and file format
+    return
 
 
 class SourceFinder(object):
@@ -587,13 +749,13 @@ class SourceFinder(object):
                                                                        positions[1][0]))
 
             # integrated flux
-            beam_area = global_data.psfhelper.get_beamarea_deg2(source.ra, source.dec)  # beam in deg^2
-            # get_beamarea_pix(source.ra, source.dec)  # beam is in pix^2
+            beam_area_pix = global_data.psfhelper.get_beamarea_pix(source.ra, source.dec)
+            beam_area = global_data.psfhelper.get_beamarea_deg2(source.ra, source.dec)
             isize = source.pixels  # number of non zero pixels
             self.log.debug("- pixels used {0}".format(isize))
             source.int_flux = np.nansum(kappa_sigma)  # total flux Jy/beam
             self.log.debug("- sum of pixles {0}".format(source.int_flux))
-            source.int_flux *= beam_area  # total flux in Jy
+            source.int_flux *= (4.*np.log(2.) / beam_area_pix)  # total flux in Jy
             self.log.debug("- integrated flux {0}".format(source.int_flux))
             eta = erf(np.sqrt(-1 * np.log(abs(source.local_rms * outerclip / source.peak_flux)))) ** 2
             self.log.debug("- eta {0}".format(eta))
@@ -608,8 +770,8 @@ class SourceFinder(object):
     ##
     # Setting up 'global' data and calculating bkg/rms
     ##
-    def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, cores=1,
-                     do_curve=True, mask=None, lat=None, psf=None, blank=False, docov=True, slice=slice):
+    def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, bkg=None, cores=1,
+                     do_curve=False, mask=None, lat=None, psf=None, blank=False, docov=True, cube_index=None):
         """
         Populate the global_data object by loading or calculating the various components
 
@@ -630,9 +792,9 @@ class SourceFinder(object):
         verb : bool
             Verbose. Write extra lines to INFO level log.
 
-        rms : float
-            A float that represents a constant rms level for the entire image.
-            Default = None, which causes the rms to be loaded or calculated.
+        rms, bkg : float
+            A float that represents a constant rms/bkg levels for the entire image.
+            Default = None, which causes the rms/bkg to be loaded or calculated.
 
         cores : int
             Number of cores to use if different from what is autodetected.
@@ -658,14 +820,14 @@ class SourceFinder(object):
             True = use covariance matrix in fitting.
             Default = True.
 
-        slice : int
+        cube_index : int
             For an image cube, which slice to use.
 
         """
         # don't reload already loaded data
         if self.global_data.img is not None:
             return
-        img = FitsImage(filename, hdu_index=hdu_index, beam=beam, slice=slice)
+        img = FitsImage(filename, hdu_index=hdu_index, beam=beam, cube_index=cube_index)
         beam = img.beam
 
         debug = logging.getLogger('Aegean').isEnabledFor(logging.DEBUG)
@@ -678,7 +840,7 @@ class SourceFinder(object):
                 self.global_data.region = mask
             elif os.path.exists(mask):
                 self.log.info("Loading mask from {0}".format(mask))
-                self.global_data.region = cPickle.load(open(mask, 'rb'))
+                self.global_data.region = Region.load(mask)
             else:
                 self.log.error("File {0} not found for loading".format(mask))
                 self.global_data.region = None
@@ -711,11 +873,7 @@ class SourceFinder(object):
         if not (rmsin and bkgin):
             if verb:
                 self.log.info("Calculating background and rms data")
-            self._make_bkg_rms(mesh_size=20, forced_rms=rms, cores=cores)
-
-        # if a forced rms was supplied use that instead
-        if rms is not None:
-            self.global_data.rmsimg = np.ones(self.global_data.data_pix.shape) * rms
+            self._make_bkg_rms(mesh_size=20, forced_rms=rms, forced_bkg=bkg, cores=cores)
 
         # replace the calculated images with input versions, if the user has supplied them.
         if bkgin:
@@ -748,7 +906,7 @@ class SourceFinder(object):
             SimpleSource.galactic = True
         return
 
-    def save_background_files(self, image_filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, rms=None, cores=1,
+    def save_background_files(self, image_filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, rms=None, bkg=None, cores=1,
                               outbase=None):
         """
         Generate and save the background and RMS maps as FITS files.
@@ -770,9 +928,9 @@ class SourceFinder(object):
             Beam object representing the synthsized beam. Will replace what is in the FITS header.
 
 
-        rms : float
-            A float that represents a constant rms level for the entire image.
-            Default = None, which causes the rms to be loaded or calculated.
+        rms, bkg : float
+            A float that represents a constant rms/bkg level for the entire image.
+            Default = None, which causes the rms/bkg to be loaded or calculated.
 
         cores : int
             Number of cores to use if different from what is autodetected.
@@ -784,7 +942,7 @@ class SourceFinder(object):
 
         self.log.info("Saving background / RMS maps")
         # load image, and load/create background/rms images
-        self.load_globals(image_filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms,
+        self.load_globals(image_filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms, bkg=bkg,
                           cores=cores, do_curve=True)
         img = self.global_data.img
         bkgimg, rmsimg = self.global_data.bkgimg, self.global_data.rmsimg
@@ -849,7 +1007,7 @@ class SourceFinder(object):
         self.log.info("Wrote {0}".format(outname))
         return
 
-    def _make_bkg_rms(self, mesh_size=20, forced_rms=None, cores=None):
+    def _make_bkg_rms(self, mesh_size=20, forced_rms=None, forced_bkg=None, cores=None):
         """
         Calculate an rms image and a bkg image.
 
@@ -858,18 +1016,29 @@ class SourceFinder(object):
         mesh_size : int
             Number of beams per box default = 20
 
-        forced_rms : bool
+        forced_rms : float
             The rms of the image.
-            If None:  calculate the rms and bkg levels (default).
-            Otherwise assume zero background and constant rms
+            If None:  calculate the rms level (default).
+            Otherwise assume a constant rms.
+
+        forced_bkg : float
+            The background level of the image.
+            If None: calculate the background level (default).
+            Otherwise assume a constant background.
 
         cores: int
             Number of cores to use if different from what is autodetected.
 
         """
-        if forced_rms:
-            self.global_data.bkgimg[:] = 0
+        if (forced_rms is not None):
+            self.log.info("Forcing rms = {0}".format(forced_rms))
             self.global_data.rmsimg[:] = forced_rms
+        if (forced_bkg is not None):
+            self.log.info("Forcing bkg = {0}".format(forced_bkg))
+            self.global_data.bkgimg[:] = forced_bkg
+
+        # If we known both the rms and the bkg then there is nothing to compute
+        if (forced_rms is not None) and (forced_bkg is not None):
             return
 
         data = self.global_data.data_pix
@@ -941,15 +1110,14 @@ class SourceFinder(object):
                 for ymin, ymax in zip(ymins, ymaxs):
                     queue.append(self._estimate_bkg_rms(xmin, xmax, ymin, ymax))
 
-        # construct the bkg and rms images
-        if self.global_data.rmsimg is None:
-            self.global_data.rmsimg = np.empty(data.shape, dtype=self.global_data.dtype)
-        if self.global_data.bkgimg is None:
-            self.global_data.bkgimg = np.empty(data.shape, dtype=self.global_data.dtype)
-
+        # only copy across the bkg/rms if they are not already set
+        # queue can only be traversed once so we have to put the if inside the loop
         for ymin, ymax, xmin, xmax, bkg, rms in queue:
-            self.global_data.bkgimg[ymin:ymax, xmin:xmax] = bkg
-            self.global_data.rmsimg[ymin:ymax, xmin:xmax] = rms
+            if (forced_rms is None):
+                self.global_data.rmsimg[ymin:ymax, xmin:xmax] = rms
+            if (forced_rms is None):
+                self.global_data.bkgimg[ymin:ymax, xmin:xmax] = bkg
+
         return
 
     def _estimate_bkg_rms(self, xmin, xmax, ymin, ymax):
@@ -1138,20 +1306,13 @@ class SourceFinder(object):
             # now we correct the xo/yo positions to be relative to the sub-image
             self.log.debug("xmxxymyx {0} {1} {2} {3}".format(xmin, xmax, ymin, ymax))
             for i in range(params['components'].value):
-                try:
-                    prefix = "c{0}_".format(i)
-                    params[prefix + 'xo'].value -= xmin
-                    params[prefix + 'xo'].min -= xmin
-                    params[prefix + 'xo'].max -= xmin
-                    params[prefix + 'yo'].value -= ymin
-                    params[prefix + 'yo'].min -= ymin
-                    params[prefix + 'yo'].max -= ymin
-                except Exception as e:
-                    self.log.error(" ARG !")
-                    self.log.info(params)
-                    self.log.info(params['components'].value)
-                    self.log.info("trying to access component {0}".format(i))
-                    raise e
+                prefix = "c{0}_".format(i)
+                params[prefix + 'xo'].value -= xmin
+                params[prefix + 'xo'].min -= xmin
+                params[prefix + 'xo'].max -= xmin
+                params[prefix + 'yo'].value -= ymin
+                params[prefix + 'yo'].min -= ymin
+                params[prefix + 'yo'].max -= ymin
             # self.log.debug(params)
             # don't fit if there are no sources
             if params['components'].value < 1:
@@ -1303,7 +1464,26 @@ class SourceFinder(object):
         beam = global_data.psfhelper.get_psf_pix(midra, middec)
         del middec, midra
 
-        icurve = dcurve[xmin:xmax, ymin:ymax]
+        # the curvature needs a buffer of 1 pixel to correctly identify local min/max
+        # on the edge of the region. We need a 1 pix buffer (if available)
+        buffx = [xmin - max(xmin-1,0), min(xmax+1, global_data.data_pix.shape[0]) - xmax]
+        buffy = [ymin - max(ymin-1,0), min(ymax+1, global_data.data_pix.shape[1]) - ymax]
+        icurve = np.zeros(shape=(xmax-xmin + buffx[0] + buffx[1], ymax-ymin + buffy[0] + buffy[1]), dtype=np.int8)
+        # compute peaks and convert to +/-1
+        peaks = scipy.ndimage.filters.maximum_filter(self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]], size=3)
+        pmask = np.where(peaks == self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]])
+        troughs = scipy.ndimage.filters.minimum_filter(self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]], size=3)
+        tmask = np.where(troughs == self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]])
+        icurve[pmask] = -1
+        icurve[tmask] = 1
+        # icurve and idata need to be the same size so we crop icurve based on the buffers that we computed
+        icurve = icurve[buffx[0]:icurve.shape[0]-buffx[1], buffy[0]:icurve.shape[1]-buffy[1]]
+        del peaks, pmask, troughs, tmask
+        
         rms = rmsimg[xmin:xmax, ymin:ymax]
 
         is_flag = 0
@@ -1314,7 +1494,6 @@ class SourceFinder(object):
 
         self.log.debug("=====")
         self.log.debug("Island ({0})".format(isle_num))
-
         params = self.estimate_lmfit_parinfo(idata, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
                                              max_summits=max_summits)
 
@@ -1355,7 +1534,7 @@ class SourceFinder(object):
                 is_flag |= flags.FITERR
             # get the real (sky) parameter errors
             model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
-            model.covar = result.covar
+
             if self.global_data.dobias and self.global_data.docov:
                 x, y = np.indices(idata.shape)
                 acf = elliptical_gaussian(x, y, 1, 0, 0, pixbeam.a * FWHM2CC * fac, pixbeam.b * FWHM2CC * fac,
@@ -1397,10 +1576,10 @@ class SourceFinder(object):
             sources.extend(res)
         return sources
 
-    def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, max_summits=None, innerclip=5,
+    def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, bkg=None, max_summits=None, innerclip=5,
                               outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
                               nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None, blank=False,
-                              docov=True, slice=None):
+                              docov=True, cube_index=None):
         """
         Run the Aegean source finder.
 
@@ -1460,8 +1639,8 @@ class SourceFinder(object):
         docov : bool
             If True then include covariance matrix in the fitting process. (default=True)
 
-        slice : int
-            For image cubes, slice determines which slice is used.
+        cube_index : int
+            For image cubes, cube_index determines which slice is used.
 
         Returns
         -------
@@ -1474,8 +1653,8 @@ class SourceFinder(object):
         if cores is not None:
             if not (cores >= 1): raise AssertionError("cores must be one or more")
 
-        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, cores=cores,
-                          verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank, docov=docov, slice=slice)
+        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, bkg=bkg, cores=cores,
+                          verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank, docov=docov, cube_index=cube_index)
         global_data = self.global_data
         rmsimg = global_data.rmsimg
         data = global_data.data_pix
@@ -1544,8 +1723,8 @@ class SourceFinder(object):
         return sources
 
     def priorized_fit_islands(self, filename, catalogue, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1,
-                              rms=None, beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=None, outerclip=3,
-                              doregroup=True, docov=True, slice=None):
+                              rms=None, bkg=None, beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=None, outerclip=3,
+                              doregroup=True, docov=True, cube_index=None):
         """
         Take an input catalog, and image, and optional background/noise images
         fit the flux and ra/dec for each of the given sources, keeping the morphology fixed
@@ -1606,7 +1785,7 @@ class SourceFinder(object):
         docov : bool
             If True then include covariance matrix in the fitting process. (default=True)
 
-        slice : int
+        cube_index : int
             For image cubes, slice determines which slice is used.
 
 
@@ -1619,8 +1798,8 @@ class SourceFinder(object):
 
         from AegeanTools.cluster import regroup
 
-        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, cores=cores, verb=True,
-                          do_curve=False, beam=beam, lat=lat, psf=imgpsf, docov=docov, slice=slice)
+        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, bkg=bkg, cores=cores, verb=True,
+                          do_curve=False, beam=beam, lat=lat, psf=imgpsf, docov=docov, cube_index=cube_index)
 
         global_data = self.global_data
         far = 10 * global_data.beam.a  # degrees
@@ -1685,8 +1864,12 @@ class SourceFinder(object):
                 self.log.info("Using catalog PSF from input catalog")
                 psf_helper = None
             for i, src in enumerate(input_sources):
+                if (src.psf_a <=0) or (src.psf_b <=0):
+                    src_mask[i] = False
+                    self.log.info("Excluding source ({0.island},{0.source}) due to psf_a/b <=0".format(src))
+                    continue
                 if has_psf:
-                    catbeam = Beam(src.psf_a * 3600, src.psf_b * 3600, src.psf_pa)
+                    catbeam = Beam(src.psf_a / 3600, src.psf_b / 3600, src.psf_pa)
                 else:
                     catbeam = psf_helper.get_beam(src.ra, src.dec)
                 imbeam = global_data.psfhelper.get_beam(src.ra, src.dec)
@@ -1915,13 +2098,9 @@ def check_cores(cores):
 
     """
     cores = min(multiprocessing.cpu_count(), cores)
-    if six.PY3:
-        log = logging.getLogger("Aegean")
-        log.info("Multi-cores not supported in python 3+, using one core")
-        return 1
     try:
         queue = pprocess.Queue(limit=cores, reuse=1)
-    except:
+    except:  # TODO: figure out what error is being thrown
         cores = 1
     else:
         try:

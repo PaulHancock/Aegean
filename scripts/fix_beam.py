@@ -1,16 +1,12 @@
 #!/usr/bin/env python
-from __future__ import print_function
-
-# Author    :   Shaoguang Guo && Yang Lu
-# Email     :   sgguo@shao.ac.cn
-# Institute :   Shanghai Astronomical Observatory
-
-# Modified by Paul Hancock upon incorporation into AegenTools
-
 """
 Script to fix the BEAM info for images created by AIPS
 Will read beam info from HISTORY and put it into the correct fits keywords
 """
+
+from __future__ import print_function
+
+# Modified by Paul Hancock upon incorporation into AegenTools
 
 __author__ = "Guo Shaoguang"
 __version__ = 'v1.0'

@@ -1,9 +1,9 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 Module for reading at writing catalogs
 """
+
+from __future__ import print_function
 
 __author__ = "Paul Hancock"
 __version__ = "1.0"
@@ -26,12 +26,12 @@ from astropy.io import fits
 from astropy.io.votable import from_table, parse_single_table
 from astropy.io.votable import writeto as writetoVO
 
-try:
-    import h5py
-
-    hdf5_supported = True
-except ImportError:
-    hdf5_supported = False
+# try:
+#     import h5py
+#
+#     hdf5_supported = True
+# except ImportError:
+#     hdf5_supported = False
 
 import sqlite3
 
@@ -82,7 +82,6 @@ def show_formats():
         "ann": "Kvis annotation",
         "reg": "DS9 regions file",
         "fits": "FITS Binary Table",
-        "hdf5": "HDF-5 format",
         "csv": "Comma separated values",
         "tab": "tabe separated values",
         "tex": "LaTeX table format",
@@ -110,10 +109,10 @@ def get_table_formats():
     fmts = ['reg', 'fits']
     fmts.extend(['vo', 'vot', 'xml'])
     fmts.extend(['csv', 'tab', 'tex', 'html'])
-    if hdf5_supported:
-        fmts.append('hdf5')
-    else:
-        log.info("HDF5 is not supported by your environment")
+    # if hdf5_supported:
+    #     fmts.append('hdf5')
+    # else:
+    #     log.info("HDF5 is not supported by your environment")
     # assume this is always possible -> though it may not be on some systems
     fmts.extend(['db', 'sqlite'])
     return fmts
@@ -143,7 +142,7 @@ def update_meta_data(meta=None):
     return meta
 
 
-def save_catalog(filename, catalog, meta=None):
+def save_catalog(filename, catalog, meta=None, prefix=None):
     """
     Save a catalogue of sources using filename as a model. Meta data can be written to some file types
     (fits, votable).
@@ -166,6 +165,9 @@ def save_catalog(filename, catalog, meta=None):
         A list of sources to write. Sources must be of type :class:`AegeanTools.models.OutputSource`,
         :class:`AegeanTools.models.SimpleSource`, or :class:`AegeanTools.models.IslandSource`.
 
+    prefix : str
+        Prepend each column name with "prefix_". Default is to prepend nothing.
+
     meta : dict
         Meta data to be written to the output file. Support for metadata depends on file type.
 
@@ -182,13 +184,13 @@ def save_catalog(filename, catalog, meta=None):
     elif extension in ['db', 'sqlite']:
         writeDB(filename, catalog, meta)
     elif extension in ['hdf5', 'fits', 'vo', 'vot', 'xml']:
-        write_catalog(filename, catalog, extension, meta)
+        write_catalog(filename, catalog, extension, meta, prefix=prefix)
     elif extension in ascii_table_formats.keys():
-        write_catalog(filename, catalog, fmt=ascii_table_formats[extension], meta=meta)
+        write_catalog(filename, catalog, fmt=ascii_table_formats[extension], meta=meta, prefix=prefix)
     else:
         log.warning("extension not recognised {0}".format(extension))
         log.warning("You get tab format")
-        write_catalog(filename, catalog, fmt='tab')
+        write_catalog(filename, catalog, fmt='tab', prefix=prefix)
     return
 
 
@@ -341,7 +343,7 @@ def table_to_source_list(table, src_type=OutputSource):
     return source_list
 
 
-def write_catalog(filename, catalog, fmt=None, meta=None):
+def write_catalog(filename, catalog, fmt=None, meta=None, prefix=None):
     """
     Write a catalog (list of sources) to a file with format determined by extension.
 
@@ -361,6 +363,9 @@ def write_catalog(filename, catalog, fmt=None, meta=None):
     fmt : str
         The file format extension.
 
+    prefix : str
+        Prepend each column name with "prefix_". Default is to prepend nothing.
+
     meta : dict
         A dictionary to be used as metadata for some file types (fits, VOTable).
 
@@ -371,9 +376,16 @@ def write_catalog(filename, catalog, fmt=None, meta=None):
     if meta is None:
         meta = {}
 
+    if prefix is None:
+        pre=''
+    else:
+        pre = prefix + '_'
+
     def writer(filename, catalog, fmt=None):
-        # construct a dict of the data
-        # this method preserves the data types in the VOTable
+        """
+        construct a dict of the data
+        this method preserves the data types in the VOTable
+        """
         tab_dict = {}
         name_list = []
         for name in catalog[0].names:
@@ -387,7 +399,7 @@ def write_catalog(filename, catalog, fmt=None, meta=None):
                     col_name = 'lat'+name[3:]
                 elif name.endswith('dec'):
                     col_name = name[:-3] + 'lat'
-
+            col_name = pre + col_name
             tab_dict[col_name] = [getattr(c, name, None) for c in catalog]
             name_list.append(col_name)
         t = Table(tab_dict, meta=meta)
@@ -613,12 +625,6 @@ def writeAnn(filename, catalog, fmt):
     See Also
     --------
     AegeanTools.catalogs.writeIslandContours
-    """
-    """
-    Input:
-        filename - file to write to
-        catalog - a list of OutputSource or SimpleSource
-        fmt - [.ann|.reg] format to use
     """
     if fmt not in ['reg', 'ann']:
         log.warning("Format not supported for island boxes{0}".format(fmt))

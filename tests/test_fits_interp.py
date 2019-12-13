@@ -1,18 +1,25 @@
-#! python
+#! /usr/bin/env python
+"""
+Test fits_interp.py
+"""
+
 __author__ = 'Paul Hancock'
-__date__ = ''
+
 from AegeanTools import fits_interp
 from astropy.io import fits
+import numpy as np
 import os
 
 
 def test_load_file_or_hdu():
+    """Test that we can 'open' either a file or HDU"""
     fname = 'tests/test_files/1904-66_AIT.fits'
     hdulist = fits.open(fname)
     if not (fits_interp.load_file_or_hdu(hdulist) is hdulist): raise AssertionError()
 
 
 def test_compress():
+    """Test the compression functionality"""
     # return None when the factor is not a positive integer
     if not (fits_interp.compress(None, factor=-1) is None): raise AssertionError()
     if not (fits_interp.compress(None, factor=0.3) is None): raise AssertionError()
@@ -39,11 +46,20 @@ def test_compress():
 
 
 def test_expand():
+    """Test the expand function"""
     fname = 'tests/test_files/1904-66_AIT.fits'
     hdulist = fits.open(fname)
+    hdulist[0].data[:] = 1.0
     compressed = fits_interp.compress(hdulist, factor=10)
+    expanded = fits_interp.expand(compressed)
+
     # the uncompressed hdu list is missing header keys so test that this gives the expected result
-    if not (fits_interp.expand(compressed) is hdulist): raise AssertionError()
+    if not (expanded is hdulist):
+        raise AssertionError()
+
+    # ensure that the interpolation isn't completely incorrect
+    if not np.all(expanded[0].data == 1.0):
+        raise AssertionError("image is not all 1.0")
 
     # now mix up the CDELT and CD keys
     compressed = fits_interp.compress(fname, factor=10)  # reload because we pass references
@@ -51,7 +67,8 @@ def test_expand():
     del compressed[0].header['CDELT1']
     compressed[0].header['CD2_2'] = compressed[0].header['CDELT2']
     del compressed[0].header['CDELT2']
-    if not (isinstance(fits_interp.expand(compressed), fits.HDUList)): raise AssertionError()
+    if not (isinstance(fits_interp.expand(compressed), fits.HDUList)):
+        raise AssertionError("CD1_1/CD2_2 doesn't work")
 
     # now strip CD2_2 and we should return None
     compressed = fits_interp.compress(fname, factor=10)
@@ -63,9 +80,10 @@ def test_expand():
 
 
 def test_fits_interp_compress_then_expand():
+    """Test that we can interp/compress files"""
     # test compression and expansion
     fits_interp.compress("tests/test_files/1904-66_AIT.fits", factor=7, outfile='tests/temp/test.fits')
-    fits_interp.expand('tests/temp/test.fits', outfile='tests/temp/test2.fits', method='linear')
+    fits_interp.expand('tests/temp/test.fits', outfile='tests/temp/test2.fits')
     # cleanup
     os.remove('tests/temp/test.fits')
     os.remove('tests/temp/test2.fits')

@@ -1,25 +1,24 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 This module contains two classes that provide WCS functions that are not
 part of the WCS toolkit, as well as some wrappers around the provided tools
 to make them a lot easier to use.
 """
+
+from __future__ import print_function
+
 __author__ = 'Paul Hancock'
 
+import astropy.wcs as pywcs
+from astropy.io import fits
 import numpy as np
 
+# AegeanTools
 from .angle_tools import gcd, bear, translate
 from .fits_image import Beam, get_beam, get_pixinfo
 
-# the glory of astropy
-import astropy.wcs as pywcs
-from astropy.io import fits
-
 # join the Aegean logger
 import logging
-
 log = logging.getLogger('Aegean')
 
 
@@ -82,7 +81,7 @@ class WCSHelper(object):
         """
         try:
             wcs = pywcs.WCS(header, naxis=2)
-        except:
+        except:  # TODO: figure out what error is being thrown
             wcs = pywcs.WCS(str(header), naxis=2)
 
         if beam is None:
@@ -433,13 +432,6 @@ class WCSHelper(object):
         dist : float
             The distance between the two points (degrees).
         """
-        """
-        Input:
-            pix1 = [x1,y1]
-            pix2 = [x2,y2]
-        Returns:
-            sep = separation in degrees
-        """
         pos1 = self.pix2sky(pix1)
         pos2 = self.pix2sky(pix2)
         sep = gcd(pos1[0], pos1[1], pos2[0], pos2[1])
@@ -621,10 +613,10 @@ class PSFHelper(WCSHelper):
         area : float
             The area of the beam in square pixels.
         """
-        beam = self.get_pixbeam(ra, dec)
-        if beam is None:
-            return 0
-        return beam.a * beam.b * np.pi
+
+        parea = abs(self.wcshelper.pixscale[0] * self.wcshelper.pixscale[1])  # in deg**2 at reference coords
+        barea = self.get_beamarea_deg2(ra, dec)
+        return barea / parea
 
     def get_beamarea_deg2(self, ra, dec):
 
