@@ -480,7 +480,12 @@ def writeFITSTable(filename, table):
 
     cols = []
     for name in table.colnames:
-        cols.append(fits.Column(name=name, format=FITSTableType(table[name][0]), array=table[name]))
+        # Cause error columns to always be floats even when they are set to -1
+        if name.startswith('err_'):
+            fmt = 'E'
+        else:
+            fmt = FITSTableType(table[name][0])
+        cols.append(fits.Column(name=name, format=fmt, array=table[name]))
     cols = fits.ColDefs(cols)
     tbhdu = fits.BinTableHDU.from_columns(cols)
     for k in table.meta:
