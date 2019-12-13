@@ -29,10 +29,10 @@ reqs = ['scipy>=0.16',
         'lmfit>=0.9.2']
 
 if sys.version_info < 3:
-    reqs.append('numpy>=1.10,<1.18')
+    reqs.append('numpy>=1.16,<1.18')
     reqs.append('astropy>=2.0, <3')
 else:
-    reqs.append('numpy>=1.10')
+    reqs.append('numpy>=1.16')
     reqs.append('astropy>=2.0')
 
 data_dir = 'AegeanTools/data'
