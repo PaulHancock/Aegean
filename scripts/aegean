@@ -301,7 +301,7 @@ if __name__ == "__main__":
 
     if options.region is not None:
         if not os.path.exists(options.region):
-            log.error("Region file {0} not found")
+            log.error("Region file {0} not found".format(options.region))
             sys.exit(1)
         if not region_available:
             log.error("Could not import AegeanTools/regions.py")
