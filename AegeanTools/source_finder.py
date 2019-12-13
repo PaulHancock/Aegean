@@ -113,13 +113,15 @@ def find_islands(im, bkg, rms,
                 continue
             island = PixelIsland()
             island.calc_bounding_box(np.array(np.nan_to_num(data_box), dtype=bool), offsets=[xmin, ymin])
+
             #island.calc_bounding_box(np.array(np.nan_to_num(data_box), dtype=bool), offsets=[0,0])
             islands.append(island)
 
     return islands
 
 
-def estimate_parinfo_image(islands, im, rms, wcshelper, max_summits=None, log=log):
+def estimate_parinfo_image(islands,
+                           im, rms, wcshelper, max_summits=None, log=log):
     """
     Estimate the initial parameters for fitting for each of the islands of pixels.
     The source sizes will be initialised as the psf of the image, which is either
@@ -134,7 +136,14 @@ def estimate_parinfo_image(islands, im, rms, wcshelper, max_summits=None, log=lo
         The image and noise maps
 
     wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
-        A wcs object valid for the image map
+        A wcshelper object valid for the image map
+
+    max_summits : int
+        The maximum number of summits that will be fit. Any in addition to this will
+        be estimated but their parameters will have vary=False.
+
+    log : `logging.Logger` or None
+        For handling logs (or not)
 
     max_summits : int
         The maximum number of summits that will be fit. Any in addition to this will

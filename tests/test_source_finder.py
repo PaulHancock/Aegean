@@ -319,6 +319,10 @@ def test_estimate_parinfo_image():
 
 
 if __name__ == "__main__":
+    #test_find_islands()
+    #test_estimate_parinfo_image()
+    #import sys
+    #sys.exit()
     # introspect and run all the functions starting with 'test'
     for f in  dir(): #['test_find_islands', 'test_estimate_parinfo_image', 'test_find_and_prior_sources']:
         if f.startswith('test'):
