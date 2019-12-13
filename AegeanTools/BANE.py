@@ -370,14 +370,14 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 
     Parameters
     ----------
-    im_name : str or HDUList
-        Image to filter. Either a string filename or an astropy.io.fits.HDUList.
+    im_name : str
+        Image to filter.
     out_base : str
         The output filename base. Will be modified to make _bkg and _rms files.
     step_size : (int,int)
         Tuple of the x,y step size in pixels
     box_size : (int,int)
-        The size of the box in piexls
+        The size of the box in pixels
     twopass : bool
         Perform a second pass calculation to ensure that the noise is not contaminated by the background.
         Default = False
