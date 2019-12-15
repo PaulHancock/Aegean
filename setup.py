@@ -23,16 +23,17 @@ def get_version():
     return AegeanTools.__version__
 
 
-reqs = ['numpy>=1.10',
-        'scipy>=0.16',
-        'astropy>=2.0',
+reqs = ['scipy>=0.16',
         'healpy >=1.10',
-        'six>=1.11']
+        'six>=1.11',
+        'lmfit>=0.9.2']
 
-if sys.version_info < (2, 7):
-    reqs.append('lmfit==0.9.1')
+if sys.version_info < (3,0):
+    reqs.append('numpy>=1.16,<1.18')
+    reqs.append('astropy>=2.0, <3')
 else:
-    reqs.append('lmfit>=0.9.2')
+    reqs.append('numpy>=1.16')
+    reqs.append('astropy>=2.0')
 
 data_dir = 'AegeanTools/data'
 
@@ -49,6 +50,7 @@ setup(
     install_requires=reqs,
     scripts=['scripts/aegean', 'scripts/BANE', 'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS'],
     data_files=[('AegeanTools', [os.path.join(data_dir, 'MOC.fits')]) ],
+    python_requires='>=2.7',
     setup_requires=['pytest-runner'],
     tests_require=['pytest', 'nose']
 )

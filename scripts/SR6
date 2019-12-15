@@ -11,11 +11,12 @@ import sys
 import numpy as np
 from astropy.io import fits
 from AegeanTools.fits_interp import compress, expand
+from AegeanTools.BANE import get_step_size
 from AegeanTools import __citation__
 
 __author__ = "Paul Hancock"
-__version__ = 'v1.0'
-__date__ = '2015-04-15'
+__version__ = 'v1.1'
+__date__ = '2019-12-13'
 
 # command line version of this program runs from here.
 if __name__ == "__main__":
@@ -25,14 +26,14 @@ if __name__ == "__main__":
 
     # tools for shrinking files
     group1 = parser.add_argument_group("Shrinking and expanding files")
-    group1.add_argument('infile', type=str,
+    group1.add_argument('infile', type=str, nargs='?', default=None,
                         help="input filename")
     group1.add_argument('-o', dest='outfile', action='store',
                         default=None, type=str, metavar='OutputFile',
                         help='output filename')
     group1.add_argument('-f', dest='factor', action='store',
                         default=None, type=int, metavar='factor',
-                        help='reduction factor')
+                        help='reduction factor. Default is 4x psf.')
     group1.add_argument('-x', dest='expand', action='store_true',
                         default=False,
                         help='Operation is expand instead of compress.')
@@ -50,6 +51,10 @@ if __name__ == "__main__":
                         help='Show citation information.')
 
     results = parser.parse_args()
+    # print help if the user enters no options or filename
+    if len(sys.argv) <= 1:
+        parser.print_help()
+        sys.exit(0)
 
     if results.cite:
         print(__citation__)
@@ -61,7 +66,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(results.infile):
         logging.error("{0} does not exist".format(results.infile))
-        sys.exit()
+        sys.exit(1)
 
     if results.mode is not None:
         logging.warning("option -i MODE is deprecated. Interpolation is always linear.")
@@ -80,4 +85,8 @@ if __name__ == "__main__":
             logging.error("Can't find {0}".format(results.maskfile))
 
     else:
+        if results.factor is None:
+            header = fits.getheader(results.infile)
+            results.factor = get_step_size(header)[0]
+            logging.info("Using compression factor of {0}".format(results.factor))
         compress(results.infile, results.factor, results.outfile)

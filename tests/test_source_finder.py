@@ -253,6 +253,7 @@ def test_find_islands():
         raise AssertionError("Incorrect number of islands found {0}, expecting 1".format(len(islands)))
     if not isinstance(islands[0], models.PixelIsland):
         raise AssertionError("Islands[0] is not a PixelIsland but instead a {0}".format(type(islands[0])))
+
     correct_box = [[3, 6], [3, 6]]
     if not np.all( islands[0].bounding_box == correct_box):
         raise AssertionError("Bounding box incorrect, should be {0}, but is {1}".format(correct_box,islands[0].bounding_box))
