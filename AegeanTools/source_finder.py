@@ -1307,12 +1307,13 @@ class SourceFinder(object):
             self.log.debug("xmxxymyx {0} {1} {2} {3}".format(xmin, xmax, ymin, ymax))
             for i in range(params['components'].value):
                 prefix = "c{0}_".format(i)
-                params[prefix + 'xo'].value -= xmin
+                # must update limits before the value as limits are enforced when the value is updated
                 params[prefix + 'xo'].min -= xmin
                 params[prefix + 'xo'].max -= xmin
-                params[prefix + 'yo'].value -= ymin
+                params[prefix + 'xo'].value -= xmin
                 params[prefix + 'yo'].min -= ymin
                 params[prefix + 'yo'].max -= ymin
+                params[prefix + 'yo'].value -= ymin
             # self.log.debug(params)
             # don't fit if there are no sources
             if params['components'].value < 1:
