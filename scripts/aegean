@@ -176,7 +176,7 @@ if __name__ == "__main__":
     options = parser.parse_args()
 
     # print help if the user enters no options or filename
-    if len(sys.argv) <= 1:
+    if options.image is None:
         parser.print_help()
         sys.exit(0)
 
