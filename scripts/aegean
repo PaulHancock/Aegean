@@ -29,6 +29,7 @@ try:
 except ImportError:
     region_available = False
 
+import AegeanTools
 from AegeanTools.source_finder import scope2lat, get_aux_files
 from AegeanTools.fits_image import Beam
 from AegeanTools.catalogs import show_formats, check_table_formats, save_catalog
@@ -204,7 +205,6 @@ if __name__ == "__main__":
         parser.print_help()
         sys.exit(0)
 
-    import AegeanTools
     from AegeanTools.source_finder import SourceFinder, check_cores
     # source finding object
     sf = SourceFinder(log=log)
