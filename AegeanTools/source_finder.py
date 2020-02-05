@@ -663,6 +663,7 @@ class SourceFinder(object):
 
             source.flags = src_flags
             # add psf info
+            # TODO -> Properly calculate the psf info in a way consistent with the above
             local_beam = global_data.psfhelper.get_beam(source.ra, source.dec)
             if local_beam is not None:
                 source.psf_a = local_beam.a * 3600
