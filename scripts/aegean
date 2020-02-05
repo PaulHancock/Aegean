@@ -175,15 +175,6 @@ if __name__ == "__main__":
 #    (options, args) = parser.parse_args()
     options = parser.parse_args()
 
-    # print help if the user enters no options or filename
-    if options.image is None:
-        parser.print_help()
-        sys.exit(0)
-
-    if options.cite:
-        print(__citation__)
-        sys.exit(0)
-
     # configure logging
     logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
@@ -191,10 +182,10 @@ if __name__ == "__main__":
     log.setLevel(logging_level)
     log.info("This is Aegean {0}-({1})".format(__version__, __date__))
 
-    import AegeanTools
-    from AegeanTools.source_finder import SourceFinder, check_cores
-    # source finding object
-    sf = SourceFinder(log=log)
+    # options that don't require image inputs
+    if options.cite:
+        print(__citation__)
+        sys.exit(0)
 
     if options.table_formats:
         show_formats()
@@ -207,6 +198,16 @@ if __name__ == "__main__":
         log.info("AstroPy {0} from {1}".format(astropy.__version__, astropy.__file__))
         log.info("LMFit {0} from {1}".format(lmfit.__version__, lmfit.__file__))
         sys.exit(0)
+
+    # print help if the user enters no options or filename
+    if options.image is None:
+        parser.print_help()
+        sys.exit(0)
+
+    import AegeanTools
+    from AegeanTools.source_finder import SourceFinder, check_cores
+    # source finding object
+    sf = SourceFinder(log=log)
 
     # check that a valid filename was entered
     filename = options.image
