@@ -42,7 +42,7 @@ class WCSHelper(object):
         WCS object
 
     beam : :class:`AegeanTools.wcs_helpers.Beam`
-        The synthesized beam.
+        The synthesized beam as defined by the fits header (at the reference location).
 
     pixscale : (float, float)
         The pixel scale at the reference location (degrees)
