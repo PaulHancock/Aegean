@@ -18,6 +18,7 @@ from scipy.special import erf
 from scipy.ndimage import label, find_objects
 from scipy.ndimage.filters import minimum_filter, maximum_filter
 # AegeanTools
+from .BANE import filter_image, get_step_size
 import AegeanTools.wcs_helpers
 from .fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit, \
                      bias_correct, elliptical_gaussian
