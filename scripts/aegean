@@ -29,7 +29,7 @@ try:
 except ImportError:
     region_available = False
 
-from AegeanTools.source_finder import scope2lat, get_aux_files
+from AegeanTools.source_finder import get_aux_files
 from AegeanTools.wcs_helpers import Beam
 from AegeanTools.catalogs import show_formats, check_table_formats, save_catalog
 from AegeanTools import fitting
@@ -41,26 +41,25 @@ header = """#Aegean version {0}
 # on dataset: {1}"""
 
 
-def check_projection(filename, options):
+def check_projection(filename, options, log):
     """
-    If the user has supplied --telescope when not required issue a warning
-    If the user has not supplied --telescope when it is required issue a critical warning
-    This depends on the projection of the image and if a psf map has been supplied:
-    If ZEA then --telescope is required
-    If SIN or a psf map has been supplied then --telescope is not required
-    :param options: options from the option parser
-    :return:
+    Kindly let the user know that projections other than SIN need some careful thought.
+
+    parameters
+    ----------
+    filename : str
+        The input fits filename
+
+    options : argparse options
+        Options from the command line
     """
     header = astropy.io.fits.getheader(filename)
-    if "ZEA" in header['CTYPE1']:
-        if options.telescope is None and options.imgpsf is None:
-            logging.warning("For projection ZEA it is advised that you supply either")
-            logging.warning("--telescope or --psf")
-    if "SIN" in header['CTYPE1']:
-        if options.telescope is not None:
-            logging.warning("For projection SIN --telescope is not required. Ignoring.")
-            options.telescope = None
+    if not( "SIN" in header['CTYPE1']):
+        if options.imgpsf is None:
+            projection = header['CTYPE1'].split('-')[-1]
+            log.warning("For projection {0} you should consider supplying a psf via --psf".format(projection))
     return
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='aegean', prefix_chars='-')
@@ -78,9 +77,9 @@ if __name__ == "__main__":
                         help='The beam parameters to be used is "--beam major minor pa" all in degrees. ' +
                              '[default: read from fits header].')
     group1.add_argument('--telescope', dest='telescope', type=str, default=None,
-                        help='The name of the telescope used to collect data. [MWA|VLA|ATCA|LOFAR]')
+                        help='DEPRECATED')
     group1.add_argument('--lat', dest='lat', type=float, default=None,
-                        help='The latitude of the telescope used to collect data.')
+                        help='DEPRECATED')
     group1.add_argument('--slice', dest='slice', type=int, default=None,
                         help='If the input data is a cube, then this slice will determine the array index of the image which will be processed by aegean')
 
@@ -191,6 +190,13 @@ if __name__ == "__main__":
     log.setLevel(logging_level)
     log.info("This is Aegean {0}-({1})".format(__version__, __date__))
 
+    # deprecation warnings
+    if options.telescope is not None:
+        log.warn("--telescope has been deprecated. Ignoring.")
+
+    if options.lat is not None:
+        log.warn("--lat has been deprecated. Ignoring.")
+
     import AegeanTools
     from AegeanTools.source_finder import SourceFinder, check_cores
     # source finding object
@@ -215,7 +221,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # check to see if the user has supplied --telescope/--psf when required
-    check_projection(filename, options)
+    check_projection(filename, options, log)
 
     # tell numpy to shut up about "invalid values encountered"
     # Its just NaN's and I don't need to hear about it once per core
@@ -259,14 +265,6 @@ if __name__ == "__main__":
         options.beam = Beam(beam[0], beam[1], beam[2])
         log.info("Using user supplied beam parameters")
         log.info("Beam is {0} deg x {1} deg with pa {2}".format(options.beam.a, options.beam.b, options.beam.pa))
-
-    # determine the latitude of the telescope
-    if options.telescope is not None:
-        lat = scope2lat(options.telescope)
-    elif options.lat is not None:
-        lat = options.lat
-    else:
-        lat = None
 
     # auto-load background, noise, psf and region files
     basename = os.path.splitext(filename)[0]
@@ -341,7 +339,7 @@ if __name__ == "__main__":
                                          bkgin=options.backgroundimg, beam=options.beam,
                                          doislandflux=options.doislandflux,
                                          nonegative=not options.negative, nopositive=options.nopositive,
-                                         mask=options.region, lat=lat, imgpsf=options.imgpsf, blank=options.blank,
+                                         mask=options.region, imgpsf=options.imgpsf, blank=options.blank,
                                          docov=options.docov, cube_index=options.slice)
         if options.blank:
             outname = basename+'_blank.fits'
@@ -370,7 +368,7 @@ if __name__ == "__main__":
         sf.priorized_fit_islands(filename, catalogue=options.input, hdu_index=options.hdu_index,
                                  rms=options.rms, bkg=options.bkg,
                                  outfile=options.outfile, bkgin=options.backgroundimg,
-                                 rmsin=options.noiseimg, beam=options.beam, lat=lat, imgpsf=options.imgpsf,
+                                 rmsin=options.noiseimg, beam=options.beam, imgpsf=options.imgpsf,
                                  catpsf=options.catpsf,
                                  stage=options.priorized, ratio=options.ratio, outerclip=options.outerclip,
                                  cores=options.cores, doregroup=options.regroup, docov=options.docov,

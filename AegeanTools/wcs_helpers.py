@@ -50,9 +50,6 @@ class WCSHelper(object):
     refpix : (float, float)
         The reference location in pixel coordinates
 
-    lat : float
-        The latitude of the telescope
-
     psf_file : str
         Filename for a psf map
 
@@ -63,7 +60,7 @@ class WCSHelper(object):
         The WCS object for the psf map
     """
 
-    def __init__(self, wcs, beam, pixscale, refpix, lat=None, psf_file=None):
+    def __init__(self, wcs, beam, pixscale, refpix, psf_file=None):
         """
         Parameters
         ----------
@@ -79,9 +76,6 @@ class WCSHelper(object):
         refpix : (float, float)
             The reference location in pixel coordinates
 
-        lat : float
-            The latitude of the telescope
-
         psf_file : str
             Filename for a psf map
         """
@@ -89,7 +83,6 @@ class WCSHelper(object):
         self.beam = beam
         self.pixscale = pixscale
         self.refpix = refpix
-        self.lat = lat
         self.psf_file = psf_file
         self._psf_map = None
         self._psf_wcs = None
@@ -117,7 +110,7 @@ class WCSHelper(object):
         return self._psf_wcs
 
     @classmethod
-    def from_header(cls, header, beam=None, lat=None, psf_file=None):
+    def from_header(cls, header, beam=None, psf_file=None):
         """
         Create a new WCSHelper class from the given header.
 
@@ -128,9 +121,6 @@ class WCSHelper(object):
 
         beam : :class:`AegeanTools.wcs_helpers.Beam` or None
             The synthesized beam. If the supplied beam is None then one is constructed form the header.
-
-        lat : float
-            The latitude of the telescope.
 
         psf_file : str
             Filename for a psf map
@@ -155,7 +145,7 @@ class WCSHelper(object):
 
         _, pixscale = get_pixinfo(header)
         refpix = (header['CRPIX1'], header['CRPIX2'])
-        return cls(wcs, beam, pixscale, refpix, lat=lat, psf_file=psf_file)
+        return cls(wcs, beam, pixscale, refpix, psf_file=psf_file)
 
     @classmethod
     def from_file(cls, filename, beam=None, psf_file=None):
@@ -463,13 +453,7 @@ class WCSHelper(object):
                 return None
             return Beam(psf[0], psf[1], psf[2])
 
-        # check to see if we need to scale the major axis based on the declination
-        if self.lat is None:
-            factor = 1
-        else:
-            # this works if the pa is zero. For non-zero pa it's a little more difficult
-            factor = np.cos(np.radians(dec - self.lat))
-        return Beam(self.beam.a / factor, self.beam.b, self.beam.pa)
+        return Beam(self.beam.a, self.beam.b, self.beam.pa)
 
     def get_pixbeam(self, ra, dec):
         """

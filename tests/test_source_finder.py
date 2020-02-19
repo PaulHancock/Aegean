@@ -44,10 +44,6 @@ def test_helpers():
     if not (sf.theta_limit(0.) == 0.): raise AssertionError()
     if not (sf.theta_limit(np.pi) == 0.): raise AssertionError()
     if not (sf.theta_limit(-3*np.pi/2) == np.pi/2): raise AssertionError()
-    # scope2lat
-    if not (sf.scope2lat('MWA') == -26.703319): raise AssertionError()
-    if not (sf.scope2lat('mwa') == -26.703319): raise AssertionError()
-    if sf.scope2lat('MyFriendsTelescope') is not None: raise AssertionError()
     # get_aux
     if not (np.all(a is None for a in sf.get_aux_files('_$_fkjfjl'))): raise AssertionError()
     aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
@@ -85,7 +81,7 @@ def dont_test_load_globals():
 
     del sfinder
     sfinder = sf.SourceFinder(log=log)
-    sfinder.load_globals(filename, rmsin=aux_files['rms'], mask='derp', do_curve=False)
+    sfinder.load_globals(filename, rmsin=aux_files['rms'], do_curve=False, mask='derp')
     if sfinder.global_data.region is not None: raise AssertionError()
     img = sfinder._load_aux_image(sfinder.global_data.img, filename)
     if img is None: raise AssertionError()

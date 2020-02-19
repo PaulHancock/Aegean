@@ -1046,8 +1046,8 @@ class SourceFinder(object):
     ##
     # Setting up 'global' data and calculating bkg/rms
     ##
-    def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, bkg=None, cores=1,
-                     do_curve=False, mask=None, lat=None, psf=None, blank=False, docov=True, cube_index=None):
+    def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, bkg=None,
+                     cores=1, do_curve=False, mask=None, psf=None, blank=False, docov=True, cube_index=None):
         """
         Populate the global_data object by loading or calculating the various components
 
@@ -1081,9 +1081,6 @@ class SourceFinder(object):
 
         mask : str or :class:`AegeanTools.regions.Region`
             filename or Region object
-
-        lat : float
-            Latitude of the observing telescope (declination of zenith)
 
         psf : str or HDUList
             Filename or HDUList of a psf image
@@ -1121,8 +1118,7 @@ class SourceFinder(object):
                 self.log.error("File {0} not found for loading".format(mask))
                 self.global_data.region = None
 
-        self.global_data.wcshelper = WCSHelper.from_header(img.get_hdu_header(), beam,
-                                                           lat=lat, psf_file=psf)
+        self.global_data.wcshelper = WCSHelper.from_header(img.get_hdu_header(), beam, psf_file=psf)
         self.global_data.psfhelper = self.global_data.wcshelper
 
         self.global_data.beam = self.global_data.wcshelper.beam
@@ -1220,8 +1216,8 @@ class SourceFinder(object):
 
         self.log.info("Saving background / RMS maps")
         # load image, and load/create background/rms images
-        self.load_globals(image_filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms, bkg=bkg,
-                          cores=cores, do_curve=True)
+        self.load_globals(image_filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms,
+                          bkg=bkg, cores=cores, do_curve=True)
         img = self.global_data.img
         bkgimg, rmsimg = self.global_data.bkgimg, self.global_data.rmsimg
         curve = np.array(self.global_data.dcurve, dtype=bkgimg.dtype)
@@ -1838,7 +1834,7 @@ class SourceFinder(object):
 
     def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, bkg=None, max_summits=None, innerclip=5,
                               outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
-                              nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None, blank=False,
+                              nopositive=False, nonegative=False, mask=None, imgpsf=None, blank=False,
                               docov=True, cube_index=None):
         """
         Run the Aegean source finder.
@@ -1887,9 +1883,6 @@ class SourceFinder(object):
             The filename of a region file created by MIMAS.
             Islands outside of this region will be ignored.
 
-        lat : float
-            The latitude of the telescope (declination of zenith).
-
         imgpsf : str or HDUList
              Filename or HDUList for a psf image.
 
@@ -1913,8 +1906,8 @@ class SourceFinder(object):
         if cores is not None:
             if not (cores >= 1): raise AssertionError("cores must be one or more")
 
-        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, bkg=bkg, cores=cores,
-                          verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank, docov=docov, cube_index=cube_index)
+        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms,
+                          bkg=bkg, cores=cores, mask=mask, psf=imgpsf, blank=blank, docov=docov, cube_index=cube_index)
         global_data = self.global_data
         rmsimg = global_data.rmsimg
         data = global_data.data_pix
@@ -1990,7 +1983,7 @@ class SourceFinder(object):
         return sources
 
     def priorized_fit_islands(self, filename, catalogue, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1,
-                              rms=None, bkg=None, beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=None, outerclip=3,
+                              rms=None, bkg=None, beam=None, imgpsf=None, catpsf=None, stage=3, ratio=None, outerclip=3,
                               doregroup=True, docov=True, cube_index=None):
         """
         Take an input catalog, and image, and optional background/noise images
@@ -2031,9 +2024,6 @@ class SourceFinder(object):
             Replaces whatever is given in the FITS header.
             If the FITS header has no BMAJ/BMIN then this is required.
 
-        lat : float
-            The latitude of the telescope (declination of zenith).
-
         imgpsf : str or HDUList
              Filename or HDUList for a psf image.
 
@@ -2065,8 +2055,8 @@ class SourceFinder(object):
 
         from AegeanTools.cluster import regroup
 
-        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, bkg=bkg, cores=cores, verb=True,
-                          do_curve=False, beam=beam, lat=lat, psf=imgpsf, docov=docov, cube_index=cube_index)
+        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms,
+                          bkg=bkg, cores=cores, do_curve=False, psf=imgpsf, docov=docov, cube_index=cube_index)
 
         global_data = self.global_data
         far = 10 * global_data.beam.a  # degrees
@@ -2295,58 +2285,6 @@ def theta_limit(theta):
     while theta > np.pi / 2:
         theta -= np.pi
     return theta
-
-
-def scope2lat(telescope):
-    """
-    Convert a telescope name into a latitude
-    returns None when the telescope is unknown.
-
-    Parameters
-    ----------
-    telescope : str
-        Acronym (name) of telescope, eg MWA.
-
-    Returns
-    -------
-    lat : float
-        The latitude of the telescope.
-
-    Notes
-    -----
-    These values were taken from wikipedia so have varying precision/accuracy
-    """
-    scopes = {'MWA': -26.703319,
-              "ATCA": -30.3128,
-              "VLA": 34.0790,
-              "LOFAR": 52.9088,
-              "KAT7": -30.721,
-              "MEERKAT": -30.721,
-              "PAPER": -30.7224,
-              "GMRT": 19.096516666667,
-              "OOTY": 11.383404,
-              "ASKAP": -26.7,
-              "MOST": -35.3707,
-              "PARKES": -32.999944,
-              "WSRT": 52.914722,
-              "AMILA": 52.16977,
-              "AMISA": 52.164303,
-              "ATA": 40.817,
-              "CHIME": 49.321,
-              "CARMA": 37.28044,
-              "DRAO": 49.321,
-              "GBT": 38.433056,
-              "LWA": 34.07,
-              "ALMA": -23.019283,
-              "FAST": 25.6525
-              }
-    if telescope.upper() in scopes:
-        return scopes[telescope.upper()]
-    else:
-        log = logging.getLogger("Aegean")
-        log.warning("Telescope {0} is unknown".format(telescope))
-        log.warning("integrated fluxes may be incorrect")
-        return None
 
 
 def check_cores(cores):
