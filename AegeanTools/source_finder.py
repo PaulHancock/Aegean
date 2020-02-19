@@ -114,8 +114,6 @@ def find_islands(im, bkg, rms,
                 continue
             island = PixelIsland()
             island.calc_bounding_box(np.array(np.nan_to_num(data_box), dtype=bool), offsets=[xmin, ymin])
-
-            #island.calc_bounding_box(np.array(np.nan_to_num(data_box), dtype=bool), offsets=[0,0])
             islands.append(island)
 
     return islands
@@ -1944,8 +1942,9 @@ class SourceFinder(object):
                                log=self.log)
         #for i, xmin, xmax, ymin, ymax in self._gen_flood_wrap(data, rmsimg, innerclip, outerclip, domask=True):
         for island in islands:
-            i = island.mask
+            #i = island.mask
             [[xmin,xmax], [ymin,ymax]] = island.bounding_box
+            i = global_data.data_pix[xmin:xmax,ymin:ymax]
             # ignore empty islands
             # This should now be impossible to trigger
             if np.size(i) < 1:

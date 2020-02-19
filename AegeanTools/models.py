@@ -512,7 +512,6 @@ class PixelIsland(object):
         """
         if len(offsets)!=self.dim:
             raise AssertionError("{0} offsets were passed but {1} are required".format(len(offsets),self.dim))
-        self.set_mask(data)
         # TODO: Figure out 3d boxes
         # set the bounding box one dimension at a time
         ndrow = np.any(data, axis=0)
@@ -520,9 +519,10 @@ class PixelIsland(object):
         self.bounding_box[1][0] = offsets[1] + rmin
         self.bounding_box[1][1] = offsets[1] + rmax + 1
         ndcol = np.any(data, axis=1)
-        rmin, rmax = np.where(ndcol)[0][[0, -1]]
-        self.bounding_box[0][0] = offsets[0] + rmin
-        self.bounding_box[0][1] = offsets[0] + rmax + 1
+        cmin, cmax = np.where(ndcol)[0][[0, -1]]
+        self.bounding_box[0][0] = offsets[0] + cmin
+        self.bounding_box[0][1] = offsets[0] + cmax + 1
+        self.set_mask(data[rmin:rmax+1, cmin:cmax+1])
         return
 
 
