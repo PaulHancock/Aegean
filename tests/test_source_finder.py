@@ -153,6 +153,7 @@ def dont_test_find_and_prior_parallel():
 
     filename = 'tests/test_files/synthetic_test.fits'
     # vanilla source finding
+    log.info("basic fitting (no bkg/rms")
     sfinder = sf.SourceFinder(log=log)
     found = sfinder.find_sources_in_image(filename, cores=cores,
                                         bkg=0, rms=0.5)
@@ -161,14 +162,19 @@ def dont_test_find_and_prior_parallel():
     aux_files = sf.get_aux_files(filename)
 
     del sfinder
+    log.info("fitting with supplied bkg/rms and 2 cores")
+    cores=2
     sfinder = sf.SourceFinder(log=log)
     _ = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
                                            rmsin=aux_files['rms'], bkgin=aux_files['bkg'],
                                            mask=aux_files['mask'], cores=cores)
+
+    log.info('now priorised fitting')
     _ = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=True, cores=cores, outfile=open('dlme','w'))
     os.remove('dlme')
 
     del sfinder
+    log.info('fitting negative sources')
     sfinder = sf.SourceFinder(log=log)
     sfinder.find_sources_in_image('tests/test_files/1904-66_SIN_neg.fits', doislandflux=True, nonegative=False, cores=cores)
 
