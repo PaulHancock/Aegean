@@ -130,7 +130,7 @@ def estimate_parinfo_image(islands,
 
     Parameters
     ----------
-    islands : [AegeanTools.models.Island, ... ]
+    islands : [AegeanTools.models.IslandFittingData, ... ]
         A list of islands which will be converted into groups of sources
 
     im, rms : :class:`numpy.ndarray`
@@ -139,7 +139,7 @@ def estimate_parinfo_image(islands,
     wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
         A wcshelper object valid for the image map
 
-    max_summits : int
+    max_summits : int or None
         The maximum number of summits that will be fit. Any in addition to this will
         be estimated but their parameters will have vary=False.
 
@@ -408,8 +408,9 @@ def priorized_islands_parinfo(sources,
 
 def characterise_islands(islands,
                          im, bkg, rms,
+                         wcshelper,
                          err_type='best',
-                         psf=None,
+                         max_summits=None,
                          do_islandfit=False):
     """
     Do the source characterisation based on the initial estimate of the island properties.
@@ -423,19 +424,20 @@ def characterise_islands(islands,
     im, bkg, rms : np.ndarray
         The image, background, and noise maps
 
+    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
+        A wcs helper object
+
     err_type : str or None
         The method for calculating uncertainties on parameters:
             'best' - Uncertainties measured based on covariance matrix of the fit and of the data
-                See Hancock et al. 2018 for a description of this process.
+                     See Hancock et al. 2018 for a description of this process.
             'condon' - Uncertainties are *calculated* based on Condon'98 (?year)
             'raw' - uncertainties directly from the covariance matrix only
             'none' or None - No uncertainties, all will be set to -1.
 
-    wcs : astropy.wcs.WCS
-        A wcs object valid for the image map
-
-    psf : str or None
-        The filename for the psf map (optional)
+    max_summits : int
+        The maximum number of summits that will be fit.
+        The final model may contain additional components but only the first few will be fit.
 
     do_islandfit : bool
         If True, then also characterise islands as well as components. Default=False.
@@ -445,7 +447,22 @@ def characterise_islands(islands,
     sources : [AegeanTools.models.SimpleSource, ... ]
         A list of characterised sources of type SimpleSource, ComponentSource, or IslandSource.
     """
-    sources = []
+    sources = estimate_parinfo_image(islands=islands,
+                                     im=im, rms=rms,
+                                     wcshelper=wcshelper, max_summits=max_summits,
+                                     log=log)
+    for src, isle in zip(sources, islands):
+        [rmin, rmax], [cmin, cmax] = isle.bounding_box
+        i_data = im[rmin:rmax, cmin:cmax]
+        fac = 1 / np.sqrt(2)
+        if err_type == 'best':
+            mx, my = np.where(np.isfinite(i_data))
+            C = Cmatrix(mx, my, pixbeam.a * FWHM2CC * fac, pixbeam.b * FWHM2CC * fac, pixbeam.pa)
+            B = Bmatrix(C)
+        else:
+            C = B = None
+        result, _ = do_lmfit(i_data, src, B=B)
+
     return sources
 
 
@@ -1925,10 +1942,10 @@ class SourceFinder(object):
         islands = find_islands(im=data, bkg=np.zeros_like(data), rms=rmsimg,
                                seed_clip=innerclip, flood_clip=outerclip,
                                log=self.log)
-        for i, xmin, xmax, ymin, ymax in self._gen_flood_wrap(data, rmsimg, innerclip, outerclip, domask=True):
-        #for island in islands:
-        #    i = island.mask
-        #    [[xmin,xmax], [ymin,ymax]] = island.bounding_box
+        #for i, xmin, xmax, ymin, ymax in self._gen_flood_wrap(data, rmsimg, innerclip, outerclip, domask=True):
+        for island in islands:
+            i = island.mask
+            [[xmin,xmax], [ymin,ymax]] = island.bounding_box
             # ignore empty islands
             # This should now be impossible to trigger
             if np.size(i) < 1:
