@@ -370,34 +370,43 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 
     Parameters
     ----------
-    im_name : str or HDUList
-        Image to filter. Either a string filename or an astropy.io.fits.HDUList.
-    out_base : str
+    im_name : str
+        Image to filter.
+
+    out_base : str or None
         The output filename base. Will be modified to make _bkg and _rms files.
+        If None, then no files are written.
+
     step_size : (int,int)
         Tuple of the x,y step size in pixels
+
     box_size : (int,int)
-        The size of the box in piexls
+        The size of the box in pixels
+
     twopass : bool
         Perform a second pass calculation to ensure that the noise is not contaminated by the background.
         Default = False
+
     cores : int
         Number of CPU corse to use.
         Default = all available
+
     nslice : int
         The image will be divided into this many horizontal stripes for processing.
         Default = None = equal to cores
+
     mask : bool
         Mask the output array to contain np.nna wherever the input array is nan or not finite.
         Default = true
+
     compressed : bool
         Return a compressed version of the background/noise images.
         Default = False
 
     Returns
     -------
-    None
-
+    bkg, rms : `numpy.ndarray`
+        The computed background and rms maps (not compressed)
     """
 
     header = fits.getheader(im_name)
@@ -420,26 +429,27 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
     bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, nslice=nslice, domask=mask)
     logging.info("done")
 
-    bkg_out = '_'.join([os.path.expanduser(out_base), 'bkg.fits'])
-    rms_out = '_'.join([os.path.expanduser(out_base), 'rms.fits'])
+    if out_base is not None:
+        # add a comment to the fits header
+        header['HISTORY'] = 'BANE {0}-({1})'.format(__version__, __date__)
 
+        bkg_out = '_'.join([os.path.expanduser(out_base), 'bkg.fits'])
+        rms_out = '_'.join([os.path.expanduser(out_base), 'rms.fits'])
 
-    # add a comment to the fits header
-    header['HISTORY'] = 'BANE {0}-({1})'.format(__version__, __date__)
+        # compress
+        if compressed:
+            hdu = fits.PrimaryHDU(bkg)
+            hdu.header = copy.deepcopy(header)
+            hdulist = fits.HDUList([hdu])
+            compress(hdulist, step_size[0], bkg_out)
+            hdulist[0].header = copy.deepcopy(header)
+            hdulist[0].data = rms
+            compress(hdulist, step_size[0], rms_out)
+        else:
+            write_fits(bkg, header, bkg_out)
+            write_fits(rms, header, rms_out)
 
-    # compress
-    if compressed:
-        hdu = fits.PrimaryHDU(bkg)
-        hdu.header = copy.deepcopy(header)
-        hdulist = fits.HDUList([hdu])
-        compress(hdulist, step_size[0], bkg_out)
-        hdulist[0].header = copy.deepcopy(header)
-        hdulist[0].data = rms
-        compress(hdulist, step_size[0], rms_out)
-        return
-
-    write_fits(bkg, header, bkg_out)
-    write_fits(rms, header, rms_out)
+    return bkg, rms
 
 
 ###
