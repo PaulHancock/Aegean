@@ -230,7 +230,7 @@ def test_esimate_lmfit_parinfo():
 # for 3.0 functionality
 
 def test_find_islands():
-    im = np.ones((10,10), dtype=np.float32)
+    im = np.ones((10,12), dtype=np.float32)
     bkg = np.zeros_like(im)
     rms = np.ones_like(im)
 
@@ -240,22 +240,23 @@ def test_find_islands():
         return AssertionError("Found islands where none existed")
 
     # now set just one island
-    im[3:6,3:6] *= 10
+    im[3:6,4:7] *= 10
     # and have some pixels masked or below the clipping threshold
-    im[5,5] = np.nan
+    im[6,5] = np.nan
     im[4,4] = 0
     # make the border nans
     im[0:3,:] = im[-1:,:] = np.nan
     im[:,0] = im[:,-1] = np.nan
 
     islands = sf.find_islands(im, bkg, rms, log=log)
+
     if len(islands) != 1:
         raise AssertionError("Incorrect number of islands found {0}, expecting 1".format(len(islands)))
     if not isinstance(islands[0], models.PixelIsland):
         raise AssertionError("Islands[0] is not a PixelIsland but instead a {0}".format(type(islands[0])))
 
-    correct_box = [[3, 6], [3, 6]]
-    if not np.all( islands[0].bounding_box == correct_box):
+    correct_box = [[3, 6], [4, 7]]
+    if not np.all(islands[0].bounding_box == correct_box):
         raise AssertionError("Bounding box incorrect, should be {0}, but is {1}".format(correct_box,islands[0].bounding_box))
 
     # add another island that is between the seed/flood thresholds
