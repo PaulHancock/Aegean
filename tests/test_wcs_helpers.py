@@ -4,7 +4,7 @@ Test wcs_helpers.py
 """
 from __future__ import print_function
 
-from AegeanTools.wcs_helpers import WCSHelper
+from AegeanTools.wcs_helpers import WCSHelper, Beam
 from astropy.io import fits
 import numpy as np
 from numpy.testing import assert_almost_equal
@@ -28,8 +28,13 @@ def test_from_header():
     helper = WCSHelper.from_header(header)
     if helper.beam is None: raise AssertionError()
     del header['BMAJ'], header['BMIN'], header['BPA']
-    helper = WCSHelper.from_header(header)
-    if helper.beam is not None: raise AssertionError()
+    # Raise an error when the beam information can't be determined
+    try:
+        _ = WCSHelper.from_header(header)
+    except AssertionError as e:
+        pass
+    else:
+        raise e
 
 
 def test_from_file():
@@ -44,15 +49,13 @@ def test_get_pixbeam():
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
 
-    beam = helper.get_pixbeam_pixel(0, 0)
+    beam = Beam(*helper.get_psf_pix2pix(0, 0))
     verify_beam(beam)
 
-    helper.lat = None
-    beam = helper.get_beam(285, -66)
+    beam = helper.get_skybeam(285, -66)
     verify_beam(beam)
 
-    helper.lat = -65
-    beam = helper.get_beam(285, -66)
+    beam = helper.get_skybeam(285, -66)
     verify_beam(beam)
 
     area = helper.get_beamarea_pix(285, -66)
@@ -60,11 +63,11 @@ def test_get_pixbeam():
     area = helper.get_beamarea_deg2(285, -66)
     if not (area >0): raise AssertionError()
 
-    beam = helper.get_pixbeam(285, -66)
-    verify_beam(beam)
-
-    beam = helper.get_pixbeam(None, None)
-    verify_beam(beam)
+    # beam = helper.get_pixbeam(285, -66)
+    # verify_beam(beam)
+    #
+    # beam = helper.get_pixbeam(None, None)
+    # verify_beam(beam)
 
 
 def test_sky_sep():

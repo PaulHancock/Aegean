@@ -280,7 +280,7 @@ def estimate_parinfo_image(islands,
                 log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
 
             # TODO: double check the yo/xo that seem reversed
-            pixbeam = wcshelper.get_pixbeam_pixel(yo + cmin, xo + rmin)
+            pixbeam = Beam(*wcshelper.get_psf_pix2pix(yo + cmin, xo + rmin))
             if pixbeam is None:
                 log.debug(" Summit has invalid WCS/Beam - Skipping.")
                 continue
@@ -737,7 +737,7 @@ class SourceFinder(object):
             if debug_on:
                 self.log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
 
-            pixbeam = global_data.psfhelper.get_pixbeam_pixel(yo + offsets[0], xo + offsets[1])
+            pixbeam = Beam(*global_data.psfhelper.get_psf_pix2pix(yo + offsets[0], xo + offsets[1]))
             if pixbeam is None:
                 self.log.debug(" Summit has invalid WCS/Beam - Skipping.")
                 continue
@@ -938,7 +938,7 @@ class SourceFinder(object):
 
             source.flags = src_flags
             # add psf info
-            local_beam = global_data.psfhelper.get_beam(source.ra, source.dec)
+            local_beam = global_data.psfhelper.get_skybeam(source.ra, source.dec)
             if local_beam is not None:
                 source.psf_a = local_beam.a * 3600
                 source.psf_b = local_beam.b * 3600
@@ -1406,7 +1406,7 @@ class SourceFinder(object):
             # this may be a subset of all sources in the island
             included_sources = []
             for src in isle:
-                pixbeam = global_data.psfhelper.get_pixbeam(src.ra, src.dec)
+                pixbeam = Beam(*global_data.psfhelper.get_psf_sky2pix(src.ra, src.dec))
                 # find the right pixels from the ra/dec
                 source_x, source_y = global_data.wcshelper.sky2pix([src.ra, src.dec])
                 source_x -= 1
@@ -1640,7 +1640,7 @@ class SourceFinder(object):
 
         # get the beam parameters at the center of this island
         midra, middec = global_data.wcshelper.pix2sky([0.5 * (xmax + xmin), 0.5 * (ymax + ymin)])
-        beam = global_data.psfhelper.get_psf_pix(midra, middec)
+        beam = global_data.psfhelper.get_psf_sky2pix(midra, middec)
         del middec, midra
 
         # the curvature needs a buffer of 1 pixel to correctly identify local min/max
@@ -1666,7 +1666,7 @@ class SourceFinder(object):
         rms = rmsimg[xmin:xmax, ymin:ymax]
 
         is_flag = 0
-        pixbeam = global_data.psfhelper.get_pixbeam_pixel((xmin + xmax) / 2., (ymin + ymax) / 2.)
+        pixbeam = Beam(*global_data.psfhelper.get_psf_pix2pix((xmin + xmax) / 2., (ymin + ymax) / 2.))
         if pixbeam is None:
             # This island is not 'on' the sky, ignore it
             return []
@@ -2021,7 +2021,7 @@ class SourceFinder(object):
             for i, src in enumerate(input_sources):
                 # Sources with an unknown psf are rejected as they are either outside the image
                 # or outside the region covered by the psf
-                skybeam = global_data.psfhelper.get_beam(src.ra, src.dec)
+                skybeam = global_data.psfhelper.get_skybeam(src.ra, src.dec)
                 if skybeam is None:
                     src_mask[i] = False
                     self.log.info("Excluding source ({0.island},{0.source}) due to lack of psf knowledge".format(src))
@@ -2052,8 +2052,8 @@ class SourceFinder(object):
                 if has_psf:
                     catbeam = Beam(src.psf_a / 3600, src.psf_b / 3600, src.psf_pa)
                 else:
-                    catbeam = psf_helper.get_beam(src.ra, src.dec)
-                imbeam = global_data.psfhelper.get_beam(src.ra, src.dec)
+                    catbeam = Beam(*psf_helper.get_psf_sky2sky(src.ra, src.dec))
+                imbeam = global_data.psfhelper.get_skybeam(src.ra, src.dec)
                 # If either of the above are None then we skip this source.
                 if catbeam is None or imbeam is None:
                     src_mask[i] = False
