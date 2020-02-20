@@ -105,7 +105,7 @@ class WCSHelper(object):
     def psf_map(self):
         if self._psf_map is None:
             # use memory mapping to avoid loading large files, when only a small subset of the pixels are actually needed
-            self._psf_map = fits.open(self.psf_file, memmap=True)
+            self._psf_map = fits.open(self.psf_file, memmap=True)[0].data
             if len(self._psf_map.shape) != 3:
                 log.critical("PSF file needs to have 3 dimensions, found {0}".format(len(self._psf_map.shape)))
                 raise Exception("Invalid PSF file {0}".format(self.psf_file))
@@ -401,8 +401,8 @@ class WCSHelper(object):
 
         # We leave the interpolation in the hands of whoever is making these images
         # clamping the x,y coords at the image boundaries just makes sense
-        x = int(np.clip(x, 0, self._psf_map.shape[1] - 1))
-        y = int(np.clip(y, 0, self._psf_map.shape[2] - 1))
+        x = int(np.clip(x, 0, self.psf_map.shape[1] - 1))
+        y = int(np.clip(y, 0, self.psf_map.shape[2] - 1))
         psf_sky = self._psf_map[:, x, y]
         return psf_sky
 
