@@ -387,17 +387,18 @@ class WCSHelper(object):
 
         Returns
         -------
-        a, b, pa : float
+        a, b, pa : (float, float, float)
             The psf semi-major axis, semi-minor axis, and position angle in (degrees).
             If a psf is defined then it is the psf that is returned, otherwise the image
             restoring beam is returned.
         """
-        # If we don't have a psf map then we just fall back to using the beam
-        # from the fits header
-        if self.psf_file is None:
-            return self.beam.a, self.beam.b, self.beam.pa
-
         x, y = self.sky2pix((ra, dec))
+
+        # If we don't have a psf map then we just fall back to using the beam
+        # from the fits header, but convert pix->sky
+        if self.psf_file is None:
+            _, _, a, b, pa = self.pix2sky_ellipse((x, y), self._psf_a, self._psf_b, self._psf_b)
+            return a, b, pa
 
         # We leave the interpolation in the hands of whoever is making these images
         # clamping the x,y coords at the image boundaries just makes sense
@@ -478,7 +479,7 @@ class WCSHelper(object):
                 return None
             return Beam(psf[0], psf[1], psf[2])
 
-        return Beam(self.beam.a, self.beam.b, self.beam.pa)
+        return Beam(*self.get_psf_sky2sky(ra, dec))
 
     def get_beamarea_deg2(self, ra, dec):
         """
