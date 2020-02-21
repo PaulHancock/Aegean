@@ -12,7 +12,6 @@ from numpy.testing import assert_almost_equal
 __author__ = 'Paul Hancock'
 
 
-
 def verify_beam(beam):
     """fail if the given beam is not valid"""
     if beam is None: raise AssertionError()
@@ -34,7 +33,8 @@ def test_from_header():
     except AssertionError as e:
         pass
     else:
-        raise e
+        raise AssertionError("Header with no beam information should thrown an exception.")
+    return
 
 
 def test_from_file():
