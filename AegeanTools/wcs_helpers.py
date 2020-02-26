@@ -397,7 +397,7 @@ class WCSHelper(object):
         # If we don't have a psf map then we just fall back to using the beam
         # from the fits header, but convert pix->sky
         if self.psf_file is None:
-            _, _, a, b, pa = self.pix2sky_ellipse((x, y), self._psf_a, self._psf_b, self._psf_b)
+            _, _, a, b, pa = self.pix2sky_ellipse((x, y), self._psf_a, self._psf_b, self._psf_theta)
             return a, b, pa
 
         # We leave the interpolation in the hands of whoever is making these images
