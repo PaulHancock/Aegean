@@ -1,8 +1,5 @@
 v 2.2.0
 =======
-General
-- Merge changes from dev-aegean
-
 Aegean
 - Internal bkg/rms calculations have been replaced with calls to BANE
 - Handling of the image psf has been drastically improved, but at the expense of only supporting SIN images

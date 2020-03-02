@@ -2106,6 +2106,7 @@ class SourceFinder(object):
             queue = pprocess.Queue(limit=cores, reuse=1)
             fit_parallel = queue.manage(pprocess.MakeReusable(self._refit_islands))
 
+        self.log.info("Performing fits")
         sources = []
         island_group = []
         group_size = 20
