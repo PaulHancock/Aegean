@@ -512,7 +512,7 @@ class SourceFinder(object):
     def __init__(self, **kwargs):
         self.global_data = GlobalFittingData()
         self.sources = []
-        self.log = None
+        self.log = log  # Use a dummy logger (which never reports anything)
 
         for k in kwargs:
             if hasattr(self, k):
