@@ -1827,7 +1827,10 @@ class SourceFinder(object):
         # Tell numpy to be quiet
         np.seterr(invalid='ignore')
         if cores is not None:
-            if not (cores >= 1): raise AssertionError("cores must be one or more")
+            if not (cores >= 1):
+                raise AssertionError("cores must be one or more")
+        else:
+            cores = multiprocessing.cpu_count()
 
         self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms,
                           bkg=bkg, cores=cores, mask=mask, psf=imgpsf, blank=blank, docov=docov, cube_index=cube_index)
