@@ -9,6 +9,22 @@ Aegean
   - Images that are not in SIN projection are supported but should use an external psf map
 - `--telescope` and `--lat` options have been deprecated as they are no longer required
 
+v 2.1.1
+=======
+General
+- drop support for python <2.7
+ 
+Aegean
+- Support for lmfit v 0.9.15 and above (affects priorized fitting only)
+- force `psf_pa` to be a float (ie 0.0) when BPA is not supplied
+- ensure that `err_*` columns are always reported as floats (ie errs are now -1.0)
+- report filename of interest when region files can't be found 
+
+BANE
+- `filter_image` will now return maps and saving to a file is optional
+
+SR6
+- automatically determine a default reduction factor
 
 v 2.1.0
 =======
