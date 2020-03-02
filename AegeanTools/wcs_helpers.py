@@ -200,10 +200,9 @@ class WCSHelper(object):
             The (ra,dec) sky coordinates in degrees
 
         """
-        return self.wcs.wcs_pix2world([pixel], 1)[0]
-        # x, y = pixel
-        ## wcs and pyfits have oposite ideas of x/y
-        # return self.wcs.wcs_pix2world([[y, x]], 1)[0]
+        x, y = pixel
+        # wcs and python have opposite ideas of x/y
+        return self.wcs.all_pix2world([[y, x]], 1, ra_dec_order=True)[0]
 
     def sky2pix(self, pos):
         """
@@ -220,10 +219,9 @@ class WCSHelper(object):
             The (x,y) pixel coordinates
 
         """
-        return self.wcs.wcs_world2pix([pos], 1)[0]
-        #pixel = self.wcs.wcs_world2pix([pos], 1)
-        ## wcs and pyfits have oposite ideas of x/y
-        #return [pixel[0][1], pixel[0][0]]
+        pixel = self.wcs.all_world2pix([pos], 1, ra_dec_order=True)
+        # wcs and python have opposite ideas of x/y
+        return [pixel[0][1], pixel[0][0]]
 
     def sky2pix_vec(self, pos, r, pa):
         """
