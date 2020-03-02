@@ -15,7 +15,6 @@ import astropy
 import logging
 import logging.config
 import argparse
-#from optparse import OptionParser
 
 # need Region in the name space in order to be able to unpickle it
 try:
@@ -170,8 +169,6 @@ if __name__ == "__main__":
     group6.add_argument('--cite', dest='cite', action="store_true", default=False,
                         help='Show citation information.')
 
-
-#    (options, args) = parser.parse_args()
     options = parser.parse_args()
 
     # print help if the user enters no options or filename
