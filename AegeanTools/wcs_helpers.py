@@ -93,7 +93,7 @@ class WCSHelper(object):
         self._psf_theta = None
 
         if self.psf_file is None:
-            ra, dec = self.pix2sky(self.refpix)
+            ra, dec = self.pix2sky([self.refpix[1], self.refpix[0]])
             pos = [ra, dec]
             _, _, self._psf_a, self._psf_b, self._psf_theta = self.sky2pix_ellipse(pos,
                                                                                    self.beam.a,
