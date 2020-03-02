@@ -1856,6 +1856,8 @@ class SourceFinder(object):
         islands = find_islands(im=data, bkg=np.zeros_like(data), rms=rmsimg,
                                seed_clip=innerclip, flood_clip=outerclip,
                                log=self.log)
+        self.log.info("Found {0} islands".format(len(islands)))
+        self.log.info("Begin fitting")
         #for i, xmin, xmax, ymin, ymax in self._gen_flood_wrap(data, rmsimg, innerclip, outerclip, domask=True):
         for island in islands:
             #i = island.mask
@@ -1903,6 +1905,7 @@ class SourceFinder(object):
                     if outfile:
                         print(str(src), file=outfile)
         self.sources.extend(sources)
+        self.log.info("Fit {0} sources".format(len(sources)))
         return sources
 
     def priorized_fit_islands(self, filename, catalogue, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1,
