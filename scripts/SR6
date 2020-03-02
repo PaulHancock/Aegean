@@ -69,7 +69,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if results.mode is not None:
-        logging.warn("option -i MODE is deprecated. Interpolation is always linear.")
+        logging.warning("option -i MODE is deprecated. Interpolation is always linear.")
 
     if results.expand:
         if results.maskfile and os.path.exists(results.maskfile):

@@ -239,7 +239,7 @@ class IslandSource(SimpleSource):
         return self.__gt__(other) or self.__eq__(other)
 
 
-class OutputSource(SimpleSource):
+class ComponentSource(SimpleSource):
     """
     A Gaussian component, aka a source, that was measured by Aegean.
 
@@ -426,7 +426,7 @@ class GlobalFittingData(object):
     hdu_header : HDUHeader
         FITS header for the input image.
 
-    beam : :class:`AegeanTools.fits_image.Beam`
+    beam : :class:`AegeanTools.wcs_helpers.Beam`
         The synthesized beam of the input image.
 
     data_pix : 2d-array
@@ -440,9 +440,6 @@ class GlobalFittingData(object):
 
     wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
         A helper object for WCS operations, created from `hdu_header`.
-
-    psfhelper : :class:`AegeanTools.wcs_helpers.PSFHelper`
-        A helper objects for tracking the changes in PSF over the image.
 
     blank : bool
         If true, then the input image will be blanked at the location of each of
@@ -482,9 +479,9 @@ class PixelIsland(object):
         A mask that represents the island within the bounding box.
     """
 
-    def __init__(self):
-        self.dim = 2
-        self.bounding_box = [None] * self.dim
+    def __init__(self, dim=2):
+        self.dim = dim
+        self.bounding_box = np.zeros((self.dim,2), dtype=np.int32)
         self.mask = None
         self.partial = False
         return
@@ -494,7 +491,7 @@ class PixelIsland(object):
 
         Parameters
         ----------
-        data : np.array(dtype=bool)
+        data : np.array
         """
         if len(data.shape) != self.dim:
             raise AssertionError("mask shape {0} is of the wrong dimension. Expecting {1}".format(data.shape, self.dim))
@@ -515,8 +512,17 @@ class PixelIsland(object):
         """
         if len(offsets)!=self.dim:
             raise AssertionError("{0} offsets were passed but {1} are required".format(len(offsets),self.dim))
-        self.set_mask(data)
-        # self.bounding_box = ?
+        # TODO: Figure out 3d boxes
+        # set the bounding box one dimension at a time
+        ndrow = np.any(data, axis=0)
+        rmin, rmax = np.where(ndrow)[0][[0, -1]]
+        self.bounding_box[1][0] = offsets[1] + rmin
+        self.bounding_box[1][1] = offsets[1] + rmax + 1
+        ndcol = np.any(data, axis=1)
+        cmin, cmax = np.where(ndcol)[0][[0, -1]]
+        self.bounding_box[0][0] = offsets[0] + cmin
+        self.bounding_box[0][1] = offsets[0] + cmax + 1
+        self.set_mask(data[rmin:rmax+1, cmin:cmax+1])
         return
 
 
@@ -577,13 +583,13 @@ def classify_catalog(catalog):
     Parameters
     ----------
     catalog : iterable
-        A list or iterable object of {SimpleSource, IslandSource, OutputSource} objects, possibly mixed.
+        A list or iterable object of {SimpleSource, IslandSource, ComponentSource} objects, possibly mixed.
         Any other objects will be silently ignored.
 
     Returns
     -------
     components : list
-        List of sources of type OutputSource
+        List of sources of type ComponentSource
 
     islands : list
         List of sources of type IslandSource
@@ -595,7 +601,7 @@ def classify_catalog(catalog):
     islands = []
     simples = []
     for source in catalog:
-        if isinstance(source, OutputSource):
+        if isinstance(source, ComponentSource):
             components.append(source)
         elif isinstance(source, IslandSource):
             islands.append(source)
@@ -612,7 +618,7 @@ def island_itergen(catalog):
     Parameters
     ----------
     catalog : iterable
-        A list or iterable of :class:`AegeanTools.models.OutputSource` objects.
+        A list or iterable of :class:`AegeanTools.models.ComponentSource` objects.
 
     Yields
     ------
