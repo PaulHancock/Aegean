@@ -118,6 +118,40 @@ def test_ellipse_round_trip():
         if not (abs(pa-pa_f) < 1): raise AssertionError()
 
 
+def test_psf_funcs():
+    """
+    For a SIN projected image, test that the beam/psf calculations are consistent at different points on the sky
+    """
+    fname = 'tests/test_files/1904-66_SIN.fits'
+    helper = WCSHelper.from_file(fname)
+    header = helper.wcs.to_header()
+
+    refpix = header['CRPIX2'], header['CRPIX1']  # note x/y swap
+    refcoord = header['CRVAL1'], header['CRVAL2']
+    beam_ref_coord = helper.get_skybeam(*refcoord)
+    beam_ref_pix = helper.get_skybeam(*helper.pix2sky(refpix))
+
+    msg = 'sky beams at ref coord/pix disagree'
+    if not abs(beam_ref_coord.a - beam_ref_pix.a) < 1e-5:
+        raise AssertionError(msg)
+    if not abs(beam_ref_coord.b - beam_ref_pix.b) < 1e-5:
+        raise AssertionError(msg)
+    if not abs(beam_ref_coord.pa - beam_ref_pix.pa) < 1e-5:
+        raise AssertionError(msg)
+
+    psf_zero = helper.get_psf_sky2pix(0,0)
+    psf_refcoord = helper.get_psf_sky2pix(*refcoord)
+
+    diff = np.subtract(psf_zero, psf_refcoord)
+    if not np.all(diff < 1e-5):
+        raise AssertionError("psf varies in pixel coordinates (it should not)")
+
+    diff = np.subtract(psf_refcoord, (helper._psf_a, helper._psf_b, helper._psf_theta))
+    if not np.all(diff < 1e-5):
+        raise AssertionError("psf varies in pixel coordinates (it should not)")
+    return
+
+
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
