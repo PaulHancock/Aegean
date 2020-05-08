@@ -479,7 +479,10 @@ class WCSHelper(object):
                 return None
             return Beam(psf[0], psf[1], psf[2])
 
-        return Beam(*self.get_psf_sky2sky(ra, dec))
+        a, b, pa = self.get_psf_sky2sky(ra, dec)
+        if not np.all(np.isfinite((a, b, pa))):
+            return None
+        return Beam(a, b, pa)
 
     def get_beamarea_deg2(self, ra, dec):
         """
