@@ -483,6 +483,8 @@ def writeFITSTable(filename, table):
         # Cause error columns to always be floats even when they are set to -1
         if name.startswith('err_'):
             fmt = 'E'
+        elif name == 'uuid':
+            fmt = '{0}A'.format(max(len(val) for val in table[name]))
         else:
             fmt = FITSTableType(table[name][0])
         cols.append(fits.Column(name=name, format=fmt, array=table[name]))

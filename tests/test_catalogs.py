@@ -184,6 +184,28 @@ def dont_test_load_save_fits_tables():
     # assert len(catin) == 2
 
 
+def test_write_fits_table_variable_uuid_lengths():
+    """Test that the length of the UUID column is appropriate"""
+    catalog = []
+    for l in range(10):
+        c = ComponentSource()
+        c.ra_str=c.dec_str="hello!"
+        c.uuid = 'source-{0:d}'.format(2**l)
+        catalog.append(c)
+    cat.save_catalog('a.fits', catalog, meta={'Purpose':'Testing'})
+    if not os.path.exists('a_comp.fits'):
+        raise AssertionError()
+
+    rcat = cat.load_table('a_comp.fits')
+    for src1,src2 in zip(rcat, catalog):
+        if len(src1['uuid']) != len(src2.uuid):
+            print("len mismatch for source {0}".format(src1))
+            print("uuid should be len={0}".format(len(src2.uuid)))
+            raise AssertionError("UUID col is of wrong length")
+    os.remove('a_comp.fits')
+    return
+
+
 def test_write_contours_boxes():
     """Test that we can write contour boxes for our island sources"""
     data = np.zeros((5, 5))
