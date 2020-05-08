@@ -171,12 +171,16 @@ if __name__ == "__main__":
 
     options = parser.parse_args()
 
+    invocation_string = " ".join(sys.argv[:])
+
     # configure logging
     logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
     logging_level = logging.DEBUG if options.debug else logging.INFO
     log.setLevel(logging_level)
     log.info("This is Aegean {0}-({1})".format(__version__, __date__))
+
+    log.debug("Run as:\n{0}".format(invocation_string))
 
     # deprecation warnings
     if options.telescope is not None:
@@ -395,7 +399,8 @@ if __name__ == "__main__":
     if len(sources) > 0 and options.tables:
         meta = {"PROGRAM": "Aegean",
                 "PROGVER": "{0}-({1})".format(__version__, __date__),
-                "FITSFILE": filename}
+                "FITSFILE": filename,
+                "RUN-AS": invocation_string}
         for t in options.tables.split(','):
-            save_catalog(t, sources, prefix=options.column_prefix)
+            save_catalog(t, sources, prefix=options.column_prefix, meta=meta)
     sys.exit()
