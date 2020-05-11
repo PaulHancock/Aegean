@@ -1,3 +1,12 @@
+v 2.2.1
+=======
+Aegean
+- Source finding metadata (stored in some output files) includes invocation string
+- Fixed a bug in get_sky-beam that occurred when either the input or output contained nan
+- Fixed a bug where `seed_clip` was used instead of `flood_clip` in the calculation of islands for fitting
+- Fixed a bug that could occur in proirised fitting when users created UUID strings of variable length
+
+
 v 2.2.0
 =======
 Aegean
