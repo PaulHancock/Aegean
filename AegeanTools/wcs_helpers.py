@@ -188,6 +188,7 @@ class WCSHelper(object):
     def pix2sky(self, pixel):
         """
         Convert pixel coordinates into sky coordinates.
+        Computed on the image wcs.
 
         Parameters
         ----------
@@ -207,6 +208,7 @@ class WCSHelper(object):
     def sky2pix(self, pos):
         """
         Convert sky coordinates into pixel coordinates.
+        Computed on the image wcs.
 
         Parameters
         ----------
@@ -222,6 +224,28 @@ class WCSHelper(object):
         pixel = self.wcs.all_world2pix([pos], 1, ra_dec_order=True)
         # wcs and python have opposite ideas of x/y
         return [pixel[0][1], pixel[0][0]]
+
+    def psf_sky2pix(self, pos):
+        """
+        Convert sky coordinates into pixel coordinates.
+        Computed on the psf wcs.
+
+        Parameters
+        ----------
+        pos : (float, float)
+            The (ra, dec) sky coordinates (degrees)
+
+        Returns
+        -------
+        pixel : (float, float)
+            The (x,y) pixel coordinates
+
+        """
+        # wcs and python have opposite ideas of x/y
+        if self.psf_wcs is not None:
+            pixel = self.psf_wcs.all_world2pix([pos], 1, ra_dec_order=True)
+            return [pixel[0][1], pixel[0][0]]
+        return None
 
     def sky2pix_vec(self, pos, r, pa):
         """
@@ -392,19 +416,20 @@ class WCSHelper(object):
             If a psf is defined then it is the psf that is returned, otherwise the image
             restoring beam is returned.
         """
-        x, y = self.sky2pix((ra, dec))
 
         # If we don't have a psf map then we just fall back to using the beam
         # from the fits header, but convert pix->sky
         if self.psf_file is None:
+            x, y = self.sky2pix((ra, dec))
             _, _, a, b, pa = self.pix2sky_ellipse((x, y), self._psf_a, self._psf_b, self._psf_theta)
             return a, b, pa
 
         # We leave the interpolation in the hands of whoever is making these images
         # clamping the x,y coords at the image boundaries just makes sense
+        x, y = self.psf_sky2pix((ra, dec))
         x = int(np.clip(x, 0, self.psf_map.shape[1] - 1))
         y = int(np.clip(y, 0, self.psf_map.shape[2] - 1))
-        psf_sky = self._psf_map[:, x, y]
+        psf_sky = self.psf_map[:3, x, y]
         return psf_sky
 
     def get_psf_sky2pix(self, ra, dec):
