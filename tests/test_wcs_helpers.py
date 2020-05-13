@@ -63,11 +63,18 @@ def test_get_pixbeam():
     area = helper.get_beamarea_deg2(285, -66)
     if not (area >0): raise AssertionError()
 
-    # beam = helper.get_pixbeam(285, -66)
-    # verify_beam(beam)
-    #
-    # beam = helper.get_pixbeam(None, None)
-    # verify_beam(beam)
+
+def test_psf_files():
+    """Test that using external psf files works properly"""
+
+    fname = 'tests/test_files/1904-66_SIN.fits'
+    psfname = 'tests/test_files/1904-66_SIN_psf.fits'
+    helper = WCSHelper.from_file(fname, psf_file=psfname)
+
+    # The psf image has only 19x19 pix and this ra/dec is
+    a, b, pa = helper.get_psf_sky2sky(290., -63.)
+    if not np.all(np.isfinite((a, b, pa))):
+        raise AssertionError("Beam contains nans")
 
 
 def test_sky_sep():
