@@ -1666,10 +1666,11 @@ class SourceFinder(object):
         rms = rmsimg[xmin:xmax, ymin:ymax]
 
         is_flag = 0
-        pixbeam = Beam(*global_data.psfhelper.get_psf_pix2pix((xmin + xmax) / 2., (ymin + ymax) / 2.))
-        if pixbeam is None:
-            # This island is not 'on' the sky, ignore it
+        a, b, pa = global_data.psfhelper.get_psf_pix2pix((xmin + xmax) / 2., (ymin + ymax) / 2.)
+        if not np.all(np.isfinite((a, b, pa))):
+            # This island has no psf or is not 'on' the sky, ignore it
             return []
+        pixbeam = Beam(a, b, pa)
 
         self.log.debug("=====")
         self.log.debug("Island ({0})".format(isle_num))
