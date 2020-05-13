@@ -2062,8 +2062,13 @@ class SourceFinder(object):
                 imbeam = global_data.psfhelper.get_skybeam(src.ra, src.dec)
                 # If either of the above are None then we skip this source.
                 if catbeam is None or imbeam is None:
+                    unknown = []
+                    if catbeam is None:
+                        unknown.append("input catalogue")
+                    if imbeam is None:
+                        unknown.append("image")
                     src_mask[i] = False
-                    self.log.info("Excluding source ({0.island},{0.source}) due to lack of psf knowledge".format(src))
+                    self.log.info("Excluding source ({0.island},{0.source}) due to lack of psf knowledge in {1}".format(src, ','.join(unknown)))
                     continue
 
                 # TODO: The following assumes that the various psf's are scaled versions of each other
