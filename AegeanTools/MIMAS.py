@@ -17,6 +17,7 @@ from astropy.coordinates import Angle, SkyCoord
 import astropy.units as u
 from astropy.io import fits as pyfits
 from astropy.wcs import wcs as pywcs
+import healpy as hp
 from .regions import Region
 from .catalogs import load_table, write_table
 
@@ -303,6 +304,45 @@ def mim2fits(mimfile, fitsfile):
     logging.info("Converted {0} -> {1}".format(mimfile, fitsfile))
     return
 
+
+def mask2mim(maskfile, mimfile, threshold=1.0, maxdepth=8):
+    """
+    Use a fits file as a mask to create a region file.
+
+    Pixels in mask file that are equal or above the threshold will be included in the reigon,
+    while those that are below the threshold will not.
+
+    Parameters
+    ----------
+    maskfile : str
+        Input file in fits format.
+
+    mimfile : str
+        Output filename
+
+    threshold : float
+        threshold value for separating include/exclude values
+
+    maxdepth : int
+        Maximum depth (resolution) of the healpix pixels
+
+    """
+    hdu = pyfits.open(maskfile)
+    wcs = pywcs.WCS(hdu[0].header)
+
+    x, y = np.where(hdu[0].data >= threshold)
+    ra, dec = wcs.all_pix2world(y, x, 0)
+    sky = np.radians(Region.radec2sky(ra, dec))
+    vec = Region.sky2vec(sky)
+    x, y, z = np.transpose(vec)
+    pix = hp.vec2pix(2**maxdepth, x, y, z, nest=True)
+
+    region = Region(maxdepth=maxdepth)
+    region.add_pixels(pix, depth=maxdepth)
+    region._renorm()
+    save_region(region, mimfile)
+    logging.info("Converted {0} -> {1}".format(maskfile, mimfile))
+    return
 
 def box2poly(line):
     """
