@@ -344,6 +344,7 @@ def mask2mim(maskfile, mimfile, threshold=1.0, maxdepth=8):
     logging.info("Converted {0} -> {1}".format(maskfile, mimfile))
     return
 
+
 def box2poly(line):
     """
     Convert a string that describes a box in ds9 format, into a polygon that is given by the corners of the box
