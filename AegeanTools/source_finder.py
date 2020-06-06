@@ -280,10 +280,11 @@ def estimate_parinfo_image(islands,
                 log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
 
             # TODO: double check the yo/xo that seem reversed
-            pixbeam = Beam(*wcshelper.get_psf_pix2pix(yo + cmin, xo + rmin))
-            if pixbeam is None:
+            a, b, pa = wcshelper.get_psf_pix2pix(yo + cmin, xo + rmin)
+            if not (np.all(np.isfinite((a, b, pa)))):
                 log.debug(" Summit has invalid WCS/Beam - Skipping.")
                 continue
+            pixbeam = Beam(a, b, pa)
 
             # set a square limit based on the size of the pixbeam
             xo_lim = 0.5 * np.hypot(pixbeam.a, pixbeam.b)
@@ -737,10 +738,11 @@ class SourceFinder(object):
             if debug_on:
                 self.log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
 
-            pixbeam = Beam(*global_data.psfhelper.get_psf_pix2pix(yo + offsets[0], xo + offsets[1]))
-            if pixbeam is None:
+            a, b, pa = global_data.psfhelper.get_psf_pix2pix(yo + offsets[0], xo + offsets[1])
+            if not(np.all(np.isfinite((a, b, pa)))):
                 self.log.debug(" Summit has invalid WCS/Beam - Skipping.")
                 continue
+            pixbeam = Beam(a, b, pa)
 
             # set a square limit based on the size of the pixbeam
             xo_lim = 0.5 * np.hypot(pixbeam.a, pixbeam.b)
@@ -1666,10 +1668,11 @@ class SourceFinder(object):
         rms = rmsimg[xmin:xmax, ymin:ymax]
 
         is_flag = 0
-        pixbeam = Beam(*global_data.psfhelper.get_psf_pix2pix((xmin + xmax) / 2., (ymin + ymax) / 2.))
-        if pixbeam is None:
-            # This island is not 'on' the sky, ignore it
+        a, b, pa = global_data.psfhelper.get_psf_pix2pix((xmin + xmax) / 2., (ymin + ymax) / 2.)
+        if not (np.all(np.isfinite((a, b, pa)))):
+            self.log.debug("Island has invalid WCS/Beam - Skipping.")
             return []
+        pixbeam = Beam(a, b, pa)
 
         self.log.debug("=====")
         self.log.debug("Island ({0})".format(isle_num))
