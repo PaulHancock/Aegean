@@ -5,6 +5,7 @@ Test source_finder.py
 
 __author__ = 'Paul Hancock'
 
+from astropy.io import fits
 from AegeanTools import source_finder as sf
 from AegeanTools.wcs_helpers import Beam, WCSHelper
 from AegeanTools import models, flags
@@ -16,6 +17,33 @@ import os
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
 log.setLevel(logging.INFO)
+
+
+def test_psf_with_nans():
+    """Test that a psf map with nans doesn't create a crash"""
+    log = logging.getLogger("Aegean")
+    sfinder = sf.SourceFinder(log=log)
+    filename = "tests/test_files/synthetic_test.fits"
+    psf = "tests/test_files/synthetic_test_psf.fits"
+    # create a test psf map with all major axis being nans
+    hdu = fits.open(psf)
+    print(hdu[0].data.shape)
+    hdu[0].data[0,:,:] = np.nan
+    hdu.writeto('dlme_psf.fits')
+
+    try:
+        found = sfinder.find_sources_in_image(filename,
+                                             cores=1, rms=0.5, bkg=0,
+                                             imgpsf='dlme_psf.fits')
+    except AssertionError as e:
+        os.remove('dlme_psf.fits')
+        if 'major' in e.args[0]:
+            raise AssertionError("Broken on psf maps with nans")
+        else:
+            raise
+
+    return
+
 
 
 def test_misc():
@@ -322,10 +350,10 @@ def test_estimate_parinfo_image():
 
 
 if __name__ == "__main__":
-    #test_find_islands()
+    test_psf_with_nans()
     #test_estimate_parinfo_image()
-    #import sys
-    #sys.exit()
+    import sys
+    sys.exit()
     # introspect and run all the functions starting with 'test'
     for f in  dir(): #['test_find_islands', 'test_estimate_parinfo_image', 'test_find_and_prior_sources']:
         if f.startswith('test'):
