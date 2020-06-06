@@ -62,6 +62,9 @@ if __name__ == "__main__":
     group2.add_argument('--mim2fits', dest='mim2fits', action='append',
                         type=str, metavar=('region.mim', 'region_MOC.fits'), nargs=2,
                         help="Convert a .mim file into a MOC.fits file", default=[])
+    group2.add_argument('--mask2mim', dest='mask2mim', action='store',
+                        type=str, metavar=('mask.fits', 'region.mim'), nargs=2,
+                        help="Convert a masked image into a region file", default=[])
     group2.add_argument('--intersect', '+i', dest='intersect', action='append', type=str, default=[],
                         metavar=('region.mim',), help="Write out the intersection of the given regions.")
     group2.add_argument('--area', dest='area', action='store', default=None,
@@ -86,6 +89,8 @@ if __name__ == "__main__":
 
     group4 = parser.add_argument_group('Extra options')
     # extras
+    group4.add_argument('--threshold', dest='threshold', type=float, default=1.0,
+                        help='Threshold value for input mask file.')
     group4.add_argument('--fitsimage', dest='mim2img', action='store_true',
                         default=False, help='Save the region as a fits image')
     group4.add_argument('--debug', dest='debug', action='store_true', help='debug mode [default=False]', default=False)
@@ -155,6 +160,14 @@ if __name__ == "__main__":
         m, i, o = results.mask_cat
         racol, deccol = results.radec_colnames
         MIMAS.mask_catalog(m, i, o, results.negate, racol, deccol)
+        sys.exit()
+
+    if len(results.mask2mim) > 0:
+        maskfile, mimfile = results.mask2mim
+        MIMAS.mask2mim(maskfile=maskfile,
+                       mimfile=mimfile,
+                       threshold=results.threshold,
+                       maxdepth=results.maxdepth)
         sys.exit()
 
     if results.mim2img:
