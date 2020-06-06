@@ -41,7 +41,8 @@ def test_psf_with_nans():
             raise AssertionError("Broken on psf maps with nans")
         else:
             raise
-
+    else:
+        os.remove('dlme_psf.fits')
     return
 
 
