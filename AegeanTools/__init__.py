@@ -10,8 +10,8 @@ generally.
 
 """
 __author__ = 'Paul Hancock'
-__version__ = '2.2.1'
-__date__ = '2020-05-13'
+__version__ = '2.2.2'
+__date__ = '2020-06-06'
 __citation__ = """
 % If your work makes use of AegeanTools please cite the following papers as appropriate:
 
