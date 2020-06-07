@@ -1008,8 +1008,8 @@ class SourceFinder(object):
             area = height * width
             source.area = area * source.pixels / source.x_width / source.y_width  # area is in deg^2
 
-            # create contours
-            msq = MarchingSquares(idata)
+            # create contours around the data which was used in fitting
+            msq = MarchingSquares(kappa_sigma)
             source.contour = [(a[0] + xmin, a[1] + ymin) for a in msq.perimeter]
             # calculate the maximum angular size of this island, brute force method
             source.max_angular_size = 0
