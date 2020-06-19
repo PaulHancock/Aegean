@@ -8,6 +8,8 @@ MIMAS
 - added new functionality, `--mask2mim`, which will convert a fits file into a region file.
   - new option `--threshold` will determine which pixels in the input image are in/out of the mask. Default is 1.
 
+BANE
+- fix a bug that would cause a crash if BSCALE was present and not 1.0
 
 v 2.2.1
 =======

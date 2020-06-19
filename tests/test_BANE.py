@@ -110,6 +110,31 @@ def test_quantitative():
     return
 
 
+def test_BSCALE():
+    """Test that BSCALE present and not 1.0 is handled properly"""
+    fbase = 'tests/test_files/1904-66_SIN'
+    outbase = 'dlme'
+    hdu = fits.open(fbase+'.fits')
+    hdu[0].header['BSCALE'] = 1.0
+    hdu.writeto('dlme.fits')
+    try:
+        BANE.filter_image(outbase+'.fits', out_base=outbase, cores=1, nslice=1)
+    except ValueError as e:
+        raise AssertionError("BSCALE=1.0 causes crash")
+    finally:
+        os.remove('dlme.fits')
+
+    hdu[0].header['BSCALE'] = 2.0
+    hdu.writeto('dlme.fits')
+    try:
+        BANE.filter_image(outbase+'.fits', out_base=outbase, cores=1, nslice=1)
+    except ValueError as e:
+        raise AssertionError("BSCALE=2.0 causes crash")
+    finally:
+        os.remove('dlme.fits')
+    return
+
+
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
