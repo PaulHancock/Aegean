@@ -10,14 +10,16 @@ import numpy as np
 from scipy.ndimage import gaussian_filter
 from astropy.wcs import WCS
 from astropy.io import fits
+from copy import deepcopy
 import logging
 
-imsize = (256, 512) # non square picks up more errors
-noise = 0.5 # non unity noise picks up more errors
-psf = [30, 30, 0] # psf in arcsec,arcsec,degrees
+imsize = (256, 512)  # non square picks up more errors
+noise = 0.5  # non unity noise picks up more errors
+psf = [30, 30, 0]  # psf in arcsec,arcsec,degrees
 pix_per_beam = 3.5
 seed = 123987554
-ra,dec = (30, -15)
+ra, dec = (30, -15)
+
 
 def make_noise_image():
     """
@@ -49,10 +51,22 @@ def make_noise_image():
     return image, wcs
 
 
-def make_psf_map():
+def make_psf_map(base):
     """
     Create a small psf map for use in testing.
     """
+
+    psf_data = np.ones((3, imsize[0], imsize[1]))
+    psf_data *= np.array(psf)[:, None, None]/3600.  # acrsec -> degrees
+    # create a few 'holes' in the map
+    psf_data[:, 56, 34] = np.nan
+
+    # blank one edge of the map
+    psf_data[:, :, 0] = np.nan
+    hdu = deepcopy(base)
+    hdu[0].data = psf_data
+    hdu[0].header['CTYPE3'] = ('Beam', '0=a,1=b,2=pa (degrees)')
+    return hdu
 
 
 def make_catalogue():
@@ -106,7 +120,7 @@ if __name__=="__main__":
     # configure logging
     logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
-    logging_level = logging.DEBUG # if options.debug else logging.INFO
+    logging_level = logging.DEBUG  # if options.debug else logging.INFO
     log.setLevel(logging_level)
 
     image, wcs = make_noise_image()
@@ -122,3 +136,6 @@ if __name__=="__main__":
     hdu[0].data += AeRes.make_model(cat, image.shape, wcshelper)
 
     hdu.writeto('synthetic_test.fits', overwrite=True)
+
+    psf_hdu = make_psf_map(hdu)
+    psf_hdu.writeto('synthetic_test_psf.fits', overwrite=True)

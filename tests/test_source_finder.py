@@ -5,9 +5,11 @@ Test source_finder.py
 
 __author__ = 'Paul Hancock'
 
+from astropy.io import fits
 from AegeanTools import source_finder as sf
 from AegeanTools.wcs_helpers import Beam, WCSHelper
 from AegeanTools import models, flags
+from AegeanTools.models import classify_catalog
 from copy import deepcopy
 import numpy as np
 import logging
@@ -16,6 +18,33 @@ import os
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
 log.setLevel(logging.INFO)
+
+
+def test_psf_with_nans():
+    """Test that a psf map with nans doesn't create a crash"""
+    log = logging.getLogger("Aegean")
+    sfinder = sf.SourceFinder(log=log)
+    filename = "tests/test_files/synthetic_test.fits"
+    psf = "tests/test_files/synthetic_test_psf.fits"
+    # create a test psf map with all major axis being nans
+    hdu = fits.open(psf)
+    print(hdu[0].data.shape)
+    hdu[0].data[0,:,:] = np.nan
+    hdu.writeto('dlme_psf.fits')
+
+    try:
+        found = sfinder.find_sources_in_image(filename,
+                                             cores=1, rms=0.5, bkg=0,
+                                             imgpsf='dlme_psf.fits')
+    except AssertionError as e:
+        os.remove('dlme_psf.fits')
+        if 'major' in e.args[0]:
+            raise AssertionError("Broken on psf maps with nans")
+        else:
+            raise
+    else:
+        os.remove('dlme_psf.fits')
+    return
 
 
 def test_misc():
@@ -44,10 +73,6 @@ def test_helpers():
     if not (sf.theta_limit(0.) == 0.): raise AssertionError()
     if not (sf.theta_limit(np.pi) == 0.): raise AssertionError()
     if not (sf.theta_limit(-3*np.pi/2) == np.pi/2): raise AssertionError()
-    # scope2lat
-    if not (sf.scope2lat('MWA') == -26.703319): raise AssertionError()
-    if not (sf.scope2lat('mwa') == -26.703319): raise AssertionError()
-    if sf.scope2lat('MyFriendsTelescope') is not None: raise AssertionError()
     # get_aux
     if not (np.all(a is None for a in sf.get_aux_files('_$_fkjfjl'))): raise AssertionError()
     aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
@@ -85,7 +110,7 @@ def dont_test_load_globals():
 
     del sfinder
     sfinder = sf.SourceFinder(log=log)
-    sfinder.load_globals(filename, rmsin=aux_files['rms'], mask='derp', do_curve=False)
+    sfinder.load_globals(filename, rmsin=aux_files['rms'], do_curve=False, mask='derp')
     if sfinder.global_data.region is not None: raise AssertionError()
     img = sfinder._load_aux_image(sfinder.global_data.img, filename)
     if img is None: raise AssertionError()
@@ -157,6 +182,7 @@ def dont_test_find_and_prior_parallel():
 
     filename = 'tests/test_files/synthetic_test.fits'
     # vanilla source finding
+    log.info("basic fitting (no bkg/rms")
     sfinder = sf.SourceFinder(log=log)
     found = sfinder.find_sources_in_image(filename, cores=cores,
                                         bkg=0, rms=0.5)
@@ -165,14 +191,19 @@ def dont_test_find_and_prior_parallel():
     aux_files = sf.get_aux_files(filename)
 
     del sfinder
+    log.info("fitting with supplied bkg/rms and 2 cores")
+    cores=2
     sfinder = sf.SourceFinder(log=log)
     _ = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
                                            rmsin=aux_files['rms'], bkgin=aux_files['bkg'],
                                            mask=aux_files['mask'], cores=cores)
+
+    log.info('now priorised fitting')
     _ = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=True, cores=cores, outfile=open('dlme','w'))
     os.remove('dlme')
 
     del sfinder
+    log.info('fitting negative sources')
     sfinder = sf.SourceFinder(log=log)
     sfinder.find_sources_in_image('tests/test_files/1904-66_SIN_neg.fits', doislandflux=True, nonegative=False, cores=cores)
 
@@ -227,10 +258,33 @@ def test_esimate_lmfit_parinfo():
     return
 
 
+def test_island_contours():
+    """Test that island contours are correct"""
+    log = logging.getLogger("Aegean")
+    sfinder = sf.SourceFinder(log=log)
+    filename = 'tests/test_files/synthetic_test.fits'
+    nsrc = 98
+    nisl = 97
+    ntot = nsrc+nisl
+
+    # vanilla source finding
+    found = sfinder.find_sources_in_image(filename, cores=1, rms=0.5, bkg=0, doislandflux=True)
+
+    components, islands, simples = classify_catalog(found)
+    isle_0_contour = np.array([(41, 405), (41, 406), (41, 407), (42, 407), (42, 408), (42, 409), (43, 409), (43, 410),
+                       (44, 410), (45, 410), (46, 410), (47, 410), (47, 409), (48, 409), (48, 408), (49, 408),
+                       (49, 407), (49, 406), (49, 405), (48, 405), (48, 404), (48, 403), (47, 403), (46, 403),
+                       (45, 403), (44, 403), (43, 403), (43, 404), (42, 404), (42, 405)])
+    if not np.all(np.array(islands[0].contour) == isle_0_contour):
+        raise AssertionError("Island contour for island 0 is incoorect")
+    return
+
+
 # for 3.0 functionality
 
+
 def test_find_islands():
-    im = np.ones((10,10), dtype=np.float32)
+    im = np.ones((10,12), dtype=np.float32)
     bkg = np.zeros_like(im)
     rms = np.ones_like(im)
 
@@ -240,22 +294,23 @@ def test_find_islands():
         return AssertionError("Found islands where none existed")
 
     # now set just one island
-    im[3:6,3:6] *= 10
+    im[3:6,4:7] *= 10
     # and have some pixels masked or below the clipping threshold
-    im[5,5] = np.nan
+    im[6,5] = np.nan
     im[4,4] = 0
     # make the border nans
     im[0:3,:] = im[-1:,:] = np.nan
     im[:,0] = im[:,-1] = np.nan
 
     islands = sf.find_islands(im, bkg, rms, log=log)
+
     if len(islands) != 1:
         raise AssertionError("Incorrect number of islands found {0}, expecting 1".format(len(islands)))
     if not isinstance(islands[0], models.PixelIsland):
         raise AssertionError("Islands[0] is not a PixelIsland but instead a {0}".format(type(islands[0])))
 
-    correct_box = [[3, 6], [3, 6]]
-    if not np.all( islands[0].bounding_box == correct_box):
+    correct_box = [[3, 6], [4, 7]]
+    if not np.all(islands[0].bounding_box == correct_box):
         raise AssertionError("Bounding box incorrect, should be {0}, but is {1}".format(correct_box,islands[0].bounding_box))
 
     # add another island that is between the seed/flood thresholds
@@ -319,10 +374,9 @@ def test_estimate_parinfo_image():
 
 
 if __name__ == "__main__":
-    #test_find_islands()
-    #test_estimate_parinfo_image()
-    #import sys
-    #sys.exit()
+    test_island_contours()
+    import sys
+    sys.exit()
     # introspect and run all the functions starting with 'test'
     for f in  dir(): #['test_find_islands', 'test_estimate_parinfo_image', 'test_find_and_prior_sources']:
         if f.startswith('test'):
