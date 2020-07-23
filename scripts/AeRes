@@ -36,7 +36,7 @@ if __name__ == "__main__":
                       help="Instead of subtracting sources, just mask them")
     parser.add_option('--sigma', dest='sigma', default=4, type='float',
                       help='If masking, pixels above this SNR are masked (requires input catalogue to list rms)')
-    parser.add_option('--frac', dest='frac', default=None,
+    parser.add_option('--frac', dest='frac', default=0, type='float',
                       help='If masking, pixels above frac*peak_flux are masked for each source')
     parser.add_option('--debug', dest='debug', action='store_true', default=False,
                       help="Debug mode.")
@@ -59,6 +59,9 @@ if __name__ == "__main__":
         logging.error("output residual filename is required")
         parser.print_help()
         sys.exit(1)
+    # convert default value of 0 to be None.
+    if options.frac <= 0:
+        options.frac = None
 
     logging.info("Using {0} and {1} to make {2}".format(options.fitsfile, options.catalog, options.rfile))
     if options.mfile is not None:

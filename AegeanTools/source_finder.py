@@ -366,9 +366,37 @@ def estimate_parinfo_image(islands,
     return sources
 
 
+def fit_islands_parinfo(models,
+                        im, rms, wcshelper):
+    """
+    Turn a list of sources into a set of islands and parameter estimates which can then be
+    characterised.
+
+    Parameters
+    ----------
+    models : [:class:`lmfit.Parinfo`, ... ]
+        A list of sources in the catalogue.
+
+    im : np.ndarray
+        The image map
+
+    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
+        A wcs object valid for the image map
+
+    Returns
+    -------
+    islands : [AegeanTools.models.SimpleSource, ...]
+        a list of islands
+    """
+
+
+    islands = []
+    for m in models:
+        pass
+    return islands
+
 def priorized_islands_parinfo(sources,
-                              im, wcs,
-                              psf=None,
+                              im, wcshelper,
                               stage=3,
                               ):
     """
@@ -383,11 +411,8 @@ def priorized_islands_parinfo(sources,
     im : np.ndarray
         The image map
 
-    wcs : astropy.wcs.WCS
+    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
         A wcs object valid for the image map
-
-    psf : str or None
-        The filename for the psf map (optional)
 
     stage : int
         The priorized fitting stage which determines what parameters are fit/fixed. One of:
@@ -397,11 +422,8 @@ def priorized_islands_parinfo(sources,
 
     Returns
     -------
-    islands : [AegeanTools.island, ...]
-        a list of islands
-
-    sources : [lmfit.Parameters, ... ]
-        The initial estimate of parameters for the components within each island.
+    islands : [:class:`AegeanTools.models.ComponentSource`, ...]
+        a list of components
     """
 
 
@@ -1679,7 +1701,7 @@ class SourceFinder(object):
         self.log.debug("Island ({0})".format(isle_num))
         params = self.estimate_lmfit_parinfo(idata, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
                                              max_summits=max_summits)
-
+        # params = estimate_parinfo_image()
         # islands at the edge of a region of nans
         # result in no components
         if params is None or params['components'].value < 1:
