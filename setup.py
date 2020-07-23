@@ -24,16 +24,17 @@ def get_version():
 
 
 reqs = ['scipy>=0.16',
-        'healpy >=1.10',
         'six>=1.11']
 
 if sys.version_info < (3,0):
     reqs.append('numpy>=1.16,<1.17')
     reqs.append('astropy>=2.0, <3')
+    reqs.append('healpy >=1.10, <=1.13')
     reqs.append('lmfit>=0.9.2, <1')
 else:
     reqs.append('numpy>=1.16')
     reqs.append('astropy>=2.0')
+    reqs.append('healpy >=1.10')
     reqs.append('lmfit>=0.9.2')
 
 data_dir = 'AegeanTools/data'
