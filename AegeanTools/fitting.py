@@ -871,16 +871,15 @@ def condon_errors(source, theta_n, psf=None):
     if psf is not None:
         beam = psf.get_beam(source.ra, source.dec)
         if beam is not None:
-            theta_n = np.hypot(beam.a, beam.b)
-            print(beam, theta_n)
+            theta_n = np.sqrt(beam.a * beam.b)
 
     if theta_n is None:
         source.err_a = source.err_b = source.err_peak_flux = source.err_pa = source.err_int_flux = 0.0
         return
 
     smoothing = major * minor / (theta_n ** 2)
-    factor1 = (1 + (major / theta_n))
-    factor2 = (1 + (minor / theta_n))
+    factor1 = (1 + (theta_n/ major)**2)
+    factor2 = (1 + (theta_n/ minor)**2)
     snr = source.peak_flux / source.local_rms
     # calculation of rho2 depends on the parameter being used so we lambda this into a function
     rho2 = lambda x: smoothing / 4 * factor1 ** alphas[x][0] * factor2 ** alphas[x][1] * snr ** 2
