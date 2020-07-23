@@ -11,6 +11,8 @@ MIMAS
 BANE
 - fix a bug that would cause a crash if BSCALE was present and not 1.0
 
+AeRes
+- fix a bug that caused a crash when the option `--frac` was used.
 v 2.2.1
 =======
 Aegean
