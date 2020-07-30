@@ -31,6 +31,15 @@ def load_sources(filename):
         A list of source components
     """
     table = catalogs.load_table(filename)
+    required_cols = ['ra','dec','peak_flux','a','b','pa']
+    good = True
+    for c in required_cols:
+        if c not in table.colnames:
+            logging.error("Column {0} not found".format(c))
+            good = False
+    if not good:
+        logging.error("Some required columns missing")
+        return None
     catalog = catalogs.table_to_source_list(table)
     logging.info("read {0} sources from {1}".format(len(catalog), filename))
     return catalog
@@ -112,9 +121,9 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
             logging.debug(" flux, sx, sy: {0} {1} {2}".format(src.peak_flux, sx, sy))
 
         # positions for which we want to make the model
-        x, y = np.mgrid[xmin:xmax, ymin:ymax]
-        x = list(map(int, x.ravel()))
-        y = list(map(int, y.ravel()))
+        x, y = np.mgrid[int(xmin):int(xmax), int(ymin):int(ymax)]
+        x = x.ravel()
+        y = y.ravel()
 
         # TODO: understand why xo/yo -1 is needed
         model = fitting.elliptical_gaussian(x, y, src.peak_flux, xo-1, yo-1, sx*FWHM2CC, sy*FWHM2CC, theta)
@@ -125,9 +134,12 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
                 indices = np.where(model >= (frac*src.peak_flux))
             else:
                 indices = np.where(model >= (sigma*src.local_rms))
-            model[indices] = np.nan
-
-        m[x, y] += model
+            # somehow m[x,y][indices] = np.nan doesn't assign any values
+            # so we have to do the more complicated
+            # m[x[indices],y[indices]] = np.nan
+            m[x[indices], y[indices]]= np.nan
+        else:
+            m[x, y] += model
         i_count += 1
     logging.info("modeled {0} sources".format(i_count))
     return m
@@ -169,6 +181,8 @@ def make_residual(fitsfile, catalog, rfile, mfile=None, add=False, mask=False, f
     None
     """
     source_list = load_sources(catalog)
+    if source_list is None:
+        return None
     # force two axes so that we dump redundant stokes/freq axes if they are present.
     hdulist = fits.open(fitsfile, naxis=2)
     # ignore dimensions of length 1
