@@ -387,7 +387,7 @@ if __name__ == "__main__":
         # theta_N is the FWHM of the smoothing kernel (the noise correlation)
         # which in this case is the same as the synthesized beam FWHM
         if options.beam:
-            theta_n = np.hypot(options.beam[0], options.beam[1])
+            theta_n = np.sqrt(options.beam.a * options.beam.b)
             psf = None
         else:
             psf = sf.global_data.psfhelper

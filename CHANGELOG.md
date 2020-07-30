@@ -3,6 +3,7 @@ v 2.2.2
 Aegean
 - Fixed a bug that could cause a crash if the psf map had nan values
 - Fixed a bug that caused island contours to just be boxes.
+- Fixed an error in the calculation of condon errors.
 
 MIMAS
 - added new functionality, `--mask2mim`, which will convert a fits file into a region file.
