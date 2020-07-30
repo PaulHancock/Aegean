@@ -11,8 +11,8 @@ from optparse import OptionParser
 import sys
 
 __author__ = 'Paul Hancock'
-__version__ = 'v0.2.6'
-__date__ = '2020-07-23'
+__version__ = 'v0.2.7'
+__date__ = '2020-07-30'
 
 
 # global constants
