@@ -135,15 +135,38 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
 
 def make_residual(fitsfile, catalog, rfile, mfile=None, add=False, mask=False, frac=None, sigma=4):
     """
+    Take an input image and catalogue, make a model of the catalogue, and then add/subtract or mask the input image.
+    Saving the residual and (optionally) model files.
 
-    @param fitsfile: Input fits image filename
-    @param catalog: Input catalog filename of a type supported by Aegean
-    @param rfile: Residual image filename
-    @param mfile: model image filename
-    @param add: add the model instead of subtracting it
-    @param mask: If true then mask pixels instead of subtracting the sources
-    @param frac: pixels that are brighter than frac*peak_flux for each source will be masked if mask=True
-    @return:
+    Parameters
+    ----------
+    fitsfile : str
+        Input fits image filename
+
+    catalog : str
+        Input catalog filename of a type supported by Aegean
+
+    rfile : str
+        Filename to write residual image
+
+    mfile : str
+        Filename to write model image. Default=None means don't write the model file.
+
+    add : bool
+        If True add the model instead of subtracting it
+
+    mask : bool
+        If true then mask pixels instead of adding or subtracting the sources
+
+    frac : float
+        pixels that are brighter than frac*peak_flux for each source will be masked if mask=True
+
+    sigma : float
+        pixels that are brighter than sigma*local_rms for each source will be masked if mask=True
+
+    Return
+    ------
+    None
     """
     source_list = load_sources(catalog)
     # force two axes so that we dump redundant stokes/freq axes if they are present.
