@@ -19,24 +19,51 @@ FWHM2CC = 1 / (2 * np.sqrt(2 * np.log(2)))
 def load_sources(filename):
     """
     Open a file, read contents, return a list of all the sources in that file.
-    @param filename:
-    @return: list of ComponentSource objects
+
+    Parameters
+    ----------
+    filename : str
+        Filename to be read
+
+    Return
+    ------
+    catalog : [`class:AegeanTools.models.ComponentSource`, ...]
+        A list of source components
     """
-    catalog = catalogs.table_to_source_list(catalogs.load_table(filename))
+    table = catalogs.load_table(filename)
+    catalog = catalogs.table_to_source_list(table)
     logging.info("read {0} sources from {1}".format(len(catalog), filename))
     return catalog
 
 
 def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
     """
+    Create a model image based on a catalogue of sources.
 
-    @param sources: a list of AegeanTools.models.SimpleSource objects
-    @param shape: the shape of the input (and output) image
-    @param wcshelper: an AegeanTools.wcs_helpers.WCSHelper object corresponding to the input image
-    @param mask: If true then mask pixels instead of subtracting the sources
-    @param frac: pixels that are brighter than frac*peak_flux for each source will be masked if mask=True
-    @param sigma: pixels that are brighter than rms*sigma be masked if mask=True
-    @return:
+    Parameters
+    ----------
+    sources : [`class:AegeanTools.models.ComponentSource`, ...]
+        a list of sources
+
+    shape : [float, float]
+        the shape of the input (and output) image
+
+    wcshelper : 'class:AegeanTools.wcs_helpers.WCSHelper'
+        A WCSHelper object corresponding to the input image
+
+    mask : bool
+        If true then mask pixels instead of subtracting or adding sources
+
+    frac : float
+        pixels that are brighter than frac*peak_flux for each source will be masked if mask=True
+
+    sigma: float
+        pixels that are brighter than rms*sigma be masked if mask=True
+
+    Returns
+    -------
+    model : np.ndarray
+        The desired model.
     """
 
     # Model array
