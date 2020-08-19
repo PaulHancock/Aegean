@@ -60,7 +60,7 @@ log = logging.getLogger('dummy')
 log.addHandler(logging.NullHandler())
 
 
-def find_islands(im, bkg, rms,
+def find_islands(im, bkg, rms, global_data,
                  seed_clip=5., flood_clip=4.,
                  log=log):
     """
@@ -114,6 +114,15 @@ def find_islands(im, bkg, rms,
                 continue
             island = PixelIsland()
             island.calc_bounding_box(np.array(np.nan_to_num(data_box), dtype=bool), offsets=[xmin, ymin])
+
+            if global_data.region is not None:
+                y, x = np.where(snr[xmin:xmax, ymin:ymax] >= flood_clip)
+                yx = list(zip(y + ymin, x + xmin))
+                ra, dec = global_data.wcshelper.wcs.wcs_pix2world(yx, 1).transpose()
+                mask = global_data.region.sky_within(ra, dec, degin=True)
+                if not np.any(mask):
+                    continue
+
             islands.append(island)
 
     return islands
@@ -1883,6 +1892,7 @@ class SourceFinder(object):
         island_group = []
         group_size = 20
         islands = find_islands(im=data, bkg=np.zeros_like(data), rms=rmsimg,
+                               global_data=self.global_data,
                                seed_clip=innerclip, flood_clip=outerclip,
                                log=self.log)
         self.log.info("Found {0} islands".format(len(islands)))
