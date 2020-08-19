@@ -7,7 +7,7 @@ from __future__ import print_function
 __author__ = 'Paul Hancock'
 
 from AegeanTools import catalogs as cat
-from AegeanTools.models import OutputSource, IslandSource, SimpleSource
+from AegeanTools.models import ComponentSource, IslandSource, SimpleSource
 from AegeanTools.msq2 import MarchingSquares
 from astropy import table
 import numpy as np
@@ -66,7 +66,7 @@ def test_update_meta_data():
 
 def test_load_save_catalog():
     """Test that we can load and save various file formats"""
-    catalog = [OutputSource()]
+    catalog = [ComponentSource()]
     for ext in ['csv', 'vot']:
         fout = 'a.'+ext
         cat.save_catalog(fout, catalog, meta=None)
@@ -125,7 +125,7 @@ def test_load_save_catalog():
 
 def test_load_table_write_table():
     """Test that we can write and load tables with various file formats"""
-    catalog = [OutputSource()]
+    catalog = [ComponentSource()]
     for fmt in ['csv', 'vo']:
         fout = 'a.'+fmt
         cat.save_catalog(fout, catalog, meta=None)
@@ -151,7 +151,7 @@ def test_load_table_write_table():
 
 def test_write_comp_isl_simp():
     """Test the writing of components/islands/simples to csv format files"""
-    catalog = [OutputSource(), IslandSource(), SimpleSource()]
+    catalog = [ComponentSource(), IslandSource(), SimpleSource()]
     catalog[0].galactic = True
     out = 'a.csv'
     cat.write_catalog(out, catalog)
@@ -173,7 +173,7 @@ def dont_test_load_save_fits_tables():
     """Test that we can load and save fits tables"""
     # The version of astropy on travis breaks on this!
     # probably a bug that will be fixed by astropy later.
-    catalog = [OutputSource()]
+    catalog = [ComponentSource()]
     cat.save_catalog('a.fits', catalog, meta=None)
     if not os.path.exists('a_comp.fits'):
         raise AssertionError()
@@ -182,6 +182,28 @@ def dont_test_load_save_fits_tables():
     # Somehow this doesn't work for my simple test cases
     # catin = cat.load_table('a_comp.fits')
     # assert len(catin) == 2
+
+
+def test_write_fits_table_variable_uuid_lengths():
+    """Test that the length of the UUID column is appropriate"""
+    catalog = []
+    for l in range(10):
+        c = ComponentSource()
+        c.ra_str=c.dec_str="hello!"
+        c.uuid = 'source-{0:d}'.format(2**l)
+        catalog.append(c)
+    cat.save_catalog('a.fits', catalog, meta={'Purpose':'Testing'})
+    if not os.path.exists('a_comp.fits'):
+        raise AssertionError()
+
+    rcat = cat.load_table('a_comp.fits')
+    for src1,src2 in zip(rcat, catalog):
+        if len(src1['uuid']) != len(src2.uuid):
+            print("len mismatch for source {0}".format(src1))
+            print("uuid should be len={0}".format(len(src2.uuid)))
+            raise AssertionError("UUID col is of wrong length")
+    os.remove('a_comp.fits')
+    return
 
 
 def test_write_contours_boxes():
@@ -228,7 +250,7 @@ def test_write_ann():
     if os.path.exists('out.ann'):
         raise AssertionError("Shoudn't have written anything")
 
-    src = OutputSource()
+    src = ComponentSource()
     # remove the parameter a to hit a checkpoint
     del src.a
     cat.writeAnn('out.reg', [src], fmt='reg')
@@ -237,7 +259,7 @@ def test_write_ann():
     os.remove('out_comp.reg')
 
     # write regular and simple sources for .ann files
-    cat.writeAnn('out.ann', [OutputSource()], fmt='ann')
+    cat.writeAnn('out.ann', [ComponentSource()], fmt='ann')
     if not os.path.exists('out_comp.ann'):
         raise AssertionError()
 
@@ -248,7 +270,7 @@ def test_write_ann():
 
     os.remove('out_simp.ann')
     # same but for .reg files
-    cat.writeAnn('out.reg', [OutputSource()], fmt='reg')
+    cat.writeAnn('out.reg', [ComponentSource()], fmt='reg')
     if not os.path.exists('out_comp.reg'):
         raise AssertionError()
 

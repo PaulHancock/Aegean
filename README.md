@@ -12,7 +12,7 @@ Programs included:
 
 Installing
 =====
-AegeanTools is built and tested on python 2.7, and 3.6.
+AegeanTools is built and tested on python 2.7.14, and 3.7.
 
 You can install via pip using 
 `pip install git+https://github.com/PaulHancock/Aegean.git` (latest)
@@ -20,16 +20,6 @@ You can install via pip using
 
 Or you can clone or download the repository and then use `python setup.py install` or `pip install .`
 
-**Notes for installing on python 3**:
-pprocess has not (yet) been updated for python 3. The 2to3 conversion tool does what you need:
-```
-wget http://www.boddie.org.uk/python/downloads/pprocess-0.5.3.tar.gz
-gunzip pprocess-0.5.3.tar.gz
-tar -xvf pprocess-0.5.3.tar
-cd pprocess-0.5.3
-2to3 -w .
-pip install .
-```
 
 
 Help
@@ -55,6 +45,6 @@ Status
  
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/014fb9c86b3f42b49ad94cd4384cfa78)](https://www.codacy.com/app/mr.paul.hancock/Aegean?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=PaulHancock/Aegean&amp;utm_campaign=Badge_Grade)
 
-[![DOI](https://zenodo.org/badge/22051760.svg)](https://zenodo.org/badge/latestdoi/22051760) - latest release
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3474072.svg)](https://doi.org/10.5281/zenodo.3474072)
 
 

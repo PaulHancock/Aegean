@@ -2,15 +2,14 @@
 """
 Test wcs_helpers.py
 """
-
 from __future__ import print_function
 
-__author__ = 'Paul Hancock'
-
-from AegeanTools.wcs_helpers import WCSHelper
+from AegeanTools.wcs_helpers import WCSHelper, Beam
 from astropy.io import fits
 import numpy as np
 from numpy.testing import assert_almost_equal
+
+__author__ = 'Paul Hancock'
 
 
 def verify_beam(beam):
@@ -28,8 +27,14 @@ def test_from_header():
     helper = WCSHelper.from_header(header)
     if helper.beam is None: raise AssertionError()
     del header['BMAJ'], header['BMIN'], header['BPA']
-    helper = WCSHelper.from_header(header)
-    if helper.beam is not None: raise AssertionError()
+    # Raise an error when the beam information can't be determined
+    try:
+        _ = WCSHelper.from_header(header)
+    except AssertionError as e:
+        pass
+    else:
+        raise AssertionError("Header with no beam information should thrown an exception.")
+    return
 
 
 def test_from_file():
@@ -44,15 +49,13 @@ def test_get_pixbeam():
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
 
-    beam = helper.get_pixbeam_pixel(0, 0)
+    beam = Beam(*helper.get_psf_pix2pix(0, 0))
     verify_beam(beam)
 
-    helper.lat = None
-    beam = helper.get_beam(285, -66)
+    beam = helper.get_skybeam(285, -66)
     verify_beam(beam)
 
-    helper.lat = -65
-    beam = helper.get_beam(285, -66)
+    beam = helper.get_skybeam(285, -66)
     verify_beam(beam)
 
     area = helper.get_beamarea_pix(285, -66)
@@ -60,18 +63,25 @@ def test_get_pixbeam():
     area = helper.get_beamarea_deg2(285, -66)
     if not (area >0): raise AssertionError()
 
-    beam = helper.get_pixbeam(285, -66)
-    verify_beam(beam)
 
-    beam = helper.get_pixbeam(None, None)
-    verify_beam(beam)
+def test_psf_files():
+    """Test that using external psf files works properly"""
+
+    fname = 'tests/test_files/1904-66_SIN.fits'
+    psfname = 'tests/test_files/1904-66_SIN_psf.fits'
+    helper = WCSHelper.from_file(fname, psf_file=psfname)
+
+    # The psf image has only 19x19 pix and this ra/dec is
+    a, b, pa = helper.get_psf_sky2sky(290., -63.)
+    if not np.all(np.isfinite((a, b, pa))):
+        raise AssertionError("Beam contains nans")
 
 
 def test_sky_sep():
     """Test sky separation"""
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
-    dist = helper.sky_sep([0, 0], [1, 1])
+    dist = helper.sky_sep((0, 0), (1, 1))
     if not (dist > 0): raise AssertionError()
 
 
@@ -85,7 +95,7 @@ def test_vector_round_trip():
     initial = [1, 45]  # r,theta = 1,45 (degrees)
     ref = helper.refpix
     ra, dec, dist, ang = helper.pix2sky_vec(ref, *initial)
-    _, _ , r, theta = helper.sky2pix_vec([ra, dec], dist, ang)
+    _, _ , r, theta = helper.sky2pix_vec((ra, dec), dist, ang)
     if not ((abs(r - initial[0]) < 1e-9) and (abs(theta - initial[1]) < 1e-9)): raise AssertionError()
 
 
@@ -106,13 +116,47 @@ def test_ellipse_round_trip():
     for _, (ra, dec) in enumerate(zip(ras.ravel(), decs.ravel())):
         if ra < 0:
             ra += 360
-        x, y, sx, sy, theta = helper.sky2pix_ellipse([ra, dec], a, b, pa)
-        ra_f, dec_f, major, minor, pa_f = helper.pix2sky_ellipse([x, y], sx, sy, theta)
+        x, y, sx, sy, theta = helper.sky2pix_ellipse((ra, dec), a, b, pa)
+        ra_f, dec_f, major, minor, pa_f = helper.pix2sky_ellipse((x, y), sx, sy, theta)
         assert_almost_equal(ra, ra_f)
         assert_almost_equal(dec, dec_f)
         if not (abs(a-major)/a < 0.05): raise AssertionError()
         if not (abs(b-minor)/b < 0.05): raise AssertionError()
         if not (abs(pa-pa_f) < 1): raise AssertionError()
+
+
+def test_psf_funcs():
+    """
+    For a SIN projected image, test that the beam/psf calculations are consistent at different points on the sky
+    """
+    fname = 'tests/test_files/1904-66_SIN.fits'
+    helper = WCSHelper.from_file(fname)
+    header = helper.wcs.to_header()
+
+    refpix = header['CRPIX2'], header['CRPIX1']  # note x/y swap
+    refcoord = header['CRVAL1'], header['CRVAL2']
+    beam_ref_coord = helper.get_skybeam(*refcoord)
+    beam_ref_pix = helper.get_skybeam(*helper.pix2sky(refpix))
+
+    msg = 'sky beams at ref coord/pix disagree'
+    if not abs(beam_ref_coord.a - beam_ref_pix.a) < 1e-5:
+        raise AssertionError(msg)
+    if not abs(beam_ref_coord.b - beam_ref_pix.b) < 1e-5:
+        raise AssertionError(msg)
+    if not abs(beam_ref_coord.pa - beam_ref_pix.pa) < 1e-5:
+        raise AssertionError(msg)
+
+    psf_zero = helper.get_psf_sky2pix(0,0)
+    psf_refcoord = helper.get_psf_sky2pix(*refcoord)
+
+    diff = np.subtract(psf_zero, psf_refcoord)
+    if not np.all(diff < 1e-5):
+        raise AssertionError("psf varies in pixel coordinates (it should not)")
+
+    diff = np.subtract(psf_refcoord, (helper._psf_a, helper._psf_b, helper._psf_theta))
+    if not np.all(diff < 1e-5):
+        raise AssertionError("psf varies in pixel coordinates (it should not)")
+    return
 
 
 if __name__ == "__main__":

@@ -63,6 +63,47 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     return amp * np.exp(exp)
 
 
+def elliptical_gaussian_with_alpha(x, y, v, amp, xo, yo, vo, sx, sy, theta, alpha, beta=None):
+    """
+    Generate a model 2d Gaussian with spectral terms.
+    Evaluate this model at the given locations x,y,dv.
+
+    amp is the amplitude at the reference frequency vo
+
+    The model is:
+    S(x,v) = amp (v/vo) ** (alpha + beta *log(v/vo))
+
+    When beta is none it is ignored.
+
+    Parameters
+    ----------
+    x, y, v : numeric or array-like
+        locations at which to evaluate the gaussian
+    amp : float
+        Peak value.
+    xo, yo, vo: float
+        Center of the gaussian.
+    sx, sy : float
+        major/minor axes in sigmas
+    theta : float
+        position angle (degrees) CCW from x-axis
+
+    alpha, beta: float
+        The spectral terms of the fit.
+
+    Returns
+    -------
+    data : numeric or array-like
+        Gaussian function evaluated at the x,y locations.
+    """
+    exponent = alpha
+    if beta is not None:
+        exponent += beta * np.log10(v/vo)
+    snu = amp * (v/vo) ** (exponent)
+    gauss = elliptical_gaussian(x,y,snu,xo,yo,sx,sy,theta)
+    return gauss
+
+
 def Cmatrix(x, y, sx, sy, theta):
     """
     Construct a correlation matrix corresponding to the data.
@@ -807,7 +848,7 @@ def condon_errors(source, theta_n, psf=None):
     theta_n : float or None
         A measure of the beam sampling. (See Condon'97).
 
-    psf : :class:`AegeanTools.fits_image.Beam`
+    psf : :class:`AegeanTools.wcs_helpers.Beam`
         The psf at the location of the source.
 
     Returns
@@ -830,16 +871,15 @@ def condon_errors(source, theta_n, psf=None):
     if psf is not None:
         beam = psf.get_beam(source.ra, source.dec)
         if beam is not None:
-            theta_n = np.hypot(beam.a, beam.b)
-            print(beam, theta_n)
+            theta_n = np.sqrt(beam.a * beam.b)
 
     if theta_n is None:
         source.err_a = source.err_b = source.err_peak_flux = source.err_pa = source.err_int_flux = 0.0
         return
 
     smoothing = major * minor / (theta_n ** 2)
-    factor1 = (1 + (major / theta_n))
-    factor2 = (1 + (minor / theta_n))
+    factor1 = (1 + (theta_n/ major)**2)
+    factor2 = (1 + (theta_n/ minor)**2)
     snr = source.peak_flux / source.local_rms
     # calculation of rho2 depends on the parameter being used so we lambda this into a function
     rho2 = lambda x: smoothing / 4 * factor1 ** alphas[x][0] * factor2 ** alphas[x][1] * snr ** 2

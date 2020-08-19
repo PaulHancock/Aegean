@@ -19,24 +19,60 @@ FWHM2CC = 1 / (2 * np.sqrt(2 * np.log(2)))
 def load_sources(filename):
     """
     Open a file, read contents, return a list of all the sources in that file.
-    @param filename:
-    @return: list of OutputSource objects
+
+    Parameters
+    ----------
+    filename : str
+        Filename to be read
+
+    Return
+    ------
+    catalog : [`class:AegeanTools.models.ComponentSource`, ...]
+        A list of source components
     """
-    catalog = catalogs.table_to_source_list(catalogs.load_table(filename))
+    table = catalogs.load_table(filename)
+    required_cols = ['ra','dec','peak_flux','a','b','pa']
+    good = True
+    for c in required_cols:
+        if c not in table.colnames:
+            logging.error("Column {0} not found".format(c))
+            good = False
+    if not good:
+        logging.error("Some required columns missing")
+        return None
+    catalog = catalogs.table_to_source_list(table)
     logging.info("read {0} sources from {1}".format(len(catalog), filename))
     return catalog
 
 
 def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
     """
+    Create a model image based on a catalogue of sources.
 
-    @param sources: a list of AegeanTools.models.SimpleSource objects
-    @param shape: the shape of the input (and output) image
-    @param wcshelper: an AegeanTools.wcs_helpers.WCSHelper object corresponding to the input image
-    @param mask: If true then mask pixels instead of subtracting the sources
-    @param frac: pixels that are brighter than frac*peak_flux for each source will be masked if mask=True
-    @param sigma: pixels that are brighter than rms*sigma be masked if mask=True
-    @return:
+    Parameters
+    ----------
+    sources : [`class:AegeanTools.models.ComponentSource`, ...]
+        a list of sources
+
+    shape : [float, float]
+        the shape of the input (and output) image
+
+    wcshelper : 'class:AegeanTools.wcs_helpers.WCSHelper'
+        A WCSHelper object corresponding to the input image
+
+    mask : bool
+        If true then mask pixels instead of subtracting or adding sources
+
+    frac : float
+        pixels that are brighter than frac*peak_flux for each source will be masked if mask=True
+
+    sigma: float
+        pixels that are brighter than rms*sigma be masked if mask=True
+
+    Returns
+    -------
+    model : np.ndarray
+        The desired model.
     """
 
     # Model array
@@ -85,9 +121,9 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
             logging.debug(" flux, sx, sy: {0} {1} {2}".format(src.peak_flux, sx, sy))
 
         # positions for which we want to make the model
-        x, y = np.mgrid[xmin:xmax, ymin:ymax]
-        x = list(map(int, x.ravel()))
-        y = list(map(int, y.ravel()))
+        x, y = np.mgrid[int(xmin):int(xmax), int(ymin):int(ymax)]
+        x = x.ravel()
+        y = y.ravel()
 
         # TODO: understand why xo/yo -1 is needed
         model = fitting.elliptical_gaussian(x, y, src.peak_flux, xo-1, yo-1, sx*FWHM2CC, sy*FWHM2CC, theta)
@@ -98,9 +134,12 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
                 indices = np.where(model >= (frac*src.peak_flux))
             else:
                 indices = np.where(model >= (sigma*src.local_rms))
-            model[indices] = np.nan
-
-        m[x, y] += model
+            # somehow m[x,y][indices] = np.nan doesn't assign any values
+            # so we have to do the more complicated
+            # m[x[indices],y[indices]] = np.nan
+            m[x[indices], y[indices]]= np.nan
+        else:
+            m[x, y] += model
         i_count += 1
     logging.info("modeled {0} sources".format(i_count))
     return m
@@ -108,17 +147,42 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
 
 def make_residual(fitsfile, catalog, rfile, mfile=None, add=False, mask=False, frac=None, sigma=4):
     """
+    Take an input image and catalogue, make a model of the catalogue, and then add/subtract or mask the input image.
+    Saving the residual and (optionally) model files.
 
-    @param fitsfile: Input fits image filename
-    @param catalog: Input catalog filename of a type supported by Aegean
-    @param rfile: Residual image filename
-    @param mfile: model image filename
-    @param add: add the model instead of subtracting it
-    @param mask: If true then mask pixels instead of subtracting the sources
-    @param frac: pixels that are brighter than frac*peak_flux for each source will be masked if mask=True
-    @return:
+    Parameters
+    ----------
+    fitsfile : str
+        Input fits image filename
+
+    catalog : str
+        Input catalog filename of a type supported by Aegean
+
+    rfile : str
+        Filename to write residual image
+
+    mfile : str
+        Filename to write model image. Default=None means don't write the model file.
+
+    add : bool
+        If True add the model instead of subtracting it
+
+    mask : bool
+        If true then mask pixels instead of adding or subtracting the sources
+
+    frac : float
+        pixels that are brighter than frac*peak_flux for each source will be masked if mask=True
+
+    sigma : float
+        pixels that are brighter than sigma*local_rms for each source will be masked if mask=True
+
+    Return
+    ------
+    None
     """
     source_list = load_sources(catalog)
+    if source_list is None:
+        return None
     # force two axes so that we dump redundant stokes/freq axes if they are present.
     hdulist = fits.open(fitsfile, naxis=2)
     # ignore dimensions of length 1

@@ -2,9 +2,7 @@
 """
 The Aegean source finding program.
 """
-
 from __future__ import print_function
-
 # standard imports
 import sys
 import six
@@ -15,28 +13,35 @@ import copy
 import logging
 import logging.config
 import lmfit
-
 import scipy
 from scipy.special import erf
 from scipy.ndimage import label, find_objects
-
+from scipy.ndimage.filters import minimum_filter, maximum_filter
 # AegeanTools
+from .BANE import filter_image, get_step_size
+import AegeanTools.wcs_helpers
 from .fitting import do_lmfit, Cmatrix, Bmatrix, errors, covar_errors, ntwodgaussian_lmfit, \
                      bias_correct, elliptical_gaussian
-from .wcs_helpers import WCSHelper, PSFHelper
-from .fits_image import FitsImage, Beam
+from .wcs_helpers import WCSHelper
+from .fits_image import FitsImage
+from AegeanTools.wcs_helpers import Beam
 from .msq2 import MarchingSquares
 from .angle_tools import dec2hms, dec2dms, gcd, bear
 from .catalogs import load_table, table_to_source_list
-from .models import SimpleSource, OutputSource, IslandSource, island_itergen, \
+from .models import SimpleSource, ComponentSource, IslandSource, island_itergen, \
     GlobalFittingData, IslandFittingData, DummyLM
+from .models import PixelIsland
 from . import flags
-
 # need Region in the name space in order to be able to unpickle it
 from .regions import Region
 
+if six.PY2:
+    import cPickle
+else:
+    import _pickle as cPickle
+
 # multiple cores support
-import pprocess
+from . import pprocess
 import multiprocessing
 
 from .__init__ import __version__, __date__
@@ -49,6 +54,465 @@ header = """#Aegean version {0}
 # constants
 CC2FHWM = (2 * math.sqrt(2 * math.log(2)))
 FWHM2CC = 1 / CC2FHWM
+
+# dummy logger
+log = logging.getLogger('dummy')
+log.addHandler(logging.NullHandler())
+
+
+def find_islands(im, bkg, rms,
+                 seed_clip=5., flood_clip=4.,
+                 log=log):
+    """
+    This function designed to be run as a stand alone process
+
+    Parameters
+    ----------
+    im, bkg, rms : :class:`numpy.ndarray`
+        Image, background, and rms maps
+
+    seed_clip, flood_clip : float
+        The seed clip which is used to create islands, and flood clip which is used to grow islands.
+        The units are in SNR.
+
+    log : `logging.Logger` or None
+        For handling logs (or not)
+
+    Returns
+    -------
+    islands : [:class:`AegeanTools.models.PixelIsland`, ...]
+        a list of islands
+    """
+    # compute SNR image
+    snr = abs(im - bkg) / rms
+
+    # mask of pixles that are above the flood_clip
+    a = snr >= flood_clip
+
+    if not np.any(a):
+        log.debug("There are no pixels above the clipping limit")
+        return []
+
+    # segmentation via scipy
+    l, n = label(a)
+    f = find_objects(l)
+
+    log.debug("{1} Found {0} islands total above flood limit".format(n, im.shape))
+
+    islands = []
+    for i in range(n):
+        xmin, xmax = f[i][0].start, f[i][0].stop
+        ymin, ymax = f[i][1].start, f[i][1].stop
+        if np.any(snr[xmin:xmax, ymin:ymax] > seed_clip):  # obey seed clip constraint
+            data_box = copy.copy(im[xmin:xmax, ymin:ymax])  # copy so that we don't blank the master data
+            data_box[np.where(
+            snr[xmin:xmax, ymin:ymax] < flood_clip)] = np.nan  # blank pixels that are outside the outerclip
+            data_box[np.where(l[xmin:xmax, ymin:ymax] != i + 1)] = np.nan  # blank out other summits
+            # check if there are any pixels left unmasked
+            if not np.any(np.isfinite(data_box)):
+                # self.log.info("{1} Island {0} has no non-masked pixels".format(i,data.shape))
+                continue
+            island = PixelIsland()
+            island.calc_bounding_box(np.array(np.nan_to_num(data_box), dtype=bool), offsets=[xmin, ymin])
+            islands.append(island)
+
+    return islands
+
+
+def estimate_parinfo_image(islands,
+                           im, rms, wcshelper, max_summits=None, log=log):
+    """
+    Estimate the initial parameters for fitting for each of the islands of pixels.
+    The source sizes will be initialised as the psf of the image, which is either
+    determined by the WCS of the image file or the psf map if one is supplied.
+
+    Parameters
+    ----------
+    islands : [AegeanTools.models.IslandFittingData, ... ]
+        A list of islands which will be converted into groups of sources
+
+    im, rms : :class:`numpy.ndarray`
+        The image and noise maps
+
+    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
+        A wcshelper object valid for the image map
+
+    max_summits : int or None
+        The maximum number of summits that will be fit. Any in addition to this will
+        be estimated but their parameters will have vary=False.
+
+    log : `logging.Logger` or None
+        For handling logs (or not)
+
+    max_summits : int
+        The maximum number of summits that will be fit. Any in addition to this will
+        be estimated but their parameters will have vary=False.
+
+    log : `logging.Logger` or None
+        For handling logs (or not)
+
+    Returns
+    --------
+    sources : [`lmfit.Parameters`, ... ]
+        The initial estimate of parameters for the components within each island.
+    """
+    debug_on = log.isEnabledFor(logging.DEBUG)
+    sources = []
+
+    for island in islands:
+        # set flags to be empty
+        is_flag = 0x0
+        [rmin, rmax], [cmin, cmax] = island.bounding_box
+        i_data = im[rmin:rmax, cmin:cmax]
+        i_rms = rms[rmin:rmax, cmin:cmax]
+
+        # the curvature needs a buffer of 1 pixel to correctly identify local min/max
+        # on the edge of the region. We need a 1 pix buffer (if available)
+        buffx = [rmin - max(rmin-1,0), min(rmax+1, im.shape[0]) - rmax]
+        buffy = [cmin - max(cmin-1,0), min(cmax+1, im.shape[1]) - cmax]
+        i_curve = np.zeros(shape=(rmax-rmin + buffx[0] + buffx[1], cmax-cmin + buffy[0] + buffy[1]),
+                          dtype=np.int8)
+        # compute peaks and convert to +/-1
+        peaks = maximum_filter(im[rmin-buffx[0]:rmax+buffx[1],
+                                  cmin-buffy[0]:cmax+buffy[0]], size=3)
+        pmask = np.where(peaks == im[rmin-buffx[0]:rmax+buffx[1],
+                                     cmin-buffy[0]:cmax+buffy[0]])
+        troughs = minimum_filter(im[rmin-buffx[0]:rmax+buffx[1],
+                                    cmin-buffy[0]:cmax+buffy[0]], size=3)
+        tmask = np.where(troughs == im[rmin-buffx[0]:rmax+buffx[1],
+                                       cmin-buffy[0]:cmax+buffy[0]])
+        i_curve[pmask] = -1
+        i_curve[tmask] = 1
+        # i_curve and im need to be the same size so we crop i_curve based on the buffers that we computed
+        i_curve = i_curve[buffx[0]:i_curve.shape[0]-buffx[1], buffy[0]:i_curve.shape[1]-buffy[1]]
+        del peaks, pmask, troughs, tmask, buffx, buffy
+
+        # apply the island mask
+        i_data[np.where(np.bitwise_not(island.mask))] = np.nan
+
+        isnegative = max(i_data[np.where(np.isfinite(i_data) & island.mask)]) < 0
+
+
+        # For small islands we can't do a 6 param fit
+        # Don't count the NaN values as part of the island
+        non_nan_pix = len(i_data[np.where(np.isfinite(i_data))].ravel())
+        if 4 <= non_nan_pix <= 6:
+            log.debug("FIXED2PSF")
+            is_flag |= flags.FIXED2PSF
+        elif non_nan_pix < 4:
+            log.debug("FITERRSMALL!")
+            is_flag |= flags.FITERRSMALL
+        else:
+            is_flag = 0
+        if debug_on:
+            log.debug(" - size {0}".format(len(i_data.ravel())))
+
+        if min(i_data.shape) <= 2 or (is_flag & flags.FITERRSMALL) or (is_flag & flags.FIXED2PSF):
+            # 1d islands or small islands only get one source
+            if debug_on:
+                log.debug("Tiny summit detected")
+                log.debug("{0}".format(i_data))
+            # and are constrained to be point sources
+            is_flag |= flags.FIXED2PSF
+            summits = [[slice(0,i_data.shape[0]), slice(0,i_data.shape[1])]]
+            n = 1
+        else:
+            if isnegative:
+                # the summit should be able to include all pixels within the island not just those above innerclip
+                kappa_sigma = np.where(i_curve > 0.5, np.where(np.isfinite(i_data),i_data, np.nan), np.nan)
+            else:
+                kappa_sigma = np.where(i_curve < -0.5, np.where(np.isfinite(i_data), i_data, np.nan), np.nan)
+
+            # count the number of peaks and their locations
+            l, n = label(kappa_sigma)
+            summits = find_objects(l)
+
+        if n < 1:
+            log.debug("Island has no summits")
+            continue
+
+        params = lmfit.Parameters()
+        summits_considered = 0
+        summits_accepted = 0
+        #TODO: figure out how to sort the components in flux order
+
+        for i in range(n):
+            # x/y min/max are indices of the summit within the island
+            xmin, xmax = summits[i][0].start, summits[i][0].stop
+            ymin, ymax = summits[i][1].start, summits[i][1].stop
+            summits_considered += 1
+            summit_flag = is_flag
+
+            summit = i_data[xmin:xmax, ymin:ymax]
+
+            if debug_on:
+                log.debug(
+                    "Summit({0}) - shape: {1} x:[{2}-{3}] y:[{4}-{5}]".format(i, summit.shape, ymin, ymax, xmin, xmax))
+            try:
+                if isnegative:
+                    xpeak, ypeak = np.unravel_index(np.nanargmin(summit), summit.shape)
+                else:
+                    xpeak, ypeak = np.unravel_index(np.nanargmax(summit), summit.shape)
+                amp = summit[xpeak,ypeak]
+            except ValueError as e:
+                if "All-NaN" in e.message:
+                    log.warning("Summit of nan's detected - this shouldn't happen")
+                    continue
+                else:
+                    raise e
+
+            if debug_on:
+                log.debug(" - max is {0:f}".format(amp))
+                log.debug(" - peak at {0},{1}".format(xpeak, ypeak))
+
+            # xo/yo are the index of the peak within the island
+            yo = ypeak + ymin
+            xo = xpeak + xmin
+
+            # allow amp to be 5% or 3 sigma higher
+            # NOTE: the 5% should depend on the beam sampling
+            if amp > 0:
+                amp_min, amp_max = 0.95 * min(3 * i_rms[xo, yo], amp), amp * 1.05 + 3 * i_rms[xo, yo]
+            else:
+                amp_max, amp_min = 0.95 * max(-3 * i_rms[xo, yo], amp), amp * 1.05 - 3 * i_rms[xo, yo]
+
+            if debug_on:
+                log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
+
+            # TODO: double check the yo/xo that seem reversed
+            a, b, pa = wcshelper.get_psf_pix2pix(yo + cmin, xo + rmin)
+            if not (np.all(np.isfinite((a, b, pa)))):
+                log.debug(" Summit has invalid WCS/Beam - Skipping.")
+                continue
+            pixbeam = Beam(a, b, pa)
+
+            # set a square limit based on the size of the pixbeam
+            xo_lim = 0.5 * np.hypot(pixbeam.a, pixbeam.b)
+            yo_lim = xo_lim
+            yo_min, yo_max = yo - yo_lim, yo + yo_lim
+            xo_min, xo_max = xo - xo_lim, xo + xo_lim
+
+            # the size of the island
+            xsize = i_data.shape[0]
+            ysize = i_data.shape[1]
+
+            # initial shape is the psf
+            sx = pixbeam.a * FWHM2CC
+            sy = pixbeam.b * FWHM2CC
+
+            # lmfit does silly things if we start with these two parameters being equal
+            sx = max(sx, sy * 1.01)
+
+            # constraints are based on the shape of the island
+            # sx,sy can become flipped so we set the min/max account for this
+            sx_min, sx_max = sy * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * FWHM2CC, sx * 1.1)
+            sy_min, sy_max = sy * 0.8, max((max(xsize, ysize) + 1) * math.sqrt(2) * FWHM2CC, sx * 1.1)
+
+            theta = pixbeam.pa  # Degrees
+            flag = summit_flag
+
+
+            # check to see if we are going to fit this component
+            if max_summits is not None:
+                maxxed = (i>=max_summits)
+            else:
+                maxxed = False
+
+            # components that are not fit need appropriate flags
+            if maxxed:
+                summit_flag |= flags.NOTFIT
+                summit_flag |= flags.FIXED2PSF
+
+            if debug_on:
+                log.debug(" - var val min max | min max")
+                log.debug(" - amp {0} {1} {2} ".format(amp, amp_min, amp_max))
+                log.debug(" - xo {0} {1} {2} ".format(xo, xo_min, xo_max))
+                log.debug(" - yo {0} {1} {2} ".format(yo, yo_min, yo_max))
+                log.debug(" - sx {0} {1} {2} | {3} {4}".format(sx, sx_min, sx_max, sx_min * CC2FHWM,
+                                                               sx_max * CC2FHWM))
+                log.debug(" - sy {0} {1} {2} | {3} {4}".format(sy, sy_min, sy_max, sy_min * CC2FHWM,
+                                                               sy_max * CC2FHWM))
+                log.debug(" - theta {0} {1} {2}".format(theta, -180, 180))
+                log.debug(" - flags {0}".format(flag))
+                log.debug(" - fit?  {0}".format(not maxxed))
+
+            # TODO: figure out how incorporate the circular constraint on sx/sy
+            prefix = "c{0}_".format(i)
+            params.add(prefix + 'amp', value=amp, min=amp_min, max=amp_max, vary=not maxxed)
+            params.add(prefix + 'xo', value=xo, min=float(xo_min), max=float(xo_max), vary=not maxxed)
+            params.add(prefix + 'yo', value=yo, min=float(yo_min), max=float(yo_max), vary=not maxxed)
+
+            if summit_flag & flags.FIXED2PSF > 0:
+                psf_vary = False
+            else:
+                psf_vary = not maxxed
+            params.add(prefix + 'sx', value=sx, min=sx_min, max=sx_max, vary=psf_vary)
+            params.add(prefix + 'sy', value=sy, min=sy_min, max=sy_max, vary=psf_vary)
+            params.add(prefix + 'theta', value=theta, vary=psf_vary)
+            params.add(prefix + 'flags', value=summit_flag, vary=False)
+
+            summits_accepted += 1
+
+        if debug_on:
+            log.debug("Estimated sources: {0}".format(summits_accepted))
+        # remember how many components are fit.
+        params.add('components', value=summits_accepted, vary=False)
+
+        if params['components'].value < n:
+            log.debug("Considered {0} summits, accepted {1}".format(summits_considered, summits_accepted))
+
+        sources.append(params)
+
+    return sources
+
+
+def fit_islands_parinfo(models,
+                        im, rms, wcshelper):
+    """
+    Turn a list of sources into a set of islands and parameter estimates which can then be
+    characterised.
+
+    Parameters
+    ----------
+    models : [:class:`lmfit.Parinfo`, ... ]
+        A list of sources in the catalogue.
+
+    im : np.ndarray
+        The image map
+
+    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
+        A wcs object valid for the image map
+
+    Returns
+    -------
+    islands : [AegeanTools.models.SimpleSource, ...]
+        a list of islands
+    """
+
+
+    islands = []
+    for m in models:
+        pass
+    return islands
+
+def priorized_islands_parinfo(sources,
+                              im, wcshelper,
+                              stage=3,
+                              ):
+    """
+    Turn a list of sources into a set of islands and parameter estimates which can then be
+    characterised.
+
+    Parameters
+    ----------
+    sources : [AegeanTools.models.SimpleSource, ... ]
+        A list of sources in the catalogue.
+
+    im : np.ndarray
+        The image map
+
+    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
+        A wcs object valid for the image map
+
+    stage : int
+        The priorized fitting stage which determines what parameters are fit/fixed. One of:
+            1 - Fit for flux only. All other params are fixed.
+            2 - Fit for flux and position. Shape parameters are fixed.
+            3 - Fit for flux, position, and shape.
+
+    Returns
+    -------
+    islands : [:class:`AegeanTools.models.ComponentSource`, ...]
+        a list of components
+    """
+
+
+def characterise_islands(islands,
+                         im, bkg, rms,
+                         wcshelper,
+                         err_type='best',
+                         max_summits=None,
+                         do_islandfit=False):
+    """
+    Do the source characterisation based on the initial estimate of the island properties.
+
+
+    Parameters
+    ----------
+    islands : [lmfit.Parameters, ... ]
+        The initial estimate of parameters for the components within each island.
+
+    im, bkg, rms : np.ndarray
+        The image, background, and noise maps
+
+    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
+        A wcs helper object
+
+    err_type : str or None
+        The method for calculating uncertainties on parameters:
+            'best' - Uncertainties measured based on covariance matrix of the fit and of the data
+                     See Hancock et al. 2018 for a description of this process.
+            'condon' - Uncertainties are *calculated* based on Condon'98 (?year)
+            'raw' - uncertainties directly from the covariance matrix only
+            'none' or None - No uncertainties, all will be set to -1.
+
+    max_summits : int
+        The maximum number of summits that will be fit.
+        The final model may contain additional components but only the first few will be fit.
+
+    do_islandfit : bool
+        If True, then also characterise islands as well as components. Default=False.
+
+    Returns
+    -------
+    sources : [AegeanTools.models.SimpleSource, ... ]
+        A list of characterised sources of type SimpleSource, ComponentSource, or IslandSource.
+    """
+    sources = estimate_parinfo_image(islands=islands,
+                                     im=im, rms=rms,
+                                     wcshelper=wcshelper, max_summits=max_summits,
+                                     log=log)
+    for src, isle in zip(sources, islands):
+        [rmin, rmax], [cmin, cmax] = isle.bounding_box
+        i_data = im[rmin:rmax, cmin:cmax]
+        fac = 1 / np.sqrt(2)
+        if err_type == 'best':
+            mx, my = np.where(np.isfinite(i_data))
+            C = Cmatrix(mx, my, pixbeam.a * FWHM2CC * fac, pixbeam.b * FWHM2CC * fac, pixbeam.pa)
+            B = Bmatrix(C)
+        else:
+            C = B = None
+        result, _ = do_lmfit(i_data, src, B=B)
+
+    return sources
+
+
+def save_catalogue(sources,
+                   output,
+                   format=None):
+    """
+    Write a catalogue of sources
+
+    Parameters
+    ----------
+    sources : [AegeanTools.models.SimpleSource, ... ]
+        A list of characterised sources of type SimpleSource, ComponentSource, or IslandSource.
+
+    output : str
+        Output filename
+
+    format : str
+        A descriptor of the output format. Options are:
+            #TODO add a bunch of options
+            'auto' or None - infer from filename extension
+
+    Returns
+    -------
+    None
+    """
+    # determine file format
+    # write catalogue based on source type and file format
+    return
 
 
 class SourceFinder(object):
@@ -71,7 +535,7 @@ class SourceFinder(object):
     def __init__(self, **kwargs):
         self.global_data = GlobalFittingData()
         self.sources = []
-        self.log = None
+        self.log = log  # Use a dummy logger (which never reports anything)
 
         for k in kwargs:
             if hasattr(self, k):
@@ -266,7 +730,7 @@ class SourceFinder(object):
                     xpeak, ypeak = np.unravel_index(np.nanargmax(summit), summit.shape)
             except ValueError as e:
                 if "All-NaN" in e.message:
-                    self.log.warn("Summit of nan's detected - this shouldn't happen")
+                    self.log.warning("Summit of nan's detected - this shouldn't happen")
                     continue
                 else:
                     raise e
@@ -296,10 +760,11 @@ class SourceFinder(object):
             if debug_on:
                 self.log.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
 
-            pixbeam = global_data.psfhelper.get_pixbeam_pixel(yo + offsets[0], xo + offsets[1])
-            if pixbeam is None:
+            a, b, pa = global_data.psfhelper.get_psf_pix2pix(yo + offsets[0], xo + offsets[1])
+            if not(np.all(np.isfinite((a, b, pa)))):
                 self.log.debug(" Summit has invalid WCS/Beam - Skipping.")
                 continue
+            pixbeam = Beam(a, b, pa)
 
             # set a square limit based on the size of the pixbeam
             xo_lim = 0.5 * np.hypot(pixbeam.a, pixbeam.b)
@@ -425,7 +890,7 @@ class SourceFinder(object):
         j = 0
         for j in range(model['components'].value):
             src_flags = is_flag
-            source = OutputSource()
+            source = ComponentSource()
             source.island = isle_num
             source.source = j
             self.log.debug(" component {0}".format(j))
@@ -497,7 +962,7 @@ class SourceFinder(object):
 
             source.flags = src_flags
             # add psf info
-            local_beam = global_data.psfhelper.get_beam(source.ra, source.dec)
+            local_beam = global_data.psfhelper.get_skybeam(source.ra, source.dec)
             if local_beam is not None:
                 source.psf_a = local_beam.a * 3600
                 source.psf_b = local_beam.b * 3600
@@ -565,8 +1030,8 @@ class SourceFinder(object):
             area = height * width
             source.area = area * source.pixels / source.x_width / source.y_width  # area is in deg^2
 
-            # create contours
-            msq = MarchingSquares(idata)
+            # create contours around the data which was used in fitting
+            msq = MarchingSquares(kappa_sigma)
             source.contour = [(a[0] + xmin, a[1] + ymin) for a in msq.perimeter]
             # calculate the maximum angular size of this island, brute force method
             source.max_angular_size = 0
@@ -605,8 +1070,8 @@ class SourceFinder(object):
     ##
     # Setting up 'global' data and calculating bkg/rms
     ##
-    def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, bkg=None, cores=1,
-                     do_curve=True, mask=None, lat=None, psf=None, blank=False, docov=True, cube_index=None):
+    def load_globals(self, filename, hdu_index=0, bkgin=None, rmsin=None, beam=None, verb=False, rms=None, bkg=None,
+                     cores=1, do_curve=False, mask=None, psf=None, blank=False, docov=True, cube_index=None):
         """
         Populate the global_data object by loading or calculating the various components
 
@@ -640,9 +1105,6 @@ class SourceFinder(object):
 
         mask : str or :class:`AegeanTools.regions.Region`
             filename or Region object
-
-        lat : float
-            Latitude of the observing telescope (declination of zenith)
 
         psf : str or HDUList
             Filename or HDUList of a psf image
@@ -680,8 +1142,8 @@ class SourceFinder(object):
                 self.log.error("File {0} not found for loading".format(mask))
                 self.global_data.region = None
 
-        self.global_data.wcshelper = WCSHelper.from_header(img.get_hdu_header(), beam, lat)
-        self.global_data.psfhelper = PSFHelper(psf, self.global_data.wcshelper)
+        self.global_data.wcshelper = WCSHelper.from_header(img.get_hdu_header(), beam, psf_file=psf)
+        self.global_data.psfhelper = self.global_data.wcshelper
 
         self.global_data.beam = self.global_data.wcshelper.beam
         self.global_data.img = img
@@ -706,9 +1168,10 @@ class SourceFinder(object):
 
         # if either of rms or bkg images are not supplied then calculate them both
         if not (rmsin and bkgin):
+
             if verb:
                 self.log.info("Calculating background and rms data")
-            self._make_bkg_rms(mesh_size=20, forced_rms=rms, forced_bkg=bkg, cores=cores)
+            self._make_bkg_rms(filename=filename, mesh_size=20, forced_rms=rms, forced_bkg=bkg, cores=cores)
 
         # replace the calculated images with input versions, if the user has supplied them.
         if bkgin:
@@ -777,8 +1240,8 @@ class SourceFinder(object):
 
         self.log.info("Saving background / RMS maps")
         # load image, and load/create background/rms images
-        self.load_globals(image_filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms, bkg=bkg,
-                          cores=cores, do_curve=True)
+        self.load_globals(image_filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms,
+                          bkg=bkg, cores=cores, do_curve=True)
         img = self.global_data.img
         bkgimg, rmsimg = self.global_data.bkgimg, self.global_data.rmsimg
         curve = np.array(self.global_data.dcurve, dtype=bkgimg.dtype)
@@ -842,12 +1305,15 @@ class SourceFinder(object):
         self.log.info("Wrote {0}".format(outname))
         return
 
-    def _make_bkg_rms(self, mesh_size=20, forced_rms=None, forced_bkg=None, cores=None):
+    def _make_bkg_rms(self, filename, mesh_size=20, forced_rms=None, forced_bkg=None, cores=None):
         """
         Calculate an rms image and a bkg image.
 
         Parameters
         ----------
+        filename : str
+            Path of the image file.
+
         mesh_size : int
             Number of beams per box default = 20
 
@@ -865,10 +1331,10 @@ class SourceFinder(object):
             Number of cores to use if different from what is autodetected.
 
         """
-        if (forced_rms is not None):
+        if forced_rms is not None:
             self.log.info("Forcing rms = {0}".format(forced_rms))
             self.global_data.rmsimg[:] = forced_rms
-        if (forced_bkg is not None):
+        if forced_bkg is not None:
             self.log.info("Forcing bkg = {0}".format(forced_bkg))
             self.global_data.bkgimg[:] = forced_bkg
 
@@ -876,118 +1342,19 @@ class SourceFinder(object):
         if (forced_rms is not None) and (forced_bkg is not None):
             return
 
-        data = self.global_data.data_pix
-        beam = self.global_data.beam
+        # use the BANE background/rms calculation
+        step_size = get_step_size(self.global_data.img._header)
+        box_size = (5*step_size[0], 5*step_size[1])
 
-        img_x, img_y = data.shape
-        xcen = int(img_x / 2)
-        ycen = int(img_y / 2)
-
-        # calculate a local beam from the center of the data
-        pixbeam = self.global_data.psfhelper.get_pixbeam_pixel(xcen, ycen)
-        if pixbeam is None:
-            self.log.error("Cannot determine the beam shape at the image center")
-            sys.exit(1)
-
-        width_x = mesh_size * max(abs(math.cos(np.radians(pixbeam.pa)) * pixbeam.a),
-                                  abs(math.sin(np.radians(pixbeam.pa)) * pixbeam.b))
-        width_x = int(width_x)
-        width_y = mesh_size * max(abs(math.sin(np.radians(pixbeam.pa)) * pixbeam.a),
-                                  abs(math.cos(np.radians(pixbeam.pa)) * pixbeam.b))
-        width_y = int(width_y)
-
-        self.log.debug("image size x,y:{0},{1}".format(img_x, img_y))
-        self.log.debug("beam: {0}".format(beam))
-        self.log.debug("mesh width (pix) x,y: {0},{1}".format(width_x, width_y))
-
-        # box centered at image center then tilling outwards
-        xstart = int(xcen - width_x / 2) % width_x  # the starting point of the first "full" box
-        ystart = int(ycen - width_y / 2) % width_y
-
-        xend = img_x - int(img_x - xstart) % width_x  # the end point of the last "full" box
-        yend = img_y - int(img_y - ystart) % width_y
-
-        xmins = [0]
-        xmins.extend(list(range(xstart, xend, width_x)))
-        xmins.append(xend)
-
-        xmaxs = [xstart]
-        xmaxs.extend(list(range(xstart + width_x, xend + 1, width_x)))
-        xmaxs.append(img_x)
-
-        ymins = [0]
-        ymins.extend(list(range(ystart, yend, width_y)))
-        ymins.append(yend)
-
-        ymaxs = [ystart]
-        ymaxs.extend(list(range(ystart + width_y, yend + 1, width_y)))
-        ymaxs.append(img_y)
-
-        # if the image is smaller than our ideal mesh size, just use the whole image instead
-        if width_x >= img_x:
-            xmins = [0]
-            xmaxs = [img_x]
-        if width_y >= img_y:
-            ymins = [0]
-            ymaxs = [img_y]
-
-        if cores > 1:
-            # set up the queue
-            queue = pprocess.Queue(limit=cores, reuse=1)
-            estimate = queue.manage(pprocess.MakeReusable(self._estimate_bkg_rms))
-            # populate the queue
-            for xmin, xmax in zip(xmins, xmaxs):
-                for ymin, ymax in zip(ymins, ymaxs):
-                    estimate(ymin, ymax, xmin, xmax)
-        else:
-            queue = []
-            for xmin, xmax in zip(xmins, xmaxs):
-                for ymin, ymax in zip(ymins, ymaxs):
-                    queue.append(self._estimate_bkg_rms(xmin, xmax, ymin, ymax))
-
-        # only copy across the bkg/rms if they are not already set
-        # queue can only be traversed once so we have to put the if inside the loop
-        for ymin, ymax, xmin, xmax, bkg, rms in queue:
-            if (forced_rms is None):
-                self.global_data.rmsimg[ymin:ymax, xmin:xmax] = rms
-            if (forced_rms is None):
-                self.global_data.bkgimg[ymin:ymax, xmin:xmax] = bkg
+        bkg, rms = filter_image(im_name=filename, out_base=None,
+                                step_size=step_size, box_size=box_size,
+                                cores=cores)
+        if forced_rms is not None:
+            self.global_data.rmsimg = rms
+        if forced_bkg is not None:
+            self.global_data.bkgimg = bkg
 
         return
-
-    def _estimate_bkg_rms(self, xmin, xmax, ymin, ymax):
-        """
-        Estimate the background noise mean and RMS.
-        The mean is estimated as the median of data.
-        The RMS is estimated as the IQR of data / 1.34896.
-
-        Parameters
-        ----------
-        xmin, xmax, ymin, ymax : int
-            The bounding region over which the bkg/rms will be calculated.
-
-        Returns
-        -------
-        ymin, ymax, xmin, xmax : int
-            A copy of the input parameters
-
-        bkg, rms : float
-            The calculated background and noise.
-        """
-        data = self.global_data.data_pix[ymin:ymax, xmin:xmax]
-        pixels = np.extract(np.isfinite(data), data).ravel()
-        if len(pixels) < 4:
-            bkg, rms = np.NaN, np.NaN
-        else:
-            pixels.sort()
-            p25 = pixels[int(pixels.size / 4)]
-            p50 = pixels[int(pixels.size / 2)]
-            p75 = pixels[int(pixels.size / 4 * 3)]
-            iqr = p75 - p25
-            bkg, rms = p50, iqr / 1.34896
-        # return the input and output data so we know what we are doing
-        # when compiling the results of multiple processes
-        return ymin, ymax, xmin, xmax, bkg, rms
 
     def _load_aux_image(self, image, auxfile):
         """
@@ -1063,7 +1430,7 @@ class SourceFinder(object):
             # this may be a subset of all sources in the island
             included_sources = []
             for src in isle:
-                pixbeam = global_data.psfhelper.get_pixbeam(src.ra, src.dec)
+                pixbeam = Beam(*global_data.psfhelper.get_psf_sky2pix(src.ra, src.dec))
                 # find the right pixels from the ra/dec
                 source_x, source_y = global_data.wcshelper.sky2pix([src.ra, src.dec])
                 source_x -= 1
@@ -1142,12 +1509,13 @@ class SourceFinder(object):
             self.log.debug("xmxxymyx {0} {1} {2} {3}".format(xmin, xmax, ymin, ymax))
             for i in range(params['components'].value):
                 prefix = "c{0}_".format(i)
-                params[prefix + 'xo'].value -= xmin
+                # must update limits before the value as limits are enforced when the value is updated
                 params[prefix + 'xo'].min -= xmin
                 params[prefix + 'xo'].max -= xmin
-                params[prefix + 'yo'].value -= ymin
+                params[prefix + 'xo'].value -= xmin
                 params[prefix + 'yo'].min -= ymin
                 params[prefix + 'yo'].max -= ymin
+                params[prefix + 'yo'].value -= ymin
             # self.log.debug(params)
             # don't fit if there are no sources
             if params['components'].value < 1:
@@ -1296,24 +1664,44 @@ class SourceFinder(object):
 
         # get the beam parameters at the center of this island
         midra, middec = global_data.wcshelper.pix2sky([0.5 * (xmax + xmin), 0.5 * (ymax + ymin)])
-        beam = global_data.psfhelper.get_psf_pix(midra, middec)
+        beam = global_data.psfhelper.get_psf_sky2pix(midra, middec)
         del middec, midra
 
-        icurve = dcurve[xmin:xmax, ymin:ymax]
+        # the curvature needs a buffer of 1 pixel to correctly identify local min/max
+        # on the edge of the region. We need a 1 pix buffer (if available)
+        buffx = [xmin - max(xmin-1,0), min(xmax+1, global_data.data_pix.shape[0]) - xmax]
+        buffy = [ymin - max(ymin-1,0), min(ymax+1, global_data.data_pix.shape[1]) - ymax]
+        icurve = np.zeros(shape=(xmax-xmin + buffx[0] + buffx[1], ymax-ymin + buffy[0] + buffy[1]), dtype=np.int8)
+        # compute peaks and convert to +/-1
+        peaks = scipy.ndimage.filters.maximum_filter(self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]], size=3)
+        pmask = np.where(peaks == self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]])
+        troughs = scipy.ndimage.filters.minimum_filter(self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]], size=3)
+        tmask = np.where(troughs == self.global_data.data_pix[xmin-buffx[0]:xmax+buffx[1],
+                                                     ymin-buffy[0]:ymax+buffy[0]])
+        icurve[pmask] = -1
+        icurve[tmask] = 1
+        # icurve and idata need to be the same size so we crop icurve based on the buffers that we computed
+        icurve = icurve[buffx[0]:icurve.shape[0]-buffx[1], buffy[0]:icurve.shape[1]-buffy[1]]
+        del peaks, pmask, troughs, tmask
+        
         rms = rmsimg[xmin:xmax, ymin:ymax]
 
         is_flag = 0
-        pixbeam = global_data.psfhelper.get_pixbeam_pixel((xmin + xmax) / 2., (ymin + ymax) / 2.)
-        if pixbeam is None:
-            # This island is not 'on' the sky, ignore it
+        a, b, pa = global_data.psfhelper.get_psf_pix2pix((xmin + xmax) / 2., (ymin + ymax) / 2.)
+        if not np.all(np.isfinite((a, b, pa))):
+            # This island has no psf or is not 'on' the sky, ignore it
+            self.log.debug("Island has invalid WCS/Beam - Skipping.")
             return []
+        pixbeam = Beam(a, b, pa)
 
         self.log.debug("=====")
         self.log.debug("Island ({0})".format(isle_num))
-
         params = self.estimate_lmfit_parinfo(idata, rms, icurve, beam, innerclip, outerclip, offsets=[xmin, ymin],
                                              max_summits=max_summits)
-
+        # params = estimate_parinfo_image()
         # islands at the edge of a region of nans
         # result in no components
         if params is None or params['components'].value < 1:
@@ -1395,7 +1783,7 @@ class SourceFinder(object):
 
     def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, bkg=None, max_summits=None, innerclip=5,
                               outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
-                              nopositive=False, nonegative=False, mask=None, lat=None, imgpsf=None, blank=False,
+                              nopositive=False, nonegative=False, mask=None, imgpsf=None, blank=False,
                               docov=True, cube_index=None):
         """
         Run the Aegean source finder.
@@ -1444,9 +1832,6 @@ class SourceFinder(object):
             The filename of a region file created by MIMAS.
             Islands outside of this region will be ignored.
 
-        lat : float
-            The latitude of the telescope (declination of zenith).
-
         imgpsf : str or HDUList
              Filename or HDUList for a psf image.
 
@@ -1468,10 +1853,13 @@ class SourceFinder(object):
         # Tell numpy to be quiet
         np.seterr(invalid='ignore')
         if cores is not None:
-            if not (cores >= 1): raise AssertionError("cores must be one or more")
+            if not (cores >= 1):
+                raise AssertionError("cores must be one or more")
+        else:
+            cores = multiprocessing.cpu_count()
 
-        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, rms=rms, bkg=bkg, cores=cores,
-                          verb=True, mask=mask, lat=lat, psf=imgpsf, blank=blank, docov=docov, cube_index=cube_index)
+        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms,
+                          bkg=bkg, cores=cores, mask=mask, psf=imgpsf, blank=blank, docov=docov, cube_index=cube_index)
         global_data = self.global_data
         rmsimg = global_data.rmsimg
         data = global_data.data_pix
@@ -1494,11 +1882,20 @@ class SourceFinder(object):
 
         island_group = []
         group_size = 20
-        for i, xmin, xmax, ymin, ymax in self._gen_flood_wrap(data, rmsimg, innerclip, outerclip, domask=True):
+        islands = find_islands(im=data, bkg=np.zeros_like(data), rms=rmsimg,
+                               seed_clip=innerclip, flood_clip=outerclip,
+                               log=self.log)
+        self.log.info("Found {0} islands".format(len(islands)))
+        self.log.info("Begin fitting")
+        #for i, xmin, xmax, ymin, ymax in self._gen_flood_wrap(data, rmsimg, innerclip, outerclip, domask=True):
+        for island in islands:
+            #i = island.mask
+            [[xmin,xmax], [ymin,ymax]] = island.bounding_box
+            i = global_data.data_pix[xmin:xmax,ymin:ymax]
             # ignore empty islands
             # This should now be impossible to trigger
             if np.size(i) < 1:
-                self.log.warn("Empty island detected, this should be imposisble.")
+                self.log.warning("Empty island detected, this should be imposisble.")
                 continue
             isle_num += 1
             scalars = (innerclip, outerclip, max_summits)
@@ -1524,7 +1921,7 @@ class SourceFinder(object):
         # Write the output to the output file
         if outfile:
             print(header.format("{0}-({1})".format(__version__, __date__), filename), file=outfile)
-            print(OutputSource.header, file=outfile)
+            print(ComponentSource.header, file=outfile)
 
         sources = []
         for srcs in queue:
@@ -1537,10 +1934,11 @@ class SourceFinder(object):
                     if outfile:
                         print(str(src), file=outfile)
         self.sources.extend(sources)
+        self.log.info("Fit {0} sources".format(len(sources)))
         return sources
 
     def priorized_fit_islands(self, filename, catalogue, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1,
-                              rms=None, bkg=None, beam=None, lat=None, imgpsf=None, catpsf=None, stage=3, ratio=None, outerclip=3,
+                              rms=None, bkg=None, beam=None, imgpsf=None, catpsf=None, stage=3, ratio=None, outerclip=3,
                               doregroup=True, docov=True, cube_index=None):
         """
         Take an input catalog, and image, and optional background/noise images
@@ -1558,7 +1956,7 @@ class SourceFinder(object):
             Image filename or HDUList.
 
         catalogue : str or list
-            Input catalogue file name or list of OutputSource objects.
+            Input catalogue file name or list of ComponentSource objects.
 
         hdu_index : int
             The index of the FITS HDU (extension).
@@ -1580,9 +1978,6 @@ class SourceFinder(object):
             Floats representing the synthesised beam (degrees).
             Replaces whatever is given in the FITS header.
             If the FITS header has no BMAJ/BMIN then this is required.
-
-        lat : float
-            The latitude of the telescope (declination of zenith).
 
         imgpsf : str or HDUList
              Filename or HDUList for a psf image.
@@ -1615,8 +2010,8 @@ class SourceFinder(object):
 
         from AegeanTools.cluster import regroup
 
-        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, rms=rms, bkg=bkg, cores=cores, verb=True,
-                          do_curve=False, beam=beam, lat=lat, psf=imgpsf, docov=docov, cube_index=cube_index)
+        self.load_globals(filename, hdu_index=hdu_index, bkgin=bkgin, rmsin=rmsin, beam=beam, verb=True, rms=rms,
+                          bkg=bkg, cores=cores, do_curve=False, psf=imgpsf, docov=docov, cube_index=cube_index)
 
         global_data = self.global_data
         far = 10 * global_data.beam.a  # degrees
@@ -1658,7 +2053,7 @@ class SourceFinder(object):
             for i, src in enumerate(input_sources):
                 # Sources with an unknown psf are rejected as they are either outside the image
                 # or outside the region covered by the psf
-                skybeam = global_data.psfhelper.get_beam(src.ra, src.dec)
+                skybeam = global_data.psfhelper.get_skybeam(src.ra, src.dec)
                 if skybeam is None:
                     src_mask[i] = False
                     self.log.info("Excluding source ({0.island},{0.source}) due to lack of psf knowledge".format(src))
@@ -1676,7 +2071,8 @@ class SourceFinder(object):
         elif catpsf is not None or has_psf:
             if catpsf is not None:
                 self.log.info("Using catalog PSF from {0}".format(catpsf))
-                psf_helper = PSFHelper(catpsf, None)  # might need to set the WCSHelper to be not None
+                #TODO determine if the following needs to be adjusted
+                psf_helper = WCSHelper(None, beam=catpsf) #PSFHelper(catpsf, None)  # might need to set the WCSHelper to be not None
             else:
                 self.log.info("Using catalog PSF from input catalog")
                 psf_helper = None
@@ -1688,12 +2084,17 @@ class SourceFinder(object):
                 if has_psf:
                     catbeam = Beam(src.psf_a / 3600, src.psf_b / 3600, src.psf_pa)
                 else:
-                    catbeam = psf_helper.get_beam(src.ra, src.dec)
-                imbeam = global_data.psfhelper.get_beam(src.ra, src.dec)
+                    catbeam = Beam(*psf_helper.get_psf_sky2sky(src.ra, src.dec))
+                imbeam = global_data.psfhelper.get_skybeam(src.ra, src.dec)
                 # If either of the above are None then we skip this source.
                 if catbeam is None or imbeam is None:
+                    unknown = []
+                    if catbeam is None:
+                        unknown.append("input catalogue")
+                    if imbeam is None:
+                        unknown.append("image")
                     src_mask[i] = False
-                    self.log.info("Excluding source ({0.island},{0.source}) due to lack of psf knowledge".format(src))
+                    self.log.info("Excluding source ({0.island},{0.source}) due to lack of psf knowledge in {1}".format(src, ','.join(unknown)))
                     continue
 
                 # TODO: The following assumes that the various psf's are scaled versions of each other
@@ -1736,6 +2137,7 @@ class SourceFinder(object):
             queue = pprocess.Queue(limit=cores, reuse=1)
             fit_parallel = queue.manage(pprocess.MakeReusable(self._refit_islands))
 
+        self.log.info("Performing fits")
         sources = []
         island_group = []
         group_size = 20
@@ -1768,11 +2170,11 @@ class SourceFinder(object):
         # Write the output to the output file
         if outfile:
             print(header.format("{0}-({1})".format(__version__, __date__), filename), file=outfile)
-            print(OutputSource.header, file=outfile)
+            print(ComponentSource.header, file=outfile)
 
         components = 0
         for source in sources:
-            if isinstance(source, OutputSource):
+            if isinstance(source, ComponentSource):
                 components += 1
                 if outfile:
                     print(str(source), file=outfile)
@@ -1846,58 +2248,6 @@ def theta_limit(theta):
     return theta
 
 
-def scope2lat(telescope):
-    """
-    Convert a telescope name into a latitude
-    returns None when the telescope is unknown.
-
-    Parameters
-    ----------
-    telescope : str
-        Acronym (name) of telescope, eg MWA.
-
-    Returns
-    -------
-    lat : float
-        The latitude of the telescope.
-
-    Notes
-    -----
-    These values were taken from wikipedia so have varying precision/accuracy
-    """
-    scopes = {'MWA': -26.703319,
-              "ATCA": -30.3128,
-              "VLA": 34.0790,
-              "LOFAR": 52.9088,
-              "KAT7": -30.721,
-              "MEERKAT": -30.721,
-              "PAPER": -30.7224,
-              "GMRT": 19.096516666667,
-              "OOTY": 11.383404,
-              "ASKAP": -26.7,
-              "MOST": -35.3707,
-              "PARKES": -32.999944,
-              "WSRT": 52.914722,
-              "AMILA": 52.16977,
-              "AMISA": 52.164303,
-              "ATA": 40.817,
-              "CHIME": 49.321,
-              "CARMA": 37.28044,
-              "DRAO": 49.321,
-              "GBT": 38.433056,
-              "LWA": 34.07,
-              "ALMA": -23.019283,
-              "FAST": 25.6525
-              }
-    if telescope.upper() in scopes:
-        return scopes[telescope.upper()]
-    else:
-        log = logging.getLogger("Aegean")
-        log.warn("Telescope {0} is unknown".format(telescope))
-        log.warn("integrated fluxes may be incorrect")
-        return None
-
-
 def check_cores(cores):
     """
     Determine how many cores we are able to use.
@@ -1915,10 +2265,6 @@ def check_cores(cores):
 
     """
     cores = min(multiprocessing.cpu_count(), cores)
-    if six.PY3:
-        log = logging.getLogger("Aegean")
-        log.info("Multi-cores not supported in python 3+, using one core")
-        return 1
     try:
         queue = pprocess.Queue(limit=cores, reuse=1)
     except:  # TODO: figure out what error is being thrown

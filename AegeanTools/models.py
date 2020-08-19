@@ -5,11 +5,11 @@ Different types of sources that Aegean is able to fit
 """
 
 from __future__ import print_function
+import numpy as np
+import uuid
 
 __author__ = "Paul Hancock"
 
-import numpy as np
-import uuid
 
 class SimpleSource(object):
     """
@@ -55,6 +55,7 @@ class SimpleSource(object):
     names = ['background', 'local_rms', 'ra', 'dec', 'peak_flux', 'err_peak_flux', 'flags', 'peak_pixel', 'a', 'b',
              'pa', 'uuid']
     galactic = False
+
     def __init__(self):
         self.background = np.nan
         self.local_rms = np.nan
@@ -68,8 +69,6 @@ class SimpleSource(object):
         self.b = np.nan
         self.pa = np.nan
         self.uuid = str(uuid.uuid4())
-
-
 
     def _sanitise(self):
         """
@@ -240,7 +239,7 @@ class IslandSource(SimpleSource):
         return self.__gt__(other) or self.__eq__(other)
 
 
-class OutputSource(SimpleSource):
+class ComponentSource(SimpleSource):
     """
     A Gaussian component, aka a source, that was measured by Aegean.
 
@@ -427,7 +426,7 @@ class GlobalFittingData(object):
     hdu_header : HDUHeader
         FITS header for the input image.
 
-    beam : :class:`AegeanTools.fits_image.Beam`
+    beam : :class:`AegeanTools.wcs_helpers.Beam`
         The synthesized beam of the input image.
 
     data_pix : 2d-array
@@ -441,9 +440,6 @@ class GlobalFittingData(object):
 
     wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
         A helper object for WCS operations, created from `hdu_header`.
-
-    psfhelper : :class:`AegeanTools.wcs_helpers.PSFHelper`
-        A helper objects for tracking the changes in PSF over the image.
 
     blank : bool
         If true, then the input image will be blanked at the location of each of
@@ -464,6 +460,69 @@ class GlobalFittingData(object):
         self.wcshelper = None
         self.psfhelper = None
         self.blank = False
+        return
+
+
+class PixelIsland(object):
+    """
+    An island of pixels within an image or cube
+
+    Attributes
+    ----------
+    dim : int
+        The number of dimensions of this island. dim >=2, default is 2 (ra/dec).
+
+    bounding_box : [(min, max), (min, max), ...]
+        A bounding box for this island. len(bounding_box)==dim.
+
+    mask : np.array(dtype=bool)
+        A mask that represents the island within the bounding box.
+    """
+
+    def __init__(self, dim=2):
+        self.dim = dim
+        self.bounding_box = np.zeros((self.dim,2), dtype=np.int32)
+        self.mask = None
+        self.partial = False
+        return
+
+    def set_mask(self, data):
+        """
+
+        Parameters
+        ----------
+        data : np.array
+        """
+        if len(data.shape) != self.dim:
+            raise AssertionError("mask shape {0} is of the wrong dimension. Expecting {1}".format(data.shape, self.dim))
+        self.mask = data
+        return
+
+    def calc_bounding_box(self, data, offsets):
+        """
+        Compute the bounding box for a data cube of dimension dim.
+        The bounding box will be the smallest nd-cube that bounds the non-zero entries of the cube.
+        Parameters
+        ----------
+        data : np.ndarray
+            Data array with dimension equal to self.dim
+
+        offsets : [xmin, ymin, ...]
+            The offset between the image zero index and the zero index of data. len(offsets)==dim
+        """
+        if len(offsets)!=self.dim:
+            raise AssertionError("{0} offsets were passed but {1} are required".format(len(offsets),self.dim))
+        # TODO: Figure out 3d boxes
+        # set the bounding box one dimension at a time
+        ndrow = np.any(data, axis=0)
+        rmin, rmax = np.where(ndrow)[0][[0, -1]]
+        self.bounding_box[1][0] = offsets[1] + rmin
+        self.bounding_box[1][1] = offsets[1] + rmax + 1
+        ndcol = np.any(data, axis=1)
+        cmin, cmax = np.where(ndcol)[0][[0, -1]]
+        self.bounding_box[0][0] = offsets[0] + cmin
+        self.bounding_box[0][1] = offsets[0] + cmax + 1
+        self.set_mask(data[rmin:rmax+1, cmin:cmax+1])
         return
 
 
@@ -524,13 +583,13 @@ def classify_catalog(catalog):
     Parameters
     ----------
     catalog : iterable
-        A list or iterable object of {SimpleSource, IslandSource, OutputSource} objects, possibly mixed.
+        A list or iterable object of {SimpleSource, IslandSource, ComponentSource} objects, possibly mixed.
         Any other objects will be silently ignored.
 
     Returns
     -------
     components : list
-        List of sources of type OutputSource
+        List of sources of type ComponentSource
 
     islands : list
         List of sources of type IslandSource
@@ -542,7 +601,7 @@ def classify_catalog(catalog):
     islands = []
     simples = []
     for source in catalog:
-        if isinstance(source, OutputSource):
+        if isinstance(source, ComponentSource):
             components.append(source)
         elif isinstance(source, IslandSource):
             islands.append(source)
@@ -559,7 +618,7 @@ def island_itergen(catalog):
     Parameters
     ----------
     catalog : iterable
-        A list or iterable of :class:`AegeanTools.models.OutputSource` objects.
+        A list or iterable of :class:`AegeanTools.models.ComponentSource` objects.
 
     Yields
     ------

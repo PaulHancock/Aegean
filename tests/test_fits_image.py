@@ -5,13 +5,14 @@ Test fits_image.py
 
 from __future__ import print_function
 
-__author__ = 'Paul Hancock'
-
+import AegeanTools.wcs_helpers
 from AegeanTools import fits_image as fi
 from astropy.io import fits
 import logging
 import numpy as np
 from numpy.testing import assert_raises, assert_array_almost_equal
+
+__author__ = 'Paul Hancock'
 
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
@@ -22,7 +23,7 @@ def test_get_pixinfo():
     """Test that we can get info from various header styles"""
     header = fits.getheader('tests/test_files/1904-66_SIN.fits')
 
-    area, scale = fi.get_pixinfo(header)
+    area, scale = AegeanTools.wcs_helpers.get_pixinfo(header)
     if not area > 0: raise AssertionError()
     if not len(scale) == 2: raise AssertionError()
 
@@ -30,25 +31,25 @@ def test_get_pixinfo():
     del header['CDELT1']
     header['CD2_2'] = header['CDELT2']
     del header['CDELT2']
-    area, scale = fi.get_pixinfo(header)
+    area, scale = AegeanTools.wcs_helpers.get_pixinfo(header)
     if not area > 0: raise AssertionError()
     if not len(scale) == 2: raise AssertionError()
 
     header['CD1_2'] = 0
     header['CD2_1'] = 0
-    area, scale = fi.get_pixinfo(header)
+    area, scale = AegeanTools.wcs_helpers.get_pixinfo(header)
     if not area > 0: raise AssertionError()
     if not len(scale) == 2: raise AssertionError()
 
     header['CD1_2'] = header['CD1_1']
     header['CD2_1'] = header['CD2_2']
-    area, scale = fi.get_pixinfo(header)
+    area, scale = AegeanTools.wcs_helpers.get_pixinfo(header)
     if not area == 0: raise AssertionError()
     if not len(scale) == 2: raise AssertionError()
 
     for f in ['CD1_1', 'CD1_2', 'CD2_2', 'CD2_1']:
         del header[f]
-    area, scale = fi.get_pixinfo(header)
+    area, scale = AegeanTools.wcs_helpers.get_pixinfo(header)
     if not area == 0: raise AssertionError()
     if not scale == (0, 0): raise AssertionError()
 
@@ -56,13 +57,13 @@ def test_get_pixinfo():
 def test_get_beam():
     """Test that we can recover the beam from the fits header"""
     header = fits.getheader('tests/test_files/1904-66_SIN.fits')
-    beam = fi.get_beam(header)
+    beam = AegeanTools.wcs_helpers.get_beam(header)
     print(beam)
     if beam is None : raise AssertionError()
     if beam.pa != header['BPA']: raise AssertionError()
 
     del header['BMAJ'], header['BMIN'], header['BPA']
-    beam = fi.get_beam(header)
+    beam = AegeanTools.wcs_helpers.get_beam(header)
     if beam is not None : raise AssertionError()
 
 
@@ -70,15 +71,15 @@ def test_fix_aips_header():
     """TEst that we can fix an aips generated fits header"""
     header = fits.getheader('tests/test_files/1904-66_SIN.fits')
     # test when this function is not needed
-    _ = fi.fix_aips_header(header)
+    _ = AegeanTools.wcs_helpers.fix_aips_header(header)
 
     # test when beam params are not present, but there is no aips history
     del header['BMAJ'], header['BMIN'], header['BPA']
-    _ = fi.fix_aips_header(header)
+    _ = AegeanTools.wcs_helpers.fix_aips_header(header)
 
     # test with some aips history
     header['HISTORY'] = 'AIPS   CLEAN BMAJ=  1.2500E-02 BMIN=  1.2500E-02 BPA=   0.00'
-    _ = fi.fix_aips_header(header)
+    _ = AegeanTools.wcs_helpers.fix_aips_header(header)
 
 
 def test_init():
@@ -99,7 +100,7 @@ def test_init():
     if not im.bzero == 1: raise AssertionError()
 
     # should be able to supply a beam directly
-    beam = fi.Beam(1, 1, 0)
+    beam = AegeanTools.wcs_helpers.Beam(1, 1, 0)
     im = fi.FitsImage(hdu, beam=beam, cube_index=0)
     if not (im.beam is beam): raise AssertionError()
 

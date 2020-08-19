@@ -1,3 +1,72 @@
+v 2.2.2
+=======
+Aegean
+- Fixed a bug that could cause a crash if the psf map had nan values
+- Fixed a bug that caused island contours to just be boxes.
+- Fixed an error in the calculation of condon errors.
+
+MIMAS
+- added new functionality, `--mask2mim`, which will convert a fits file into a region file.
+  - new option `--threshold` will determine which pixels in the input image are in/out of the mask. Default is 1.
+
+BANE
+- fix a bug that would cause a crash if BSCALE was present and not 1.0
+
+AeRes
+- fix a bug that caused a crash when the option `--frac` was used.
+v 2.2.1
+=======
+Aegean
+- Source finding metadata (stored in some output files) includes invocation string
+- Fixed a bug in `get_sky_beam` that occurred when either the input or output contained nan
+- Fixed a bug where `seed_clip` was used instead of `flood_clip` in the calculation of islands for fitting
+- Fixed a bug that could occur in proirised fitting when users created UUID strings of variable length
+- Fixed an issue that caused incorrect psf to be computed if the psf and image maps have different size/wcs.
+
+
+v 2.2.0
+=======
+Aegean
+- Internal bkg/rms calculations have been replaced with calls to BANE
+- Handling of the image psf has been drastically improved, but at the expense of only supporting SIN images
+  - Images that are not in SIN projection are supported but should use an external psf map
+- `--telescope` and `--lat` options have been deprecated as they are no longer required
+
+v 2.1.1
+=======
+General
+- drop support for python <2.7
+ 
+Aegean
+- Support for lmfit v 0.9.15 and above (affects priorized fitting only)
+- force `psf_pa` to be a float (ie 0.0) when BPA is not supplied
+- ensure that `err_*` columns are always reported as floats (ie errs are now -1.0)
+- report filename of interest when region files can't be found 
+
+BANE
+- `filter_image` will now return maps and saving to a file is optional
+
+SR6
+- automatically determine a default reduction factor
+
+v 2.1.0
+=======
+General
+- Begin preparation for a major update (Aegean 3.0)
+- Include `pprocess.py` and update it to support python3
+- Update testing to include python 3.7 on ubuntu 16.04
+- Remove old an unused `Test` directory and files (saves space for installs)
+
+Aegean
+- Allow multi-core processing in python3
+- Do curvature calculation on islands instead of entire image (small speed improvement)
+
+2019-09-03
+==========
+Aegean
+- Fix a bug that caused int/peak flux ratios to be not 1 in some cases
+- Island integrated fluxes are now computed in the same way as components
+
 2018-09-13
 ==========
 BANE
