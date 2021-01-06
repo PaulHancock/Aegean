@@ -3,6 +3,10 @@ v 2.2.3
 Aegean
 - Fixed a bug that caused a crash if the input file was in galactic coordinates
 
+AeRes
+- Fix a bug that caused a model to be subtracted before masking was applied.
+- Allow input catalogue to have non-standard column names. User can map column names using command line options. See `AeRes --help` for details.
+
 v 2.2.2
 =======
 Aegean
@@ -19,6 +23,7 @@ BANE
 
 AeRes
 - fix a bug that caused a crash when the option `--frac` was used.
+
 v 2.2.1
 =======
 Aegean
