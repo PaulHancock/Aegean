@@ -1,3 +1,8 @@
+v 2.2.3
+=======
+Aegean
+- Fixed a bug that caused a crash if the input file was in galactic coordinates
+
 v 2.2.2
 =======
 Aegean
