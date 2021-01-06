@@ -16,7 +16,10 @@ from AegeanTools import catalogs, fitting, wcs_helpers
 FWHM2CC = 1 / (2 * np.sqrt(2 * np.log(2)))
 
 
-def load_sources(filename):
+def load_sources(filename,
+                 ra_col='ra', dec_col='dec',
+                 peak_col='peak_flux',
+                 a_col='a', b_col='b', pa_col='pa'):
     """
     Open a file, read contents, return a list of all the sources in that file.
 
@@ -25,21 +28,31 @@ def load_sources(filename):
     filename : str
         Filename to be read
 
+    ra_col, dec_col, peak_col, a_col, b_col, pa_col : str
+        The column names for each of the parameters.
+        Default = ['ra', 'dec', 'peak_flux', 'a', 'b', 'pa']
+
     Return
     ------
     catalog : [`class:AegeanTools.models.ComponentSource`, ...]
         A list of source components
     """
     table = catalogs.load_table(filename)
-    required_cols = ['ra','dec','peak_flux','a','b','pa']
+    required_cols = [ra_col, dec_col, peak_col, a_col, b_col, pa_col]
+    #required_cols = ['ra','dec','peak_flux','a','b','pa']
     good = True
     for c in required_cols:
         if c not in table.colnames:
             logging.error("Column {0} not found".format(c))
             good = False
     if not good:
-        logging.error("Some required columns missing")
+        logging.error("Some required columns missing or mis-labeled")
         return None
+    # rename the table columns
+    for old, new in zip([ra_col, dec_col, peak_col, a_col, b_col, pa_col],
+                        ['ra', 'dec', 'peak_flux', 'a', 'b', 'pa']):
+        table.rename_column(old, new)
+
     catalog = catalogs.table_to_source_list(table)
     logging.info("read {0} sources from {1}".format(len(catalog), filename))
     return catalog
@@ -145,7 +158,8 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
     return m
 
 
-def make_residual(fitsfile, catalog, rfile, mfile=None, add=False, mask=False, frac=None, sigma=4):
+def make_residual(fitsfile, catalog, rfile, mfile=None, add=False, mask=False, frac=None, sigma=4,
+                  colmap=None):
     """
     Take an input image and catalogue, make a model of the catalogue, and then add/subtract or mask the input image.
     Saving the residual and (optionally) model files.
@@ -176,11 +190,20 @@ def make_residual(fitsfile, catalog, rfile, mfile=None, add=False, mask=False, f
     sigma : float
         pixels that are brighter than sigma*local_rms for each source will be masked if mask=True
 
+    colmap : dict
+        A mapping of column names. Default is:
+        {'ra_col':'ra', 'dec_col':'dec', 'peak_col':'peak_flux', 'a_col':'a', 'b_col':'b', 'pa_col':'pa}
+
     Return
     ------
     None
     """
-    source_list = load_sources(catalog)
+
+    if colmap is None:
+        colmap = {}
+
+    source_list = load_sources(catalog, **colmap)
+
     if source_list is None:
         return None
     # force two axes so that we dump redundant stokes/freq axes if they are present.

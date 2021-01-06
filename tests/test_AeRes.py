@@ -20,7 +20,22 @@ def test_load_sources():
     filename = 'tests/test_files/1904_comp.fits'
     cat = ar.load_sources(filename)
     if cat is None:
-        raise AssertionError("load_sources_failed")
+        raise AssertionError("load_sources failed")
+    return
+
+
+def test_load_soruces_renamed_columns():
+    """Test load_sources with renamed columns"""
+    filename = 'tests/test_files/1904_comp_renamed_cols.fits'
+    colnames = {'ra_col':'RAJ2000',
+                'dec_col':'DEJ2000',
+                'peak_col':'S',
+                'a_col':'bmaj',
+                'b_col':'bmin',
+                'pa_col':'bpa'}
+    cat = ar.load_sources(filename,**colnames)
+    if cat is None:
+        raise AssertionError("load_sources failed with renamed columns")
     return
 
 
