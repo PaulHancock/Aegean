@@ -159,6 +159,17 @@ def test_psf_funcs():
     return
 
 
+def test_galactic_coords():
+    """Test that we can work with galactic coordinates"""
+    fname = 'tests/test_files/1904-66_SIN.lb.fits'
+    header = fits.getheader(fname)
+    try:
+        helper = WCSHelper.from_header(header)
+    except ValueError as e:
+        raise AssertionError("galactic coordinates break WCSHelper")
+    return
+
+
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
