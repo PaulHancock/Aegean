@@ -87,6 +87,10 @@ class WCSHelper(object):
         self._psf_map = None  # image data for the psf
         self._psf_wcs = None  # wcs for the psf map
 
+        # until we can determine the difference between ra/dec based only on the wcs
+        # we must avoid using this sorting option
+        self.ra_dec_order = False
+
         # the psf in pixel coords, at the reference coordinate
         self._psf_a = None
         self._psf_b = None
@@ -99,6 +103,7 @@ class WCSHelper(object):
                                                                                    self.beam.a,
                                                                                    self.beam.b,
                                                                                    self.beam.pa)
+
 
     # This construct gives us an attribute 'self.psf_map' which is only loaded on demand
     @property
@@ -203,7 +208,7 @@ class WCSHelper(object):
         """
         x, y = pixel
         # wcs and python have opposite ideas of x/y
-        return self.wcs.all_pix2world([[y, x]], 1, ra_dec_order=True)[0]
+        return self.wcs.all_pix2world([[y, x]], 1, ra_dec_order=self.ra_dec_order)[0]
 
     def sky2pix(self, pos):
         """
@@ -221,7 +226,7 @@ class WCSHelper(object):
             The (x,y) pixel coordinates
 
         """
-        pixel = self.wcs.all_world2pix([pos], 1, ra_dec_order=True)
+        pixel = self.wcs.all_world2pix([pos], 1, ra_dec_order=self.ra_dec_order)
         # wcs and python have opposite ideas of x/y
         return [pixel[0][1], pixel[0][0]]
 
@@ -243,7 +248,7 @@ class WCSHelper(object):
         """
         # wcs and python have opposite ideas of x/y
         if self.psf_wcs is not None:
-            pixel = self.psf_wcs.all_world2pix([pos], 1, ra_dec_order=True)
+            pixel = self.psf_wcs.all_world2pix([pos], 1, ra_dec_order=self.ra_dec_order)
             return [pixel[0][1], pixel[0][0]]
         return None
 
