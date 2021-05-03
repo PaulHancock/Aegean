@@ -1887,7 +1887,8 @@ class SourceFinder(object):
                                log=self.log)
         self.log.info("Found {0} islands".format(len(islands)))
         self.log.info("Begin fitting")
-        #for i, xmin, xmax, ymin, ymax in self._gen_flood_wrap(data, rmsimg, innerclip, outerclip, domask=True):
+
+        n_island_groups = 0
         for island in islands:
             #i = island.mask
             [[xmin,xmax], [ymin,ymax]] = island.bounding_box
@@ -1907,16 +1908,19 @@ class SourceFinder(object):
             if cores == 1:
                 res = self._fit_island(island_data)
                 queue.append(res)
+                n_island_groups += 1
             else:
                 island_group.append(island_data)
                 # If the island group is full queue it for the subprocesses to fit
                 if len(island_group) >= group_size:
                     fit_parallel(island_group)
+                    n_island_groups += 1
                     island_group = []
 
         # The last partially-filled island group also needs to be queued for fitting
         if len(island_group) > 0:
             fit_parallel(island_group)
+            n_island_groups += 1
 
         # Write the output to the output file
         if outfile:
@@ -1924,7 +1928,11 @@ class SourceFinder(object):
             print(ComponentSource.header, file=outfile)
 
         sources = []
-        for srcs in queue:
+        ten_percent = max(1, round(n_island_groups/10)) # for emitting progress information
+
+        for i, srcs in enumerate(queue):
+            if (i % ten_percent) == 0: # print progress every 10 percent
+                self.log.info("{0:3.0f}% fitting completed".format(i/n_island_groups*100))
             if srcs:  # ignore empty lists
                 for src in srcs:
                     # ignore sources that we have been told to ignore
@@ -2142,27 +2150,35 @@ class SourceFinder(object):
         island_group = []
         group_size = 20
 
+        n_island_groups = 0
         for i, island in enumerate(groups):
             island_group.append(island)
             # If the island group is full queue it for the subprocesses to fit
             if len(island_group) >= group_size:
                 if cores > 1:
                     fit_parallel(island_group, stage, outerclip, istart=i)
+                    n_island_groups += 1
                 else:
                     res = self._refit_islands(island_group, stage, outerclip, istart=i)
                     queue.append(res)
+                    n_island_groups += 1
                 island_group = []
 
         # The last partially-filled island group also needs to be queued for fitting
         if len(island_group) > 0:
             if cores > 1:
                 fit_parallel(island_group, stage, outerclip, istart=i)
+                n_island_groups += 1
             else:
                 res = self._refit_islands(island_group, stage, outerclip, istart=i)
                 queue.append(res)
+                n_island_groups += 1
 
+        ten_percent = max(1, round(n_island_groups/10)) # for emitting progress information
         # now unpack the fitting results in to a list of sources
-        for s in queue:
+        for i,s in enumerate(queue):
+            if (i % ten_percent) == 0: # print progress every 10 percent
+                self.log.info("{0:3.0f}% fitting completed".format(i/n_island_groups*100))
             sources.extend(s)
 
         sources = sorted(sources)
