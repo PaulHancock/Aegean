@@ -36,6 +36,7 @@ else:
     reqs.append('astropy>=2.0')
     reqs.append('healpy >=1.10')
     reqs.append('lmfit>=0.9.2')
+    reqs.append('tqdm>=4.0.0')
 
 data_dir = 'AegeanTools/data'
 

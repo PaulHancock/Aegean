@@ -14,6 +14,7 @@ import logging
 import logging.config
 import lmfit
 import scipy
+from tqdm import tqdm
 from scipy.special import erf
 from scipy.ndimage import label, find_objects
 from scipy.ndimage.filters import minimum_filter, maximum_filter
@@ -1784,7 +1785,7 @@ class SourceFinder(object):
     def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, bkg=None, max_summits=None, innerclip=5,
                               outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
                               nopositive=False, nonegative=False, mask=None, imgpsf=None, blank=False,
-                              docov=True, cube_index=None):
+                              docov=True, cube_index=None, progress=False):
         """
         Run the Aegean source finder.
 
@@ -1843,6 +1844,9 @@ class SourceFinder(object):
 
         cube_index : int
             For image cubes, cube_index determines which slice is used.
+
+        progress : bool
+            Produce a progress bar as islands are being fitted. (default=False)
 
         Returns
         -------
@@ -1924,7 +1928,7 @@ class SourceFinder(object):
             print(ComponentSource.header, file=outfile)
 
         sources = []
-        for srcs in queue:
+        for srcs in tqdm(queue, total=len(islands), desc='Fitted Islands', disable=not progress):
             if srcs:  # ignore empty lists
                 for src in srcs:
                     # ignore sources that we have been told to ignore

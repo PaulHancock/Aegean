@@ -81,7 +81,8 @@ if __name__ == "__main__":
                         help='DEPRECATED')
     group1.add_argument('--slice', dest='slice', type=int, default=None,
                         help='If the input data is a cube, then this slice will determine the array index of the image which will be processed by aegean')
-
+    group1.add_argument('--progress', default=False, action='store_true',
+                    help='Provide a progress bar as islands are being fitted. [default: False')
 
     # Input
     group2 = parser.add_argument_group("Input Options")
@@ -346,7 +347,7 @@ if __name__ == "__main__":
                                          doislandflux=options.doislandflux,
                                          nonegative=not options.negative, nopositive=options.nopositive,
                                          mask=options.region, imgpsf=options.imgpsf, blank=options.blank,
-                                         docov=options.docov, cube_index=options.slice)
+                                         docov=options.docov, cube_index=options.slice, progress=options.progress)
         if options.blank:
             outname = basename+'_blank.fits'
             sf.save_image(outname)
