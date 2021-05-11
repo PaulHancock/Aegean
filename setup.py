@@ -24,7 +24,8 @@ def get_version():
 
 
 reqs = ['scipy>=0.16',
-        'six>=1.11']
+        'six>=1.11',
+        'tqdm>=4']
 
 if sys.version_info < (3,0):
     reqs.append('numpy>=1.16,<1.17')
