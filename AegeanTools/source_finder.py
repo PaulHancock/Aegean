@@ -1785,7 +1785,7 @@ class SourceFinder(object):
     def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, bkg=None, max_summits=None, innerclip=5,
                               outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
                               nopositive=False, nonegative=False, mask=None, imgpsf=None, blank=False,
-                              docov=True, cube_index=None):
+                              docov=True, cube_index=None, progress=False):
         """
         Run the Aegean source finder.
 
@@ -1844,6 +1844,9 @@ class SourceFinder(object):
 
         cube_index : int
             For image cubes, cube_index determines which slice is used.
+
+        progress : bool
+            If true then show a progress bar when fitting island groups
 
         Returns
         -------
@@ -1925,7 +1928,7 @@ class SourceFinder(object):
             for g in island_groups:
                 fit_parallel(g)
 
-            with tqdm(total=len(island_groups), desc="Fitting Island Groups:") as pbar:
+            with tqdm(total=len(island_groups), desc="Fitting Island Groups:", disable=not progress) as pbar:
                 # turn our queue into a list of sources, filtering +/- peak flux as required
                 for srcs in queue:
                     pbar.update(1)
@@ -1947,9 +1950,10 @@ class SourceFinder(object):
         self.log.info("Fit {0} sources".format(len(sources)))
         return sources
 
+
     def priorized_fit_islands(self, filename, catalogue, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1,
                               rms=None, bkg=None, beam=None, imgpsf=None, catpsf=None, stage=3, ratio=None, outerclip=3,
-                              doregroup=True, docov=True, cube_index=None):
+                              doregroup=True, docov=True, cube_index=None, progress=False):
         """
         Take an input catalog, and image, and optional background/noise images
         fit the flux and ra/dec for each of the given sources, keeping the morphology fixed
@@ -2010,6 +2014,8 @@ class SourceFinder(object):
         cube_index : int
             For image cubes, slice determines which slice is used.
 
+        progress : bool
+            If true then show a progress bar when fitting island groups
 
         Returns
         -------
@@ -2159,7 +2165,7 @@ class SourceFinder(object):
             island_groups.append(island_group)
 
         sources = []
-        with tqdm(total=len(island_groups), desc="Refitting Island Groups") as pbar:
+        with tqdm(total=len(island_groups), desc="Refitting Island Groups", disable=not progress) as pbar:
             if cores == 1:
                 for i, g in enumerate(island_groups):
                     srcs = self._refit_islands(g, stage, outerclip, istart=i)
