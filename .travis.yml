@@ -2,7 +2,7 @@ language: python
 dist: xenial
 cache: pip
 python:
-  - "2.7.14"
+  - "3.6"
   - "3.7"
 # command to install dependencies
 install:

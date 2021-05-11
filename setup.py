@@ -3,7 +3,6 @@
 Setup for AegeanTools
 """
 import os
-import sys
 from setuptools import setup
 
 # Utility function to read the README file.
@@ -25,18 +24,11 @@ def get_version():
 
 reqs = ['scipy>=0.16',
         'six>=1.11',
-        'tqdm>=4']
-
-if sys.version_info < (3,0):
-    reqs.append('numpy>=1.16,<1.17')
-    reqs.append('astropy>=2.0, <3')
-    reqs.append('healpy >=1.10, <=1.13')
-    reqs.append('lmfit>=0.9.2, <1')
-else:
-    reqs.append('numpy>=1.16')
-    reqs.append('astropy>=2.0')
-    reqs.append('healpy >=1.10')
-    reqs.append('lmfit>=0.9.2')
+        'tqdm>=4',
+        'numpy>=1.16',
+        'astropy>=2.0',
+        'healpy >=1.10',
+        'lmfit>=0.9.2']
 
 data_dir = 'AegeanTools/data'
 
@@ -53,7 +45,7 @@ setup(
     install_requires=reqs,
     scripts=['scripts/aegean', 'scripts/BANE', 'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS'],
     data_files=[('AegeanTools', [os.path.join(data_dir, 'MOC.fits')]) ],
-    python_requires='>=2.7',
+    python_requires='>=3.6',
     setup_requires=['pytest-runner'],
     tests_require=['pytest', 'nose']
 )
