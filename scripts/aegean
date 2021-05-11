@@ -75,10 +75,6 @@ if __name__ == "__main__":
     group1.add_argument('--beam', dest='beam', type=float, nargs=3, default=None,
                         help='The beam parameters to be used is "--beam major minor pa" all in degrees. ' +
                              '[default: read from fits header].')
-    group1.add_argument('--telescope', dest='telescope', type=str, default=None,
-                        help='DEPRECATED')
-    group1.add_argument('--lat', dest='lat', type=float, default=None,
-                        help='DEPRECATED')
     group1.add_argument('--slice', dest='slice', type=int, default=None,
                         help='If the input data is a cube, then this slice will determine the array index of the image which will be processed by aegean')
     group1.add_argument('--progress', default=False, action='store_true',
@@ -183,13 +179,6 @@ if __name__ == "__main__":
 
     log.debug("Run as:\n{0}".format(invocation_string))
 
-    # deprecation warnings
-    if options.telescope is not None:
-        log.warn("--telescope has been deprecated. Ignoring.")
-
-    if options.lat is not None:
-        log.warn("--lat has been deprecated. Ignoring.")
-  
     # options that don't require image inputs
     if options.cite:
         print(__citation__)
@@ -216,10 +205,6 @@ if __name__ == "__main__":
     if options.image is None:
         parser.print_help()
         sys.exit(0)
-
-    from AegeanTools.source_finder import SourceFinder, check_cores
-    # source finding object
-    sf = SourceFinder(log=log)
 
     # check that a valid filename was entered
     filename = options.image
