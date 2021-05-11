@@ -1938,11 +1938,10 @@ class SourceFinder(object):
 
         # Write the output to the output file
         if outfile:
-            with open(outfile, 'r') as f:
-                print(header.format("{0}-({1})".format(__version__, __date__), filename), file=f)
-                print(ComponentSource.header, file=f)
-                for s in sources:
-                            print(str(s), file=f)
+            print(header.format("{0}-({1})".format(__version__, __date__), filename), file=outfile)
+            print(ComponentSource.header, file=outfile)
+            for s in sources:
+                        print(str(s), file=outfile)
 
         self.sources.extend(sources)
         self.log.info("Fit {0} sources".format(len(sources)))
@@ -2142,47 +2141,39 @@ class SourceFinder(object):
         else:
             groups = list(island_itergen(input_sources))
 
-        if cores == 1:  # single-threaded, no parallel processing
-            queue = []
-        else:
-            queue = pprocess.Queue(limit=cores, reuse=1)
-            fit_parallel = queue.manage(pprocess.MakeReusable(self._refit_islands))
 
-        self.log.info("Performing fits")
-        sources = []
-        island_group = []
+        self.log.info("Begin fitting")
+
+        island_groups = []  # will be a list of groups of islands
+        island_group = []   # will be a list of islands
         group_size = 20
 
-        n_island_groups = 0
-        for i, island in enumerate(groups):
+        for island in groups:
             island_group.append(island)
             # If the island group is full queue it for the subprocesses to fit
             if len(island_group) >= group_size:
-                if cores > 1:
-                    fit_parallel(island_group, stage, outerclip, istart=i)
-                    n_island_groups += 1
-                else:
-                    res = self._refit_islands(island_group, stage, outerclip, istart=i)
-                    queue.append(res)
-                    n_island_groups += 1
+                island_groups.append(island_group)
                 island_group = []
-
         # The last partially-filled island group also needs to be queued for fitting
         if len(island_group) > 0:
-            if cores > 1:
-                fit_parallel(island_group, stage, outerclip, istart=i)
-                n_island_groups += 1
-            else:
-                res = self._refit_islands(island_group, stage, outerclip, istart=i)
-                queue.append(res)
-                n_island_groups += 1
+            island_groups.append(island_group)
 
-        ten_percent = max(1, round(n_island_groups/10)) # for emitting progress information
-        # now unpack the fitting results in to a list of sources
-        for i,s in enumerate(queue):
-            if (i % ten_percent) == 0: # print progress every 10 percent
-                self.log.info("{0:3.0f}% fitting completed".format(i/n_island_groups*100))
-            sources.extend(s)
+        sources = []
+        with tqdm(total=len(island_groups), desc="Refitting Island Groups") as pbar:
+            if cores == 1:
+                for i, g in enumerate(island_groups):
+                    srcs = self._refit_islands(g, stage, outerclip, istart=i)
+                    pbar.update(1)  # update bar as each individual island is fit
+                    sources.extend(srcs)
+            else:
+                queue = pprocess.Queue(limit=cores, reuse=1)
+                fit_parallel = queue.manage(pprocess.MakeReusable(self._refit_islands))
+                for i, g in enumerate(island_groups):
+                    fit_parallel(g, stage, outerclip, istart=i)
+                for srcs in queue:
+                    pbar.update(1)
+                    sources.extend(srcs)
+
 
         sources = sorted(sources)
 
@@ -2190,15 +2181,10 @@ class SourceFinder(object):
         if outfile:
             print(header.format("{0}-({1})".format(__version__, __date__), filename), file=outfile)
             print(ComponentSource.header, file=outfile)
+            for source in sources:
+                print(str(source), file=outfile)
 
-        components = 0
-        for source in sources:
-            if isinstance(source, ComponentSource):
-                components += 1
-                if outfile:
-                    print(str(source), file=outfile)
-
-        self.log.info("fit {0} components".format(components))
+        self.log.info("fit {0} components".format(len(sources)))
         self.sources.extend(sources)
         return sources
 
