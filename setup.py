@@ -3,7 +3,6 @@
 Setup for AegeanTools
 """
 import os
-import sys
 from setuptools import setup
 
 # Utility function to read the README file.
@@ -24,35 +23,44 @@ def get_version():
 
 
 reqs = ['scipy>=0.16',
-        'six>=1.11']
-
-if sys.version_info < (3,0):
-    reqs.append('numpy>=1.16,<1.17')
-    reqs.append('astropy>=2.0, <3')
-    reqs.append('healpy >=1.10, <=1.13')
-    reqs.append('lmfit>=0.9.2, <1')
-else:
-    reqs.append('numpy>=1.16')
-    reqs.append('astropy>=2.0')
-    reqs.append('healpy >=1.10')
-    reqs.append('lmfit>=0.9.2')
+        'six>=1.11',
+        'tqdm>=4',
+        'numpy>=1.16',
+        'astropy>=2.0',
+        'healpy >=1.10',
+        'lmfit>=0.9.2']
 
 data_dir = 'AegeanTools/data'
 
 setup(
     name="AegeanTools",
+    packages=['AegeanTools'],
     version=get_version(),
-    author="Paul Hancock",
-    author_email="Mr.Paul.Hancock@gmail.com",
+    licence='afl-3.0',
+
     description="The Aegean source finding program, and associated tools.",
-    url="https://github.com/PaulHancock/Aegean",
     long_description=read('README.md'),
     long_description_content_type='text/markdown',
-    packages=['AegeanTools'],
+    author="Paul Hancock",
+    author_email="Mr.Paul.Hancock@gmail.com",
+    url="https://github.com/PaulHancock/Aegean",
+
     install_requires=reqs,
     scripts=['scripts/aegean', 'scripts/BANE', 'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS'],
     data_files=[('AegeanTools', [os.path.join(data_dir, 'MOC.fits')]) ],
-    python_requires='>=2.7',
+    python_requires='>=3.6',
     setup_requires=['pytest-runner'],
-    tests_require=['pytest', 'nose']
+    tests_require=['pytest', 'nose'],
+
+    keywords=['image processing', 'radioastronomy'],
+    classifiers = [
+    'Development Status :: 5 - Production/Stable',      # Chose either "3 - Alpha", "4 - Beta" or "5 - Production/Stable" as the current state of your package
+    'Intended Audience :: Science/Research',
+    'Topic :: Scientific/Engineering :: Astronomy',
+    'License :: OSI Approved :: Academic Free License 3.0 (AFL-3.0)',
+    'Programming Language :: Python :: 3.6',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+  ],
 )

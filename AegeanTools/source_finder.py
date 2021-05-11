@@ -17,6 +17,7 @@ import scipy
 from scipy.special import erf
 from scipy.ndimage import label, find_objects
 from scipy.ndimage.filters import minimum_filter, maximum_filter
+from tqdm import tqdm
 # AegeanTools
 from .BANE import filter_image, get_step_size
 import AegeanTools.wcs_helpers
@@ -1784,7 +1785,7 @@ class SourceFinder(object):
     def find_sources_in_image(self, filename, hdu_index=0, outfile=None, rms=None, bkg=None, max_summits=None, innerclip=5,
                               outerclip=4, cores=None, rmsin=None, bkgin=None, beam=None, doislandflux=False,
                               nopositive=False, nonegative=False, mask=None, imgpsf=None, blank=False,
-                              docov=True, cube_index=None):
+                              docov=True, cube_index=None, progress=False):
         """
         Run the Aegean source finder.
 
@@ -1844,6 +1845,9 @@ class SourceFinder(object):
         cube_index : int
             For image cubes, cube_index determines which slice is used.
 
+        progress : bool
+            If true then show a progress bar when fitting island groups
+
         Returns
         -------
         sources : list
@@ -1872,24 +1876,18 @@ class SourceFinder(object):
         self.log.info("seedclip={0}".format(innerclip))
         self.log.info("floodclip={0}".format(outerclip))
 
-        isle_num = 0
-
-        if cores == 1:  # single-threaded, no parallel processing
-            queue = []
-        else:
-            queue = pprocess.Queue(limit=cores, reuse=1)
-            fit_parallel = queue.manage(pprocess.MakeReusable(self._fit_islands))
-
-        island_group = []
-        group_size = 20
         islands = find_islands(im=data, bkg=np.zeros_like(data), rms=rmsimg,
                                seed_clip=innerclip, flood_clip=outerclip,
                                log=self.log)
         self.log.info("Found {0} islands".format(len(islands)))
         self.log.info("Begin fitting")
-        #for i, xmin, xmax, ymin, ymax in self._gen_flood_wrap(data, rmsimg, innerclip, outerclip, domask=True):
+
+        island_groups = []  # will be a list of groups of islands
+        island_group = []   # will be a list of islands
+        group_size = 20
+        isle_num = 0
+
         for island in islands:
-            #i = island.mask
             [[xmin,xmax], [ymin,ymax]] = island.bounding_box
             i = global_data.data_pix[xmin:xmax,ymin:ymax]
             # ignore empty islands
@@ -1901,45 +1899,61 @@ class SourceFinder(object):
             scalars = (innerclip, outerclip, max_summits)
             offsets = (xmin, xmax, ymin, ymax)
             island_data = IslandFittingData(isle_num, i, scalars, offsets, doislandflux)
-            # If cores==1 run fitting in main process. Otherwise build up groups of islands
-            # and submit to queue for subprocesses. Passing a group of islands is more
-            # efficient than passing single islands to the subprocesses.
-            if cores == 1:
-                res = self._fit_island(island_data)
-                queue.append(res)
-            else:
-                island_group.append(island_data)
-                # If the island group is full queue it for the subprocesses to fit
-                if len(island_group) >= group_size:
-                    fit_parallel(island_group)
-                    island_group = []
-
+            island_group.append(island_data)
+            # If the island group is full queue it for the subprocesses to fit
+            if len(island_group) >= group_size:
+                island_groups.append(island_group)
+                island_group = []
         # The last partially-filled island group also needs to be queued for fitting
         if len(island_group) > 0:
-            fit_parallel(island_group)
+            island_groups.append(island_group)
+
+        # now fit all the groups and put results into queue
+        sources = []
+        if cores == 1:
+            with tqdm(total=isle_num, desc="Fitting Islands:") as pbar:
+                for g in island_groups:
+                    for i in g:
+                        srcs = self._fit_island(i)
+                        pbar.update(1)  # update bar as each individual island is fit
+                        for src in srcs:
+                            # ignore sources that we have been told to ignore
+                            if (src.peak_flux > 0 and nopositive) or (src.peak_flux < 0 and nonegative):
+                                continue
+                            sources.append(src)
+
+        else:
+            queue = pprocess.Queue(limit=cores, reuse=1)
+            fit_parallel = queue.manage(pprocess.MakeReusable(self._fit_islands))
+            for g in island_groups:
+                fit_parallel(g)
+
+            with tqdm(total=len(island_groups), desc="Fitting Island Groups:", disable=not progress) as pbar:
+                # turn our queue into a list of sources, filtering +/- peak flux as required
+                for srcs in queue:
+                    pbar.update(1)
+                    if srcs:  # ignore empty lists
+                        for src in srcs:
+                            # ignore sources that we have been told to ignore
+                            if (src.peak_flux > 0 and nopositive) or (src.peak_flux < 0 and nonegative):
+                                continue
+                            sources.append(src)
 
         # Write the output to the output file
         if outfile:
             print(header.format("{0}-({1})".format(__version__, __date__), filename), file=outfile)
             print(ComponentSource.header, file=outfile)
+            for s in sources:
+                        print(str(s), file=outfile)
 
-        sources = []
-        for srcs in queue:
-            if srcs:  # ignore empty lists
-                for src in srcs:
-                    # ignore sources that we have been told to ignore
-                    if (src.peak_flux > 0 and nopositive) or (src.peak_flux < 0 and nonegative):
-                        continue
-                    sources.append(src)
-                    if outfile:
-                        print(str(src), file=outfile)
         self.sources.extend(sources)
         self.log.info("Fit {0} sources".format(len(sources)))
         return sources
 
+
     def priorized_fit_islands(self, filename, catalogue, hdu_index=0, outfile=None, bkgin=None, rmsin=None, cores=1,
                               rms=None, bkg=None, beam=None, imgpsf=None, catpsf=None, stage=3, ratio=None, outerclip=3,
-                              doregroup=True, docov=True, cube_index=None):
+                              doregroup=True, docov=True, cube_index=None, progress=False):
         """
         Take an input catalog, and image, and optional background/noise images
         fit the flux and ra/dec for each of the given sources, keeping the morphology fixed
@@ -2000,6 +2014,8 @@ class SourceFinder(object):
         cube_index : int
             For image cubes, slice determines which slice is used.
 
+        progress : bool
+            If true then show a progress bar when fitting island groups
 
         Returns
         -------
@@ -2131,39 +2147,39 @@ class SourceFinder(object):
         else:
             groups = list(island_itergen(input_sources))
 
-        if cores == 1:  # single-threaded, no parallel processing
-            queue = []
-        else:
-            queue = pprocess.Queue(limit=cores, reuse=1)
-            fit_parallel = queue.manage(pprocess.MakeReusable(self._refit_islands))
 
-        self.log.info("Performing fits")
-        sources = []
-        island_group = []
+        self.log.info("Begin fitting")
+
+        island_groups = []  # will be a list of groups of islands
+        island_group = []   # will be a list of islands
         group_size = 20
 
-        for i, island in enumerate(groups):
+        for island in groups:
             island_group.append(island)
             # If the island group is full queue it for the subprocesses to fit
             if len(island_group) >= group_size:
-                if cores > 1:
-                    fit_parallel(island_group, stage, outerclip, istart=i)
-                else:
-                    res = self._refit_islands(island_group, stage, outerclip, istart=i)
-                    queue.append(res)
+                island_groups.append(island_group)
                 island_group = []
-
         # The last partially-filled island group also needs to be queued for fitting
         if len(island_group) > 0:
-            if cores > 1:
-                fit_parallel(island_group, stage, outerclip, istart=i)
-            else:
-                res = self._refit_islands(island_group, stage, outerclip, istart=i)
-                queue.append(res)
+            island_groups.append(island_group)
 
-        # now unpack the fitting results in to a list of sources
-        for s in queue:
-            sources.extend(s)
+        sources = []
+        with tqdm(total=len(island_groups), desc="Refitting Island Groups", disable=not progress) as pbar:
+            if cores == 1:
+                for i, g in enumerate(island_groups):
+                    srcs = self._refit_islands(g, stage, outerclip, istart=i)
+                    pbar.update(1)  # update bar as each individual island is fit
+                    sources.extend(srcs)
+            else:
+                queue = pprocess.Queue(limit=cores, reuse=1)
+                fit_parallel = queue.manage(pprocess.MakeReusable(self._refit_islands))
+                for i, g in enumerate(island_groups):
+                    fit_parallel(g, stage, outerclip, istart=i)
+                for srcs in queue:
+                    pbar.update(1)
+                    sources.extend(srcs)
+
 
         sources = sorted(sources)
 
@@ -2171,15 +2187,10 @@ class SourceFinder(object):
         if outfile:
             print(header.format("{0}-({1})".format(__version__, __date__), filename), file=outfile)
             print(ComponentSource.header, file=outfile)
+            for source in sources:
+                print(str(source), file=outfile)
 
-        components = 0
-        for source in sources:
-            if isinstance(source, ComponentSource):
-                components += 1
-                if outfile:
-                    print(str(source), file=outfile)
-
-        self.log.info("fit {0} components".format(components))
+        self.log.info("fit {0} components".format(len(sources)))
         self.sources.extend(sources)
         return sources
 
