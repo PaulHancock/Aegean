@@ -17,6 +17,7 @@ import scipy
 from scipy.special import erf
 from scipy.ndimage import label, find_objects
 from scipy.ndimage.filters import minimum_filter, maximum_filter
+from tqdm import tqdm
 # AegeanTools
 from .BANE import filter_image, get_step_size
 import AegeanTools.wcs_helpers
@@ -1872,25 +1873,18 @@ class SourceFinder(object):
         self.log.info("seedclip={0}".format(innerclip))
         self.log.info("floodclip={0}".format(outerclip))
 
-        isle_num = 0
-
-        if cores == 1:  # single-threaded, no parallel processing
-            queue = []
-        else:
-            queue = pprocess.Queue(limit=cores, reuse=1)
-            fit_parallel = queue.manage(pprocess.MakeReusable(self._fit_islands))
-
-        island_group = []
-        group_size = 20
         islands = find_islands(im=data, bkg=np.zeros_like(data), rms=rmsimg,
                                seed_clip=innerclip, flood_clip=outerclip,
                                log=self.log)
         self.log.info("Found {0} islands".format(len(islands)))
         self.log.info("Begin fitting")
 
-        n_island_groups = 0
+        island_groups = []  # will be a list of groups of islands
+        island_group = []   # will be a list of islands
+        group_size = 20
+        isle_num = 0
+
         for island in islands:
-            #i = island.mask
             [[xmin,xmax], [ymin,ymax]] = island.bounding_box
             i = global_data.data_pix[xmin:xmax,ymin:ymax]
             # ignore empty islands
@@ -1902,45 +1896,54 @@ class SourceFinder(object):
             scalars = (innerclip, outerclip, max_summits)
             offsets = (xmin, xmax, ymin, ymax)
             island_data = IslandFittingData(isle_num, i, scalars, offsets, doislandflux)
-            # If cores==1 run fitting in main process. Otherwise build up groups of islands
-            # and submit to queue for subprocesses. Passing a group of islands is more
-            # efficient than passing single islands to the subprocesses.
-            if cores == 1:
-                res = self._fit_island(island_data)
-                queue.append(res)
-                n_island_groups += 1
-            else:
-                island_group.append(island_data)
-                # If the island group is full queue it for the subprocesses to fit
-                if len(island_group) >= group_size:
-                    fit_parallel(island_group)
-                    n_island_groups += 1
-                    island_group = []
-
+            island_group.append(island_data)
+            # If the island group is full queue it for the subprocesses to fit
+            if len(island_group) >= group_size:
+                island_groups.append(island_group)
+                island_group = []
         # The last partially-filled island group also needs to be queued for fitting
         if len(island_group) > 0:
-            fit_parallel(island_group)
-            n_island_groups += 1
+            island_groups.append(island_group)
+
+        # now fit all the groups and put results into queue
+        sources = []
+        if cores == 1:
+            with tqdm(total=isle_num, desc="Fitting Islands:") as pbar:
+                for g in island_groups:
+                    for i in g:
+                        srcs = self._fit_island(i)
+                        pbar.update(1)  # update bar as each individual island is fit
+                        for src in srcs:
+                            # ignore sources that we have been told to ignore
+                            if (src.peak_flux > 0 and nopositive) or (src.peak_flux < 0 and nonegative):
+                                continue
+                            sources.append(src)
+
+        else:
+            queue = pprocess.Queue(limit=cores, reuse=1)
+            fit_parallel = queue.manage(pprocess.MakeReusable(self._fit_islands))
+            for g in island_groups:
+                fit_parallel(g)
+
+            with tqdm(total=len(island_groups), desc="Fitting Island Groups:") as pbar:
+                # turn our queue into a list of sources, filtering +/- peak flux as required
+                for srcs in queue:
+                    pbar.update(1)
+                    if srcs:  # ignore empty lists
+                        for src in srcs:
+                            # ignore sources that we have been told to ignore
+                            if (src.peak_flux > 0 and nopositive) or (src.peak_flux < 0 and nonegative):
+                                continue
+                            sources.append(src)
 
         # Write the output to the output file
         if outfile:
-            print(header.format("{0}-({1})".format(__version__, __date__), filename), file=outfile)
-            print(ComponentSource.header, file=outfile)
+            with open(outfile, 'r') as f:
+                print(header.format("{0}-({1})".format(__version__, __date__), filename), file=f)
+                print(ComponentSource.header, file=f)
+                for s in sources:
+                            print(str(s), file=f)
 
-        sources = []
-        ten_percent = max(1, round(n_island_groups/10)) # for emitting progress information
-
-        for i, srcs in enumerate(queue):
-            if (i % ten_percent) == 0: # print progress every 10 percent
-                self.log.info("{0:3.0f}% fitting completed".format(i/n_island_groups*100))
-            if srcs:  # ignore empty lists
-                for src in srcs:
-                    # ignore sources that we have been told to ignore
-                    if (src.peak_flux > 0 and nopositive) or (src.peak_flux < 0 and nonegative):
-                        continue
-                    sources.append(src)
-                    if outfile:
-                        print(str(src), file=outfile)
         self.sources.extend(sources)
         self.log.info("Fit {0} sources".format(len(sources)))
         return sources
