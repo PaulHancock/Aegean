@@ -57,7 +57,7 @@ setup(
     'Development Status :: 5 - Production/Stable',      # Chose either "3 - Alpha", "4 - Beta" or "5 - Production/Stable" as the current state of your package
     'Intended Audience :: Science/Research',
     'Topic :: Scientific/Engineering :: Astronomy',
-    'License :: OSI Approved :: Academic Free License 3.0 (AFL-3.0)',
+    'License :: OSI Approved :: Academic Free License (AFL)',
     'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
     'Programming Language :: Python :: 3.8',
