@@ -1,3 +1,13 @@
+v 2.2.4
+=======
+General
+- Add requirement tqdm for progress bars
+- drop explicit support for python 2.x (no longer tested in CI, probably still works)
+
+Aegean
+- Add a progress bar to fitting and refitting islands
+- Remove deprecated options `--telescope` and `--lat`
+
 v 2.2.3
 =======
 Aegean
