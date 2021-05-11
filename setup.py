@@ -34,18 +34,33 @@ data_dir = 'AegeanTools/data'
 
 setup(
     name="AegeanTools",
+    packages=['AegeanTools'],
     version=get_version(),
-    author="Paul Hancock",
-    author_email="Mr.Paul.Hancock@gmail.com",
+    licence='afl-3.0',
+
     description="The Aegean source finding program, and associated tools.",
-    url="https://github.com/PaulHancock/Aegean",
     long_description=read('README.md'),
     long_description_content_type='text/markdown',
-    packages=['AegeanTools'],
+    author="Paul Hancock",
+    author_email="Mr.Paul.Hancock@gmail.com",
+    url="https://github.com/PaulHancock/Aegean",
+
     install_requires=reqs,
     scripts=['scripts/aegean', 'scripts/BANE', 'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS'],
     data_files=[('AegeanTools', [os.path.join(data_dir, 'MOC.fits')]) ],
     python_requires='>=3.6',
     setup_requires=['pytest-runner'],
-    tests_require=['pytest', 'nose']
+    tests_require=['pytest', 'nose'],
+
+    keywords=['image processing', 'radioastronomy'],
+    classifiers = [
+    'Development Status :: 5 - Production/Stable',      # Chose either "3 - Alpha", "4 - Beta" or "5 - Production/Stable" as the current state of your package
+    'Intended Audience :: Science/Research',
+    'Topic :: Scientific/Engineering :: Astronomy',
+    'License :: OSI Approved :: Academic Free License 3.0 (AFL-3.0)',
+    'Programming Language :: Python :: 3.6',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+  ],
 )
