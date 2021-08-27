@@ -439,7 +439,7 @@ class WCSHelper(object):
         # clamping the x,y coords at the image boundaries just makes sense
         x, y = self.psf_sky2pix((ra, dec))
 
-        log.debug("sky2sky ", ra, dec, x, y)
+        log.debug("sky2sky {0}, {1}, {2}, {3}".format(ra, dec, x, y))
 
         x = int(np.clip(x, 0, self.psf_map.shape[1] - 1))
         y = int(np.clip(y, 0, self.psf_map.shape[2] - 1))
