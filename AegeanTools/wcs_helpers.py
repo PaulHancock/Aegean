@@ -13,9 +13,9 @@ import numpy as np
 import logging
 from .angle_tools import gcd, bear, translate
 
-__author__ = 'Paul Hancock'
+__author__ = "Paul Hancock"
 
-log = logging.getLogger('Aegean')
+log = logging.getLogger("Aegean")
 
 
 class WCSHelper(object):
@@ -80,7 +80,9 @@ class WCSHelper(object):
             Filename for a psf map
         """
         self.wcs = wcs
-        self.beam = beam # the beam as per the fits header (at the reference coordiante)
+        self.beam = (
+            beam  # the beam as per the fits header (at the reference coordiante)
+        )
         self.pixscale = pixscale
         self.refpix = refpix
         self.psf_file = psf_file
@@ -99,11 +101,9 @@ class WCSHelper(object):
         if self.psf_file is None:
             ra, dec = self.pix2sky([self.refpix[1], self.refpix[0]])
             pos = [ra, dec]
-            _, _, self._psf_a, self._psf_b, self._psf_theta = self.sky2pix_ellipse(pos,
-                                                                                   self.beam.a,
-                                                                                   self.beam.b,
-                                                                                   self.beam.pa)
-
+            _, _, self._psf_a, self._psf_b, self._psf_theta = self.sky2pix_ellipse(
+                pos, self.beam.a, self.beam.b, self.beam.pa
+            )
 
     # This construct gives us an attribute 'self.psf_map' which is only loaded on demand
     @property
@@ -112,7 +112,11 @@ class WCSHelper(object):
             # use memory mapping to avoid loading large files, when only a small subset of the pixels are actually needed
             self._psf_map = fits.open(self.psf_file, memmap=True)[0].data
             if len(self._psf_map.shape) != 3:
-                log.critical("PSF file needs to have 3 dimensions, found {0}".format(len(self._psf_map.shape)))
+                log.critical(
+                    "PSF file needs to have 3 dimensions, found {0}".format(
+                        len(self._psf_map.shape)
+                    )
+                )
                 raise Exception("Invalid PSF file {0}".format(self.psf_file))
         return self._psf_map
 
@@ -163,7 +167,7 @@ class WCSHelper(object):
             raise AssertionError("Cannot determine beam information")
 
         _, pixscale = get_pixinfo(header)
-        refpix = (header['CRPIX1'], header['CRPIX2'])
+        refpix = (header["CRPIX1"], header["CRPIX2"])
         return cls(wcs, beam, pixscale, refpix, psf_file=psf_file)
 
     @classmethod
@@ -308,8 +312,7 @@ class WCSHelper(object):
         """
         ra1, dec1 = self.pix2sky(pixel)
         x, y = pixel
-        a = (x + r * np.cos(np.radians(theta)),
-             y + r * np.sin(np.radians(theta)))
+        a = (x + r * np.cos(np.radians(theta)), y + r * np.sin(np.radians(theta)))
         locations = self.pix2sky(a)
         ra2, dec2 = locations
         a = gcd(ra1, dec1, ra2, dec2)
@@ -384,14 +387,15 @@ class WCSHelper(object):
         """
         ra, dec = self.pix2sky(pixel)
         x, y = pixel
-        v_sx = (x + sx * np.cos(np.radians(theta)),
-                y + sx * np.sin(np.radians(theta)))
+        v_sx = (x + sx * np.cos(np.radians(theta)), y + sx * np.sin(np.radians(theta)))
         ra2, dec2 = self.pix2sky(v_sx)
         major = gcd(ra, dec, ra2, dec2)
         pa = bear(ra, dec, ra2, dec2)
 
-        v_sy = (x + sy * np.cos(np.radians(theta - 90)),
-                y + sy * np.sin(np.radians(theta - 90)))
+        v_sy = (
+            x + sy * np.cos(np.radians(theta - 90)),
+            y + sy * np.sin(np.radians(theta - 90)),
+        )
         ra2, dec2 = self.pix2sky(v_sy)
         minor = gcd(ra, dec, ra2, dec2)
         pa2 = bear(ra, dec, ra2, dec2) - 90
@@ -426,12 +430,17 @@ class WCSHelper(object):
         # from the fits header, but convert pix->sky
         if self.psf_file is None:
             x, y = self.sky2pix((ra, dec))
-            _, _, a, b, pa = self.pix2sky_ellipse((x, y), self._psf_a, self._psf_b, self._psf_theta)
+            _, _, a, b, pa = self.pix2sky_ellipse(
+                (x, y), self._psf_a, self._psf_b, self._psf_theta
+            )
             return a, b, pa
 
         # We leave the interpolation in the hands of whoever is making these images
         # clamping the x,y coords at the image boundaries just makes sense
         x, y = self.psf_sky2pix((ra, dec))
+
+        log.debug("sky2sky {0}, {1}, {2}, {3}".format(ra, dec, x, y))
+
         x = int(np.clip(x, 0, self.psf_map.shape[1] - 1))
         y = int(np.clip(y, 0, self.psf_map.shape[2] - 1))
         psf_sky = self.psf_map[:3, x, y]
@@ -460,7 +469,9 @@ class WCSHelper(object):
             return self._psf_a, self._psf_b, self._psf_theta
 
         psf_sky = self.get_psf_sky2sky(ra, dec)
-        psf_pix = self.sky2pix_ellipse((ra, dec), psf_sky[0], psf_sky[1], psf_sky[2])[2:]
+        psf_pix = self.sky2pix_ellipse((ra, dec), psf_sky[0], psf_sky[1], psf_sky[2])[
+            2:
+        ]
         return psf_pix
 
     def get_psf_pix2pix(self, x, y):
@@ -546,8 +557,8 @@ class WCSHelper(object):
         area : float
             The beam area in square pixels.
         """
-        a, b, _ = self.get_psf_sky2pix(ra,dec)
-        return a*b*np.pi
+        a, b, _ = self.get_psf_sky2pix(ra, dec)
+        return a * b * np.pi
 
     def sky_sep(self, pix1, pix2):
         """
@@ -574,9 +585,12 @@ class Beam(object):
     Small class to hold the properties of the beam.
     Properties are a,b,pa. No assumptions are made as to the units, but both a and b have to be >0.
     """
+
     def __init__(self, a, b, pa):
-        if not (a > 0): raise AssertionError("major axis must be >0")
-        if not (b > 0): raise AssertionError("minor axis must be >0")
+        if not (a > 0):
+            raise AssertionError("major axis must be >0")
+        if not (b > 0):
+            raise AssertionError("minor axis must be >0")
         self.a = a
         self.b = b
         self.pa = pa
@@ -610,19 +624,22 @@ def get_pixinfo(header):
     change over the image, depending on the projection.
     """
     if all(a in header for a in ["CDELT1", "CDELT2"]):
-        pixarea = abs(header["CDELT1"]*header["CDELT2"])
+        pixarea = abs(header["CDELT1"] * header["CDELT2"])
         pixscale = (header["CDELT1"], header["CDELT2"])
     elif all(a in header for a in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]):
-        pixarea = abs(header["CD1_1"]*header["CD2_2"]
-                    - header["CD1_2"]*header["CD2_1"])
+        pixarea = abs(
+            header["CD1_1"] * header["CD2_2"] - header["CD1_2"] * header["CD2_1"]
+        )
         pixscale = (header["CD1_1"], header["CD2_2"])
         if not (header["CD1_2"] == 0 and header["CD2_1"] == 0):
             log.warning("Pixels don't appear to be square -> pixscale is wrong")
     elif all(a in header for a in ["CD1_1", "CD2_2"]):
-        pixarea = abs(header["CD1_1"]*header["CD2_2"])
+        pixarea = abs(header["CD1_1"] * header["CD2_2"])
         pixscale = (header["CD1_1"], header["CD2_2"])
     else:
-        log.critical("cannot determine pixel area, using zero EVEN THOUGH THIS IS WRONG!")
+        log.critical(
+            "cannot determine pixel area, using zero EVEN THOUGH THIS IS WRONG!"
+        )
         pixarea = 0
         pixscale = (0, 0)
     return pixarea, pixscale
@@ -687,10 +704,10 @@ def fix_aips_header(header):
     header : :class:`astropy.io.fits.HDUHeader`
         A header which has BMAJ, BMIN, and BPA keys, as well as a new HISTORY card.
     """
-    if 'BMAJ' in header and 'BMIN' in header and 'BPA' in header:
+    if "BMAJ" in header and "BMIN" in header and "BPA" in header:
         # The header already has the required keys so there is nothing to do
         return header
-    aips_hist = [a for a in header['HISTORY'] if a.startswith("AIPS")]
+    aips_hist = [a for a in header["HISTORY"] if a.startswith("AIPS")]
     if len(aips_hist) == 0:
         # There are no AIPS history items to process
         return header
@@ -706,8 +723,8 @@ def fix_aips_header(header):
     else:
         # there are AIPS cards but there is no BMAJ/BMIN/BPA
         return header
-    header['BMAJ'] = bmaj
-    header['BMIN'] = bmin
-    header['BPA'] = bpa
-    header['HISTORY'] = 'Beam information AIPS->fits by AegeanTools'
+    header["BMAJ"] = bmaj
+    header["BMIN"] = bmin
+    header["BPA"] = bpa
+    header["HISTORY"] = "Beam information AIPS->fits by AegeanTools"
     return header
