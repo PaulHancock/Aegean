@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-"""
+""" 
 The Aegean source finding program.
 """
 from __future__ import print_function
