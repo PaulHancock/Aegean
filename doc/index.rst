@@ -11,7 +11,6 @@ Welcome to the AegeanTools documentation!
    :caption: Contents:
    :glob:
 
-   api
    modules
    classes
    scripts
