@@ -12,5 +12,6 @@ Welcome to the AegeanTools documentation!
    :glob:
 
    modules
+   classes
    scripts
    includes/*
