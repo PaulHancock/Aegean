@@ -480,9 +480,7 @@ def fit_islands_parinfo(models, im, rms, wcshelper):
     return islands
 
 
-def priorized_islands_parinfo(
-    sources, im, wcshelper, stage=3,
-):
+def priorized_islands_parinfo(sources, im, wcshelper, stage=3):
     """
     Turn a list of sources into a set of islands and parameter estimates which can then be
     characterised.
@@ -519,11 +517,9 @@ def characterise_islands(
     wcshelper,
     err_type="best",
     max_summits=None,
-    do_islandfit=False,
-):
+    do_islandfit=False):
     """
     Do the source characterisation based on the initial estimate of the island properties.
-
 
     Parameters
     ----------
@@ -553,8 +549,9 @@ def characterise_islands(
 
     Returns
     -------
-    sources : [AegeanTools.models.SimpleSource, ... ]
-        A list of characterised sources of type SimpleSource, ComponentSource, or IslandSource.
+    sources : [:py:class:`AegeanTools.models.SimpleSource`, ... ]
+        A list of characterised sources of type S:py:class:`AegeanTools.models.impleSource`, 
+        :py:class:`AegeanTools.models.ComponentSource`, or :py:class:`AegeanTools.models.IslandSource`.
     """
     sources = estimate_parinfo_image(
         islands=islands,
