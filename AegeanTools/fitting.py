@@ -71,7 +71,7 @@ def elliptical_gaussian_with_alpha(x, y, v, amp, xo, yo, vo, sx, sy, theta, alph
     amp is the amplitude at the reference frequency vo
 
     The model is:
-    S(x,v) = amp (v/vo) ** (alpha + beta *log(v/vo))
+    S(x,v) = amp (v/vo) ^ (alpha + beta x log(v/vo))
 
     When beta is none it is ignored.
 

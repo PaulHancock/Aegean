@@ -35,7 +35,7 @@ class SimpleSource(object):
         Value of the brightest pixel for this source.
 
     flags : int
-        Flags. See :module:`AegeanTools.flags`.
+        Flags. See :mod:`AegeanTools.flags`.
 
     a, b, pa : float
         Shape parameters for this source.
@@ -45,7 +45,7 @@ class SimpleSource(object):
 
     See Also
     --------
-    :module:`AegeanTools.flags`
+    :mod:`AegeanTools.flags`
     """
     header = "#RA           DEC          Flux      err     a     b         pa     flags\n" + \
              "#                        Jy/beam   Jy/beam   ''    ''        deg  ZWNCPES\n" + \
@@ -164,14 +164,14 @@ class IslandSource(SimpleSource):
         of this island.
 
     flags : int
-        Flags. See :module:`AegeanTools.flags`.
+        Flags. See :mod:`AegeanTools.flags`.
 
     uuid : str
         Unique ID for this source. This is random and not dependent on the source properties.
 
     See Also
     --------
-    :module:`AegeanTools.flags`
+    :mod:`AegeanTools.flags`
 
     """
     names = ['island', 'components', 'background', 'local_rms', 'ra_str', 'dec_str', 'ra', 'dec',
@@ -284,14 +284,14 @@ class ComponentSource(SimpleSource):
         (degrees).
 
     flags : int
-        Flags. See :module:`AegeanTools.flags`.
+        Flags. See :mod:`AegeanTools.flags`.
 
     uuid : str
         Unique ID for this source. This is random and not dependent on the source properties.
 
     See Also
     --------
-    :module:`AegeanTools.flags`
+    :mod:`AegeanTools.flags`
 
     """
     #header for the output
@@ -502,6 +502,7 @@ class PixelIsland(object):
         """
         Compute the bounding box for a data cube of dimension dim.
         The bounding box will be the smallest nd-cube that bounds the non-zero entries of the cube.
+
         Parameters
         ----------
         data : np.ndarray
