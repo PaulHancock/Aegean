@@ -6,13 +6,15 @@ python:
   - "3.7"
 # command to install dependencies
 install:
-  - pip install .
-  - pip install coveralls
-  - pip install codacy-coverage
+  - pip install .                       # for AegeanTools
+  - pip install coveralls               # for coverage
+  - pip install codacy-coverage         # for code quality
+  - pip install -r doc/requirements.txt # for sphinx documentation 
 # command to run tests
 script:
-  - coverage run setup.py test
-  - coverage combine
+  - coverage run setup.py test          # run tests
+  - coverage combine                    # combine test results
+  - make -C doc html                    # Build documentation
 after_success:
   - coveralls
   - python-codacy-coverage -r coverage.xml
