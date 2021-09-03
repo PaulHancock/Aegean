@@ -4,6 +4,9 @@ A regrouping tool to accompany the Aegean source finding program.
 """
 
 from AegeanTools.cluster import regroup
+from AegeanTools.catalogs import save_catalog, load_table, table_to_source_list
+
+import numpy as np
 
 import logging
 import argparse
@@ -17,19 +20,22 @@ __version__ = '0.1-alpha'
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='regroup', prefix_chars='-')
-    parser.add_argument('--input', dest='input', type=str, default=None,
+    group1 = parser.add_argument_group("Required")
+    group1.add_argument('--input', dest='input', type=str, default=None, required=True,
                         help='The input catalogue.')
-    parser.add_argument("--table", dest='tables', default=None, type=str,
-                        help="Additional table outputs, format inferred from extension. [default: none]")
-    parser.add_argument('--ratio', dest='ratio', default=None, type=float,
+    group1.add_argument("--table", dest='tables', default=None, type=str, required=True,
+                        help="Table outputs, format inferred from extension.")
+
+    group2 = parser.add_argument_group("Optional")
+    group2.add_argument('--ratio', dest='ratio', default=None, type=float,
                         help="The ratio of synthesized beam sizes (image psf / input catalog psf). ")
-    parser.add_argument('--debug', dest='debug', action='store_true', default=False,
+    group2.add_argument('--debug', dest='debug', action='store_true', default=False,
                         help="Debug mode.")
 
     options = parser.parse_args()
 
     if options.input is None:
-        parser.print_help()
+        parser.print_usage()
         sys.exit()
 
     invocation_string = " ".join(sys.argv[:])
@@ -47,3 +53,16 @@ if __name__ == "__main__":
         log.error("{0} not found".format(filename))
         sys.exit(1)
     
+    input_table = load_table(options.input)
+    input_sources = np.array(table_to_source_list(input_table))
+
+    sources = input_sources
+    
+    if options.tables:
+        meta = {"PROGRAM": "regroup",
+                "PROGVER": "{0}-({1})".format(__version__, __date__),
+                "CATFILE": filename,
+                "RUN-AS": invocation_string}
+        for t in options.tables.split(','):
+            save_catalog(t, sources, meta=meta)
+    sys.exit()
