@@ -276,3 +276,31 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
             src.source = comp
         islands.append(group)
     return islands
+
+
+def check_attributes_for_regroup(catalog):
+    """
+    Check that the catalog has all the attributes reqired for the regrouping task.
+
+    Parameters
+    ==========
+    catalog : list
+        List of python objects, ideally derived from :py:class:`AegeanTools.models.SimpleSource`
+    
+    Returns
+    =======
+    result : bool
+        True if the first entry in the catalog has the required attributes
+    """
+    src = catalog[0]
+    missing = []
+    for att in ['ra','dec','a','b','pa']:
+        if not hasattr(src, att):
+            missing.append(att)
+
+    if  missing:
+        log.error("catalog is not understood.")
+        log.error("catalog: Should be a list of objects with the following properties[units]:")
+        log.error("ra[deg],dec[deg], a[arcsec],b[arcsec],pa[deg]")
+        return False
+    return True  
