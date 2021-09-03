@@ -13,6 +13,7 @@ __author__= "Paul Hancock"
 import numpy as np
 import math
 
+from .wcs_helpers import Beam
 from .angle_tools import gcd, bear
 from .catalogs import load_table, table_to_source_list
 
@@ -278,6 +279,111 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
     return islands
 
 
+def resize(catalog, ratio, psfhelper):
+    """
+    Resize all the sources in a given catalogue.
+    Either use a ratio to blindly scale all sources by the same amount,
+    or use a psf map to deconvolve the sources and then convolve them with the new psf
+
+    Sources that cannot be rescaled are not returned
+
+    Parameters
+    ----------
+    catalog : list
+        List of objects
+
+    ratio : float, default=None
+        Ratio for scaling the sources
+
+    psfhelper : :py:class:`AegeanTools.wcs_helpers.WCSHelper`
+        A wcs helper object that contains psf information for the target image/projection
+    
+    Returns
+    -------
+    catalog : list
+        Modified list of objects
+    """
+
+    src_mask = np.ones(len(catalog), dtype=bool)
+
+    # If ratio is provided we just the psf by this amount
+    if ratio is not None:
+        log.info("Using ratio of {0} to scale input source shapes".format(ratio))
+
+        for i, src in enumerate(catalog):
+            # Sources with an unknown psf are rejected as they are either outside the image
+            # or outside the region covered by the psf
+            skybeam = psfhelper.get_skybeam(src.ra, src.dec)
+            if skybeam is None:
+                src_mask[i] = False
+                log.info("Excluding source ({0.island},{0.source}) due to lack of psf knowledge".format(src))
+                continue
+            # the new source size is the previous size, convolved with the expanded psf
+            src.a = np.sqrt(
+                src.a ** 2 + (skybeam.a * 3600) ** 2 * (1 - 1 / ratio ** 2)
+            )
+            src.b = np.sqrt(
+                src.b ** 2 + (skybeam.b * 3600) ** 2 * (1 - 1 / ratio ** 2)
+            )
+            # source with funky a/b are also rejected
+            if not np.all(np.isfinite((src.a, src.b))):
+                log.info("Excluding source ({0.island},{0.source}) due to bad psf ({0.a},{0.b},{0.pa})".format(src))
+                src_mask[i] = False
+
+    # if we know the psf from the input catalogue (has_psf), or if it was provided via a psf map
+    # then we use that psf.
+    elif catpsf is not None or has_psf:
+        for i, src in enumerate(catalog):
+            if (src.psf_a <= 0) or (src.psf_b <= 0):
+                src_mask[i] = False
+                log.info(
+                    "Excluding source ({0.island},{0.source}) due to psf_a/b <=0".format(
+                        src
+                    )
+                )
+                continue
+            if has_psf:
+                catbeam = Beam(src.psf_a / 3600, src.psf_b / 3600, src.psf_pa)
+            else:
+                catbeam = Beam(*psfhelper.get_psf_sky2sky(src.ra, src.dec))
+            imbeam = psfhelper.get_skybeam(src.ra, src.dec)
+            # If either of the above are None then we skip this source.
+            if catbeam is None or imbeam is None:
+                unknown = []
+                if catbeam is None:
+                    unknown.append("input catalogue")
+                if imbeam is None:
+                    unknown.append("image")
+                src_mask[i] = False
+                log.info(
+                    "Excluding source ({0.island},{0.source}) due to lack of psf knowledge in {1}".format(
+                        src, ",".join(unknown)
+                    )
+                )
+                continue
+
+            # TODO: The following assumes that the various psf's are scaled versions of each other
+            # and makes no account for differing position angles. This needs to be checked and/or addressed.
+
+            # deconvolve the source shape from the catalogue psf
+            src.a = (src.a / 3600) ** 2 - catbeam.a ** 2 + imbeam.a ** 2  # degrees
+
+            # clip the minimum source shape to be the image psf
+            if src.a < 0:
+                src.a = imbeam.a * 3600  # arcsec
+            else:
+                src.a = np.sqrt(src.a) * 3600  # arcsec
+
+            src.b = (src.b / 3600) ** 2 - catbeam.b ** 2 + imbeam.b ** 2
+            if src.b < 0:
+                src.b = imbeam.b * 3600  # arcsec
+            else:
+                src.b = np.sqrt(src.b) * 3600  # arcsec
+    else:
+        log.info("Not scaling input source sizes")
+    return
+
+
 def check_attributes_for_regroup(catalog):
     """
     Check that the catalog has all the attributes reqired for the regrouping task.
@@ -303,4 +409,4 @@ def check_attributes_for_regroup(catalog):
         log.error("catalog: Should be a list of objects with the following properties[units]:")
         log.error("ra[deg],dec[deg], a[arcsec],b[arcsec],pa[deg]")
         return False
-    return True  
+    return True
