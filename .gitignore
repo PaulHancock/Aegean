@@ -13,3 +13,4 @@ build/
 dist/
 wiki/
 doc/_build/
+.vscode
