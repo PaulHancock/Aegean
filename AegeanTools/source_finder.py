@@ -990,7 +990,6 @@ class SourceFinder(object):
                 self.log.debug(" - theta {0} {1} {2}".format(theta, -180, 180))
                 self.log.debug(" - flags {0}".format(flag))
                 self.log.debug(" - fit?  {0}".format(not maxxed))
-                self.log.debug(" - amp_min amp_max {0} {1}".format(amp_min, amp_max))
 
             # TODO: figure out how incorporate the circular constraint on sx/sy
             prefix = "c{0}_".format(i)
@@ -2117,21 +2116,16 @@ class SourceFinder(object):
 
         self.log.debug("=====")
         self.log.debug("Island ({0})".format(isle_num))
-        try:
-            params = self.estimate_lmfit_parinfo(
-                idata,
-                rms,
-                icurve,
-                beam,
-                innerclip,
-                outerclip,
-                offsets=[xmin, ymin],
-                max_summits=max_summits,
-            )
-        except ValueError:
-            self.log.debug("Estimate lmfit parinfo failed, skipping")
-            params = None
-
+        params = self.estimate_lmfit_parinfo(
+            idata,
+            rms,
+            icurve,
+            beam,
+            innerclip,
+            outerclip,
+            offsets=[xmin, ymin],
+            max_summits=max_summits,
+        )
         # params = estimate_parinfo_image()
         # islands at the edge of a region of nans
         # result in no components
