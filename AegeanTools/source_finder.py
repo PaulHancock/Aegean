@@ -2109,16 +2109,21 @@ class SourceFinder(object):
 
         self.log.debug("=====")
         self.log.debug("Island ({0})".format(isle_num))
-        params = self.estimate_lmfit_parinfo(
-            idata,
-            rms,
-            icurve,
-            beam,
-            innerclip,
-            outerclip,
-            offsets=[xmin, ymin],
-            max_summits=max_summits,
-        )
+        try:
+            params = self.estimate_lmfit_parinfo(
+                idata,
+                rms,
+                icurve,
+                beam,
+                innerclip,
+                outerclip,
+                offsets=[xmin, ymin],
+                max_summits=max_summits,
+            )
+        except:
+            self.log.debug("Estimaste lfit params failed, setting to None")
+            params = None
+
         # params = estimate_parinfo_image()
         # islands at the edge of a region of nans
         # result in no components
