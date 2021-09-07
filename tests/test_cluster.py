@@ -7,9 +7,10 @@ from __future__ import print_function
 
 __author__ = 'Paul Hancock'
 
-from AegeanTools import cluster
+from AegeanTools import cluster, catalogs, wcs_helpers
 from AegeanTools.models import SimpleSource
 from copy import deepcopy
+from astropy.io import fits
 import math
 import numpy as np
 
@@ -117,6 +118,42 @@ def test_regroup():
     if not len(a) == 1:
         raise AssertionError()
 
+
+def test_resize_ratio():
+    """Test that resize works with ratio"""
+    # Load a table
+    table = catalogs.load_table('tests/test_files/1904_comp.fits')
+    srccat = catalogs.table_to_source_list(table)
+
+    first = deepcopy(srccat[0])
+    out = cluster.resize(deepcopy(srccat), ratio=1)
+
+    if not ((first.a - out[0].a < 1e-9) and
+            (first.b - out[0].b < 1e-9)):
+        raise AssertionError("resize of 1 is not identity")
+
+    return
+
+
+def test_resize_psfhelper():
+    """Test that resize works with psfhelpers"""
+    # Load a table
+    table = catalogs.load_table('tests/test_files/1904_comp.fits')
+    srccat = catalogs.table_to_source_list(table)
+    # make psfhelper
+    head = fits.getheader('tests/test_files/1904-66_SIN.fits')
+    psfhelper = wcs_helpers.WCSHelper.from_header(head)
+
+    first = deepcopy(srccat[0])
+    out = cluster.resize(deepcopy(srccat), psfhelper=psfhelper)
+    print(first.a, out[0].a)
+
+    if not ((first.a - out[0].a < 1e-9) and
+            (first.b - out[0].b < 1e-9)):
+        raise AssertionError("resize with psfhelper is not identity")
+
+    return
+    
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
