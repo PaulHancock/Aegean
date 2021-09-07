@@ -83,6 +83,7 @@ def test_vectorized():
             if not np.isclose(dx0xi, dist(to_ss(x0), to_ss(xi)), atol=0):
                 raise AssertionError()
 
+
 def test_pairwise_elliptical_binary():
     """Test pairwise_elliptical_binary distance"""
     src1 = SimpleSource()
@@ -96,7 +97,9 @@ def test_pairwise_elliptical_binary():
     src3 = deepcopy(src1)
     src3.dec = 50
     mat = cluster.pairwise_ellpitical_binary([src1, src2, src3], eps=0.5)
-    if not np.all(mat == [[False, True, False], [True, False, False], [False, False, False]]):
+    if not np.all(mat == [[False, True, False],
+                          [True, False, False],
+                          [False, False, False]]):
         raise AssertionError()
 
 
@@ -109,14 +112,19 @@ def test_regroup():
         pass
 
     # this should result in 51 groups
-    a = cluster.regroup('tests/test_files/1904_comp.fits', eps=1/3600.)
+    a = cluster.regroup('tests/test_files/1904_comp.fits',
+                        eps=1/3600.)
     if not len(a) == 51:
-        raise AssertionError("Regroup with eps=1/3600. gave {0} groups instead of 51".format(len(a)))
+        raise AssertionError(
+            "Regroup with eps=1/3600. gave {0} groups instead of 51"
+            .format(len(a)))
 
     # this should give 1 group
     a = cluster.regroup('tests/test_files/1904_comp.fits', eps=10, far=1000)
     if not len(a) == 1:
-        raise AssertionError("Regroup with eps=10, far=1000. gave {0} groups instead of 51".format(len(a)))
+        raise AssertionError(
+            "Regroup with eps=10, far=1000. gave {0} groups instead of 51"
+            .format(len(a)))
 
 
 def test_resize_ratio():
@@ -153,7 +161,7 @@ def test_resize_psfhelper():
         raise AssertionError("resize with psfhelper is not identity")
 
     return
-    
+
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
