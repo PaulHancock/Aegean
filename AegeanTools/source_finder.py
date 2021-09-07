@@ -49,6 +49,7 @@ from .models import (
     DummyLM,
 )
 from .models import PixelIsland
+from . import cluster
 from . import flags
 
 # need Region in the name space in order to be able to unpickle it
@@ -2582,117 +2583,16 @@ class SourceFinder(object):
             return []
         del ok
 
-        src_mask = np.ones(len(input_sources), dtype=bool)
-
-        # check to see if the input catalog contains psf information
-        has_psf = getattr(input_sources[0], "psf_a", None) is not None
-
-        # the input sources are the initial conditions for our fits.
-        # Expand each source size if needed.
-
-        # If ratio is provided we just the psf by this amount
-        if ratio is not None:
-            self.log.info(
-                "Using ratio of {0} to scale input source shapes".format(ratio)
-            )
-            far *= ratio
-            for i, src in enumerate(input_sources):
-                # Sources with an unknown psf are rejected as they are either outside the image
-                # or outside the region covered by the psf
-                skybeam = global_data.psfhelper.get_skybeam(src.ra, src.dec)
-                if skybeam is None:
-                    src_mask[i] = False
-                    self.log.info(
-                        "Excluding source ({0.island},{0.source}) due to lack of psf knowledge".format(
-                            src
-                        )
-                    )
-                    continue
-                # the new source size is the previous size, convolved with the expanded psf
-                src.a = np.sqrt(
-                    src.a ** 2 + (skybeam.a * 3600) ** 2 * (1 - 1 / ratio ** 2)
-                )
-                src.b = np.sqrt(
-                    src.b ** 2 + (skybeam.b * 3600) ** 2 * (1 - 1 / ratio ** 2)
-                )
-                # source with funky a/b are also rejected
-                if not np.all(np.isfinite((src.a, src.b))):
-                    self.log.info(
-                        "Excluding source ({0.island},{0.source}) due to funky psf ({0.a},{0.b},{0.pa})".format(
-                            src
-                        )
-                    )
-                    src_mask[i] = False
-
-        # if we know the psf from the input catalogue (has_psf), or if it was provided via a psf map
-        # then we use that psf.
-        elif catpsf is not None or has_psf:
-            if catpsf is not None:
-                self.log.info("Using catalog PSF from {0}".format(catpsf))
-                # TODO determine if the following needs to be adjusted
-                psf_helper = WCSHelper(
-                    None, beam=catpsf
-                )  # PSFHelper(catpsf, None)  # might need to set the WCSHelper to be not None
-            else:
-                self.log.info("Using catalog PSF from input catalog")
-                psf_helper = None
-            for i, src in enumerate(input_sources):
-                if (src.psf_a <= 0) or (src.psf_b <= 0):
-                    src_mask[i] = False
-                    self.log.info(
-                        "Excluding source ({0.island},{0.source}) due to psf_a/b <=0".format(
-                            src
-                        )
-                    )
-                    continue
-                if has_psf:
-                    catbeam = Beam(src.psf_a / 3600, src.psf_b / 3600, src.psf_pa)
-                else:
-                    catbeam = Beam(*psf_helper.get_psf_sky2sky(src.ra, src.dec))
-                imbeam = global_data.psfhelper.get_skybeam(src.ra, src.dec)
-                # If either of the above are None then we skip this source.
-                if catbeam is None or imbeam is None:
-                    unknown = []
-                    if catbeam is None:
-                        unknown.append("input catalogue")
-                    if imbeam is None:
-                        unknown.append("image")
-                    src_mask[i] = False
-                    self.log.info(
-                        "Excluding source ({0.island},{0.source}) due to lack of psf knowledge in {1}".format(
-                            src, ",".join(unknown)
-                        )
-                    )
-                    continue
-
-                # TODO: The following assumes that the various psf's are scaled versions of each other
-                # and makes no account for differing position angles. This needs to be checked and/or addressed.
-
-                # deconvolve the source shape from the catalogue psf
-                src.a = (src.a / 3600) ** 2 - catbeam.a ** 2 + imbeam.a ** 2  # degrees
-
-                # clip the minimum source shape to be the image psf
-                if src.a < 0:
-                    src.a = imbeam.a * 3600  # arcsec
-                else:
-                    src.a = np.sqrt(src.a) * 3600  # arcsec
-
-                src.b = (src.b / 3600) ** 2 - catbeam.b ** 2 + imbeam.b ** 2
-                if src.b < 0:
-                    src.b = imbeam.b * 3600  # arcsec
-                else:
-                    src.b = np.sqrt(src.b) * 3600  # arcsec
-        else:
-            self.log.info("Not scaling input source sizes")
-
+        # Do the resizing
         self.log.info("{0} sources in catalog".format(len(input_sources)))
-        self.log.info("{0} sources accepted".format(sum(src_mask)))
+        sources = cluster.resize(input_sources, ratio=ratio, psfhelper=global_data.psfhelper)
+        self.log.info("{0} sources accepted".format(len(sources)))
 
-        if len(src_mask) < 1:
+        if len(sources) < 1:
             self.log.debug("No sources accepted for priorized fitting")
             return []
 
-        input_sources = input_sources[src_mask]
+        input_sources = sources
         # redo the grouping if required
         if doregroup:
             groups = regroup(input_sources, eps=np.sqrt(2), far=far)
