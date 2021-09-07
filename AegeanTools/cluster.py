@@ -276,7 +276,11 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
             src.island = isle
             src.source = comp
         islands.append(group)
-    return islands
+
+    sources = []
+    for group in islands:
+        sources.extend(group)
+    return sources
 
 
 def resize(catalog, ratio, psfhelper):
@@ -306,24 +310,18 @@ def resize(catalog, ratio, psfhelper):
 
     src_mask = np.ones(len(catalog), dtype=bool)
 
+    has_psf = False
     # If ratio is provided we just the psf by this amount
     if ratio is not None:
         log.info("Using ratio of {0} to scale input source shapes".format(ratio))
 
         for i, src in enumerate(catalog):
-            # Sources with an unknown psf are rejected as they are either outside the image
-            # or outside the region covered by the psf
-            skybeam = psfhelper.get_skybeam(src.ra, src.dec)
-            if skybeam is None:
-                src_mask[i] = False
-                log.info("Excluding source ({0.island},{0.source}) due to lack of psf knowledge".format(src))
-                continue
             # the new source size is the previous size, convolved with the expanded psf
             src.a = np.sqrt(
-                src.a ** 2 + (skybeam.a * 3600) ** 2 * (1 - 1 / ratio ** 2)
+                src.a ** 2 + (src.psf_a)** 2 * (1 - 1 / ratio ** 2)
             )
             src.b = np.sqrt(
-                src.b ** 2 + (skybeam.b * 3600) ** 2 * (1 - 1 / ratio ** 2)
+                src.b ** 2 + (src.psf_b) ** 2 * (1 - 1 / ratio ** 2)
             )
             # source with funky a/b are also rejected
             if not np.all(np.isfinite((src.a, src.b))):
@@ -332,7 +330,7 @@ def resize(catalog, ratio, psfhelper):
 
     # if we know the psf from the input catalogue (has_psf), or if it was provided via a psf map
     # then we use that psf.
-    elif catpsf is not None or has_psf:
+    elif psfhelper is not None:
         for i, src in enumerate(catalog):
             if (src.psf_a <= 0) or (src.psf_b <= 0):
                 src_mask[i] = False
@@ -381,7 +379,9 @@ def resize(catalog, ratio, psfhelper):
                 src.b = np.sqrt(src.b) * 3600  # arcsec
     else:
         log.info("Not scaling input source sizes")
-    return
+    #return only the sources where resizing was possible
+    out_cat = list(map(catalog.__getitem__, np.where(src_mask)[0]))
+    return out_cat
 
 
 def check_attributes_for_regroup(catalog):
@@ -389,12 +389,12 @@ def check_attributes_for_regroup(catalog):
     Check that the catalog has all the attributes reqired for the regrouping task.
 
     Parameters
-    ==========
+    ----------
     catalog : list
         List of python objects, ideally derived from :py:class:`AegeanTools.models.SimpleSource`
     
     Returns
-    =======
+    -------
     result : bool
         True if the first entry in the catalog has the required attributes
     """
