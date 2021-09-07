@@ -279,7 +279,7 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
 
     sources = []
     for group in islands:
-        sources.extend(group)
+        sources.append(group)
     return sources
 
 
