@@ -217,7 +217,7 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
     ----------
     catalog : str or object
         Either a filename to read into a source list, or a list of objects with the following properties[units]:
-        ra[deg],dec[deg], a[arcsec],b[arcsec],pa[deg], peak_flux[any]
+        ra[deg], dec[deg], a[arcsec], b[arcsec],pa[deg], peak_flux[any]
 
     eps : float
         maximum normalised distance within which sources are considered to be grouped
@@ -310,7 +310,9 @@ def resize(catalog, ratio=None, psfhelper=None):
 
     src_mask = np.ones(len(catalog), dtype=bool)
 
-    has_psf = False
+    # check to see if the input catalog contains psf information
+    has_psf = getattr(catalog[0], "psf_a", None) is not None
+
     # If ratio is provided we just the psf by this amount
     if ratio is not None:
         log.info("Using ratio of {0} to scale input source shapes".format(ratio))
@@ -330,7 +332,7 @@ def resize(catalog, ratio=None, psfhelper=None):
 
     # if we know the psf from the input catalogue (has_psf), or if it was provided via a psf map
     # then we use that psf.
-    elif psfhelper is not None:
+    elif psfhelper is not None or has_psf:
         for i, src in enumerate(catalog):
             if (src.psf_a <= 0) or (src.psf_b <= 0):
                 src_mask[i] = False
