@@ -5,20 +5,18 @@ Cluster and crossmatch tools and analysis functions.
 Includes:
 - DBSCAN clustering
 """
-
 from __future__ import print_function
-
-__author__= "Paul Hancock"
-
-import numpy as np
-import math
 
 from .wcs_helpers import Beam
 from .angle_tools import gcd, bear
 from .catalogs import load_table, table_to_source_list
 
-# join the Aegean logger
+import numpy as np
+import math
 import logging
+
+__author__ = "Paul Hancock"
+
 log = logging.getLogger('Aegean')
 
 cc2fwhm = (2 * math.sqrt(2 * math.log(2)))
@@ -48,10 +46,10 @@ def norm_dist(src1, src2):
     """
     if np.all(src1 == src2):
         return 0
-    dist = gcd(src1.ra, src1.dec, src2.ra, src2.dec) # degrees
+    dist = gcd(src1.ra, src1.dec, src2.ra, src2.dec)  # degrees
 
     # the angle between the ellipse centers
-    phi = bear(src1.ra, src1.dec, src2.ra, src2.dec) # Degrees
+    phi = bear(src1.ra, src1.dec, src2.ra, src2.dec)  # Degrees
     # Calculate the radius of each ellipse along a line that joins their centers.
     r1 = src1.a*src1.b / np.hypot(src1.a * np.sin(np.radians(phi - src1.pa)),
                                   src1.b * np.cos(np.radians(phi - src1.pa)))
@@ -84,7 +82,7 @@ def sky_dist(src1, src2):
 
     if np.all(src1 == src2):
         return 0
-    return gcd(src1.ra, src1.dec, src2.ra, src2.dec) # degrees
+    return gcd(src1.ra, src1.dec, src2.ra, src2.dec)  # degrees
 
 
 def pairwise_ellpitical_binary(sources, eps, far=None):
@@ -301,7 +299,7 @@ def resize(catalog, ratio=None, psfhelper=None):
 
     psfhelper : :py:class:`AegeanTools.wcs_helpers.WCSHelper`, default=None
         A wcs helper object that contains psf information for the target image/projection
-    
+
     Returns
     -------
     catalog : list
@@ -315,19 +313,21 @@ def resize(catalog, ratio=None, psfhelper=None):
 
     # If ratio is provided we just the psf by this amount
     if ratio is not None:
-        log.info("Using ratio of {0} to scale input source shapes".format(ratio))
+        log.info(
+            "Using ratio of {0} to scale input source shapes".format(ratio))
 
         for i, src in enumerate(catalog):
             # the new source size is the previous size, convolved with the expanded psf
             src.a = np.sqrt(
-                src.a ** 2 + (src.psf_a)** 2 * (1 - 1 / ratio ** 2)
+                src.a ** 2 + (src.psf_a) ** 2 * (1 - 1 / ratio ** 2)
             )
             src.b = np.sqrt(
                 src.b ** 2 + (src.psf_b) ** 2 * (1 - 1 / ratio ** 2)
             )
             # source with funky a/b are also rejected
             if not np.all(np.isfinite((src.a, src.b))):
-                log.info("Excluding source ({0.island},{0.source}) due to bad psf ({0.a},{0.b},{0.pa})".format(src))
+                log.info(
+                    "Excluding source ({0.island},{0.source}) due to bad psf ({0.a},{0.b},{0.pa})".format(src))
                 src_mask[i] = False
 
     # if we know the psf from the input catalogue (has_psf), or if it was provided via a psf map
@@ -366,7 +366,8 @@ def resize(catalog, ratio=None, psfhelper=None):
             # and makes no account for differing position angles. This needs to be checked and/or addressed.
 
             # deconvolve the source shape from the catalogue psf
-            src.a = (src.a / 3600) ** 2 - catbeam.a ** 2 + imbeam.a ** 2  # degrees
+            src.a = (src.a / 3600) ** 2 - catbeam.a ** 2 + \
+                imbeam.a ** 2  # degrees
 
             # clip the minimum source shape to be the image psf
             if src.a < 0:
@@ -381,7 +382,7 @@ def resize(catalog, ratio=None, psfhelper=None):
                 src.b = np.sqrt(src.b) * 3600  # arcsec
     else:
         log.info("Not scaling input source sizes")
-    #return only the sources where resizing was possible
+    # return only the sources where resizing was possible
     out_cat = list(map(catalog.__getitem__, np.where(src_mask)[0]))
     return out_cat
 
@@ -394,7 +395,7 @@ def check_attributes_for_regroup(catalog):
     ----------
     catalog : list
         List of python objects, ideally derived from :py:class:`AegeanTools.models.SimpleSource`
-    
+
     Returns
     -------
     result : bool
@@ -402,13 +403,14 @@ def check_attributes_for_regroup(catalog):
     """
     src = catalog[0]
     missing = []
-    for att in ['ra','dec','a','b','pa']:
+    for att in ['ra', 'dec', 'a', 'b', 'pa']:
         if not hasattr(src, att):
             missing.append(att)
 
-    if  missing:
+    if missing:
         log.error("catalog is not understood.")
-        log.error("catalog: Should be a list of objects with the following properties[units]:")
+        log.error(
+            "catalog: Should be a list of objects with the following properties[units]:")
         log.error("ra[deg],dec[deg], a[arcsec],b[arcsec],pa[deg]")
         return False
     return True
