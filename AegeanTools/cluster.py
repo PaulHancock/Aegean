@@ -283,7 +283,7 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
     return sources
 
 
-def resize(catalog, ratio, psfhelper):
+def resize(catalog, ratio=None, psfhelper=None):
     """
     Resize all the sources in a given catalogue.
     Either use a ratio to blindly scale all sources by the same amount,
@@ -299,7 +299,7 @@ def resize(catalog, ratio, psfhelper):
     ratio : float, default=None
         Ratio for scaling the sources
 
-    psfhelper : :py:class:`AegeanTools.wcs_helpers.WCSHelper`
+    psfhelper : :py:class:`AegeanTools.wcs_helpers.WCSHelper`, default=None
         A wcs helper object that contains psf information for the target image/projection
     
     Returns
