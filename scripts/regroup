@@ -3,7 +3,7 @@
 A regrouping tool to accompany the Aegean source finding program.
 """
 
-from AegeanTools.cluster import regroup
+from AegeanTools.cluster import regroup, resize, check_attributes_for_regroup
 from AegeanTools.catalogs import save_catalog, load_table, table_to_source_list
 
 import numpy as np
@@ -26,10 +26,18 @@ if __name__ == "__main__":
     group1.add_argument("--table", dest='tables', default=None, type=str, required=True,
                         help="Table outputs, format inferred from extension.")
 
-    group2 = parser.add_argument_group("Optional")
-    group2.add_argument('--ratio', dest='ratio', default=None, type=float,
+    group2 = parser.add_argument_group("Clustering options")
+    group2.add_argument('--noregroup', dest='regroup', default=True, action='store_false',
+                        help='Do not perform regrouping (default False)')
+    group2.add_argument('--eps', dest='eps', default=np.sqrt(2), type=float,
+                        help="The grouping parameter epsilon")
+
+    group3 = parser.add_argument_group("Scaling options")
+    group3.add_argument('--ratio', dest='ratio', default=None, type=float,
                         help="The ratio of synthesized beam sizes (image psf / input catalog psf). ")
-    group2.add_argument('--debug', dest='debug', action='store_true', default=False,
+
+    group4 = parser.add_argument_group("Other options")                        
+    group4.add_argument('--debug', dest='debug', action='store_true', default=False,
                         help="Debug mode.")
 
     options = parser.parse_args()
@@ -52,17 +60,31 @@ if __name__ == "__main__":
     if not os.path.exists(filename):
         log.error("{0} not found".format(filename))
         sys.exit(1)
-    
+
     input_table = load_table(options.input)
     input_sources = np.array(table_to_source_list(input_table))
 
     sources = input_sources
+
+    if options.regroup:
+        if not check_attributes_for_regroup(sources):
+            log.error("Cannot use catalog")
+            sys.exit(1)
+        log.debug("Regrouping with eps={0}".format(options.eps))
+        sources = regroup(sources, eps=options.eps)
+        log.debug("{0} sources regrouped".format(len(sources)))
     
+    if options.ratio is not None:
+        sources = resize(sources, options.ratio, psfhelper=None)
+        log.debug("{0} sources resized".format(len(sources)))
+    
+
     if options.tables:
         meta = {"PROGRAM": "regroup",
                 "PROGVER": "{0}-({1})".format(__version__, __date__),
                 "CATFILE": filename,
                 "RUN-AS": invocation_string}
         for t in options.tables.split(','):
+            log.debug("writing {0}".format(t))
             save_catalog(t, sources, meta=meta)
     sys.exit()
