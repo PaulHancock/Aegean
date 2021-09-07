@@ -111,12 +111,12 @@ def test_regroup():
     # this should result in 51 groups
     a = cluster.regroup('tests/test_files/1904_comp.fits', eps=1/3600.)
     if not len(a) == 51:
-        raise AssertionError()
+        raise AssertionError("Regroup with eps=1/3600. gave {0} groups instead of 51".format(len(a)))
 
     # this should give 1 group
     a = cluster.regroup('tests/test_files/1904_comp.fits', eps=10, far=1000)
     if not len(a) == 1:
-        raise AssertionError()
+        raise AssertionError("Regroup with eps=10, far=1000. gave {0} groups instead of 51".format(len(a)))
 
 
 def test_resize_ratio():
