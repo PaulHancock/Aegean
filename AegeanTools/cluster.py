@@ -11,6 +11,7 @@ from .wcs_helpers import Beam
 from .angle_tools import gcd, bear
 from .catalogs import load_table, table_to_source_list
 
+from sklearn.cluster import DBSCAN
 import numpy as np
 import math
 import logging
@@ -28,15 +29,18 @@ def norm_dist(src1, src2):
     Calculate the normalised distance between two sources.
     Sources are elliptical Gaussians.
 
-    The normalised distance is calculated as the GCD distance between the centers,
-    divided by quadrature sum of the radius of each ellipse along a line joining the two ellipses.
+    The normalised distance is calculated as the GCD distance between the
+    centers, divided by quadrature sum of the radius of each ellipse along
+    a line joining the two ellipses.
 
-    For ellipses that touch at a single point, the normalized distance will be 1/sqrt(2).
+    For ellipses that touch at a single point, the normalized distance
+    will be 1/sqrt(2).
 
     Parameters
     ----------
     src1, src2 : object
-        The two positions to compare. Objects must have the following parameters: (ra, dec, a, b, pa).
+        The two positions to compare. Objects must have the following
+        parameters: (ra, dec, a, b, pa).
 
     Returns
     -------
@@ -50,7 +54,8 @@ def norm_dist(src1, src2):
 
     # the angle between the ellipse centers
     phi = bear(src1.ra, src1.dec, src2.ra, src2.dec)  # Degrees
-    # Calculate the radius of each ellipse along a line that joins their centers.
+    # Calculate the radius of each ellipse
+    # along a line that joins their centers.
     r1 = src1.a*src1.b / np.hypot(src1.a * np.sin(np.radians(phi - src1.pa)),
                                   src1.b * np.cos(np.radians(phi - src1.pa)))
     r2 = src2.a*src2.b / np.hypot(src2.a * np.sin(np.radians(180 + phi - src2.pa)),
@@ -132,6 +137,51 @@ def pairwise_ellpitical_binary(sources, eps, far=None):
             distances[i, j] = norm_dist(src1, src2) > eps
             distances[j, i] = distances[i, j]
     return distances
+
+
+def regroup_dbscan(srccat, eps=4):
+    """
+    """
+    log.info("Regrouping islands within catalog")
+
+    # extract ra/dec
+    ras = np.radians(np.array([s.ra for s in srccat]))
+    decs = np.radians(np.array([s.dec for s in srccat]))
+
+    # convert to cartesian coords
+    y = np.cos(decs)
+    x = np.cos(ras)*y
+    y *= np.sin(ras)
+    z = np.sin(decs)
+
+    X = np.hstack([x[:, None], y[:, None], z[:, None]])
+
+    # run clustering algorighm
+    db = DBSCAN(eps=np.radians(eps), min_samples=1).fit(X)
+
+    # count labels and regroup accordingly
+    labels = db.labels_
+    groups = [[]]*len(labels)
+    unique_labels = set(labels)
+    for i, l in enumerate(unique_labels):
+        group = list(map(srccat.__getitem__, np.where(labels == l)[0]))
+        groups[i] = group
+
+    log.info("Found {0:d} clusters".format(len(unique_labels)))
+
+    islands = []
+    # now that we have the groups, we relabel the sources to have (island,component) in flux order
+    # note that the order of sources within an island list is not changed - just their labels
+    for isle, group in enumerate(groups):
+        for comp, src in enumerate(sorted(group, key=lambda x: -1*x.peak_flux)):
+            src.island = isle
+            src.source = comp
+        islands.append(group)
+
+    sources = []
+    for group in islands:
+        sources.append(group)
+    return sources
 
 
 def regroup_vectorized(srccat, eps, far=None, dist=norm_dist):

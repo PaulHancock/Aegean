@@ -127,6 +127,18 @@ def test_regroup():
             .format(len(a)))
 
 
+def test_regroup_dbscan():
+    table = catalogs.load_table('tests/test_files/1904_comp.fits')
+    srccat = catalogs.table_to_source_list(table)
+    a = cluster.regroup_dbscan(srccat,
+                               eps=1/3600.)
+    if not len(a) == 51:
+        raise AssertionError(
+            "Regroup_dbscan with eps=1/3600. gave {0} groups instead of 51"
+            .format(len(a)))
+    return
+
+
 def test_resize_ratio():
     """Test that resize works with ratio"""
     # Load a table
