@@ -2672,7 +2672,7 @@ class SourceFinder(object):
         )
 
         global_data = self.global_data
-        far = 10 * global_data.beam.a  # degrees
+
         # load the table and convert to an input source list
         if isinstance(catalogue, six.string_types):
             input_table = load_table(catalogue)
@@ -2710,6 +2710,7 @@ class SourceFinder(object):
         input_sources = sources
         # redo the grouping if required
         if doregroup:
+            # TODO: scale eps in some appropriate manner
             groups = regroup_dbscan(input_sources, eps=0.2)
         else:
             groups = list(island_itergen(input_sources))
