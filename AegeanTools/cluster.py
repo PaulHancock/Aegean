@@ -161,8 +161,8 @@ def regroup_dbscan(srccat, eps=4):
 
     # count labels and regroup accordingly
     labels = db.labels_
-    groups = [[]]*len(labels)
     unique_labels = set(labels)
+    groups = [[]]*len(unique_labels)
     for i, l in enumerate(unique_labels):
         group = list(map(srccat.__getitem__, np.where(labels == l)[0]))
         groups[i] = group
