@@ -2653,7 +2653,7 @@ class SourceFinder(object):
 
         """
 
-        from AegeanTools.cluster import regroup
+        from AegeanTools.cluster import regroup, regroup_dbscan
 
         self.load_globals(
             filename,
@@ -2710,7 +2710,7 @@ class SourceFinder(object):
         input_sources = sources
         # redo the grouping if required
         if doregroup:
-            groups = regroup(input_sources, eps=np.sqrt(2), far=far)
+            groups = regroup_dbscan(input_sources, eps=0.2)
         else:
             groups = list(island_itergen(input_sources))
 
