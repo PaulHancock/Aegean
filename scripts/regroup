@@ -3,7 +3,11 @@
 A regrouping tool to accompany the Aegean source finding program.
 """
 
-from AegeanTools.cluster import regroup, resize, check_attributes_for_regroup
+from AegeanTools.cluster import (
+    regroup_dbscan,
+    resize,
+    check_attributes_for_regroup
+)
 from AegeanTools.catalogs import save_catalog, load_table, table_to_source_list
 from AegeanTools import wcs_helpers
 
@@ -16,8 +20,8 @@ import sys
 import os
 
 __author__ = ['PaulHancock']
-__date__ = '2021-09-03'
-__version__ = '0.1-alpha'
+__date__ = '2021-09-09'
+__version__ = '0.9'
 
 
 if __name__ == "__main__":
@@ -30,11 +34,11 @@ if __name__ == "__main__":
                         help="Table outputs, format inferred from extension.")
 
     group2 = parser.add_argument_group("Clustering options")
+    group2.add_argument('--eps', dest='eps', default=4, type=float,
+                        help="The grouping parameter epsilon (~arcmin)")
     group2.add_argument('--noregroup', dest='regroup', default=True,
                         action='store_false',
                         help='Do not perform regrouping (default False)')
-    group2.add_argument('--eps', dest='eps', default=np.sqrt(2), type=float,
-                        help="The grouping parameter epsilon")
 
     group3 = parser.add_argument_group("Scaling options")
     group3.add_argument('--ratio', dest='ratio', default=None, type=float,
@@ -95,8 +99,9 @@ if __name__ == "__main__":
         if not check_attributes_for_regroup(sources):
             log.error("Cannot use catalog")
             sys.exit(1)
-        log.debug("Regrouping with eps={0}".format(options.eps))
-        sources = regroup(sources, eps=options.eps)
+        log.debug("Regrouping with eps={0}[arcmin]".format(options.eps))
+        eps = np.sin(np.radians(options.eps/60))
+        sources = regroup_dbscan(sources, eps=eps)
         log.debug("{0} sources regrouped".format(len(sources)))
     else:
         log.debug("Not regrouping")
