@@ -48,7 +48,8 @@ setup(
 
     install_requires=reqs,
     scripts=['scripts/aegean', 'scripts/BANE',
-             'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS'],
+             'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS',
+             'scripts/AeReg'],
     data_files=[('AegeanTools', [os.path.join(data_dir, 'MOC.fits')])],
     python_requires='>=3.6',
     setup_requires=['pytest-runner'],
