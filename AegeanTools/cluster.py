@@ -141,9 +141,28 @@ def pairwise_ellpitical_binary(sources, eps, far=None):
 
 def regroup_dbscan(srccat, eps=4):
     """
+    Regroup the islands of a catalog according using DBSCAN.
+
+    Return a list of island groups.
+
+    Parameters
+    ----------
+    srccat : [ `object`]
+        A list of objects with parameters ra,dec (both in decimal degrees)
+    eps : float
+        maximum normalized distance within which sources are considered to be
+        grouped
+
+    Returns
+    -------
+    islands : list of lists
+        Each island contains integer indices for members from srccat
+        (in descending dec order).
+
     """
     log.info("Regrouping islands within catalog")
 
+    log.debug("converting ra/dec -> x,y,z")
     # extract ra/dec
     ras = np.radians(np.array([s.ra for s in srccat]))
     decs = np.radians(np.array([s.dec for s in srccat]))
@@ -154,11 +173,14 @@ def regroup_dbscan(srccat, eps=4):
     y *= np.sin(ras)
     z = np.sin(decs)
 
+    log.debug("Constructing X array")
     X = np.hstack([x[:, None], y[:, None], z[:, None]])
 
+    log.debug("Clustering")
     # run clustering algorighm
-    db = DBSCAN(eps=np.radians(eps), min_samples=1).fit(X)
+    db = DBSCAN(eps=eps, min_samples=1).fit(X)
 
+    log.debug("Constructing groups")
     # count labels and regroup accordingly
     labels = db.labels_
     unique_labels = set(labels)
@@ -169,6 +191,7 @@ def regroup_dbscan(srccat, eps=4):
 
     log.info("Found {0:d} clusters".format(len(unique_labels)))
 
+    log.debug("Labeling/sorting sources")
     islands = []
     # now that we have the groups, we relabel the sources to have (island,component) in flux order
     # note that the order of sources within an island list is not changed - just their labels
