@@ -28,7 +28,8 @@ reqs = ['scipy>=0.16',
         'numpy>=1.16',
         'astropy>=2.0',
         'healpy >=1.10',
-        'lmfit>=0.9.2']
+        'lmfit>=0.9.2',
+        'sklearn>=0.24.2']
 
 data_dir = 'AegeanTools/data'
 
@@ -46,21 +47,24 @@ setup(
     url="https://github.com/PaulHancock/Aegean",
 
     install_requires=reqs,
-    scripts=['scripts/aegean', 'scripts/BANE', 'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS'],
-    data_files=[('AegeanTools', [os.path.join(data_dir, 'MOC.fits')]) ],
+    scripts=['scripts/aegean', 'scripts/BANE',
+             'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS'],
+    data_files=[('AegeanTools', [os.path.join(data_dir, 'MOC.fits')])],
     python_requires='>=3.6',
     setup_requires=['pytest-runner'],
     tests_require=['pytest', 'nose'],
 
     keywords=['image processing', 'radioastronomy'],
-    classifiers = [
-    'Development Status :: 5 - Production/Stable',      # Chose either "3 - Alpha", "4 - Beta" or "5 - Production/Stable" as the current state of your package
-    'Intended Audience :: Science/Research',
-    'Topic :: Scientific/Engineering :: Astronomy',
-    'License :: OSI Approved :: Academic Free License (AFL)',
-    'Programming Language :: Python :: 3.6',
-    'Programming Language :: Python :: 3.7',
-    'Programming Language :: Python :: 3.8',
-    'Programming Language :: Python :: 3.9',
-  ],
+    classifiers=[
+        # Chose either "3 - Alpha", "4 - Beta" or "5 - Production/Stable"
+        # as the current state of your package
+        'Development Status :: 5 - Production/Stable',
+        'Intended Audience :: Science/Research',
+        'Topic :: Scientific/Engineering :: Astronomy',
+        'License :: OSI Approved :: Academic Free License (AFL)',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+    ],
 )
