@@ -593,6 +593,7 @@ def characterise_islands(
         max_summits=max_summits,
         log=log,
     )
+    pixbeam = None  # to quiet the linter
     for src, isle in zip(sources, islands):
         [rmin, rmax], [cmin, cmax] = isle.bounding_box
         i_data = im[rmin:rmax, cmin:cmax]
@@ -600,7 +601,10 @@ def characterise_islands(
         if err_type == "best":
             mx, my = np.where(np.isfinite(i_data))
             C = Cmatrix(
-                mx, my, pixbeam.a * FWHM2CC * fac, pixbeam.b * FWHM2CC * fac, pixbeam.pa
+                mx, my,
+                pixbeam.a * FWHM2CC * fac,
+                pixbeam.b * FWHM2CC * fac,
+                pixbeam.pa
             )
             B = Bmatrix(C)
         else:
@@ -2571,6 +2575,7 @@ class SourceFinder(object):
         ratio=None,
         outerclip=3,
         doregroup=True,
+        regroup_eps=None,
         docov=True,
         cube_index=None,
         progress=False,
@@ -2580,80 +2585,82 @@ class SourceFinder(object):
         fit the flux and ra/dec for each of the given sources, keeping the
         morphology fixed
 
-        if doregroup is true the groups will be recreated based on a matching
-        radius/probability.
-
-        if doregroup is false then the islands of the input catalog will be
-        preserved.
-
         Multiple cores can be specified, and will be used.
-
 
         Parameters
         ----------
         filename : str or HDUList
-          Image filename or HDUList.
+            Image filename or HDUList.
 
         catalogue : str or list
-          Input catalogue file name or list of ComponentSource objects.
+            Input catalogue file name or list of ComponentSource objects.
 
         hdu_index : int
-          The index of the FITS HDU (extension).
+            The index of the FITS HDU (extension).
 
         outfile : str
-          file for printing catalog
-          (NOT a table, just a text file of my own design)
+            file for printing catalog
+            (NOT a table, just a text file of my own design)
 
         rmsin, bkgin : str or HDUList
-          Filename or HDUList for the noise and background images.
-          If either are None, then it will be calculated internally.
+            Filename or HDUList for the noise and background images.
+            If either are None, then it will be calculated internally.
 
         cores : int
-          Number of CPU cores to use. None means all cores.
+            Number of CPU cores to use. None means all cores.
 
         rms : float
-          Use this rms for the entire image
-          (will also assume that background is 0)
+            Use this rms for the entire image
+            (will also assume that background is 0)
 
-        beam : (major, minor, pa)
-          Floats representing the synthesised beam (degrees).
-          Replaces whatever is given in the FITS header.
-          If the FITS header has no BMAJ/BMIN then this is required.
+        beam : (float, float, float)
+            (major, minor, pa) representing the synthesised beam (degrees).
+            Replaces whatever is given in the FITS header.
+            If the FITS header has no BMAJ/BMIN then this is required.
 
         imgpsf : str or HDUList
-           Filename or HDUList for a psf image.
+            Filename or HDUList for a psf image.
 
         catpsf : str or HDUList
-           Filename or HDUList for the catalogue psf image.
+            Filename or HDUList for the catalogue psf image.
 
         stage : int
-          Refitting stage
+            Refitting stage
 
         ratio : float
-          If not None - ratio of image psf to catalog psf,
-          otherwise interpret from catalogue or image if possible
+            If not None - ratio of image psf to catalog psf,
+            otherwise interpret from catalogue or image if possible
 
-        innerclip, outerclip : float
-          The seed (inner) and flood (outer) clipping level (sigmas).
+        outerclip : float
+            The flood (outer) clipping level (sigmas).
 
-        docov : bool
-          If True then include covariance matrix in the fitting process.
-          Default=True
+        doregroup : bool, Default=True
+            Relabel all the islands/groups to ensure that nearby
+            components are jointly fit.
 
-        cube_index : int
-          For image cubes, slice determines which slice is used.
+        regroup_eps: float, Default=None
+            The linking parameter for regouping. Components that are
+            closer than this distance (in arcmin) will be jointly fit.
+            If NONE, then use 4x the average source major axis size (after
+            rescaling if required).
 
-        progress : bool
-          If true then show a progress bar when fitting island groups
+        docov : bool, Default=True
+            If True then include covariance matrix in the fitting process.
+
+        cube_index : int, Default=None
+            For image cubes, slice determines which slice is used.
+
+        progress : bool, Default=True
+            Show a progress bar when fitting island groups
 
         Returns
         -------
         sources : list
-          List of sources measured.
+            List of sources measured.
 
         """
 
-        from AegeanTools.cluster import regroup, regroup_dbscan
+        from AegeanTools.cluster import regroup_dbscan
 
         self.load_globals(
             filename,
@@ -2707,11 +2714,17 @@ class SourceFinder(object):
             self.log.debug("No sources accepted for priorized fitting")
             return []
 
+        # compute eps if it's not defined
+        if regroup_eps is None:
+            # s.a is in arcsec but we assume regroup_eps is in arcmin
+            regroup_eps = 4*np.mean([s.a*60 for s in sources])
+        # convert regroup_eps into a value appropriate for a cartesian measure
+        regroup_eps = np.sin(np.radians(regroup_eps/60))
         input_sources = sources
         # redo the grouping if required
         if doregroup:
             # TODO: scale eps in some appropriate manner
-            groups = regroup_dbscan(input_sources, eps=0.2)
+            groups = regroup_dbscan(input_sources, eps=regroup_eps)
         else:
             groups = list(island_itergen(input_sources))
 
