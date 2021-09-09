@@ -29,7 +29,7 @@ reqs = ['scipy>=0.16',
         'astropy>=2.0',
         'healpy >=1.10',
         'lmfit>=0.9.2',
-        'sklearn>=0.24.2']
+        'scikit-learn>=0.24.2']
 
 data_dir = 'AegeanTools/data'
 
