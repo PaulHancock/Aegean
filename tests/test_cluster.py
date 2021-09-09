@@ -108,8 +108,8 @@ def test_regroup():
     # this should throw an attribute error
     try:
         cluster.regroup([1], eps=1)
-    except AttributeError as _:
-        pass
+    except AttributeError as e:
+        print(f"Correctly raised error {type(e)}")
 
     # this should result in 51 groups
     a = cluster.regroup('tests/test_files/1904_comp.fits',
