@@ -149,6 +149,9 @@ if __name__ == "__main__":
     group5.add_argument('--catpsf', dest='catpsf', type=str, default=None,
                         help='A psf map corresponding to the input catalog. This will allow for the correct resizing of' +
                              ' sources when the catalog and image psfs differ.')
+    group5.add_argument('--regroup-eps', dest='regroup_eps', default=None, type=float,
+                        help='The size in arcminutes that is used to regroup nearby components into a ' +
+                            'a single set of components that will be solved for simultaneously')
 
 
     # Debug and extras
@@ -366,7 +369,7 @@ if __name__ == "__main__":
                                  stage=options.priorized, ratio=options.ratio, outerclip=options.outerclip,
                                  cores=options.cores, doregroup=options.regroup, docov=options.docov,
                                  cube_index=options.slice,
-                                 progress=options.progress)
+                                 progress=options.progress, regroup_eps=options.regroup_eps)
 
 
     sources = sf.sources

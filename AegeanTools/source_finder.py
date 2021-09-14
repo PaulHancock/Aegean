@@ -2717,7 +2717,7 @@ class SourceFinder(object):
         # compute eps if it's not defined
         if regroup_eps is None:
             # s.a is in arcsec but we assume regroup_eps is in arcmin
-            regroup_eps = 4*np.mean([s.a*60 for s in sources])
+            regroup_eps = 4*np.mean([s.a/60 for s in sources])
         # convert regroup_eps into a value appropriate for a cartesian measure
         regroup_eps = np.sin(np.radians(regroup_eps/60))
         input_sources = sources
