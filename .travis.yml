@@ -19,10 +19,10 @@ cache: pip
 
 # command to install dependencies
 install:
-  - pip install .                       # for AegeanTools
-  - pip install coveralls               # for coverage
-  - pip install codacy-coverage         # for code quality
-  - pip install -r doc/requirements.txt # for sphinx documentation 
+  - pip3 install .                       # for AegeanTools
+  - pip3 install coveralls               # for coverage
+  - pip3 install codacy-coverage         # for code quality
+  - pip3 install -r doc/requirements.txt # for sphinx documentation 
 # command to run tests
 script:
   - coverage run setup.py test          # run tests
