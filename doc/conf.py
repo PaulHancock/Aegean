@@ -31,10 +31,10 @@ sys.path.insert(0, os.path.abspath('..'))
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = ['sphinx.ext.autodoc',
-    'sphinx.ext.mathjax',
-    'sphinx.ext.viewcode',
-    'numpydoc',
-    'myst_parser']
+              'sphinx.ext.mathjax',
+              'sphinx.ext.viewcode',
+              'numpydoc',
+              'myst_parser']
 
 # config numpydoc to not use autosummary
 numpydoc_show_class_members = False
@@ -46,8 +46,8 @@ templates_path = ['_templates']
 # You can specify multiple suffix as a list of string:
 #
 # source_suffix = ['.rst', '.md']
-source_suffix = {'.rst':'restructuredtext',
-                 '.md':'markdown'}
+source_suffix = {'.rst': 'restructuredtext',
+                 '.md': 'markdown'}
 
 # The master toctree document.
 master_doc = 'index'
@@ -159,6 +159,3 @@ texinfo_documents = [
      author, 'AegeanTools', 'One line description of project.',
      'Miscellaneous'),
 ]
-
-
-
