@@ -110,8 +110,8 @@ def find_islands(im, bkg, rms, seed_clip=5.0, flood_clip=4.0, log=log):
         log.debug("There are no pixels above the clipping limit")
         return []
 
-    # segmentation via scipy
-    l, n = label(a)
+    # segmentation via scipy, structure includes diagonal pixels as single island
+    l, n = label(a, structure=np.ones((3,3)))
     f = find_objects(l)
 
     log.debug("{1} Found {0} islands total above flood limit"
