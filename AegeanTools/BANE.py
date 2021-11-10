@@ -96,8 +96,7 @@ def sigmaclip(arr, lo, hi, reps=10):
 
         curr_valid = len(clipped)
         logging.debug("{0} {1} {2}".format(count, prev_valid, curr_valid))
-        # Making sure some set of pixels are available
-        if curr_valid < 30: 
+        if curr_valid < 1: 
             break
         # No change in statistics if no change is noted
         if prev_valid == curr_valid:
