@@ -50,7 +50,7 @@ def barrier(events, sid, kind='neighbour'):
     return
 
 
-def sigmaclip(arr, lo, hi, reps=20):
+def sigmaclip(arr, lo, hi, reps=10):
     """
     Perform sigma clipping on an array, ignoring non finite values.
 
