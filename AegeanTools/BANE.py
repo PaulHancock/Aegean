@@ -15,7 +15,6 @@ import numpy as np
 import os
 from scipy.interpolate import RegularGridInterpolator
 import sys
-from tempfile import NamedTemporaryFile
 from time import gmtime, strftime
 
 # Aegean tools
@@ -37,7 +36,7 @@ def barrier(events, sid, kind='neighbour'):
     """
     events[sid].set()
     # only wait for the neighbours
-    if kind=='neighbour':
+    if kind == 'neighbour':
         if sid > 0:
             logging.debug("{0} is waiting for {1}".format(sid, sid - 1))
             events[sid - 1].wait()
@@ -96,7 +95,7 @@ def sigmaclip(arr, lo, hi, reps=10):
 
         curr_valid = len(clipped)
         logging.debug("{0} {1} {2}".format(count, prev_valid, curr_valid))
-        if curr_valid < 1: 
+        if curr_valid < 1:
             break
         # No change in statistics if no change is noted
         if prev_valid == curr_valid:
@@ -105,7 +104,8 @@ def sigmaclip(arr, lo, hi, reps=10):
         mean = np.mean(clipped)
         prev_valid = curr_valid
     else:
-        logging.debug("No stopping criteria was reached after {0} cycles".format(reps))
+        logging.debug(
+            "No stopping criteria was reached after {0} cycles".format(reps))
 
     return mean, std
 
@@ -166,7 +166,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
     """
 
     ymin, ymax = region
-    logging.debug('rows {0}-{1} starting at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    logging.debug('rows {0}-{1} starting at {2}'.format(ymin,
+                  ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
     # cut out the region of interest plus 1/2 the box size, but clip to the image size
     data_row_min = max(0, ymin - box_size[0]//2)
@@ -215,7 +216,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
     cols.append(shape[1])
 
     # store the computed bkg/rms in this smaller array
-    vals = np.zeros(shape=(len(rows),len(cols)))
+    vals = np.zeros(shape=(len(rows), len(cols)))
 
     for i, row in enumerate(rows):
         for j, col in enumerate(cols):
@@ -223,7 +224,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
             new = data[r_min:r_max, c_min:c_max]
             new = np.ravel(new)
             bkg, _ = sigmaclip(new, 3, 3)
-            vals[i,j] = bkg
+            vals[i, j] = bkg
 
     # indices of all the pixels within our region
     gr, gc = np.mgrid[ymin-data_row_min:ymax-data_row_min, 0:shape[1]]
@@ -254,8 +255,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
             r_min, r_max, c_min, c_max = box(row, col)
             new = data[r_min:r_max, c_min:c_max]
             new = np.ravel(new)
-            _ , rms = sigmaclip(new, 3, 3)
-            vals[i,j] = rms
+            _, rms = sigmaclip(new, 3, 3)
+            vals[i, j] = rms
 
     logging.debug("Interpolating rm to sharemem rms")
     ifunc = RegularGridInterpolator((rows, cols), vals)
@@ -271,13 +272,15 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
         barrier(mask_events, sid)
         logging.debug("applying mask")
         for i in range(gr.shape[0]):
-            mask = np.where(np.bitwise_not(np.isfinite(data[i + ymin-data_row_min,:])))[0]
+            mask = np.where(np.bitwise_not(
+                np.isfinite(data[i + ymin-data_row_min, :])))[0]
             for j in mask:
-                idx = np.ravel_multi_index((i + ymin,j),shape)
+                idx = np.ravel_multi_index((i + ymin, j), shape)
                 ibkg[idx] = np.nan
                 irms[idx] = np.nan
         logging.debug(" ... done applying mask")
-    logging.debug('rows {0}-{1} finished at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    logging.debug('rows {0}-{1} finished at {2}'.format(ymin,
+                  ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     return
 
 
@@ -318,7 +321,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None,
 
     if cores is None:
         cores = multiprocessing.cpu_count()
-    if (nslice is None) or (cores==1):
+    if (nslice is None) or (cores == 1):
         nslice = cores
 
     img_y, img_x = shape
@@ -329,8 +332,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None,
     ibkg = multiprocessing.Array('f', img_y*img_x)
 
     global irms
-    #rms = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
-    #irms = multiprocessing.sharedctypes.Array(rms._type_, rms, lock=True)
+    # rms = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
+    # irms = multiprocessing.sharedctypes.Array(rms._type_, rms, lock=True)
     irms = multiprocessing.Array('f', img_y * img_x)
 
     logging.info("using {0} cores".format(cores))
@@ -424,7 +427,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
     """
 
     header = fits.getheader(im_name)
-    shape = (header['NAXIS2'],header['NAXIS1'])
+    shape = (header['NAXIS2'], header['NAXIS1'])
 
     if step_size is None:
         step_size = get_step_size(header)
@@ -436,11 +439,14 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
     if compressed:
         if not step_size[0] == step_size[1]:
             step_size = (min(step_size), min(step_size))
-            logging.info("Changing grid to be {0} so we can compress the output".format(step_size))
+            logging.info(
+                "Changing grid to be {0} so we can compress the output".format(step_size))
 
-    logging.info("using grid_size {0}, box_size {1}".format(step_size,box_size))
+    logging.info("using grid_size {0}, box_size {1}".format(
+        step_size, box_size))
     logging.info("on data shape {0}".format(shape))
-    bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, nslice=nslice, domask=mask)
+    bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size,
+                                  cores=cores, shape=shape, nslice=nslice, domask=mask)
     logging.info("done")
 
     if out_base is not None:
@@ -499,11 +505,13 @@ def get_step_size(header):
         elif 'CD1_1' in header:
             pix_scale = np.sqrt(abs(header['CD1_1']*header['CD2_2']))
             if 'CD1_2' in header and 'CD2_1' in header:
-                if header['CD1_2'] != 0 or header['CD2_1']!=0:
-                    logging.warning("CD1_2 and/or CD2_1 are non-zero and I don't know what to do with them")
+                if header['CD1_2'] != 0 or header['CD2_1'] != 0:
+                    logging.warning(
+                        "CD1_2 and/or CD2_1 are non-zero and I don't know what to do with them")
                     logging.warning("Ingoring them")
         else:
-            logging.warning("Cannot determine pixel scale, assuming 4 pixels per beam")
+            logging.warning(
+                "Cannot determine pixel scale, assuming 4 pixels per beam")
             pix_scale = beam_size/4.
         # default to 4x the synthesized beam width
         step_size = int(np.ceil(4*beam_size/pix_scale))
