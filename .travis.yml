@@ -25,7 +25,7 @@ install:
   - pip3 install -r doc/requirements.txt # for sphinx documentation 
 # command to run tests
 script:
-  - coverage run setup.py test          # run tests
+  - coverage run pytest                 # run tests
   - coverage combine                    # combine test results
   - make -C doc html                    # Build documentation
 after_success:
