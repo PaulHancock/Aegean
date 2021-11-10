@@ -20,6 +20,9 @@ Aegean
   - see `AeReg` above
   - use `--regroup-eps` to set the radius, default is 4x the average source major axis size
 
+BANE
+- Update sigma clipping to be better (see #159)
+
 v 2.2.4
 =======
 General
