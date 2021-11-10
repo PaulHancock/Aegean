@@ -21,8 +21,8 @@ from time import gmtime, strftime
 from .fits_interp import compress
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.8.1'
-__date__ = '2019-12-13'
+__version__ = 'v1.8.2'
+__date__ = '2021-11-10'
 
 # global variables for multiprocessing
 ibkg = irms = None
