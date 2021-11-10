@@ -110,8 +110,8 @@ def find_islands(im, bkg, rms, seed_clip=5.0, flood_clip=4.0, log=log):
         log.debug("There are no pixels above the clipping limit")
         return []
 
-    # segmentation via scipy
-    l, n = label(a)
+    # segmentation via scipy, structure includes diagonal pixels as single island
+    l, n = label(a, structure=np.ones((3,3)))
     f = find_objects(l)
 
     log.debug("{1} Found {0} islands total above flood limit"
@@ -123,25 +123,30 @@ def find_islands(im, bkg, rms, seed_clip=5.0, flood_clip=4.0, log=log):
         ymin, ymax = f[i][1].start, f[i][1].stop
         # obey seed clip constraint
         if np.any(snr[xmin:xmax, ymin:ymax] > seed_clip):
-            data_box = copy.copy(
+            
+            data_box = copy.deepcopy(
                 im[xmin:xmax, ymin:ymax]
             )  # copy so that we don't blank the master data
-            data_box[
-                np.where(snr[xmin:xmax, ymin:ymax] < flood_clip)
-            ] = np.nan  # blank pixels that are outside the outerclip
-            data_box[
-                np.where(l[xmin:xmax, ymin:ymax] != i + 1)
-            ] = np.nan  # blank out other summits
+            
+
+            # make mask and blank out pixels with below the noise level or
+            # are pixels that are of another island in the FoV
+            island_mask = (snr[xmin:xmax, ymin:ymax] < flood_clip) | \
+                          (l[xmin:xmax, ymin:ymax] != i + 1)
+            data_box[island_mask] = np.nan 
+
             # check if there are any pixels left unmasked
             if not np.any(np.isfinite(data_box)):
                 # self.log.info("{1} Island {0} has no non-masked pixels"
                 #               .format(i,data.shape))
                 continue
+            
             island = PixelIsland()
             island.calc_bounding_box(
                 np.array(np.nan_to_num(data_box), dtype=bool),
                 offsets=[xmin, ymin]
             )
+            island.set_mask(island_mask)
             islands.append(island)
 
     return islands
@@ -192,8 +197,13 @@ def estimate_parinfo_image(islands, im, rms, wcshelper,
         # set flags to be empty
         is_flag = 0x0
         [rmin, rmax], [cmin, cmax] = island.bounding_box
-        i_data = im[rmin:rmax, cmin:cmax]
-        i_rms = rms[rmin:rmax, cmin:cmax]
+        i_data = copy.deepcopy(im[rmin:rmax, cmin:cmax])
+        i_rms = copy.deepcopy(rms[rmin:rmax, cmin:cmax])
+
+        # Mask out the bad pixels
+        island_mask = island.mask 
+        i_data[island_mask] = np.nan
+        i_rms[island_mask] = np.nan
 
         # the curvature needs a buffer of 1 pixel to correctly identify
         # the local min/max on the edge of the region.
@@ -237,15 +247,12 @@ def estimate_parinfo_image(islands, im, rms, wcshelper,
         ]
         del peaks, pmask, troughs, tmask, buffx, buffy
 
-        # apply the island mask
-        i_data[np.where(np.bitwise_not(island.mask))] = np.nan
-
-        isnegative = max(
-            i_data[np.where(np.isfinite(i_data) & island.mask)]) < 0
+        # have already applied the island mask at start of loop
+        isnegative = np.nanmax(i_data[np.isfinite(i_data)]) < 0
 
         # For small islands we can't do a 6 param fit
         # Don't count the NaN values as part of the island
-        non_nan_pix = len(i_data[np.where(np.isfinite(i_data))].ravel())
+        non_nan_pix = np.sum(np.isfinite(i_data))
         if 4 <= non_nan_pix <= 6:
             log.debug("FIXED2PSF")
             is_flag |= flags.FIXED2PSF
@@ -731,20 +738,23 @@ class SourceFinder(object):
             ):  # obey inner clip constraint
                 # self.log.info("{1} Island {0} is above the inner clip limit"
                 #               .format(i, data.shape))
-                data_box = copy.copy(
+                
+                # Flag pixel that are either below the flood level, or belong to other
+                # islands that happen to be withing the bounding box
+                island_mask = (snr[xmin:xmax, ymin:ymax] < outerclip) | \
+                              (l[xmin:xmax, ymin:ymax] != i + 1)
+                data_box = copy.deepcopy(
                     data[xmin:xmax, ymin:ymax]
                 )  # copy so that we don't blank the master data
-                data_box[
-                    np.where(snr[xmin:xmax, ymin:ymax] < outerclip)
-                ] = np.nan  # blank pixels that are outside the outerclip
-                data_box[
-                    np.where(l[xmin:xmax, ymin:ymax] != i + 1)
-                ] = np.nan  # blank out other summits
+                
+                # blank out the bad pixels
+                data_box[island_mask] = np.nan
                 # check if there are any pixels left unmasked
                 if not np.any(np.isfinite(data_box)):
                     # self.log.info("{1} Island {0} has no non-masked pixels"
                     #               .format(i,data.shape))
                     continue
+                
                 if domask and (self.global_data.region is not None):
                     y, x = np.where(snr[xmin:xmax, ymin:ymax] >= outerclip)
                     # convert indices of this sub region to indices in
@@ -821,7 +831,7 @@ class SourceFinder(object):
 
         # check to see if this island is a negative peak since we need to
         # treat such cases slightly differently
-        isnegative = max(data[np.where(np.isfinite(data))]) < 0
+        isnegative = np.nanmax(data[np.isfinite(data)]) < 0
         if isnegative:
             self.log.debug("[is a negative island]")
 
@@ -2478,10 +2488,14 @@ class SourceFinder(object):
 
         for island in islands:
             [[xmin, xmax], [ymin, ymax]] = island.bounding_box
-            i = global_data.data_pix[xmin:xmax, ymin:ymax]
+            island_mask = island.mask
+
+            i = copy.deepcopy(global_data.data_pix[xmin:xmax, ymin:ymax])
+            i[island_mask] = np.nan
+
             # ignore empty islands
             # This should now be impossible to trigger
-            if np.size(i) < 1:
+            if not np.any(np.isfinite(i)):
                 self.log.warning(
                     "Empty island detected, this should be imposisble.")
                 continue

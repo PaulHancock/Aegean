@@ -1,7 +1,33 @@
+V 2.2.5
+=======
+General
+- Add new script `AeReg` which will perform regrouping/resizing of a catalogue
+- Add github wiki/README for `AeReg`
+
+AeReg
+- New script!
+- Separate regroup/resize operations and add to module `AegeanTools.cluster`
+- Resize will update the size of catalogue components based on the current shape, psf, and either a ratio or a new psf
+- Resize *does not* update the position angle of the sources
+- Regroup will use DBSCAN to perform clustering and then relabel components in to new islands
+- Regrouping radius can be set via `--eps` in arcminutes
+
+Aegean
+- Fix a bug which allowed components of one island to appear in nearby islands (see #158)
+- Update documentation and associated [website](http://aegeantools.rtfd.io/)
+- Change the regrouping algorithm to be crazy fast (compared to stupid slow)
+  - adds `scikit-learn>=0.24.2` as a dependency
+  - see `AeReg` above
+  - use `--regroup-eps` to set the radius, default is 4x the average source major axis size
+
+BANE
+- Update sigma clipping to be better (see #159)
+- Update tests to account for the above
+
 v 2.2.4
 =======
 General
-- Add requirement tqdm for progress bars
+- Add requirement `tqdm` for progress bars
 - drop explicit support for python 2.x (no longer tested in CI, probably still works)
 
 Aegean
