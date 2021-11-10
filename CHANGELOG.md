@@ -22,6 +22,7 @@ Aegean
 
 BANE
 - Update sigma clipping to be better (see #159)
+- Update tests to account for the above
 
 v 2.2.4
 =======
