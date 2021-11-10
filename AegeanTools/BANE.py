@@ -50,7 +50,7 @@ def barrier(events, sid, kind='neighbour'):
     return
 
 
-def sigmaclip(arr, lo, hi, reps=3):
+def sigmaclip(arr, lo, hi, reps=10):
     """
     Perform sigma clipping on an array, ignoring non finite values.
 
@@ -89,16 +89,24 @@ def sigmaclip(arr, lo, hi, reps=3):
 
     std = np.std(clipped)
     mean = np.mean(clipped)
-    for _ in range(int(reps)):
-        clipped = clipped[np.where(clipped > mean-std*lo)]
-        clipped = clipped[np.where(clipped < mean+std*hi)]
-        pstd = std
-        if len(clipped) < 1:
+    prev_valid = len(clipped)
+    for count in range(int(reps)):
+        mask = (clipped > mean-std*lo) & (clipped < mean+std*hi)
+        clipped = clipped[mask]
+
+        curr_valid = len(clipped)
+        logging.debug("{0} {1} {2}".format(count, prev_valid, curr_valid))
+        if curr_valid < 1: 
+            break
+        # No change in statistics if no change is noted
+        if prev_valid == curr_valid:
             break
         std = np.std(clipped)
         mean = np.mean(clipped)
-        if 2*abs(pstd-std)/(pstd+std) < 0.2:
-            break
+        prev_valid = curr_valid
+    else:
+        logging.debug("No stopping criteria was reached after {0} cycles".format(reps))
+
     return mean, std
 
 
