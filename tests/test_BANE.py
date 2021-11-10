@@ -103,12 +103,13 @@ def test_quantitative():
     b2 = fits.getdata(ref_bkg)
     os.remove(rms)
     os.remove(bkg)
-
     if not np.allclose(r1, r2, atol=0.01, equal_nan=True):
-        raise AssertionError("rms is wrong")
+        raise AssertionError(
+            "rms is wrong {0}".format(np.nanmax(np.abs(r1-r2))))
 
-    if not np.allclose(b1, b2, atol=0.003, equal_nan=True):
-        raise AssertionError("bkg is wrong")
+    if not np.allclose(b1, b2, atol=0.01, equal_nan=True):
+        raise AssertionError(
+            "bkg is wrong {0}".format(np.nanmax(np.abs(b1-b2))))
 
     return
 
