@@ -94,7 +94,6 @@ def sigmaclip(arr, lo, hi, reps=10):
         clipped = clipped[mask]
 
         curr_valid = len(clipped)
-        logging.debug("{0} {1} {2}".format(count, prev_valid, curr_valid))
         if curr_valid < 1:
             break
         # No change in statistics if no change is noted
