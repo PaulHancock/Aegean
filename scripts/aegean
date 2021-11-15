@@ -53,7 +53,7 @@ def check_projection(filename, options, log):
         Options from the command line
     """
     header = astropy.io.fits.getheader(filename)
-    if not( "SIN" in header['CTYPE1']):
+    if not("SIN" in header['CTYPE1']):
         if options.imgpsf is None:
             projection = header['CTYPE1'].split('-')[-1]
             log.warning("For projection {0} you should consider supplying a psf via --psf".format(projection))
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     group2.add_argument('--psf', dest='imgpsf', default=None, type=str,
                         help="A .fits file that represents the local PSF. ")
     group2.add_argument('--autoload', dest='autoload', action="store_true", default=False,
-                        help="Automatically look for background, noise, region, and psf files "+
+                        help="Automatically look for background, noise, region, and psf files " +
                              "using the input filename as a hint. [default: don't do this]")
 
     # Output
@@ -134,10 +134,10 @@ if __name__ == "__main__":
                         help="replace errors with those suggested by Condon'97. [Default = False]")
 
     # priorized fitting
-    group5 = parser.add_argument_group("Priorized Fitting config options","in addition to the above source fitting options")
+    group5 = parser.add_argument_group("Priorized Fitting config options", "in addition to the above source fitting options")
     group5.add_argument('--priorized', dest='priorized', default=0, type=int,
-                        help="Enable priorized fitting level n=[1,2,3]. 1=fit flux, 2=fit flux/position, 3=fit flux/position/shape. " + 
-                             "See the GitHub wiki for more details." )
+                        help="Enable priorized fitting level n=[1,2,3]. 1=fit flux, 2=fit flux/position, 3=fit flux/position/shape. " +
+                             "See the GitHub wiki for more details.")
     group5.add_argument('--ratio', dest='ratio', default=None, type=float,
                         help="The ratio of synthesized beam sizes (image psf / input catalog psf). " +
                              "For use with priorized.")
@@ -151,8 +151,7 @@ if __name__ == "__main__":
                              ' sources when the catalog and image psfs differ.')
     group5.add_argument('--regroup-eps', dest='regroup_eps', default=None, type=float,
                         help='The size in arcminutes that is used to regroup nearby components into a ' +
-                            'a single set of components that will be solved for simultaneously')
-
+                        'a single set of components that will be solved for simultaneously')
 
     # Debug and extras
     group6 = parser.add_argument_group("Extra options")
@@ -315,7 +314,6 @@ if __name__ == "__main__":
             log.critical("One or more output table formats are not supported: Exiting")
             sys.exit(1)
 
-
     # if an outputfile was specified open it for writing
     if options.outfile == 'stdout':
         options.outfile = sys.stdout
@@ -338,7 +336,7 @@ if __name__ == "__main__":
                                          docov=options.docov, cube_index=options.slice,
                                          progress=options.progress)
         if options.blank:
-            outname = basename+'_blank.fits'
+            outname = basename + '_blank.fits'
             sf.save_image(outname)
         if len(found) == 0:
             log.info("No sources found in image")
@@ -370,7 +368,6 @@ if __name__ == "__main__":
                                  cores=options.cores, doregroup=options.regroup, docov=options.docov,
                                  cube_index=options.slice,
                                  progress=options.progress, regroup_eps=options.regroup_eps)
-
 
     sources = sf.sources
     # if --condon is set then we replace all the errors with those described by Condon'97
