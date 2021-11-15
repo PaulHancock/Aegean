@@ -1733,7 +1733,7 @@ class SourceFinder(object):
             step_size=step_size,
             box_size=box_size,
             cores=cores,
-            # cube_index=self.global_data.cube_index,
+            cube_index=self.global_data.cube_index,
         )
         if forced_rms is not None:
             self.global_data.rmsimg = rms
