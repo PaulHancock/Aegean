@@ -27,8 +27,8 @@ if __name__ == "__main__":
                         help='Number of cores to use. Default = all available.')
     group1.add_argument('--stripes', dest='stripes', type=int, default=None,
                         help='Number of slices.')
-    group1.add_argument('--cube_index', dest='cube_index', type=int, default=0,
-                        help='For 3d data use this index for the 3rd dimension.')
+    group1.add_argument('--slice', dest='cube_index', type=int, default=0,
+                        help='If the input data is a cube, then this slice will determine the array index of the image which will be processed by BANE')
     group1.add_argument('--nomask', dest='mask', action='store_false', default=True,
                         help="Don't mask the output array [default = mask]")
     group1.add_argument('--noclobber', dest='clobber', action='store_false', default=True,
