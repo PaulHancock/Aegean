@@ -21,8 +21,8 @@ from time import gmtime, strftime
 from .fits_interp import compress
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.8.2'
-__date__ = '2021-11-10'
+__version__ = 'v1.9.0'
+__date__ = '2021-11-15'
 
 # global variables for multiprocessing
 ibkg = irms = None
@@ -131,7 +131,7 @@ def _sf2(args):
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
-def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
+def sigma_filter(filename, region, step_size, box_size, shape, domask, sid, cube_index):
     """
     Calculate the background and rms for a sub region of an image. The results are
     written to shared memory - irms and ibkg.
@@ -159,6 +159,9 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
     sid : int
         The stripe number
 
+    cube_index : int
+        The index into the 3rd dimension (if present)
+
     Returns
     -------
     None
@@ -180,9 +183,15 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
         if NAXIS == 2:
             data = a[0].section[data_row_min:data_row_max, 0:shape[1]]
         elif NAXIS == 3:
-            data = a[0].section[0, data_row_min:data_row_max, 0:shape[1]]
+            data = np.squeeze(
+                a[0].section[cube_index,
+                             data_row_min:data_row_max, 0:shape[1]]
+            )
         elif NAXIS == 4:
-            data = a[0].section[0, 0, data_row_min:data_row_max, 0:shape[1]]
+            data = np.squeeze(
+                a[0].section[0, cube_index,
+                             data_row_min:data_row_max, 0:shape[1]]
+            )
         else:
             logging.error("Too many NAXIS for me {0}".format(NAXIS))
             logging.error("fix your file to be more sane")
@@ -283,7 +292,9 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
     return
 
 
-def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None, domask=True):
+def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
+                       nslice=None, domask=True,
+                       cube_index=0):
     """
     Calculate the background and noise images corresponding to the input file.
     The calculation is done via a box-car approach and uses multiple cores and shared memory.
@@ -311,6 +322,10 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None,
 
     domask : bool
         True(Default) = copy data mask to output.
+
+    cube_index : int
+        For 3d data use this index into the third dimension.
+        Default = 0
 
     Returns
     -------
@@ -360,7 +375,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None,
 
     args = []
     for i, region in enumerate(zip(ymins, ymaxs)):
-        args.append((filename, region, step_size, box_size, shape, domask, i))
+        args.append((filename, region, step_size, box_size,
+                    shape, domask, i, cube_index))
 
     # start a new process for each task, hopefully to reduce residual memory use
     pool = multiprocessing.Pool(processes=cores, maxtasksperchild=1)
@@ -379,7 +395,10 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None,
     return bkg, rms
 
 
-def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False, nslice=None):
+def filter_image(im_name, out_base, step_size=None, box_size=None,
+                 twopass=False,  # Deprecated
+                 cores=None, mask=True, compressed=False, nslice=None,
+                 cube_index=None):
     """
     Create a background and noise image from an input image.
     Resulting images are written to `outbase_bkg.fits` and `outbase_rms.fits`
@@ -401,7 +420,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 
     twopass : bool
         Perform a second pass calculation to ensure that the noise is not contaminated by the background.
-        Default = False
+        Default = False. DEPRECATED
 
     cores : int
         Number of CPU corse to use.
@@ -419,11 +438,18 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         Return a compressed version of the background/noise images.
         Default = False
 
+    cube_index : int
+        If the input data is 3d, then use this index for the 3rd dimension.
+        Default = None, use the first index.
+
     Returns
     -------
     bkg, rms : `numpy.ndarray`
         The computed background and rms maps (not compressed)
     """
+    # Use the first slice of the 3rd dimension if not specified
+    if cube_index is None:
+        cube_index = 0
 
     header = fits.getheader(im_name)
     shape = (header['NAXIS2'], header['NAXIS1'])
@@ -442,10 +468,11 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
                 "Changing grid to be {0} so we can compress the output".format(step_size))
 
     logging.info("using grid_size {0}, box_size {1}".format(
-        step_size, box_size))
+                 step_size, box_size))
     logging.info("on data shape {0}".format(shape))
     bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size,
-                                  cores=cores, shape=shape, nslice=nslice, domask=mask)
+                                  cores=cores, shape=shape, nslice=nslice, domask=mask,
+                                  cube_index=cube_index)
     logging.info("done")
 
     if out_base is not None:
