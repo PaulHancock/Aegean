@@ -1,3 +1,11 @@
+Nov 15
+======
+BANE
+- Allow BANE to run on a single slice of an image cube using the `slice` option (see #86).
+
+Aegean
+- When not providing background/noise images use BANE and pass the `slice` option accordingly.
+
 V 2.2.5
 =======
 General
