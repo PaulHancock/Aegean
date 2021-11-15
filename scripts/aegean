@@ -313,7 +313,7 @@ if __name__ == "__main__":
     if options.save:
         sf.save_background_files(filename, hdu_index=hdu_index, cores=options.cores, beam=options.beam,
                                  outbase=options.outbase, bkgin=options.backgroundimg, rmsin=options.noiseimg,
-                                 rms=options.rms, bkg=options.bkg)
+                                 rms=options.rms, bkg=options.bkg, cube_index=options.slice)
         sys.exit(0)
 
     # check that the output table formats are supported (if given)

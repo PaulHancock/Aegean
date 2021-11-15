@@ -1465,6 +1465,7 @@ class SourceFinder(object):
         )
         self.global_data.pixarea = img.pixarea
         self.global_data.dcurve = None
+        self.global_data.cube_index = cube_index
 
         if do_curve:
             self.log.info("Calculating curvature")
@@ -1548,6 +1549,7 @@ class SourceFinder(object):
         bkg=None,
         cores=1,
         outbase=None,
+        cube_index=None,
     ):
         """
         Generate and save the background and RMS maps as FITS files.
@@ -1580,6 +1582,8 @@ class SourceFinder(object):
         outbase : str
           Basename for output files.
 
+        cube_index : int
+          If images are 3d, use this index into the 3rd axis.
         """
 
         self.log.info("Saving background / RMS maps")
@@ -1595,6 +1599,7 @@ class SourceFinder(object):
             bkg=bkg,
             cores=cores,
             do_curve=True,
+            cube_index=cube_index
         )
         img = self.global_data.img
         bkgimg, rmsimg = self.global_data.bkgimg, self.global_data.rmsimg
@@ -1728,6 +1733,7 @@ class SourceFinder(object):
             step_size=step_size,
             box_size=box_size,
             cores=cores,
+            # cube_index=self.global_data.cube_index,
         )
         if forced_rms is not None:
             self.global_data.rmsimg = rms

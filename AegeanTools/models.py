@@ -447,6 +447,9 @@ class GlobalFittingData(object):
         If true, then the input image will be blanked at the location of each of
         the measured islands.
 
+    cube_index : int
+        If the image is a cube, use this index into the 3rd axis.
+
     """
 
     def __init__(self):
@@ -462,6 +465,7 @@ class GlobalFittingData(object):
         self.wcshelper = None
         self.psfhelper = None
         self.blank = False
+        self.cube_index = None
         return
 
 
