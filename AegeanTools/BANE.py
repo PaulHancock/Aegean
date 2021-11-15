@@ -453,6 +453,13 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
 
     header = fits.getheader(im_name)
     shape = (header['NAXIS2'], header['NAXIS1'])
+    naxis = header['NAXIS']
+    if naxis > 2:
+        naxis3 = header['NAXIS3']
+        if cube_index >= naxis3:
+            logging.error(
+                "3rd dimension has len {0} but index {1} was passed".format(naxis3, cube_index))
+            return None
 
     if step_size is None:
         step_size = get_step_size(header)
