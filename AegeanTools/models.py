@@ -75,7 +75,8 @@ class SimpleSource(object):
         Convert attributes of type npumpy.float32 to numpy.float64 so that they will print properly.
         """
         for k in self.__dict__:
-            if isinstance(self.__dict__[k], np.float32):  # np.float32 has a broken __str__ method
+            # np.float32 has a broken __str__ method
+            if isinstance(self.__dict__[k], np.float32):
                 self.__dict__[k] = np.float64(self.__dict__[k])
 
     def __str__(self):
@@ -176,18 +177,18 @@ class IslandSource(SimpleSource):
     """
     names = ['island', 'components', 'background', 'local_rms', 'ra_str', 'dec_str', 'ra', 'dec',
              'peak_flux', 'int_flux', 'err_int_flux', 'eta', 'x_width', 'y_width', 'max_angular_size', 'pa',
-             'pixels', 'area', 'beam_area', 'flags','uuid']
+             'pixels', 'area', 'beam_area', 'flags', 'uuid']
 
     def __init__(self):
         SimpleSource.__init__(self)
         self.island = 0  # island number
-        #background = None # local background zero point
-        #local_rms= None #local image rms
+        # background = None # local background zero point
+        # local_rms= None #local image rms
         self.ra_str = ''  # str
         self.dec_str = ''  # str
-        #ra = None # degrees
-        #dec = None # degrees
-        #peak_flux = None # Jy/beam
+        # ra = None # degrees
+        # dec = None # degrees
+        # peak_flux = None # Jy/beam
         self.int_flux = np.nan  # Jy
         self.err_int_flux = np.nan  # Jy
         self.x_width = np.nan
@@ -203,7 +204,8 @@ class IslandSource(SimpleSource):
         self.extent = np.nan
         self.contour = []
         self.max_angular_size_anchors = []
-        self.pix_mask = [] # the ra/dec of all the non masked pixels in this island.
+        # the ra/dec of all the non masked pixels in this island.
+        self.pix_mask = []
 
     def __str__(self):
         return "({0:d})".format(self.island)
@@ -294,12 +296,12 @@ class ComponentSource(SimpleSource):
     :mod:`AegeanTools.flags`
 
     """
-    #header for the output
+    # header for the output
     header = "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err    flags\n" + \
              "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   ZWNCPES\n" + \
              "#============================================================================================================================================================================================"
 
-    #formatting strings for making nice output
+    # formatting strings for making nice output
     formatter = "({0.island:04d},{0.source:02d}) {0.background: 8.6f} {0.local_rms: 8.6f} " + \
                 "{0.ra_str:12s} {0.dec_str:12s} {0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} {0.err_dec: 9.7f} " + \
                 "{0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} {0.err_int_flux: 8.6f} " + \
@@ -307,29 +309,29 @@ class ComponentSource(SimpleSource):
                 "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:07b}"
     names = ['island', 'source', 'background', 'local_rms', 'ra_str', 'dec_str', 'ra', 'err_ra', 'dec', 'err_dec',
              'peak_flux', 'err_peak_flux', 'int_flux', 'err_int_flux', 'a', 'err_a', 'b', 'err_b', 'pa', 'err_pa',
-             'flags','residual_mean','residual_std','uuid','psf_a','psf_b','psf_pa']
+             'flags', 'residual_mean', 'residual_std', 'uuid', 'psf_a', 'psf_b', 'psf_pa']
 
     def __init__(self):
         SimpleSource.__init__(self)
         self.island = 0  # island number
         self.source = 0  # source number
-        #background = None # local background zero point
-        #local_rms= None #local image rms
-        self.ra_str = ''  #str
-        self.dec_str = ''  #str
-        #ra = None # degrees
+        # background = None # local background zero point
+        # local_rms= None #local image rms
+        self.ra_str = ''  # str
+        self.dec_str = ''  # str
+        # ra = None # degrees
         self.err_ra = np.nan  # degrees
-        #dec = None # degrees
+        # dec = None # degrees
         self.err_dec = np.nan
-        #peak_flux = None # Jy/beam
-        #err_peak_flux = None # Jy/beam
-        self.int_flux = np.nan  #Jy
-        self.err_int_flux = np.nan  #Jy
-        #self.a = 0.0 # major axis (arcsecs)
+        # peak_flux = None # Jy/beam
+        # err_peak_flux = None # Jy/beam
+        self.int_flux = np.nan  # Jy
+        self.err_int_flux = np.nan  # Jy
+        # self.a = 0.0 # major axis (arcsecs)
         self.err_a = np.nan  # arcsecs
-        #self.b = 0.0 # minor axis (arcsecs)
+        # self.b = 0.0 # minor axis (arcsecs)
         self.err_b = np.nan  # arcsecs
-        #self.pa = 0.0 # position angle (degrees - WHAT??)
+        # self.pa = 0.0 # position angle (degrees - WHAT??)
         self.err_pa = np.nan  # degrees
         self.flags = 0x0
         self.residual_mean = np.nan
@@ -481,7 +483,7 @@ class PixelIsland(object):
 
     def __init__(self, dim=2):
         self.dim = dim
-        self.bounding_box = np.zeros((self.dim,2), dtype=np.int32)
+        self.bounding_box = np.zeros((self.dim, 2), dtype=np.int32)
         self.mask = None
         self.partial = False
         return
@@ -494,7 +496,8 @@ class PixelIsland(object):
         data : np.array
         """
         if len(data.shape) != self.dim:
-            raise AssertionError("mask shape {0} is of the wrong dimension. Expecting {1}".format(data.shape, self.dim))
+            raise AssertionError(
+                "mask shape {0} is of the wrong dimension. Expecting {1}".format(data.shape, self.dim))
         self.mask = data
         return
 
@@ -511,8 +514,9 @@ class PixelIsland(object):
         offsets : [xmin, ymin, ...]
             The offset between the image zero index and the zero index of data. len(offsets)==dim
         """
-        if len(offsets)!=self.dim:
-            raise AssertionError("{0} offsets were passed but {1} are required".format(len(offsets),self.dim))
+        if len(offsets) != self.dim:
+            raise AssertionError(
+                "{0} offsets were passed but {1} are required".format(len(offsets), self.dim))
         # TODO: Figure out 3d boxes
         # set the bounding box one dimension at a time
         ndrow = np.any(data, axis=0)
@@ -551,7 +555,7 @@ class IslandFittingData(object):
         If true then also measure properties of the island.
     """
 
-    def __init__(self, isle_num=0, i=None, scalars=None, offsets=(0,0,1,1), doislandflux=False):
+    def __init__(self, isle_num=0, i=None, scalars=None, offsets=(0, 0, 1, 1), doislandflux=False):
         self.isle_num = isle_num
         self.i = i
         self.scalars = scalars
@@ -641,7 +645,7 @@ def island_itergen(catalog):
         if src.island == isle_num:
             group.append(src)
             c_len -= 1
-            if c_len <0:
+            if c_len < 0:
                 # we have just added the last item from the catalog
                 # and there are no more to pop
                 yield group
