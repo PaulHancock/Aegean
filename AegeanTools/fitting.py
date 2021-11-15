@@ -883,9 +883,8 @@ def condon_errors(source, theta_n, psf=None):
     minor = source.b / 3600.  # degrees
     phi = np.radians(source.pa)  # radians
     if psf is not None:
-        beam = psf.get_beam(source.ra, source.dec)
-        if beam is not None:
-            theta_n = np.sqrt(beam.a * beam.b)
+        a, b, _ = psf.get_psf_sky2sky(source.ra, source.dec)
+        theta_n = np.sqrt(a * b)
 
     if theta_n is None:
         source.err_a = source.err_b = source.err_peak_flux = source.err_pa = source.err_int_flux = 0.0

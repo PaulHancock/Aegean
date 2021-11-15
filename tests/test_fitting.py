@@ -7,7 +7,7 @@ from __future__ import print_function
 
 __author__ = 'Paul Hancock'
 
-from AegeanTools import fitting, models
+from AegeanTools import fitting, models, wcs_helpers
 import lmfit
 import numpy as np
 
@@ -204,7 +204,12 @@ def test_condon_errs():
     fitting.condon_errors(source, None)
     if source.err_pa < 0:
         raise AssertionError("err_pa<0")
-    if source.err_pa < 0: raise AssertionError()
+
+    psf = wcs_helpers.WCSHelper.from_file('tests/test_files/1904-66_SIN.fits')
+    try:
+        fitting.condon_errors(source, theta_n=8., psf=psf)
+    except AttributeError as e:
+        raise AssertionError("condon_errors failed with psf")
 
 
 if __name__ == "__main__":
