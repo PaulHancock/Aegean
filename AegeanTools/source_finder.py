@@ -111,7 +111,7 @@ def find_islands(im, bkg, rms, seed_clip=5.0, flood_clip=4.0, log=log):
         return []
 
     # segmentation via scipy, structure includes diagonal pixels as single island
-    l, n = label(a, structure=np.ones((3,3)))
+    l, n = label(a, structure=np.ones((3, 3)))
     f = find_objects(l)
 
     log.debug("{1} Found {0} islands total above flood limit"
@@ -123,24 +123,23 @@ def find_islands(im, bkg, rms, seed_clip=5.0, flood_clip=4.0, log=log):
         ymin, ymax = f[i][1].start, f[i][1].stop
         # obey seed clip constraint
         if np.any(snr[xmin:xmax, ymin:ymax] > seed_clip):
-            
+
             data_box = copy.deepcopy(
                 im[xmin:xmax, ymin:ymax]
             )  # copy so that we don't blank the master data
-            
 
             # make mask and blank out pixels with below the noise level or
             # are pixels that are of another island in the FoV
             island_mask = (snr[xmin:xmax, ymin:ymax] < flood_clip) | \
                           (l[xmin:xmax, ymin:ymax] != i + 1)
-            data_box[island_mask] = np.nan 
+            data_box[island_mask] = np.nan
 
             # check if there are any pixels left unmasked
             if not np.any(np.isfinite(data_box)):
                 # self.log.info("{1} Island {0} has no non-masked pixels"
                 #               .format(i,data.shape))
                 continue
-            
+
             island = PixelIsland()
             island.calc_bounding_box(
                 np.array(np.nan_to_num(data_box), dtype=bool),
@@ -201,7 +200,7 @@ def estimate_parinfo_image(islands, im, rms, wcshelper,
         i_rms = copy.deepcopy(rms[rmin:rmax, cmin:cmax])
 
         # Mask out the bad pixels
-        island_mask = island.mask 
+        island_mask = island.mask
         i_data[island_mask] = np.nan
         i_rms[island_mask] = np.nan
 
@@ -738,7 +737,7 @@ class SourceFinder(object):
             ):  # obey inner clip constraint
                 # self.log.info("{1} Island {0} is above the inner clip limit"
                 #               .format(i, data.shape))
-                
+
                 # Flag pixel that are either below the flood level, or belong to other
                 # islands that happen to be withing the bounding box
                 island_mask = (snr[xmin:xmax, ymin:ymax] < outerclip) | \
@@ -746,7 +745,7 @@ class SourceFinder(object):
                 data_box = copy.deepcopy(
                     data[xmin:xmax, ymin:ymax]
                 )  # copy so that we don't blank the master data
-                
+
                 # blank out the bad pixels
                 data_box[island_mask] = np.nan
                 # check if there are any pixels left unmasked
@@ -754,7 +753,7 @@ class SourceFinder(object):
                     # self.log.info("{1} Island {0} has no non-masked pixels"
                     #               .format(i,data.shape))
                     continue
-                
+
                 if domask and (self.global_data.region is not None):
                     y, x = np.where(snr[xmin:xmax, ymin:ymax] >= outerclip)
                     # convert indices of this sub region to indices in
@@ -1466,6 +1465,7 @@ class SourceFinder(object):
         )
         self.global_data.pixarea = img.pixarea
         self.global_data.dcurve = None
+        self.global_data.cube_index = cube_index
 
         if do_curve:
             self.log.info("Calculating curvature")
@@ -1549,6 +1549,7 @@ class SourceFinder(object):
         bkg=None,
         cores=1,
         outbase=None,
+        cube_index=None,
     ):
         """
         Generate and save the background and RMS maps as FITS files.
@@ -1571,7 +1572,6 @@ class SourceFinder(object):
           Beam object representing the synthsized beam.
           Will replace what is in the FITS header.
 
-
         rms, bkg : float
           A float that represents a constant rms/bkg level for the image.
           Default = None, which causes the rms/bkg to be loaded or calculated.
@@ -1582,6 +1582,8 @@ class SourceFinder(object):
         outbase : str
           Basename for output files.
 
+        cube_index : int
+          If images are 3d, use this index into the 3rd axis.
         """
 
         self.log.info("Saving background / RMS maps")
@@ -1597,6 +1599,7 @@ class SourceFinder(object):
             bkg=bkg,
             cores=cores,
             do_curve=True,
+            cube_index=cube_index
         )
         img = self.global_data.img
         bkgimg, rmsimg = self.global_data.bkgimg, self.global_data.rmsimg
@@ -1730,6 +1733,7 @@ class SourceFinder(object):
             step_size=step_size,
             box_size=box_size,
             cores=cores,
+            cube_index=self.global_data.cube_index,
         )
         if forced_rms is not None:
             self.global_data.rmsimg = rms

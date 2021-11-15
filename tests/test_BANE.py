@@ -83,7 +83,26 @@ def test_ND_images():
     except Exception as e:
         pass
     else:
-        raise AssertionError()
+        raise AssertionError("BANE failed on 5d image in unexpected way")
+
+
+def test_slice():
+    """
+    Test the BANE will give correct results when run with the slice option
+    """
+    fname = 'tests/test_files/1904-66_SIN_3d.fits'
+    # don't crash and die
+    try:
+        for index in [0, 1, 2]:
+            BANE.filter_image(fname, out_base=None, nslice=1, cube_index=0)
+    except Exception as e:
+        raise AssertionError("Error on cube_index {0}:\n{0}".format(index, e))
+
+    # die niecely when using an invalid cube_index
+    try:
+        BANE.filter_image(fname, out_base=None, nslice=1, cube_index=3)
+    except Exception as e:
+        raise AssertionError("BANE didn't die safely with cube_index=3")
 
 
 def test_quantitative():

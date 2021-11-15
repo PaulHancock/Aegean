@@ -56,7 +56,8 @@ def check_projection(filename, options, log):
     if not("SIN" in header['CTYPE1']):
         if options.imgpsf is None:
             projection = header['CTYPE1'].split('-')[-1]
-            log.warning("For projection {0} you should consider supplying a psf via --psf".format(projection))
+            log.warning(
+                "For projection {0} you should consider supplying a psf via --psf".format(projection))
     return
 
 
@@ -112,7 +113,8 @@ if __name__ == "__main__":
                         help='Prepend each column name with "prefix_". Default = prepend nothing')
 
     # SF config options
-    group4 = parser.add_argument_group("Source finding/fitting configuration options")
+    group4 = parser.add_argument_group(
+        "Source finding/fitting configuration options")
     group4.add_argument("--maxsummits", dest='max_summits', type=float, default=None,
                         help="If more than *maxsummits* summits are detected in an island, no fitting is done, " +
                              "only estimation. [default: no limit]")
@@ -134,7 +136,8 @@ if __name__ == "__main__":
                         help="replace errors with those suggested by Condon'97. [Default = False]")
 
     # priorized fitting
-    group5 = parser.add_argument_group("Priorized Fitting config options", "in addition to the above source fitting options")
+    group5 = parser.add_argument_group(
+        "Priorized Fitting config options", "in addition to the above source fitting options")
     group5.add_argument('--priorized', dest='priorized', default=0, type=int,
                         help="Enable priorized fitting level n=[1,2,3]. 1=fit flux, 2=fit flux/position, 3=fit flux/position/shape. " +
                              "See the GitHub wiki for more details.")
@@ -196,11 +199,15 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if options.file_versions:
-        log.info("AegeanTools {0} from {1}".format(AegeanTools.__version__, AegeanTools.__file__))
+        log.info("AegeanTools {0} from {1}".format(
+            AegeanTools.__version__, AegeanTools.__file__))
         log.info("Numpy {0} from {1} ".format(np.__version__, np.__file__))
-        log.info("Scipy {0} from {1}".format(scipy.__version__, scipy.__file__))
-        log.info("AstroPy {0} from {1}".format(astropy.__version__, astropy.__file__))
-        log.info("LMFit {0} from {1}".format(lmfit.__version__, lmfit.__file__))
+        log.info("Scipy {0} from {1}".format(
+            scipy.__version__, scipy.__file__))
+        log.info("AstroPy {0} from {1}".format(
+            astropy.__version__, astropy.__file__))
+        log.info("LMFit {0} from {1}".format(
+            lmfit.__version__, lmfit.__file__))
         sys.exit(0)
 
     # print help if the user enters no options or filename
@@ -223,7 +230,8 @@ if __name__ == "__main__":
 
     # check for nopositive/negative conflict
     if options.nopositive and not options.negative:
-        log.warning('Requested no positive sources, but no negative sources. Nothing to find.')
+        log.warning(
+            'Requested no positive sources, but no negative sources. Nothing to find.')
         sys.exit()
 
     # if priorized/save are enabled we turn off "find" unless it was specifically set
@@ -258,7 +266,8 @@ if __name__ == "__main__":
             sys.exit(1)
         options.beam = Beam(beam[0], beam[1], beam[2])
         log.info("Using user supplied beam parameters")
-        log.info("Beam is {0} deg x {1} deg with pa {2}".format(options.beam.a, options.beam.b, options.beam.pa))
+        log.info("Beam is {0} deg x {1} deg with pa {2}".format(
+            options.beam.a, options.beam.b, options.beam.pa))
 
     # auto-load background, noise, psf and region files
     basename = os.path.splitext(filename)[0]
@@ -304,14 +313,15 @@ if __name__ == "__main__":
     if options.save:
         sf.save_background_files(filename, hdu_index=hdu_index, cores=options.cores, beam=options.beam,
                                  outbase=options.outbase, bkgin=options.backgroundimg, rmsin=options.noiseimg,
-                                 rms=options.rms, bkg=options.bkg)
+                                 rms=options.rms, bkg=options.bkg, cube_index=options.slice)
         sys.exit(0)
 
     # check that the output table formats are supported (if given)
     # BEFORE any cpu intensive work is done
     if options.tables is not None:
         if not check_table_formats(options.tables):
-            log.critical("One or more output table formats are not supported: Exiting")
+            log.critical(
+                "One or more output table formats are not supported: Exiting")
             sys.exit(1)
 
     # if an outputfile was specified open it for writing
@@ -358,7 +368,8 @@ if __name__ == "__main__":
 
         log.info("Stage = {0}".format(options.priorized))
         if options.doislandflux:
-            log.warning("--island requested but not yet supported for priorized fitting")
+            log.warning(
+                "--island requested but not yet supported for priorized fitting")
         sf.priorized_fit_islands(filename, catalogue=options.input, hdu_index=options.hdu_index,
                                  rms=options.rms, bkg=options.bkg,
                                  outfile=options.outfile, bkgin=options.backgroundimg,
