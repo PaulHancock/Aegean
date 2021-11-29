@@ -3,7 +3,6 @@ include =
   AegeanTools/*.py
 concurrency =
   multiprocessing
-  pprocess
 parallel = True
 
 [report]
