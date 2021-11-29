@@ -2504,6 +2504,8 @@ class SourceFinder(object):
             rms=rmsimg,
             seed_clip=innerclip,
             flood_clip=outerclip,
+            region=global_data.region,
+            wcs=global_data.psfhelper,
             log=self.log,
         )
         self.log.info("Found {0} islands".format(len(islands)))
