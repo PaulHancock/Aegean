@@ -1537,7 +1537,7 @@ class SourceFinder(object):
         if verb and debug:
             self.log.debug(
                 "Data max is {0}".format(
-                    img.get_pixels()[np.isfinite(img.get_pixels())].max()
+                    np.nanmax(img.get_pixels())
                 )
             )
             self.log.debug("Doing background subtraction")
@@ -1546,7 +1546,7 @@ class SourceFinder(object):
         if verb and debug:
             self.log.debug(
                 "Data max is {0}".format(
-                    img.get_pixels()[np.isfinite(img.get_pixels())].max()
+                    np.nanmax(img.get_pixels())
                 )
             )
 
@@ -1759,9 +1759,9 @@ class SourceFinder(object):
             cores=cores,
             cube_index=self.global_data.cube_index,
         )
-        if forced_rms is not None:
+        if forced_rms is None:
             self.global_data.rmsimg = rms
-        if forced_bkg is not None:
+        if forced_bkg is None:
             self.global_data.bkgimg = bkg
 
         return
