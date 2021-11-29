@@ -79,7 +79,10 @@ log = logging.getLogger("dummy")
 log.addHandler(logging.NullHandler())
 
 
-def find_islands(im, bkg, rms, seed_clip=5.0, flood_clip=4.0, log=log):
+def find_islands(im, bkg, rms,
+                 seed_clip=5.0, flood_clip=4.0,
+                 region=None, wcs=None,
+                 log=log):
     """
     This function designed to be run as a stand alone process
 
@@ -89,8 +92,17 @@ def find_islands(im, bkg, rms, seed_clip=5.0, flood_clip=4.0, log=log):
       Image, background, and rms maps
 
     seed_clip, flood_clip : float
-      The seed clip which is used to create islands, and flood clip which is 
+      The seed clip which is used to create islands, and flood clip which is
       used to grow islands. The units are in SNR.
+
+    region : :class:`AegeanTools.regions.Region` or None
+      Region over which to find islands. Islands must have at least 1 pixel overlap
+      with the region in order to be returned. Default = None, no constraints.
+      Region *requires* a wcs to be defined.
+
+    wcs : :class:`AegeanTools.wcs_helpers.WCSHelper` or None
+      If a region is specified then this WCSHelper will be used to map sky->pix
+      coordinates. Default = None.
 
     log : `logging.Logger` or None
       For handling logs (or not)
@@ -100,6 +112,11 @@ def find_islands(im, bkg, rms, seed_clip=5.0, flood_clip=4.0, log=log):
     islands : [:class:`AegeanTools.models.PixelIsland`, ...]
       a list of islands
     """
+    if (region is not None) and (wcs is None):
+        log.warning("Find islands: Region was passed, but no wcs is defined." +
+                    " Ignoring region.")
+        region = None
+
     # compute SNR image
     snr = abs(im - bkg) / rms
 
@@ -123,10 +140,17 @@ def find_islands(im, bkg, rms, seed_clip=5.0, flood_clip=4.0, log=log):
         ymin, ymax = f[i][1].start, f[i][1].stop
         # obey seed clip constraint
         if np.any(snr[xmin:xmax, ymin:ymax] > seed_clip):
+            # obey region constraint
+            if region is not None:
+                y, x = np.where(snr[xmin:xmax, ymin:ymax] >= flood_clip)
+                yx = list(zip(y + ymin, x + xmin))
+                ra, dec = wcs.wcs.wcs_pix2world(yx, 1).transpose()
+                mask = region.sky_within(ra, dec, degin=True)
+                if not np.any(mask):
+                    continue
 
-            data_box = copy.deepcopy(
-                im[xmin:xmax, ymin:ymax]
-            )  # copy so that we don't blank the master data
+            # copy so that we don't blank the master data
+            data_box = copy.deepcopy(im[xmin:xmax, ymin:ymax])
 
             # make mask and blank out pixels with below the noise level or
             # are pixels that are of another island in the FoV
@@ -635,7 +659,7 @@ def save_catalogue(sources, output, format=None):
 
     format : str
       A descriptor of the output format. Options are:
-      #TODO add a bunch of options
+      # TODO add a bunch of options
       'auto' or None - infer from filename extension
 
     Returns
@@ -2480,6 +2504,8 @@ class SourceFinder(object):
             rms=rmsimg,
             seed_clip=innerclip,
             flood_clip=outerclip,
+            region=global_data.region,
+            wcs=global_data.psfhelper,
             log=self.log,
         )
         self.log.info("Found {0} islands".format(len(islands)))

@@ -1,10 +1,11 @@
-Nov 15
+Nov 29
 ======
 BANE
 - Allow BANE to run on a single slice of an image cube using the `slice` option (see #86).
 
 Aegean
 - When not providing background/noise images use BANE and pass the `slice` option accordingly.
+- Use the file specified by `--region` when finding islands.
 
 V 2.2.5
 =======
