@@ -94,7 +94,21 @@ def test_helpers():
         raise AssertionError()
 
 
-def dont_test_load_globals():
+def test__make_bkg_rms():
+    """Ensure that SourceFinder._make_bkg_rms works properly"""
+    log = logging.getLogger("Aegean")
+    sfinder = sf.SourceFinder(log=log)
+    filename = 'tests/test_files/1904-66_SIN.fits'
+    sfinder.load_globals(filename)
+
+    # check that we don't make mistake #163 again.
+    if not np.all(sfinder.global_data.rmsimg[50:55, 50:55] > 0):
+        raise AssertionError("RMS map is not positive in the middle")
+    if not np.any(sfinder.global_data.bkgimg[50:55, 50:55] != 0):
+        raise AssertionError("BKG map is all zero in the middle")
+
+
+def test_load_globals():
     """Test load_globals"""
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
@@ -472,11 +486,7 @@ def test_regions_used_in_finding():
 
 
 if __name__ == "__main__":
-    test_island_contours()
-    import sys
-    sys.exit()
     # introspect and run all the functions starting with 'test'
-    # ['test_find_islands', 'test_estimate_parinfo_image', 'test_find_and_prior_sources']:
     for f in dir():
         if f.startswith('test'):
             print(f)
