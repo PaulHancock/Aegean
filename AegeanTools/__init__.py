@@ -11,7 +11,7 @@ generally.
 """
 __author__ = 'Paul Hancock'
 __version__ = '2.2.5'
-__date__ = '2021-11-15'
+__date__ = '2021-11-29'
 __citation__ = """
 % If your work makes use of AegeanTools please cite the following papers as appropriate:
 
