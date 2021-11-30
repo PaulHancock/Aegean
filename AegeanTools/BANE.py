@@ -9,6 +9,7 @@ from astropy.io import fits
 import copy
 import logging
 import multiprocessing
+from multiprocessing import Barrier
 from multiprocessing.shared_memory import SharedMemory
 import numpy as np
 import os
@@ -25,28 +26,9 @@ __date__ = '2021-11-30'
 
 # global variables for multiprocessing
 # ibkg = irms = None
-bkg_events = []
-mask_events = []
-
-
-def barrier(events, sid, kind='neighbour'):
-    """
-    act as a multiprocessing barrier
-    """
-    events[sid].set()
-    # only wait for the neighbours
-    if kind == 'neighbour':
-        if sid > 0:
-            logging.debug("{0} is waiting for {1}".format(sid, sid - 1))
-            events[sid - 1].wait()
-        if sid < len(bkg_events) - 1:
-            logging.debug("{0} is waiting for {1}".format(sid, sid + 1))
-            events[sid + 1].wait()
-    # wait for all
-    else:
-        [e.wait() for e in events]
-    return
-
+# bkg_events = []
+# mask_events = []
+barrier = None
 
 def sigmaclip(arr, lo, hi, reps=10):
     """
@@ -130,7 +112,7 @@ def _sf2(args):
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
-def sigma_filter(filename, region, step_size, box_size, shape, domask, sid, cube_index):
+def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_index):
     """
     Calculate the background and rms for a sub region of an image. The results are
     written to shared memory - irms and ibkg.
@@ -154,9 +136,6 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid, cube
 
     domask : bool
         If true then copy the data mask to the output.
-
-    sid : int
-        The stripe number
 
     cube_index : int
         The index into the 3rd dimension (if present)
@@ -255,8 +234,10 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid, cube
     del ifunc, interp_bkg
     logging.debug(" ... done writing bkg")
 
-    # signal that the bkg is done for this region, and wait for neighbours
-    barrier(bkg_events, sid)
+    # wait for all to complete
+    i = barrier.wait()
+    if i == 0:
+        barrier.reset()
 
     logging.debug("background subtraction")
     data[0 + ymin - data_row_min: data.shape[0] -
@@ -282,7 +263,12 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid, cube
     logging.debug(" .. done writing rms")
 
     if domask:
-        barrier(mask_events, sid)
+        # wait for all to complete
+        i = barrier.wait()
+        if i == 0:
+            barrier.reset()
+
+
         logging.debug("applying mask")
         mask = ~np.isfinite(
             data[0 + ymin - data_row_min: data.shape[0] -
@@ -361,15 +347,12 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
     logging.debug("ymins {0}".format(ymins))
     logging.debug("ymaxs {0}".format(ymaxs))
 
-    # create an event per stripe
-    global bkg_events, mask_events
-    bkg_events = [multiprocessing.Event() for _ in range(len(ymaxs))]
-    mask_events = [multiprocessing.Event() for _ in range(len(ymaxs))]
-
+    global barrier
+    barrier = Barrier(parties=len(ymaxs))
     args = []
     for i, region in enumerate(zip(ymins, ymaxs)):
         args.append((filename, region, step_size, box_size,
-                    shape, domask, i, cube_index))
+                    shape, domask, cube_index))
 
     exit = False
     try:
