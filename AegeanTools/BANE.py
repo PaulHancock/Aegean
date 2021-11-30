@@ -25,8 +25,8 @@ __date__ = '2021-11-30'
 
 # global variables for multiprocessing
 # ibkg = irms = None
-bkg_events = []
-mask_events = []
+# events = []
+# mask_events = []
 
 
 def barrier(events, sid, kind='neighbour'):
@@ -39,7 +39,7 @@ def barrier(events, sid, kind='neighbour'):
         if sid > 0:
             logging.debug("{0} is waiting for {1}".format(sid, sid - 1))
             events[sid - 1].wait()
-        if sid < len(bkg_events) - 1:
+        if sid < len(events) - 1:
             logging.debug("{0} is waiting for {1}".format(sid, sid + 1))
             events[sid + 1].wait()
     # wait for all
@@ -256,8 +256,12 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid, cube
     logging.debug(" ... done writing bkg")
 
     # signal that the bkg is done for this region, and wait for neighbours
-    barrier(bkg_events, sid)
-
+    global events
+    barrier(events, sid)
+    if sid == 0:
+        for e in events:
+            e.clear()
+    
     logging.debug("background subtraction")
     data[0 + ymin - data_row_min: data.shape[0] -
          (data_row_max - ymax), :] -= ibkg[ymin:ymax, :]
@@ -282,7 +286,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid, cube
     logging.debug(" .. done writing rms")
 
     if domask:
-        barrier(mask_events, sid)
+        barrier(events, sid)
         logging.debug("applying mask")
         mask = ~np.isfinite(
             data[0 + ymin - data_row_min: data.shape[0] -
@@ -362,14 +366,13 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
     logging.debug("ymaxs {0}".format(ymaxs))
 
     # create an event per stripe
-    global bkg_events, mask_events
-    bkg_events = [multiprocessing.Event() for _ in range(len(ymaxs))]
-    mask_events = [multiprocessing.Event() for _ in range(len(ymaxs))]
+    global events
+    events = [multiprocessing.Event() for _ in range(len(ymaxs))]
 
     args = []
     for i, region in enumerate(zip(ymins, ymaxs)):
         args.append((filename, region, step_size, box_size,
-                    shape, domask, i, cube_index))
+                     shape, domask, i, cube_index))
 
     exit = False
     try:
