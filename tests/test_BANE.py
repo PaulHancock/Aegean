@@ -21,7 +21,7 @@ def test_sigmaclip():
     """Test the sigmaclipping"""
     # normal usage case
     data = np.ones(100)
-    if not BANE.sigmaclip(data, 3, 4, reps=4)[0] == 1. :
+    if not BANE.sigmaclip(data, 3, 4, reps=4)[0] == 1.:
         raise AssertionError()
 
     data[13] = np.nan
@@ -42,7 +42,9 @@ def test_filter_image():
     bkg = outbase + '_bkg.fits'
     # hdu = fits.getheader(fname)
     # shape = hdu[0]['NAXIS1'], hdu[0]['NAXIS2']
-    BANE.filter_image(fname, step_size=(10, 10), box_size=(100, 100), cores=2, out_base=outbase)
+    BANE.filter_image(fname, step_size=(10, 10),
+                      box_size=(100, 100),
+                      cores=2, out_base=outbase)
     if not os.path.exists(rms):
         raise AssertionError()
 
@@ -51,7 +53,8 @@ def test_filter_image():
         raise AssertionError()
 
     os.remove(bkg)
-    BANE.filter_image(fname, cores=2, out_base=outbase, twopass=True, compressed=True)
+    BANE.filter_image(fname, cores=2, out_base=outbase,
+                      twopass=True, compressed=True)
     if not os.path.exists(rms):
         raise AssertionError()
 
@@ -69,19 +72,38 @@ def test_ND_images():
     rms = outbase + '_rms.fits'
     bkg = outbase + '_bkg.fits'
     # this should work just fine, but trigger different NAXIS checks
-    for fname in [fbase.format(n) for n in [3,4]]:
+    for fname in [fbase.format(n) for n in [3, 4]]:
         BANE.filter_image(fname, out_base=outbase)
         os.remove(rms)
         os.remove(bkg)
 
     fname = fbase.format(5)
     try:
-        BANE.filter_image(fname,out_base=outbase)
+        BANE.filter_image(fname, out_base=outbase)
     except Exception as e:
         pass
     else:
-        raise AssertionError()
-    
+        raise AssertionError("BANE failed on 5d image in unexpected way")
+
+
+def test_slice():
+    """
+    Test the BANE will give correct results when run with the slice option
+    """
+    fname = 'tests/test_files/1904-66_SIN_3d.fits'
+    # don't crash and die
+    try:
+        for index in [0, 1, 2]:
+            BANE.filter_image(fname, out_base=None, nslice=1, cube_index=0)
+    except Exception as e:
+        raise AssertionError("Error on cube_index {0}:\n{0}".format(index, e))
+
+    # die niecely when using an invalid cube_index
+    try:
+        BANE.filter_image(fname, out_base=None, nslice=1, cube_index=3)
+    except Exception as e:
+        raise AssertionError("BANE didn't die safely with cube_index=3")
+
 
 def test_quantitative():
     """Test that the images are equal to a pre-calculated version"""
@@ -100,12 +122,13 @@ def test_quantitative():
     b2 = fits.getdata(ref_bkg)
     os.remove(rms)
     os.remove(bkg)
-
     if not np.allclose(r1, r2, atol=0.01, equal_nan=True):
-        raise AssertionError("rms is wrong")
+        raise AssertionError(
+            "rms is wrong {0}".format(np.nanmax(np.abs(r1-r2))))
 
-    if not np.allclose(b1, b2, atol=0.003, equal_nan=True):
-        raise AssertionError("bkg is wrong")
+    if not np.allclose(b1, b2, atol=0.01, equal_nan=True):
+        raise AssertionError(
+            "bkg is wrong {0}".format(np.nanmax(np.abs(b1-b2))))
 
     return
 

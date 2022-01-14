@@ -15,15 +15,14 @@ import numpy as np
 import os
 from scipy.interpolate import RegularGridInterpolator
 import sys
-from tempfile import NamedTemporaryFile
 from time import gmtime, strftime
 
 # Aegean tools
 from .fits_interp import compress
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.8.1'
-__date__ = '2019-12-13'
+__version__ = 'v1.9.0'
+__date__ = '2021-11-15'
 
 # global variables for multiprocessing
 ibkg = irms = None
@@ -37,7 +36,7 @@ def barrier(events, sid, kind='neighbour'):
     """
     events[sid].set()
     # only wait for the neighbours
-    if kind=='neighbour':
+    if kind == 'neighbour':
         if sid > 0:
             logging.debug("{0} is waiting for {1}".format(sid, sid - 1))
             events[sid - 1].wait()
@@ -50,7 +49,7 @@ def barrier(events, sid, kind='neighbour'):
     return
 
 
-def sigmaclip(arr, lo, hi, reps=3):
+def sigmaclip(arr, lo, hi, reps=10):
     """
     Perform sigma clipping on an array, ignoring non finite values.
 
@@ -89,16 +88,24 @@ def sigmaclip(arr, lo, hi, reps=3):
 
     std = np.std(clipped)
     mean = np.mean(clipped)
-    for _ in range(int(reps)):
-        clipped = clipped[np.where(clipped > mean-std*lo)]
-        clipped = clipped[np.where(clipped < mean+std*hi)]
-        pstd = std
-        if len(clipped) < 1:
+    prev_valid = len(clipped)
+    for count in range(int(reps)):
+        mask = (clipped > mean-std*lo) & (clipped < mean+std*hi)
+        clipped = clipped[mask]
+
+        curr_valid = len(clipped)
+        if curr_valid < 1:
+            break
+        # No change in statistics if no change is noted
+        if prev_valid == curr_valid:
             break
         std = np.std(clipped)
         mean = np.mean(clipped)
-        if 2*abs(pstd-std)/(pstd+std) < 0.2:
-            break
+        prev_valid = curr_valid
+    else:
+        logging.debug(
+            "No stopping criteria was reached after {0} cycles".format(reps))
+
     return mean, std
 
 
@@ -124,7 +131,7 @@ def _sf2(args):
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
-def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
+def sigma_filter(filename, region, step_size, box_size, shape, domask, sid, cube_index):
     """
     Calculate the background and rms for a sub region of an image. The results are
     written to shared memory - irms and ibkg.
@@ -152,13 +159,17 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
     sid : int
         The stripe number
 
+    cube_index : int
+        The index into the 3rd dimension (if present)
+
     Returns
     -------
     None
     """
 
     ymin, ymax = region
-    logging.debug('rows {0}-{1} starting at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    logging.debug('rows {0}-{1} starting at {2}'.format(ymin,
+                  ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
     # cut out the region of interest plus 1/2 the box size, but clip to the image size
     data_row_min = max(0, ymin - box_size[0]//2)
@@ -172,9 +183,15 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
         if NAXIS == 2:
             data = a[0].section[data_row_min:data_row_max, 0:shape[1]]
         elif NAXIS == 3:
-            data = a[0].section[0, data_row_min:data_row_max, 0:shape[1]]
+            data = np.squeeze(
+                a[0].section[cube_index,
+                             data_row_min:data_row_max, 0:shape[1]]
+            )
         elif NAXIS == 4:
-            data = a[0].section[0, 0, data_row_min:data_row_max, 0:shape[1]]
+            data = np.squeeze(
+                a[0].section[0, cube_index,
+                             data_row_min:data_row_max, 0:shape[1]]
+            )
         else:
             logging.error("Too many NAXIS for me {0}".format(NAXIS))
             logging.error("fix your file to be more sane")
@@ -207,7 +224,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
     cols.append(shape[1])
 
     # store the computed bkg/rms in this smaller array
-    vals = np.zeros(shape=(len(rows),len(cols)))
+    vals = np.zeros(shape=(len(rows), len(cols)))
 
     for i, row in enumerate(rows):
         for j, col in enumerate(cols):
@@ -215,7 +232,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
             new = data[r_min:r_max, c_min:c_max]
             new = np.ravel(new)
             bkg, _ = sigmaclip(new, 3, 3)
-            vals[i,j] = bkg
+            vals[i, j] = bkg
 
     # indices of all the pixels within our region
     gr, gc = np.mgrid[ymin-data_row_min:ymax-data_row_min, 0:shape[1]]
@@ -246,8 +263,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
             r_min, r_max, c_min, c_max = box(row, col)
             new = data[r_min:r_max, c_min:c_max]
             new = np.ravel(new)
-            _ , rms = sigmaclip(new, 3, 3)
-            vals[i,j] = rms
+            _, rms = sigmaclip(new, 3, 3)
+            vals[i, j] = rms
 
     logging.debug("Interpolating rm to sharemem rms")
     ifunc = RegularGridInterpolator((rows, cols), vals)
@@ -263,17 +280,21 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid):
         barrier(mask_events, sid)
         logging.debug("applying mask")
         for i in range(gr.shape[0]):
-            mask = np.where(np.bitwise_not(np.isfinite(data[i + ymin-data_row_min,:])))[0]
+            mask = np.where(np.bitwise_not(
+                np.isfinite(data[i + ymin-data_row_min, :])))[0]
             for j in mask:
-                idx = np.ravel_multi_index((i + ymin,j),shape)
+                idx = np.ravel_multi_index((i + ymin, j), shape)
                 ibkg[idx] = np.nan
                 irms[idx] = np.nan
         logging.debug(" ... done applying mask")
-    logging.debug('rows {0}-{1} finished at {2}'.format(ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+    logging.debug('rows {0}-{1} finished at {2}'.format(ymin,
+                  ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     return
 
 
-def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None, domask=True):
+def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
+                       nslice=None, domask=True,
+                       cube_index=0):
     """
     Calculate the background and noise images corresponding to the input file.
     The calculation is done via a box-car approach and uses multiple cores and shared memory.
@@ -302,6 +323,10 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None,
     domask : bool
         True(Default) = copy data mask to output.
 
+    cube_index : int
+        For 3d data use this index into the third dimension.
+        Default = 0
+
     Returns
     -------
     bkg, rms : numpy.ndarray
@@ -310,7 +335,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None,
 
     if cores is None:
         cores = multiprocessing.cpu_count()
-    if (nslice is None) or (cores==1):
+    if (nslice is None) or (cores == 1):
         nslice = cores
 
     img_y, img_x = shape
@@ -321,8 +346,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None,
     ibkg = multiprocessing.Array('f', img_y*img_x)
 
     global irms
-    #rms = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
-    #irms = multiprocessing.sharedctypes.Array(rms._type_, rms, lock=True)
+    # rms = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
+    # irms = multiprocessing.sharedctypes.Array(rms._type_, rms, lock=True)
     irms = multiprocessing.Array('f', img_y * img_x)
 
     logging.info("using {0} cores".format(cores))
@@ -350,7 +375,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None,
 
     args = []
     for i, region in enumerate(zip(ymins, ymaxs)):
-        args.append((filename, region, step_size, box_size, shape, domask, i))
+        args.append((filename, region, step_size, box_size,
+                    shape, domask, i, cube_index))
 
     # start a new process for each task, hopefully to reduce residual memory use
     pool = multiprocessing.Pool(processes=cores, maxtasksperchild=1)
@@ -369,7 +395,10 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape, nslice=None,
     return bkg, rms
 
 
-def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False, cores=None, mask=True, compressed=False, nslice=None):
+def filter_image(im_name, out_base, step_size=None, box_size=None,
+                 twopass=False,  # Deprecated
+                 cores=None, mask=True, compressed=False, nslice=None,
+                 cube_index=None):
     """
     Create a background and noise image from an input image.
     Resulting images are written to `outbase_bkg.fits` and `outbase_rms.fits`
@@ -391,7 +420,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
 
     twopass : bool
         Perform a second pass calculation to ensure that the noise is not contaminated by the background.
-        Default = False
+        Default = False. DEPRECATED
 
     cores : int
         Number of CPU corse to use.
@@ -409,14 +438,28 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
         Return a compressed version of the background/noise images.
         Default = False
 
+    cube_index : int
+        If the input data is 3d, then use this index for the 3rd dimension.
+        Default = None, use the first index.
+
     Returns
     -------
     bkg, rms : `numpy.ndarray`
         The computed background and rms maps (not compressed)
     """
+    # Use the first slice of the 3rd dimension if not specified
+    if cube_index is None:
+        cube_index = 0
 
     header = fits.getheader(im_name)
-    shape = (header['NAXIS2'],header['NAXIS1'])
+    shape = (header['NAXIS2'], header['NAXIS1'])
+    naxis = header['NAXIS']
+    if naxis > 2:
+        naxis3 = header['NAXIS3']
+        if cube_index >= naxis3:
+            logging.error(
+                "3rd dimension has len {0} but index {1} was passed".format(naxis3, cube_index))
+            return None
 
     if step_size is None:
         step_size = get_step_size(header)
@@ -428,11 +471,15 @@ def filter_image(im_name, out_base, step_size=None, box_size=None, twopass=False
     if compressed:
         if not step_size[0] == step_size[1]:
             step_size = (min(step_size), min(step_size))
-            logging.info("Changing grid to be {0} so we can compress the output".format(step_size))
+            logging.info(
+                "Changing grid to be {0} so we can compress the output".format(step_size))
 
-    logging.info("using grid_size {0}, box_size {1}".format(step_size,box_size))
+    logging.info("using grid_size {0}, box_size {1}".format(
+                 step_size, box_size))
     logging.info("on data shape {0}".format(shape))
-    bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size, cores=cores, shape=shape, nslice=nslice, domask=mask)
+    bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size,
+                                  cores=cores, shape=shape, nslice=nslice, domask=mask,
+                                  cube_index=cube_index)
     logging.info("done")
 
     if out_base is not None:
@@ -491,11 +538,13 @@ def get_step_size(header):
         elif 'CD1_1' in header:
             pix_scale = np.sqrt(abs(header['CD1_1']*header['CD2_2']))
             if 'CD1_2' in header and 'CD2_1' in header:
-                if header['CD1_2'] != 0 or header['CD2_1']!=0:
-                    logging.warning("CD1_2 and/or CD2_1 are non-zero and I don't know what to do with them")
+                if header['CD1_2'] != 0 or header['CD2_1'] != 0:
+                    logging.warning(
+                        "CD1_2 and/or CD2_1 are non-zero and I don't know what to do with them")
                     logging.warning("Ingoring them")
         else:
-            logging.warning("Cannot determine pixel scale, assuming 4 pixels per beam")
+            logging.warning(
+                "Cannot determine pixel scale, assuming 4 pixels per beam")
             pix_scale = beam_size/4.
         # default to 4x the synthesized beam width
         step_size = int(np.ceil(4*beam_size/pix_scale))

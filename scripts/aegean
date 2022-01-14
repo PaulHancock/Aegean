@@ -53,10 +53,11 @@ def check_projection(filename, options, log):
         Options from the command line
     """
     header = astropy.io.fits.getheader(filename)
-    if not( "SIN" in header['CTYPE1']):
+    if not("SIN" in header['CTYPE1']):
         if options.imgpsf is None:
             projection = header['CTYPE1'].split('-')[-1]
-            log.warning("For projection {0} you should consider supplying a psf via --psf".format(projection))
+            log.warning(
+                "For projection {0} you should consider supplying a psf via --psf".format(projection))
     return
 
 
@@ -95,7 +96,7 @@ if __name__ == "__main__":
     group2.add_argument('--psf', dest='imgpsf', default=None, type=str,
                         help="A .fits file that represents the local PSF. ")
     group2.add_argument('--autoload', dest='autoload', action="store_true", default=False,
-                        help="Automatically look for background, noise, region, and psf files "+
+                        help="Automatically look for background, noise, region, and psf files " +
                              "using the input filename as a hint. [default: don't do this]")
 
     # Output
@@ -112,7 +113,8 @@ if __name__ == "__main__":
                         help='Prepend each column name with "prefix_". Default = prepend nothing')
 
     # SF config options
-    group4 = parser.add_argument_group("Source finding/fitting configuration options")
+    group4 = parser.add_argument_group(
+        "Source finding/fitting configuration options")
     group4.add_argument("--maxsummits", dest='max_summits', type=float, default=None,
                         help="If more than *maxsummits* summits are detected in an island, no fitting is done, " +
                              "only estimation. [default: no limit]")
@@ -134,10 +136,11 @@ if __name__ == "__main__":
                         help="replace errors with those suggested by Condon'97. [Default = False]")
 
     # priorized fitting
-    group5 = parser.add_argument_group("Priorized Fitting config options","in addition to the above source fitting options")
+    group5 = parser.add_argument_group(
+        "Priorized Fitting config options", "in addition to the above source fitting options")
     group5.add_argument('--priorized', dest='priorized', default=0, type=int,
-                        help="Enable priorized fitting level n=[1,2,3]. 1=fit flux, 2=fit flux/position, 3=fit flux/position/shape. " + 
-                             "See the GitHub wiki for more details." )
+                        help="Enable priorized fitting level n=[1,2,3]. 1=fit flux, 2=fit flux/position, 3=fit flux/position/shape. " +
+                             "See the GitHub wiki for more details.")
     group5.add_argument('--ratio', dest='ratio', default=None, type=float,
                         help="The ratio of synthesized beam sizes (image psf / input catalog psf). " +
                              "For use with priorized.")
@@ -149,7 +152,9 @@ if __name__ == "__main__":
     group5.add_argument('--catpsf', dest='catpsf', type=str, default=None,
                         help='A psf map corresponding to the input catalog. This will allow for the correct resizing of' +
                              ' sources when the catalog and image psfs differ.')
-
+    group5.add_argument('--regroup-eps', dest='regroup_eps', default=None, type=float,
+                        help='The size in arcminutes that is used to regroup nearby components into a ' +
+                        'a single set of components that will be solved for simultaneously')
 
     # Debug and extras
     group6 = parser.add_argument_group("Extra options")
@@ -194,11 +199,15 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if options.file_versions:
-        log.info("AegeanTools {0} from {1}".format(AegeanTools.__version__, AegeanTools.__file__))
+        log.info("AegeanTools {0} from {1}".format(
+            AegeanTools.__version__, AegeanTools.__file__))
         log.info("Numpy {0} from {1} ".format(np.__version__, np.__file__))
-        log.info("Scipy {0} from {1}".format(scipy.__version__, scipy.__file__))
-        log.info("AstroPy {0} from {1}".format(astropy.__version__, astropy.__file__))
-        log.info("LMFit {0} from {1}".format(lmfit.__version__, lmfit.__file__))
+        log.info("Scipy {0} from {1}".format(
+            scipy.__version__, scipy.__file__))
+        log.info("AstroPy {0} from {1}".format(
+            astropy.__version__, astropy.__file__))
+        log.info("LMFit {0} from {1}".format(
+            lmfit.__version__, lmfit.__file__))
         sys.exit(0)
 
     # print help if the user enters no options or filename
@@ -221,7 +230,8 @@ if __name__ == "__main__":
 
     # check for nopositive/negative conflict
     if options.nopositive and not options.negative:
-        log.warning('Requested no positive sources, but no negative sources. Nothing to find.')
+        log.warning(
+            'Requested no positive sources, but no negative sources. Nothing to find.')
         sys.exit()
 
     # if priorized/save are enabled we turn off "find" unless it was specifically set
@@ -256,7 +266,8 @@ if __name__ == "__main__":
             sys.exit(1)
         options.beam = Beam(beam[0], beam[1], beam[2])
         log.info("Using user supplied beam parameters")
-        log.info("Beam is {0} deg x {1} deg with pa {2}".format(options.beam.a, options.beam.b, options.beam.pa))
+        log.info("Beam is {0} deg x {1} deg with pa {2}".format(
+            options.beam.a, options.beam.b, options.beam.pa))
 
     # auto-load background, noise, psf and region files
     basename = os.path.splitext(filename)[0]
@@ -302,16 +313,16 @@ if __name__ == "__main__":
     if options.save:
         sf.save_background_files(filename, hdu_index=hdu_index, cores=options.cores, beam=options.beam,
                                  outbase=options.outbase, bkgin=options.backgroundimg, rmsin=options.noiseimg,
-                                 rms=options.rms, bkg=options.bkg)
+                                 rms=options.rms, bkg=options.bkg, cube_index=options.slice)
         sys.exit(0)
 
     # check that the output table formats are supported (if given)
     # BEFORE any cpu intensive work is done
     if options.tables is not None:
         if not check_table_formats(options.tables):
-            log.critical("One or more output table formats are not supported: Exiting")
+            log.critical(
+                "One or more output table formats are not supported: Exiting")
             sys.exit(1)
-
 
     # if an outputfile was specified open it for writing
     if options.outfile == 'stdout':
@@ -335,7 +346,7 @@ if __name__ == "__main__":
                                          docov=options.docov, cube_index=options.slice,
                                          progress=options.progress)
         if options.blank:
-            outname = basename+'_blank.fits'
+            outname = basename + '_blank.fits'
             sf.save_image(outname)
         if len(found) == 0:
             log.info("No sources found in image")
@@ -357,7 +368,8 @@ if __name__ == "__main__":
 
         log.info("Stage = {0}".format(options.priorized))
         if options.doislandflux:
-            log.warning("--island requested but not yet supported for priorized fitting")
+            log.warning(
+                "--island requested but not yet supported for priorized fitting")
         sf.priorized_fit_islands(filename, catalogue=options.input, hdu_index=options.hdu_index,
                                  rms=options.rms, bkg=options.bkg,
                                  outfile=options.outfile, bkgin=options.backgroundimg,
@@ -366,8 +378,7 @@ if __name__ == "__main__":
                                  stage=options.priorized, ratio=options.ratio, outerclip=options.outerclip,
                                  cores=options.cores, doregroup=options.regroup, docov=options.docov,
                                  cube_index=options.slice,
-                                 progress=options.progress)
-
+                                 progress=options.progress, regroup_eps=options.regroup_eps)
 
     sources = sf.sources
     # if --condon is set then we replace all the errors with those described by Condon'97

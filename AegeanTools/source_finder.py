@@ -79,7 +79,10 @@ log = logging.getLogger("dummy")
 log.addHandler(logging.NullHandler())
 
 
-def find_islands(im, bkg, rms, seed_clip=5.0, flood_clip=4.0, log=log):
+def find_islands(im, bkg, rms,
+                 seed_clip=5.0, flood_clip=4.0,
+                 region=None, wcs=None,
+                 log=log):
     """
     This function designed to be run as a stand alone process
 
@@ -89,8 +92,17 @@ def find_islands(im, bkg, rms, seed_clip=5.0, flood_clip=4.0, log=log):
       Image, background, and rms maps
 
     seed_clip, flood_clip : float
-      The seed clip which is used to create islands, and flood clip which is 
+      The seed clip which is used to create islands, and flood clip which is
       used to grow islands. The units are in SNR.
+
+    region : :class:`AegeanTools.regions.Region` or None
+      Region over which to find islands. Islands must have at least 1 pixel overlap
+      with the region in order to be returned. Default = None, no constraints.
+      Region *requires* a wcs to be defined.
+
+    wcs : :class:`AegeanTools.wcs_helpers.WCSHelper` or None
+      If a region is specified then this WCSHelper will be used to map sky->pix
+      coordinates. Default = None.
 
     log : `logging.Logger` or None
       For handling logs (or not)
@@ -100,6 +112,11 @@ def find_islands(im, bkg, rms, seed_clip=5.0, flood_clip=4.0, log=log):
     islands : [:class:`AegeanTools.models.PixelIsland`, ...]
       a list of islands
     """
+    if (region is not None) and (wcs is None):
+        log.warning("Find islands: Region was passed, but no wcs is defined." +
+                    " Ignoring region.")
+        region = None
+
     # compute SNR image
     snr = abs(im - bkg) / rms
 
@@ -110,8 +127,8 @@ def find_islands(im, bkg, rms, seed_clip=5.0, flood_clip=4.0, log=log):
         log.debug("There are no pixels above the clipping limit")
         return []
 
-    # segmentation via scipy
-    l, n = label(a)
+    # segmentation via scipy, structure includes diagonal pixels as single island
+    l, n = label(a, structure=np.ones((3, 3)))
     f = find_objects(l)
 
     log.debug("{1} Found {0} islands total above flood limit"
@@ -123,25 +140,36 @@ def find_islands(im, bkg, rms, seed_clip=5.0, flood_clip=4.0, log=log):
         ymin, ymax = f[i][1].start, f[i][1].stop
         # obey seed clip constraint
         if np.any(snr[xmin:xmax, ymin:ymax] > seed_clip):
-            data_box = copy.copy(
-                im[xmin:xmax, ymin:ymax]
-            )  # copy so that we don't blank the master data
-            data_box[
-                np.where(snr[xmin:xmax, ymin:ymax] < flood_clip)
-            ] = np.nan  # blank pixels that are outside the outerclip
-            data_box[
-                np.where(l[xmin:xmax, ymin:ymax] != i + 1)
-            ] = np.nan  # blank out other summits
+            # obey region constraint
+            if region is not None:
+                y, x = np.where(snr[xmin:xmax, ymin:ymax] >= flood_clip)
+                yx = list(zip(y + ymin, x + xmin))
+                ra, dec = wcs.wcs.wcs_pix2world(yx, 1).transpose()
+                mask = region.sky_within(ra, dec, degin=True)
+                if not np.any(mask):
+                    continue
+
+            # copy so that we don't blank the master data
+            data_box = copy.deepcopy(im[xmin:xmax, ymin:ymax])
+
+            # make mask and blank out pixels with below the noise level or
+            # are pixels that are of another island in the FoV
+            island_mask = (snr[xmin:xmax, ymin:ymax] < flood_clip) | \
+                          (l[xmin:xmax, ymin:ymax] != i + 1)
+            data_box[island_mask] = np.nan
+
             # check if there are any pixels left unmasked
             if not np.any(np.isfinite(data_box)):
                 # self.log.info("{1} Island {0} has no non-masked pixels"
                 #               .format(i,data.shape))
                 continue
+
             island = PixelIsland()
             island.calc_bounding_box(
                 np.array(np.nan_to_num(data_box), dtype=bool),
                 offsets=[xmin, ymin]
             )
+            island.set_mask(island_mask)
             islands.append(island)
 
     return islands
@@ -192,8 +220,13 @@ def estimate_parinfo_image(islands, im, rms, wcshelper,
         # set flags to be empty
         is_flag = 0x0
         [rmin, rmax], [cmin, cmax] = island.bounding_box
-        i_data = im[rmin:rmax, cmin:cmax]
-        i_rms = rms[rmin:rmax, cmin:cmax]
+        i_data = copy.deepcopy(im[rmin:rmax, cmin:cmax])
+        i_rms = copy.deepcopy(rms[rmin:rmax, cmin:cmax])
+
+        # Mask out the bad pixels
+        island_mask = island.mask
+        i_data[island_mask] = np.nan
+        i_rms[island_mask] = np.nan
 
         # the curvature needs a buffer of 1 pixel to correctly identify
         # the local min/max on the edge of the region.
@@ -237,15 +270,12 @@ def estimate_parinfo_image(islands, im, rms, wcshelper,
         ]
         del peaks, pmask, troughs, tmask, buffx, buffy
 
-        # apply the island mask
-        i_data[np.where(np.bitwise_not(island.mask))] = np.nan
-
-        isnegative = max(
-            i_data[np.where(np.isfinite(i_data) & island.mask)]) < 0
+        # have already applied the island mask at start of loop
+        isnegative = np.nanmax(i_data[np.isfinite(i_data)]) < 0
 
         # For small islands we can't do a 6 param fit
         # Don't count the NaN values as part of the island
-        non_nan_pix = len(i_data[np.where(np.isfinite(i_data))].ravel())
+        non_nan_pix = np.sum(np.isfinite(i_data))
         if 4 <= non_nan_pix <= 6:
             log.debug("FIXED2PSF")
             is_flag |= flags.FIXED2PSF
@@ -629,7 +659,7 @@ def save_catalogue(sources, output, format=None):
 
     format : str
       A descriptor of the output format. Options are:
-      #TODO add a bunch of options
+      # TODO add a bunch of options
       'auto' or None - infer from filename extension
 
     Returns
@@ -731,20 +761,23 @@ class SourceFinder(object):
             ):  # obey inner clip constraint
                 # self.log.info("{1} Island {0} is above the inner clip limit"
                 #               .format(i, data.shape))
-                data_box = copy.copy(
+
+                # Flag pixel that are either below the flood level, or belong to other
+                # islands that happen to be withing the bounding box
+                island_mask = (snr[xmin:xmax, ymin:ymax] < outerclip) | \
+                              (l[xmin:xmax, ymin:ymax] != i + 1)
+                data_box = copy.deepcopy(
                     data[xmin:xmax, ymin:ymax]
                 )  # copy so that we don't blank the master data
-                data_box[
-                    np.where(snr[xmin:xmax, ymin:ymax] < outerclip)
-                ] = np.nan  # blank pixels that are outside the outerclip
-                data_box[
-                    np.where(l[xmin:xmax, ymin:ymax] != i + 1)
-                ] = np.nan  # blank out other summits
+
+                # blank out the bad pixels
+                data_box[island_mask] = np.nan
                 # check if there are any pixels left unmasked
                 if not np.any(np.isfinite(data_box)):
                     # self.log.info("{1} Island {0} has no non-masked pixels"
                     #               .format(i,data.shape))
                     continue
+
                 if domask and (self.global_data.region is not None):
                     y, x = np.where(snr[xmin:xmax, ymin:ymax] >= outerclip)
                     # convert indices of this sub region to indices in
@@ -821,7 +854,7 @@ class SourceFinder(object):
 
         # check to see if this island is a negative peak since we need to
         # treat such cases slightly differently
-        isnegative = max(data[np.where(np.isfinite(data))]) < 0
+        isnegative = np.nanmax(data[np.isfinite(data)]) < 0
         if isnegative:
             self.log.debug("[is a negative island]")
 
@@ -1456,6 +1489,7 @@ class SourceFinder(object):
         )
         self.global_data.pixarea = img.pixarea
         self.global_data.dcurve = None
+        self.global_data.cube_index = cube_index
 
         if do_curve:
             self.log.info("Calculating curvature")
@@ -1503,7 +1537,7 @@ class SourceFinder(object):
         if verb and debug:
             self.log.debug(
                 "Data max is {0}".format(
-                    img.get_pixels()[np.isfinite(img.get_pixels())].max()
+                    np.nanmax(img.get_pixels())
                 )
             )
             self.log.debug("Doing background subtraction")
@@ -1512,7 +1546,7 @@ class SourceFinder(object):
         if verb and debug:
             self.log.debug(
                 "Data max is {0}".format(
-                    img.get_pixels()[np.isfinite(img.get_pixels())].max()
+                    np.nanmax(img.get_pixels())
                 )
             )
 
@@ -1539,6 +1573,7 @@ class SourceFinder(object):
         bkg=None,
         cores=1,
         outbase=None,
+        cube_index=None,
     ):
         """
         Generate and save the background and RMS maps as FITS files.
@@ -1561,7 +1596,6 @@ class SourceFinder(object):
           Beam object representing the synthsized beam.
           Will replace what is in the FITS header.
 
-
         rms, bkg : float
           A float that represents a constant rms/bkg level for the image.
           Default = None, which causes the rms/bkg to be loaded or calculated.
@@ -1572,6 +1606,8 @@ class SourceFinder(object):
         outbase : str
           Basename for output files.
 
+        cube_index : int
+          If images are 3d, use this index into the 3rd axis.
         """
 
         self.log.info("Saving background / RMS maps")
@@ -1587,6 +1623,7 @@ class SourceFinder(object):
             bkg=bkg,
             cores=cores,
             do_curve=True,
+            cube_index=cube_index
         )
         img = self.global_data.img
         bkgimg, rmsimg = self.global_data.bkgimg, self.global_data.rmsimg
@@ -1720,10 +1757,11 @@ class SourceFinder(object):
             step_size=step_size,
             box_size=box_size,
             cores=cores,
+            cube_index=self.global_data.cube_index,
         )
-        if forced_rms is not None:
+        if forced_rms is None:
             self.global_data.rmsimg = rms
-        if forced_bkg is not None:
+        if forced_bkg is None:
             self.global_data.bkgimg = bkg
 
         return
@@ -2466,6 +2504,8 @@ class SourceFinder(object):
             rms=rmsimg,
             seed_clip=innerclip,
             flood_clip=outerclip,
+            region=global_data.region,
+            wcs=global_data.psfhelper,
             log=self.log,
         )
         self.log.info("Found {0} islands".format(len(islands)))
@@ -2478,10 +2518,14 @@ class SourceFinder(object):
 
         for island in islands:
             [[xmin, xmax], [ymin, ymax]] = island.bounding_box
-            i = global_data.data_pix[xmin:xmax, ymin:ymax]
+            island_mask = island.mask
+
+            i = copy.deepcopy(global_data.data_pix[xmin:xmax, ymin:ymax])
+            i[island_mask] = np.nan
+
             # ignore empty islands
             # This should now be impossible to trigger
-            if np.size(i) < 1:
+            if not np.any(np.isfinite(i)):
                 self.log.warning(
                     "Empty island detected, this should be imposisble.")
                 continue
@@ -2717,7 +2761,7 @@ class SourceFinder(object):
         # compute eps if it's not defined
         if regroup_eps is None:
             # s.a is in arcsec but we assume regroup_eps is in arcmin
-            regroup_eps = 4*np.mean([s.a*60 for s in sources])
+            regroup_eps = 4*np.mean([s.a/60 for s in sources])
         # convert regroup_eps into a value appropriate for a cartesian measure
         regroup_eps = np.sin(np.radians(regroup_eps/60))
         input_sources = sources
