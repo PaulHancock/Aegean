@@ -16,7 +16,7 @@ from .angle_tools import gcd, bear
 
 # Other AegeanTools
 from . import flags
-
+from .exceptions import AegeanNaNModelError
 
 # join the Aegean logger
 import logging
@@ -1252,7 +1252,6 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     params = copy.deepcopy(params)
     data = np.array(data)
     mask = np.where(np.isfinite(data))
-
     def residual(params, **kwargs):
         """
         The residual function required by lmfit
@@ -1269,17 +1268,24 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
         """
         f = ntwodgaussian_lmfit(params)  # A function describing the model
         model = f(*mask)  # The actual model
+        
+        if np.any(~np.isfinite(model)):
+            raise AegeanNaNModelError("lmfit optimisation has return NaN in the parameter set. ")
+
         if B is None:
             return model - data[mask]
         else:
             return (model - data[mask]).dot(B)
 
+     # try:
     if dojac:
         result = lmfit.minimize(residual, params, kws={
                                 'x': mask[0], 'y': mask[1], 'B': B, 'errs': errs}, Dfun=lmfit_jacobian)
     else:
         result = lmfit.minimize(residual, params, kws={
                                 'x': mask[0], 'y': mask[1], 'B': B, 'errs': errs})
+    # except AegeanNaNModelError:
+    #     return None, None
 
     # Remake the residual so that it is once again (model - data)
     if B is not None:
