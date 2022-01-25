@@ -40,6 +40,7 @@ jobs:
       run: |
         coverage run -m pytest
         coverage combine      
-    - name: Coveralls Finished
-      run: |
-        COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_REPO_TOKEN }} coveralls --finish 
+# currently fails with a complaint about the repo token being wrong.
+#    - name: Coveralls Finished
+#      run: |
+#        COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_REPO_TOKEN }} coveralls --finish 
