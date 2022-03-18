@@ -1,0 +1,29 @@
+#! /usr/bin/env python
+
+"""
+A psf map making tool.
+"""
+
+import sys
+import os
+import logging
+import logging.config
+import argparse
+
+# users can create a psf map that can be used in PSFHelpers and by aegean --psf
+# can specify an output filename
+# can specify an input image that contains wcs and other meta data for making the psf map
+# can specify a reference coordinate for the phase/pointing center
+# can specify if the psf is elevation dependent (MWA snapshot = Yes, ATCA mosaic = No, MWA)
+# can specify if the psf is declinatoin dependent (MWA mosaic = Yes)
+# can provide a catalogue with psf_[a,b,pa] and [a,b,pa] from which a psf map will be created
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(prog='makepsf', prefix_chars='-')
+    group1 = parser.add_argument_group('Configuration Options')
+
+    group1.add_argument("--out", dest='out', type=str, default=None,
+                        help='Output file for psf map')
+    group1.add_argument("--fromimage", dest='fromimage', type=str, default=None,
+                        help="Reference image which has the required wcs information")
