@@ -594,7 +594,6 @@ def characterise_islands(
       'best' - Uncertainties measured based on covariance matrix of the
                fit and of the data
                See Hancock et al. 2018 for a description of this process.
-      'condon' - Uncertainties are *calculated* based on Condon'98 (?year)
       'raw' - uncertainties directly from the covariance matrix only
       'none' or None - No uncertainties, all will be set to -1.
 
