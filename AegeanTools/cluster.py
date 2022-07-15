@@ -5,16 +5,16 @@ Cluster and crossmatch tools and analysis functions.
 Includes:
 - DBSCAN clustering
 """
-from __future__ import print_function
 
-from .wcs_helpers import Beam
-from .angle_tools import gcd, bear
-from .catalogs import load_table, table_to_source_list
-
-from sklearn.cluster import DBSCAN
-import numpy as np
-import math
 import logging
+import math
+
+import numpy as np
+from sklearn.cluster import DBSCAN
+
+from .angle_tools import bear, gcd
+from .catalogs import load_table, table_to_source_list
+from .wcs_helpers import Beam
 
 __author__ = "Paul Hancock"
 

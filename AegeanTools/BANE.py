@@ -4,25 +4,25 @@
 This module contains all of the BANE specific code
 The function filter_image should be imported from elsewhere and run as is.
 """
-from __future__ import division
-# standard imports
-from astropy.io import fits
+
 import copy
 import logging
 import multiprocessing
 import multiprocessing.sharedctypes
-import numpy as np
 import os
-from scipy.interpolate import RegularGridInterpolator
 import sys
 from time import gmtime, strftime
+
+import numpy as np
+from astropy.io import fits
+from scipy.interpolate import RegularGridInterpolator
 
 # Aegean tools
 from .fits_interp import compress
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.9.0'
-__date__ = '2021-11-15'
+__version__ = 'v1.9.1'
+__date__ = '2022-07-15'
 
 # global variables for multiprocessing
 ibkg = irms = None

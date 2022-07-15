@@ -2,17 +2,14 @@
 """
 Test the AeRes module
 """
+import os
 
-from __future__ import print_function
+import numpy as np
+from AegeanTools import AeRes as ar
+from AegeanTools import catalogs, wcs_helpers
+from astropy.io import fits
 
 __author__ = 'Paul Hancock'
-
-from AegeanTools import AeRes as ar
-from AegeanTools import wcs_helpers, catalogs
-
-from astropy.io import fits
-import numpy as np
-import os
 
 
 def test_load_sources():
@@ -27,13 +24,13 @@ def test_load_sources():
 def test_load_soruces_renamed_columns():
     """Test load_sources with renamed columns"""
     filename = 'tests/test_files/1904_comp_renamed_cols.fits'
-    colnames = {'ra_col':'RAJ2000',
-                'dec_col':'DEJ2000',
-                'peak_col':'S',
-                'a_col':'bmaj',
-                'b_col':'bmin',
-                'pa_col':'bpa'}
-    cat = ar.load_sources(filename,**colnames)
+    colnames = {'ra_col': 'RAJ2000',
+                'dec_col': 'DEJ2000',
+                'peak_col': 'S',
+                'a_col': 'bmaj',
+                'b_col': 'bmin',
+                'pa_col': 'bpa'}
+    cat = ar.load_sources(filename, **colnames)
     if cat is None:
         raise AssertionError("load_sources failed with renamed columns")
     return

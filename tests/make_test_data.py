@@ -1,17 +1,16 @@
 #! /usr/bin/env python
-from __future__ import print_function, division
+import logging
+from copy import deepcopy
 
-__author__ = 'Paul Hancock'
-
-from AegeanTools import models, AeRes
+import numpy as np
+from AegeanTools import AeRes, models
 from AegeanTools.source_finder import FWHM2CC
 from AegeanTools.wcs_helpers import WCSHelper
-import numpy as np
-from scipy.ndimage import gaussian_filter
-from astropy.wcs import WCS
 from astropy.io import fits
-from copy import deepcopy
-import logging
+from astropy.wcs import WCS
+from scipy.ndimage import gaussian_filter
+
+__author__ = 'Paul Hancock'
 
 imsize = (256, 512)  # non square picks up more errors
 noise = 0.5  # non unity noise picks up more errors
@@ -45,7 +44,8 @@ def make_noise_image():
 
     wcs = WCS(naxis=2)
     wcs.wcs.crpix = [imsize[0]/2, imsize[1]/2]
-    wcs.wcs.cdelt = np.array([psf[0]/3600/pix_per_beam, psf[1]/3600/pix_per_beam])
+    wcs.wcs.cdelt = np.array(
+        [psf[0]/3600/pix_per_beam, psf[1]/3600/pix_per_beam])
     wcs.wcs.crval = [ra, dec]
     wcs.wcs.ctype = ["RA---SIN", "DEC--SIN"]
     return image, wcs
@@ -87,7 +87,7 @@ def make_catalogue():
             src.dec = d
             src.a, src.b, src.pa = psf
             src.island = i*10 + j
-            src.peak_flux = fluxes[i*10 +j]
+            src.peak_flux = fluxes[i*10 + j]
             src.background = 0
             src.local_rms = noise
             src.err_peak_flux = noise
@@ -116,7 +116,7 @@ def make_catalogue():
     return cat
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     # configure logging
     logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")

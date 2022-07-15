@@ -2,14 +2,11 @@
 """
 Test fitting.py
 """
-
-from __future__ import print_function
-
-__author__ = 'Paul Hancock'
-
-from AegeanTools import fitting, models, wcs_helpers
 import lmfit
 import numpy as np
+from AegeanTools import fitting
+
+__author__ = 'Paul Hancock'
 
 
 def make_model():

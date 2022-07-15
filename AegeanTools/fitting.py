@@ -1,28 +1,26 @@
 #! /usr/bin/env python
 """
-Provide fitting routines and helper fucntions to Aegean
+Provide fitting routines and helper functions to Aegean
 """
 
-from __future__ import print_function
+import copy
+import logging
+import math
+
+import lmfit
+import numpy as np
+from scipy.linalg import eigh, inv
+
+from . import flags
+from .angle_tools import bear, gcd
+from .exceptions import AegeanNaNModelError
 
 __author__ = "Paul Hancock"
 
-import copy
-import math
-import numpy as np
-from scipy.linalg import eigh, inv
-import lmfit
-from .angle_tools import gcd, bear
-
-# Other AegeanTools
-from . import flags
-from .exceptions import AegeanNaNModelError
-
 # join the Aegean logger
-import logging
 log = logging.getLogger('Aegean')
 
-# ERR_MASK is used to indicate that the err_x value is not able to be determined
+# ERR_MASK is used to indicate that the err_x value can't be determined
 ERR_MASK = -1.0
 
 
@@ -63,7 +61,9 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     return amp * np.exp(exp)
 
 
-def elliptical_gaussian_with_alpha(x, y, v, amp, xo, yo, vo, sx, sy, theta, alpha, beta=None):
+def elliptical_gaussian_with_alpha(x, y, v, amp,
+                                   xo, yo, vo, sx, sy, theta,
+                                   alpha, beta=None):
     """
     Generate a model 2d Gaussian with spectral terms.
     Evaluate this model at the given locations x,y,dv.
@@ -112,7 +112,7 @@ def Cmatrix(x, y, sx, sy, theta):
     Parameters
     ----------
     x, y : array-like
-        locations at which to evaluate the correlation matirx
+        locations at which to evaluate the correlation matrix
     sx, sy : float
         major/minor axes of the gaussian correlation function (sigmas)
 
@@ -131,8 +131,8 @@ def Cmatrix(x, y, sx, sy, theta):
 
 def Bmatrix(C):
     """
-    Calculate a matrix which is effectively the square root of the correlation matrix C
-
+    Calculate a matrix which is effectively the square root of the 
+    correlation matrix C
 
     Parameters
     ----------
@@ -189,8 +189,9 @@ def jacobian(pars, x, y):
         sy = pars[prefix + 'sy'].value
         theta = pars[prefix + 'theta'].value
 
-        # The derivative with respect to component i doesn't depend on any other components
-        # thus the model should not contain the other components
+        # The derivative with respect to component i
+        # doesn't depend on any other components thus
+        # the model should not contain the other components
         model = elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta)
 
         # precompute for speed
@@ -272,7 +273,8 @@ def emp_jacobian(pars, x, y):
 
 def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
     """
-    Wrapper around :func:`AegeanTools.fitting.jacobian` and :func:`AegeanTools.fitting.emp_jacobian`
+    Wrapper around :func:`AegeanTools.fitting.jacobian` 
+    and :func:`AegeanTools.fitting.emp_jacobian`
     which gives the output in a format that is required for lmfit.
 
     Parameters
@@ -290,7 +292,7 @@ def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
         a B-matrix (optional) see :func:`AegeanTools.fitting.Bmatrix`
 
     emp : bool
-        If true the use the empirical Jacobian, otherwise use the analytical one.
+        If true the use empirical Jacobian, otherwise use analytical
         Default = False.
 
     Returns
@@ -647,7 +649,8 @@ def emp_hessian(pars, x, y):
 
     Notes
     -----
-    Uses :func:`AegeanTools.fitting.emp_jacobian` to calculate the first order derivatives.
+    Uses :func:`AegeanTools.fitting.emp_jacobian` to calculate the first order 
+    derivatives.
 
     See Also
     --------
@@ -692,7 +695,8 @@ def nan_acf(noise):
         for j in range(jx):
             sj_min = slice(j, None, None)
             sj_max = slice(None, jx-j, None)
-            if np.all(np.isnan(noise[si_min, sj_min])) or np.all(np.isnan(noise[si_max, sj_max])):
+            if (np.all(np.isnan(noise[si_min, sj_min])) or
+                    np.all(np.isnan(noise[si_max, sj_max]))):
                 corr[i, j] = np.nan
             else:
                 corr[i, j] = np.nansum(
@@ -704,7 +708,8 @@ def nan_acf(noise):
 def make_ita(noise, acf=None):
     """
     Create the matrix ita of the noise where the noise may be a masked array
-    where ita(x,y) is the correlation between pixel pairs that have the same separation as x and y.
+    where ita(x,y) is the correlation between pixel pairs that have the same 
+    separation as x and y.
 
     Parameters
     ----------
@@ -871,8 +876,9 @@ def errors(source, model, wcshelper):
 
     # if the source wasn't fit then all errors are -1
     if source.flags & (flags.NOTFIT | flags.FITERR):
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = ERR_MASK
-        source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
+        source.err_peak_flux = source.err_a = source.err_b =\
+            source.err_pa = source.err_ra = source.err_dec =\
+            source.err_int_flux = ERR_MASK
         return source
     # copy the errors from the model
     prefix = "c{0}_".format(source.source)
@@ -895,7 +901,8 @@ def errors(source, model, wcshelper):
 
     ref = wcshelper.pix2sky([xo, yo])
     # check to see if the reference position has a valid WCS coordinate
-    # It is possible for this to fail, even if the ra/dec conversion works elsewhere
+    # It is possible for this to fail,
+    # even if the ra/dec conversion works elsewhere
     if not all(np.isfinite(ref)):
         source.flags |= flags.WCSERR
         source.err_peak_flux = source.err_a = source.err_b = source.err_pa = ERR_MASK
@@ -979,8 +986,8 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
 
     # if the source wasn't fit then all errors are -1
     if source.flags & (flags.NOTFIT | flags.FITERR):
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = ERR_MASK
-        source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa =\
+            source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
         return source
     # copy the errors/values from the model
     prefix = "c{0}_".format(source.source)
@@ -1004,18 +1011,19 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
     # check for inf/nan errors -> these sources have poor fits.
     if not all(a is not None and np.isfinite(a) for a in pix_errs):
         source.flags |= flags.FITERR
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = ERR_MASK
-        source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = \
+            source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
         return source
 
     # calculate the reference coordinate
     ref = wcshelper.pix2sky([xo, yo])
     # check to see if the reference position has a valid WCS coordinate
-    # It is possible for this to fail, even if the ra/dec conversion works elsewhere
+    # It is possible for this to fail,
+    # even if the ra/dec conversion works elsewhere
     if not all(np.isfinite(ref)):
         source.flags |= flags.WCSERR
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = ERR_MASK
-        source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = \
+            source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
         return source
 
     # calculate position errors by transforming the error ellipse
@@ -1031,7 +1039,7 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
             _, _, major, minor, pa = wcshelper.pix2sky_ellipse(
                 [xo, yo], a, b, pa)
 
-            # now determine the radius of the ellipse along the ra/dec directions.
+            # determine the radius of the ellipse along the ra/dec directions.
             source.err_ra = major*minor / \
                 np.hypot(major*np.sin(np.radians(pa)),
                          minor*np.cos(np.radians(pa)))
@@ -1086,7 +1094,8 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
 
 def ntwodgaussian_lmfit(params):
     """
-    Convert an lmfit.Parameters object into a function which calculates the model.
+    Convert an lmfit.Parameters object into a function which calculates 
+    the model.
 
 
     Parameters
@@ -1153,7 +1162,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     errs : 1d-array
 
     dojac : bool
-        If true then an analytic jacobian will be passed to the fitting routine.
+        If true then an analytic jacobian will be passed to the fitter
 
     Returns
     -------
@@ -1173,6 +1182,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     params = copy.deepcopy(params)
     data = np.array(data)
     mask = np.where(np.isfinite(data))
+
     def residual(params, **kwargs):
         """
         The residual function required by lmfit
@@ -1189,24 +1199,27 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
         """
         f = ntwodgaussian_lmfit(params)  # A function describing the model
         model = f(*mask)  # The actual model
-        
+
         if np.any(~np.isfinite(model)):
-            raise AegeanNaNModelError("lmfit optimisation has return NaN in the parameter set. ")
+            raise AegeanNaNModelError(
+                "lmfit optimisation has return NaN in the parameter set. ")
 
         if B is None:
             return model - data[mask]
         else:
             return (model - data[mask]).dot(B)
 
-     # try:
     if dojac:
-        result = lmfit.minimize(residual, params, kws={
-                                'x': mask[0], 'y': mask[1], 'B': B, 'errs': errs}, Dfun=lmfit_jacobian)
+        result = lmfit.minimize(residual, params,
+                                kws={
+                                    'x': mask[0], 'y': mask[1],
+                                    'B': B, 'errs': errs},
+                                Dfun=lmfit_jacobian)
     else:
-        result = lmfit.minimize(residual, params, kws={
-                                'x': mask[0], 'y': mask[1], 'B': B, 'errs': errs})
-    # except AegeanNaNModelError:
-    #     return None, None
+        result = lmfit.minimize(residual, params,
+                                kws={
+                                    'x': mask[0], 'y': mask[1],
+                                    'B': B, 'errs': errs})
 
     # Remake the residual so that it is once again (model - data)
     if B is not None:

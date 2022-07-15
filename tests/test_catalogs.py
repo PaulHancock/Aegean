@@ -2,19 +2,19 @@
 """
 Test catalogues.py
 """
-from __future__ import print_function
 
-__author__ = 'Paul Hancock'
+import logging
+import os
 
+import numpy as np
 from AegeanTools import catalogs as cat
 from AegeanTools.models import ComponentSource, IslandSource, SimpleSource
 from AegeanTools.msq2 import MarchingSquares
 from astropy import table
-import numpy as np
 from numpy.testing import assert_raises
-import os
 
-import logging
+__author__ = 'Paul Hancock'
+
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
 log.setLevel(logging.INFO)
@@ -29,7 +29,8 @@ def test_nulls():
 
 def test_check_table_formats():
     """Test check_table_formats"""
-    files = ','.join(['a.csv', 'a.fits', 'a.vot', 'a.hdf5',  'a.ann', 'a.docx', 'a'])
+    files = ','.join(['a.csv', 'a.fits', 'a.vot',
+                     'a.hdf5',  'a.ann', 'a.docx', 'a'])
 
     if cat.check_table_formats(files):
         raise AssertionError()
@@ -189,15 +190,15 @@ def test_write_fits_table_variable_uuid_lengths():
     catalog = []
     for l in range(10):
         c = ComponentSource()
-        c.ra_str=c.dec_str="hello!"
+        c.ra_str = c.dec_str = "hello!"
         c.uuid = 'source-{0:d}'.format(2**l)
         catalog.append(c)
-    cat.save_catalog('a.fits', catalog, meta={'Purpose':'Testing'})
+    cat.save_catalog('a.fits', catalog, meta={'Purpose': 'Testing'})
     if not os.path.exists('a_comp.fits'):
         raise AssertionError()
 
     rcat = cat.load_table('a_comp.fits')
-    for src1,src2 in zip(rcat, catalog):
+    for src1, src2 in zip(rcat, catalog):
         if len(src1['uuid']) != len(src2.uuid):
             print("len mismatch for source {0}".format(src1))
             print("uuid should be len={0}".format(len(src2.uuid)))
@@ -300,7 +301,7 @@ def test_writeFITSTable():
     """Test that we can write a fits table"""
     tab = table.Table.read('tests/test_files/1904_comp.fits')
     outfile = 'dlme.fits'
-    tab.meta ={'test':'test'}
+    tab.meta = {'test': 'test'}
     cat.writeFITSTable(outfile, tab)
     if not os.path.exists(outfile):
         raise AssertionError()

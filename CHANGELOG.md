@@ -1,5 +1,8 @@
 July 2022
 =========
+General
+- dropped support for version of python prior to 3.6
+
 Aegean
 - Calculation and reporting of 'condon' errors has been removed
 

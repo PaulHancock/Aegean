@@ -4,12 +4,10 @@ Provie a class which performs the marching squares algorithm on an image.
 The desired output is a set of regions / contours.
 """
 
-from __future__ import print_function
-
-__author__ = "Paul Hancock"
-
 from copy import copy
 import numpy as np
+
+__author__ = "Paul Hancock"
 
 
 class MarchingSquares():

@@ -4,9 +4,9 @@ Different types of sources that Aegean is able to fit
 
 """
 
-from __future__ import print_function
-import numpy as np
 import uuid
+
+import numpy as np
 
 __author__ = "Paul Hancock"
 
