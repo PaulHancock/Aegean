@@ -178,40 +178,6 @@ def test_bias_correct():
     fitting.bias_correct(model, data)
 
 
-def test_condon_errs():
-    """Test that we can create Condon errors"""
-    source = models.ComponentSource()
-    source.ra = 0
-    source.dec = 1
-    source.a = 10
-    source.b = 10
-    source.pa = 0
-    source.local_rms = 0.1
-    source.peak_flux = 1
-    source.int_flux = 1
-
-    fitting.condon_errors(source, None)
-    if not (source.err_a == 0):
-        raise AssertionError(
-            "err_a should be zero but is {0}".format(source.err_a))
-
-    fitting.condon_errors(source, theta_n=8.)
-    if not (source.err_a > 0):
-        raise AssertionError("err_a should be non-zero")
-
-    # test that we can get a PA error
-    source.a = 20
-    fitting.condon_errors(source, None)
-    if source.err_pa < 0:
-        raise AssertionError("err_pa<0")
-
-    psf = wcs_helpers.WCSHelper.from_file('tests/test_files/1904-66_SIN.fits')
-    try:
-        fitting.condon_errors(source, theta_n=8., psf=psf)
-    except AttributeError as e:
-        raise AssertionError("condon_errors failed with psf")
-
-
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
