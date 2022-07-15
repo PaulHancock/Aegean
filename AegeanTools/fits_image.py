@@ -9,7 +9,7 @@ import astropy.wcs as pywcs
 import numpy
 import scipy.stats
 
-from .fits_interp import expand
+from .fits_tools import expand
 from .wcs_helpers import get_beam, get_pixinfo
 
 __author__ = "Paul Hancock"

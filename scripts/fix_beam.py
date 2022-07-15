@@ -11,7 +11,7 @@ __institute__ = 'Shanghai Astronomical Observatory'
 
 import sys
 import argparse
-from AegeanTools.fits_interp import load_file_or_hdu
+from AegeanTools.fits_tools import load_file_or_hdu
 from AegeanTools.wcs_helpers import fix_aips_header
 
 

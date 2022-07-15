@@ -18,7 +18,7 @@ from astropy.io import fits
 from scipy.interpolate import RegularGridInterpolator
 
 # Aegean tools
-from .fits_interp import compress
+from .fits_tools import compress
 
 __author__ = 'Paul Hancock'
 __version__ = 'v1.9.1'
