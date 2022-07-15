@@ -1,5 +1,10 @@
-Nov 29
-======
+July 2022
+=========
+Aegean
+- Calculation and reporting of 'condon' errors has been removed
+
+Nov 29 2021
+===========
 BANE
 - Allow BANE to run on a single slice of an image cube using the `slice` option (see #86).
 
