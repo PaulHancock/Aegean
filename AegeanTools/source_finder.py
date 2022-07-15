@@ -20,6 +20,8 @@ from scipy.ndimage import label, find_objects
 from scipy.ndimage.filters import minimum_filter, maximum_filter
 from tqdm import tqdm
 
+from AegeanTools.exceptions import AegeanNaNModelError
+
 # AegeanTools
 from .BANE import filter_image, get_step_size
 from .fitting import (
@@ -2549,9 +2551,12 @@ class SourceFinder(object):
             with tqdm(total=isle_num, desc="Fitting Islands:") as pbar:
                 for g in island_groups:
                     for i in g:
-                        srcs = self._fit_island(i)
+                        try:
+                            pbar.update(1)
+                            srcs = self._fit_island(i)
+                        except AegeanNaNModelError:
+                            continue
                         # update bar as each individual island is fit
-                        pbar.update(1)
                         for src in srcs:
                             # ignore sources that we have been told to ignore
                             if (src.peak_flux > 0 and nopositive) or (
