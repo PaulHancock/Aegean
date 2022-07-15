@@ -1,40 +1,32 @@
 #! /usr/bin/env python
-from __future__ import print_function
-
 """
 The Aegean source finding program.
 
 """
 
-import sys
-import os
-import numpy as np
-import scipy
-import lmfit
-import astropy
+import argparse
 import logging
 import logging.config
-import argparse
+import multiprocessing
+import os
+import sys
+
+import astropy
+import lmfit
+import numpy as np
+import scipy
+from AegeanTools import __citation__, __date__, __version__
+from AegeanTools.catalogs import (check_table_formats, save_catalog,
+                                  show_formats)
+from AegeanTools.source_finder import get_aux_files
+from AegeanTools.wcs_helpers import Beam
 
 # need Region in the name space in order to be able to unpickle it
 try:
     from AegeanTools.regions import Region
-
     region_available = True
-    try:
-        import cPickle as pickle
-    except ImportError:
-        import pickle
 except ImportError:
     region_available = False
-
-from AegeanTools.source_finder import get_aux_files
-from AegeanTools.wcs_helpers import Beam
-from AegeanTools.catalogs import show_formats, check_table_formats, save_catalog
-from AegeanTools import fitting
-import multiprocessing
-
-from AegeanTools import __version__, __date__, __citation__
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -189,6 +181,7 @@ if __name__ == "__main__":
 
     import AegeanTools
     from AegeanTools.source_finder import SourceFinder, check_cores
+
     # source finding object
     sf = SourceFinder(log=log)
 

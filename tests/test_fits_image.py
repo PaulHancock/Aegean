@@ -3,14 +3,13 @@
 Test fits_image.py
 """
 
-from __future__ import print_function
+import logging
 
 import AegeanTools.wcs_helpers
+import numpy as np
 from AegeanTools import fits_image as fi
 from astropy.io import fits
-import logging
-import numpy as np
-from numpy.testing import assert_raises, assert_array_almost_equal
+from numpy.testing import assert_array_almost_equal, assert_raises
 
 __author__ = 'Paul Hancock'
 
@@ -24,34 +23,44 @@ def test_get_pixinfo():
     header = fits.getheader('tests/test_files/1904-66_SIN.fits')
 
     area, scale = AegeanTools.wcs_helpers.get_pixinfo(header)
-    if not area > 0: raise AssertionError()
-    if not len(scale) == 2: raise AssertionError()
+    if not area > 0:
+        raise AssertionError()
+    if not len(scale) == 2:
+        raise AssertionError()
 
     header['CD1_1'] = header['CDELT1']
     del header['CDELT1']
     header['CD2_2'] = header['CDELT2']
     del header['CDELT2']
     area, scale = AegeanTools.wcs_helpers.get_pixinfo(header)
-    if not area > 0: raise AssertionError()
-    if not len(scale) == 2: raise AssertionError()
+    if not area > 0:
+        raise AssertionError()
+    if not len(scale) == 2:
+        raise AssertionError()
 
     header['CD1_2'] = 0
     header['CD2_1'] = 0
     area, scale = AegeanTools.wcs_helpers.get_pixinfo(header)
-    if not area > 0: raise AssertionError()
-    if not len(scale) == 2: raise AssertionError()
+    if not area > 0:
+        raise AssertionError()
+    if not len(scale) == 2:
+        raise AssertionError()
 
     header['CD1_2'] = header['CD1_1']
     header['CD2_1'] = header['CD2_2']
     area, scale = AegeanTools.wcs_helpers.get_pixinfo(header)
-    if not area == 0: raise AssertionError()
-    if not len(scale) == 2: raise AssertionError()
+    if not area == 0:
+        raise AssertionError()
+    if not len(scale) == 2:
+        raise AssertionError()
 
     for f in ['CD1_1', 'CD1_2', 'CD2_2', 'CD2_1']:
         del header[f]
     area, scale = AegeanTools.wcs_helpers.get_pixinfo(header)
-    if not area == 0: raise AssertionError()
-    if not scale == (0, 0): raise AssertionError()
+    if not area == 0:
+        raise AssertionError()
+    if not scale == (0, 0):
+        raise AssertionError()
 
 
 def test_get_beam():
@@ -59,12 +68,15 @@ def test_get_beam():
     header = fits.getheader('tests/test_files/1904-66_SIN.fits')
     beam = AegeanTools.wcs_helpers.get_beam(header)
     print(beam)
-    if beam is None : raise AssertionError()
-    if beam.pa != header['BPA']: raise AssertionError()
+    if beam is None:
+        raise AssertionError()
+    if beam.pa != header['BPA']:
+        raise AssertionError()
 
     del header['BMAJ'], header['BMIN'], header['BPA']
     beam = AegeanTools.wcs_helpers.get_beam(header)
-    if beam is not None : raise AssertionError()
+    if beam is not None:
+        raise AssertionError()
 
 
 def test_fix_aips_header():
@@ -96,13 +108,16 @@ def test_init():
     hdu[0].header['BZERO'] = 1
     hdu[0].header['BSCALE'] = 2
     im = fi.FitsImage(hdu)
-    if not im.bscale == 2: raise AssertionError()
-    if not im.bzero == 1: raise AssertionError()
+    if not im.bscale == 2:
+        raise AssertionError()
+    if not im.bzero == 1:
+        raise AssertionError()
 
     # should be able to supply a beam directly
     beam = AegeanTools.wcs_helpers.Beam(1, 1, 0)
     im = fi.FitsImage(hdu, beam=beam, cube_index=0)
-    if not (im.beam is beam): raise AssertionError()
+    if not (im.beam is beam):
+        raise AssertionError()
 
     # raise exception if the beam cannot be determined
     del hdu[0].header['BMAJ']
@@ -115,7 +130,8 @@ def test_init():
     assert_raises(Exception, fi.FitsImage, hdu)
     # this should be fine
     im = fi.FitsImage(hdu, cube_index=0)
-    if not (im.x == im.y == 3): raise AssertionError()
+    if not (im.x == im.y == 3):
+        raise AssertionError()
 
     # can't work with 4d data
     hdu[0].data = np.empty((3, 3, 3, 3))
@@ -128,7 +144,8 @@ def test_get_background_rms():
     hdu = fits.open(filename)
     hdu[0].data = np.empty((40, 40))
     im = fi.FitsImage(hdu)
-    if not (im.get_background_rms() > 0): raise AssertionError()
+    if not (im.get_background_rms() > 0):
+        raise AssertionError()
 
 
 def test_pix2sky_sky2pix():

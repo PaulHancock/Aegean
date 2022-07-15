@@ -5,13 +5,13 @@ part of the WCS toolkit, as well as some wrappers around the provided tools
 to make them a lot easier to use.
 """
 
-from __future__ import print_function
-
-from astropy.wcs import WCS
-from astropy.io import fits
-import numpy as np
 import logging
-from .angle_tools import gcd, bear, translate
+
+import numpy as np
+from astropy.io import fits
+from astropy.wcs import WCS
+
+from .angle_tools import bear, gcd, translate
 
 __author__ = "Paul Hancock"
 
@@ -81,7 +81,8 @@ class WCSHelper(object):
         """
         self.wcs = wcs
         self.beam = (
-            beam  # the beam as per the fits header (at the reference coordiante)
+            # the beam as per the fits header (at the reference coordiante)
+            beam
         )
         self.pixscale = pixscale
         self.refpix = refpix
@@ -230,7 +231,8 @@ class WCSHelper(object):
             The (x,y) pixel coordinates
 
         """
-        pixel = self.wcs.all_world2pix([pos], 1, ra_dec_order=self.ra_dec_order)
+        pixel = self.wcs.all_world2pix(
+            [pos], 1, ra_dec_order=self.ra_dec_order)
         # wcs and python have opposite ideas of x/y
         return [pixel[0][1], pixel[0][0]]
 
@@ -252,7 +254,8 @@ class WCSHelper(object):
         """
         # wcs and python have opposite ideas of x/y
         if self.psf_wcs is not None:
-            pixel = self.psf_wcs.all_world2pix([pos], 1, ra_dec_order=self.ra_dec_order)
+            pixel = self.psf_wcs.all_world2pix(
+                [pos], 1, ra_dec_order=self.ra_dec_order)
             return [pixel[0][1], pixel[0][0]]
         return None
 
@@ -312,7 +315,8 @@ class WCSHelper(object):
         """
         ra1, dec1 = self.pix2sky(pixel)
         x, y = pixel
-        a = (x + r * np.cos(np.radians(theta)), y + r * np.sin(np.radians(theta)))
+        a = (x + r * np.cos(np.radians(theta)),
+             y + r * np.sin(np.radians(theta)))
         locations = self.pix2sky(a)
         ra2, dec2 = locations
         a = gcd(ra1, dec1, ra2, dec2)
@@ -387,7 +391,8 @@ class WCSHelper(object):
         """
         ra, dec = self.pix2sky(pixel)
         x, y = pixel
-        v_sx = (x + sx * np.cos(np.radians(theta)), y + sx * np.sin(np.radians(theta)))
+        v_sx = (x + sx * np.cos(np.radians(theta)),
+                y + sx * np.sin(np.radians(theta)))
         ra2, dec2 = self.pix2sky(v_sx)
         major = gcd(ra, dec, ra2, dec2)
         pa = bear(ra, dec, ra2, dec2)
@@ -628,11 +633,13 @@ def get_pixinfo(header):
         pixscale = (header["CDELT1"], header["CDELT2"])
     elif all(a in header for a in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]):
         pixarea = abs(
-            header["CD1_1"] * header["CD2_2"] - header["CD1_2"] * header["CD2_1"]
+            header["CD1_1"] * header["CD2_2"] -
+            header["CD1_2"] * header["CD2_1"]
         )
         pixscale = (header["CD1_1"], header["CD2_2"])
         if not (header["CD1_2"] == 0 and header["CD2_1"] == 0):
-            log.warning("Pixels don't appear to be square -> pixscale is wrong")
+            log.warning(
+                "Pixels don't appear to be square -> pixscale is wrong")
     elif all(a in header for a in ["CD1_1", "CD2_2"]):
         pixarea = abs(header["CD1_1"] * header["CD2_2"])
         pixscale = (header["CD1_1"], header["CD2_2"])

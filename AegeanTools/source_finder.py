@@ -2,70 +2,39 @@
 """
 The Aegean source finding program.
 """
-from __future__ import print_function
 
-# standard imports
-import sys
-import six
-import os
-import numpy as np
-import math
 import copy
 import logging
 import logging.config
+import math
+import multiprocessing
+import os
+import sys
+
 import lmfit
+import numpy as np
 import scipy
+import six
+from scipy.ndimage import find_objects, label
+from scipy.ndimage.filters import maximum_filter, minimum_filter
 from scipy.special import erf
-from scipy.ndimage import label, find_objects
-from scipy.ndimage.filters import minimum_filter, maximum_filter
 from tqdm import tqdm
 
-from AegeanTools.exceptions import AegeanNaNModelError
-
-# AegeanTools
+from . import cluster, flags, pprocess
+from .__init__ import __date__, __version__
+from .angle_tools import bear, dec2dms, dec2hms, gcd
 from .BANE import filter_image, get_step_size
-from .fitting import (
-    do_lmfit,
-    Cmatrix,
-    Bmatrix,
-    errors,
-    covar_errors,
-    ntwodgaussian_lmfit,
-    bias_correct,
-    elliptical_gaussian,
-)
-from .wcs_helpers import WCSHelper
-from .fits_image import FitsImage
-from AegeanTools.wcs_helpers import Beam
-from .msq2 import MarchingSquares
-from .angle_tools import dec2hms, dec2dms, gcd, bear
 from .catalogs import load_table, table_to_source_list
-from .models import (
-    SimpleSource,
-    ComponentSource,
-    IslandSource,
-    island_itergen,
-    GlobalFittingData,
-    IslandFittingData,
-    DummyLM,
-)
-from .models import PixelIsland
-from . import cluster
-from . import flags
-
-# need Region in the name space in order to be able to unpickle it
+from .exceptions import AegeanNaNModelError
+from .fits_image import FitsImage
+from .fitting import (Bmatrix, Cmatrix, bias_correct, covar_errors, do_lmfit,
+                      elliptical_gaussian, errors, ntwodgaussian_lmfit)
+from .models import (ComponentSource, DummyLM, GlobalFittingData,
+                     IslandFittingData, IslandSource, PixelIsland,
+                     SimpleSource, island_itergen)
+from .msq2 import MarchingSquares
 from .regions import Region
-
-if six.PY2:
-    import cPickle
-else:
-    import _pickle as cPickle
-
-# multiple cores support
-from . import pprocess
-import multiprocessing
-
-from .__init__ import __version__, __date__
+from .wcs_helpers import Beam, WCSHelper
 
 __author__ = "Paul Hancock"
 

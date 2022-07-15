@@ -3,16 +3,16 @@
 Tools for interacting with fits images (HUDLists)
 """
 
-from __future__ import print_function
-
-import numpy
-import astropy.wcs as pywcs
-import scipy.stats
 import logging
-from .fits_interp import expand
-from .wcs_helpers import get_pixinfo, get_beam
 
-__author__= "Paul Hancock"
+import astropy.wcs as pywcs
+import numpy
+import scipy.stats
+
+from .fits_interp import expand
+from .wcs_helpers import get_beam, get_pixinfo
+
+__author__ = "Paul Hancock"
 
 # Join the Aegean logger
 log = logging.getLogger("Aegean")
@@ -44,7 +44,8 @@ class FitsImage(object):
             Default = None.
         """
 
-        self.hdu = expand(filename)[hdu_index] # auto detects if the file needs expanding
+        # auto detects if the file needs expanding
+        self.hdu = expand(filename)[hdu_index]
 
         self._header = self.hdu.header
         # need to read these headers before we 'touch' the data or they dissappear
@@ -84,7 +85,8 @@ class FitsImage(object):
             if cube_index is None:
                 log.critical("Image is a cube, but no cube_index is given")
                 raise Exception("Image is a cube, but no cube_index is given")
-            log.info("Image is a cube, using cube_index {0}".format(cube_index))
+            log.info(
+                "Image is a cube, using cube_index {0}".format(cube_index))
             self._pixels = self._pixels[cube_index, :, :]
         elif len(self._pixels.shape) > 3:
             log.critical("Image has >3 axes.")
@@ -92,7 +94,8 @@ class FitsImage(object):
         # convert +/- inf to nan
         self._pixels[numpy.where(numpy.isinf(self._pixels))] = numpy.nan
         # del self.hdu
-        log.debug("Using axes {0} and {1}".format(self._header['CTYPE1'], self._header['CTYPE2']))
+        log.debug("Using axes {0} and {1}".format(
+            self._header['CTYPE1'], self._header['CTYPE2']))
 
     def get_pixels(self):
         """
@@ -120,7 +123,8 @@ class FitsImage(object):
         None
         """
         if not (pixels.shape == self._pixels.shape):
-            raise AssertionError("Shape mismatch between pixels supplied {0} and existing image pixels {1}".format(pixels.shape,self._pixels.shape))
+            raise AssertionError("Shape mismatch between pixels supplied {0} and existing image pixels {1}".format(
+                pixels.shape, self._pixels.shape))
         self._pixels = pixels
         # reset this so that it is calculated next time the function is called
         self._rms = None
@@ -195,5 +199,3 @@ class FitsImage(object):
         skybox = [skypos, skypos]
         pixbox = self.wcs.all_world2pix(skybox, 1)
         return [float(pixbox[0][0]), float(pixbox[0][1])]
-
-

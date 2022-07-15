@@ -2,11 +2,11 @@
 """
 Test MIMAS.py
 """
-
-from __future__ import print_function
 from AegeanTools import MIMAS
 import numpy as np
 import os
+
+__author__ = 'Paul Hancock'
 
 
 def test_Dummy():
@@ -29,32 +29,32 @@ def test_galactic2fk5():
 
 
 def no_test_mask_plane():
-    #TODO
+    # TODO
     return
 
 
 def no_test_mask_file():
-    #TODO
+    # TODO
     return
 
 
 def no_test_mask_table():
-    #TODO
+    # TODO
     return
 
 
 def no_test_mask_catalog():
-    #TODO
+    # TODO
     return
 
 
 def no_test_mim2reg():
-    #TODO
+    # TODO
     return
 
 
 def no_test_mim2fits():
-    #TODO
+    # TODO
     return
 
 
@@ -65,7 +65,8 @@ def test_mask2mim():
     MIMAS.mask2mim(maskfile=maskfile,
                    mimfile=mimfile)
     if not os.path.exists(mimfile):
-        raise AssertionError("Failed to convert {0}->{1}".foramt(maskfile, mimfile))
+        raise AssertionError(
+            "Failed to convert {0}->{1}".foramt(maskfile, mimfile))
     os.remove(mimfile)
 
     # test with threshold of 2.0
@@ -74,49 +75,50 @@ def test_mask2mim():
                    threshold=2.0,
                    maxdepth=9)
     if not os.path.exists(mimfile):
-        raise AssertionError("Failed to convert {0}->{1}".foramt(maskfile, mimfile))
+        raise AssertionError(
+            "Failed to convert {0}->{1}".foramt(maskfile, mimfile))
     os.remove(mimfile)
 
     return
 
 
 def no_test_box2poly():
-    #TODO
+    # TODO
     return
 
 
 def no_test_circle2circle():
-    #TODO
+    # TODO
     return
 
 
 def no_test_poly2poly():
-    #TODO
+    # TODO
     return
 
 
 def no_test_reg2mim():
-    #TODO
+    # TODO
     return
 
 
 def no_test_combine_regions():
-    #TODO
+    # TODO
     return
 
 
 def no_test_intersect_regions():
-    #TODO
+    # TODO
     return
 
 
 def no_test_save_region():
-    #TODO
+    # TODO
     return
 
 
 def no_test_save_as_image():
-    #TODO
+    # TODO
     return
 
 

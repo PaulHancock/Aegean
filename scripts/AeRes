@@ -2,13 +2,12 @@
 """
  Tool for making residual images with Aegean tables as input
 """
-from __future__ import print_function
+
+import argparse
+import logging
+import sys
 
 from AegeanTools.AeRes import make_residual
-
-import logging
-import argparse
-import sys
 
 __author__ = 'Paul Hancock'
 __version__ = 'v0.2.7'
@@ -22,7 +21,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog='AeRes', prefix_chars='-')
     group1 = parser.add_argument_group("I/O arguments")
     group1.add_argument("-c", "--catalog", dest='catalog', default=None,
-                        help="Catalog in a format that Aegean understands."+
+                        help="Catalog in a format that Aegean understands." +
                         "\nRA/DEC should be in degrees, a/b/pa should be in arcsec/arcsec/degrees.")
     group1.add_argument("-f", "--fitsimage", dest='fitsfile', default=None,
                         help="Input fits file.")
@@ -62,7 +61,8 @@ if __name__ == "__main__":
     options = parser.parse_args()
 
     logging_level = logging.DEBUG if options.debug else logging.INFO
-    logging.basicConfig(level=logging_level, format="%(process)d:%(levelname)s %(message)s")
+    logging.basicConfig(level=logging_level,
+                        format="%(process)d:%(levelname)s %(message)s")
     logging.info("This is AeRes {0}-({1})".format(__version__, __date__))
 
     if options.catalog is None:
@@ -81,16 +81,17 @@ if __name__ == "__main__":
     if options.frac <= 0:
         options.frac = None
 
-    logging.info("Using {0} and {1} to make {2}".format(options.fitsfile, options.catalog, options.rfile))
+    logging.info("Using {0} and {1} to make {2}".format(
+        options.fitsfile, options.catalog, options.rfile))
     if options.mfile is not None:
         logging.info(" and writing model to {0}".format(options.mfile))
 
-    colmap={'ra_col':options.ra_col,
-            'dec_col':options.dec_col,
-            'peak_col':options.peak_col,
-            'a_col':options.a_col,
-            'b_col':options.b_col,
-            'pa_col':options.pa_col}
+    colmap = {'ra_col': options.ra_col,
+              'dec_col': options.dec_col,
+              'peak_col': options.peak_col,
+              'a_col': options.a_col,
+              'b_col': options.b_col,
+              'pa_col': options.pa_col}
 
     make_residual(options.fitsfile, options.catalog, options.rfile,
                   mfile=options.mfile, add=options.add, mask=options.mask, frac=options.frac, sigma=options.sigma,

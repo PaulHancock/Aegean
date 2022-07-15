@@ -2,42 +2,27 @@
 """
 Module for reading at writing catalogs
 """
-
-from __future__ import print_function
-
-__author__ = "Paul Hancock"
-__version__ = "1.0"
-__date__ = "2016-07-26"
-
-# Standard imports
+import logging
 import os
-import numpy as np
 import re
-import six
+import sqlite3
 from time import gmtime, strftime
 
-# Other AegeanTools
-from .models import ComponentSource, classify_catalog
-
-# input/output table formats
-from astropy.table.table import Table
-from astropy.io import ascii
-from astropy.io import fits
+import numpy as np
+import six
+from astropy.io import ascii, fits
 from astropy.io.votable import from_table, parse_single_table
 from astropy.io.votable import writeto as writetoVO
+from astropy.table.table import Table
 
-# try:
-#     import h5py
-#
-#     hdf5_supported = True
-# except ImportError:
-#     hdf5_supported = False
+from .models import ComponentSource, classify_catalog
 
-import sqlite3
+__author__ = "Paul Hancock"
+__version__ = "1.1"
+__date__ = "2022-07-15"
+
 
 # join the Aegean logger
-import logging
-
 log = logging.getLogger('Aegean')
 
 
@@ -175,7 +160,8 @@ def save_catalog(filename, catalog, meta=None, prefix=None):
     -------
     None
     """
-    ascii_table_formats = {'csv': 'csv', 'tab': 'tab', 'tex': 'latex', 'html': 'html'}
+    ascii_table_formats = {'csv': 'csv',
+                           'tab': 'tab', 'tex': 'latex', 'html': 'html'}
     # .ann and .reg are handled by me
     meta = update_meta_data(meta)
     extension = os.path.splitext(filename)[1][1:].lower()
@@ -186,7 +172,8 @@ def save_catalog(filename, catalog, meta=None, prefix=None):
     elif extension in ['hdf5', 'fits', 'vo', 'vot', 'xml']:
         write_catalog(filename, catalog, extension, meta, prefix=prefix)
     elif extension in ascii_table_formats.keys():
-        write_catalog(filename, catalog, fmt=ascii_table_formats[extension], meta=meta, prefix=prefix)
+        write_catalog(
+            filename, catalog, fmt=ascii_table_formats[extension], meta=meta, prefix=prefix)
     else:
         log.warning("extension not recognised {0}".format(extension))
         log.warning("You get tab format")
@@ -225,7 +212,8 @@ def load_catalog(filename):
 
     else:
         log.info("Assuming ascii format, reading first two columns")
-        lines = [a.strip().split() for a in open(filename, 'r').readlines() if not a.startswith('#')]
+        lines = [a.strip().split() for a in open(
+            filename, 'r').readlines() if not a.startswith('#')]
         try:
             catalog = [(float(a[0]), float(a[1])) for a in lines]
         except:
@@ -294,7 +282,8 @@ def write_table(table, filename):
         if "Format could not be identified" not in e.message:
             raise e
         else:
-            fmt = os.path.splitext(filename)[-1][1:].lower()  # extension sans '.'
+            # extension sans '.'
+            fmt = os.path.splitext(filename)[-1][1:].lower()
             raise Exception("Cannot auto-determine format for {0}".format(fmt))
     return
 
@@ -377,7 +366,7 @@ def write_catalog(filename, catalog, fmt=None, meta=None, prefix=None):
         meta = {}
 
     if prefix is None:
-        pre=''
+        pre = ''
     else:
         pre = prefix + '_'
 
@@ -473,7 +462,8 @@ def writeFITSTable(filename, table):
         elif isinstance(val, six.string_types):
             types = "{0}A".format(len(val))
         else:
-            log.warning("Column {0} is of unknown type {1}".format(val, type(val)))
+            log.warning(
+                "Column {0} is of unknown type {1}".format(val, type(val)))
             log.warning("Using 5A")
             types = "5A"
         return types
@@ -525,7 +515,8 @@ def writeIslandContours(filename, catalog, fmt='reg'):
 
     out = open(filename, 'w')
     print("#Aegean island contours", file=out)
-    print("#AegeanTools.catalogs version {0}-({1})".format(__version__, __date__), file=out)
+    print(
+        "#AegeanTools.catalogs version {0}-({1})".format(__version__, __date__), file=out)
     line_fmt = 'image;line({0},{1},{2},{3})'
     text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
     mas_fmt = 'image; line({1},{0},{3},{2}) #color = yellow'
@@ -534,16 +525,18 @@ def writeIslandContours(filename, catalog, fmt='reg'):
         contour = c.contour
         if len(contour) > 1:
             for p1, p2 in zip(contour[:-1], contour[1:]):
-                print(line_fmt.format(p1[1] + 0.5, p1[0] + 0.5, p2[1] + 0.5, p2[0] + 0.5), file=out)
+                print(line_fmt.format(
+                    p1[1] + 0.5, p1[0] + 0.5, p2[1] + 0.5, p2[0] + 0.5), file=out)
             print(line_fmt.format(contour[-1][1] + 0.5, contour[-1][0] + 0.5, contour[0][1] + 0.5,
-                                          contour[0][0] + 0.5), file=out)
+                                  contour[0][0] + 0.5), file=out)
         # comment out lines that have invalid ra/dec (WCS problems)
         if np.nan in [c.ra, c.dec]:
             print('#', end=' ', file=out)
         # some islands may not have anchors because they don't have any contours
         if len(c.max_angular_size_anchors) == 4:
             print(text_fmt.format(c.ra, c.dec, c.island), file=out)
-            print(mas_fmt.format(*[a + 0.5 for a in c.max_angular_size_anchors]), file=out)
+            print(mas_fmt.format(
+                *[a + 0.5 for a in c.max_angular_size_anchors]), file=out)
         for p1, p2 in c.pix_mask:
             # DS9 uses 1-based instead of 0-based indexing
             print(x_fmt.format(p1 + 1, p2 + 1), file=out)
@@ -650,7 +643,8 @@ def writeAnn(filename, catalog, fmt):
     if len(cat) > 0:
         ras = [a.ra for a in cat]
         decs = [a.dec for a in cat]
-        if not hasattr(cat[0], 'a'):  # a being the variable that I used for bmaj.
+        # a being the variable that I used for bmaj.
+        if not hasattr(cat[0], 'a'):
             bmajs = [30 / 3600.0 for a in cat]
             bmins = bmajs
             pas = [0 for a in cat]
@@ -663,7 +657,8 @@ def writeAnn(filename, catalog, fmt):
         if fmt == 'ann':
             new_file = re.sub('.ann$', '_{0}.ann'.format(suffix), filename)
             out = open(new_file, 'w')
-            print("#Aegean version {0}-({1})".format(__version__, __date__), file=out)
+            print(
+                "#Aegean version {0}-({1})".format(__version__, __date__), file=out)
             print('PA SKY', file=out)
             print('FONT hershey12', file=out)
             print('COORD W', file=out)
@@ -671,7 +666,8 @@ def writeAnn(filename, catalog, fmt):
         else:  # reg
             new_file = re.sub('.reg$', '_{0}.reg'.format(suffix), filename)
             out = open(new_file, 'w')
-            print("#Aegean version {0}-({1})".format(__version__, __date__), file=out)
+            print(
+                "#Aegean version {0}-({1})".format(__version__, __date__), file=out)
             print("fk5", file=out)
             formatter = 'ellipse {0} {1} {2:.9f}d {3:.9f}d {4:+07.3f}d # text="{5}"'
             # DS9 has some strange ideas about position angle
@@ -691,7 +687,8 @@ def writeAnn(filename, catalog, fmt):
             log.warning('kvis islands are currently not working')
             return
         else:
-            log.warning('format {0} not supported for island annotations'.format(fmt))
+            log.warning(
+                'format {0} not supported for island annotations'.format(fmt))
             return
         writeIslandContours(new_file, islands, fmt)
         log.info("wrote {0}".format(new_file))
@@ -750,12 +747,14 @@ def writeDB(filename, catalog, meta=None):
                 types.append("BOOL")
             elif isinstance(val, (int, np.int64, np.int32)):
                 types.append("INT")
-            elif isinstance(val, (float, np.float64, np.float32)):  # float32 is bugged and claims not to be a float
+            # float32 is bugged and claims not to be a float
+            elif isinstance(val, (float, np.float64, np.float32)):
                 types.append("FLOAT")
             elif isinstance(val, six.string_types):
                 types.append("VARCHAR")
             else:
-                log.warning("Column {0} is of unknown type {1}".format(n, type(n)))
+                log.warning(
+                    "Column {0} is of unknown type {1}".format(n, type(n)))
                 log.warning("Using VARCHAR")
                 types.append("VARCHAR")
         return types
@@ -768,12 +767,14 @@ def writeDB(filename, catalog, meta=None):
     # determine the column names by inspecting the catalog class
     for t, tn in zip(classify_catalog(catalog), ["components", "islands", "simples"]):
         if len(t) < 1:
-            continue  #don't write empty tables
+            continue  # don't write empty tables
         col_names = t[0].names
         col_types = sqlTypes(t[0], col_names)
-        stmnt = ','.join(["{0} {1}".format(a, b) for a, b in zip(col_names, col_types)])
+        stmnt = ','.join(["{0} {1}".format(a, b)
+                         for a, b in zip(col_names, col_types)])
         db.execute('CREATE TABLE {0} ({1})'.format(tn, stmnt))
-        stmnt = 'INSERT INTO {0} ({1}) VALUES ({2})'.format(tn, ','.join(col_names), ','.join(['?' for i in col_names]))
+        stmnt = 'INSERT INTO {0} ({1}) VALUES ({2})'.format(
+            tn, ','.join(col_names), ','.join(['?' for i in col_names]))
         # expend the iterators that are created by python 3+
         data = list(map(nulls, list(r.as_list() for r in t)))
         db.executemany(stmnt, data)
@@ -783,8 +784,8 @@ def writeDB(filename, catalog, meta=None):
     for k in meta:
         db.execute("INSERT INTO meta (key, val) VALUES (?,?)", (k, meta[k]))
     conn.commit()
-    log.info(db.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall())
+    log.info(db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table';").fetchall())
     conn.close()
     log.info("Wrote file {0}".format(filename))
     return
-

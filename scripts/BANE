@@ -1,12 +1,10 @@
 #! /usr/bin/env python
-from __future__ import print_function
 
 # standard imports
-import sys
-import os
 import argparse
+import os
+import sys
 
-# Aegean tools
 from AegeanTools import BANE, __citation__
 
 __author__ = 'Paul Hancock'

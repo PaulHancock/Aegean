@@ -2,19 +2,17 @@
 """
 Test cluster.py
 """
+import logging
+import math
+from copy import deepcopy
 
-from __future__ import print_function
+import numpy as np
+from AegeanTools import catalogs, cluster, wcs_helpers
+from AegeanTools.models import SimpleSource
+from astropy.io import fits
 
 __author__ = 'Paul Hancock'
 
-from AegeanTools import cluster, catalogs, wcs_helpers
-from AegeanTools.models import SimpleSource
-from copy import deepcopy
-from astropy.io import fits
-import math
-import numpy as np
-
-import logging
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
 log.setLevel(logging.INFO)

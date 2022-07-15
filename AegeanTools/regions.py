@@ -3,20 +3,15 @@
 Describe sky areas as a collection of HEALPix pixels
 """
 
-from __future__ import print_function
-import os
 import datetime
+import os
+
+import _pickle as cPickle
+import astropy.units as u
 import healpy as hp
 import numpy as np
 from astropy.coordinates import SkyCoord
-import astropy.units as u
 from astropy.io import fits
-import six
-
-if six.PY2:
-    import cPickle
-else:
-    import _pickle as cPickle
 
 __author__ = "Paul Hancock"
 
@@ -74,7 +69,7 @@ class Region(object):
         mimfile : str
             File to write
         """
-        cPickle.dump(self, open(mimfile,'wb'), protocol=2)
+        cPickle.dump(self, open(mimfile, 'wb'), protocol=2)
         return
 
     def __repr__(self):
@@ -122,14 +117,17 @@ class Region(object):
         depth : int
             The deepth at which the polygon will be inserted.
         """
-        if not (len(positions) >= 3): raise AssertionError("A minimum of three coordinate pairs are required")
+        if not (len(positions) >= 3):
+            raise AssertionError(
+                "A minimum of three coordinate pairs are required")
 
         if depth is None or depth > self.maxdepth:
             depth = self.maxdepth
 
         ras, decs = np.array(list(zip(*positions)))
         sky = self.radec2sky(ras, decs)
-        pix = hp.query_polygon(2**depth, self.sky2vec(sky), inclusive=True, nest=True)
+        pix = hp.query_polygon(2**depth, self.sky2vec(sky),
+                               inclusive=True, nest=True)
         self.add_pixels(pix, depth)
         self._renorm()
         return
@@ -167,7 +165,8 @@ class Region(object):
         """
         area = 0
         for d in range(1, self.maxdepth+1):
-            area += len(self.pixeldict[d])*hp.nside2pixarea(2**d, degrees=degrees)
+            area += len(self.pixeldict[d]) * \
+                hp.nside2pixarea(2**d, degrees=degrees)
         return area
 
     def get_demoted(self):
@@ -245,7 +244,8 @@ class Region(object):
 
         theta_phi = self.sky2ang(sky)
         # Set values that are nan to be zero and record a mask
-        mask = np.bitwise_not(np.logical_and.reduce(np.isfinite(theta_phi), axis=1))
+        mask = np.bitwise_not(np.logical_and.reduce(
+            np.isfinite(theta_phi), axis=1))
         theta_phi[mask, :] = 0
 
         theta, phi = theta_phi.transpose()
@@ -297,7 +297,8 @@ class Region(object):
         """
         # work only on the lowest level
         # TODO: Allow this to be done for regions with different depths.
-        if not (self.maxdepth == other.maxdepth): raise AssertionError("Regions must have the same maxdepth")
+        if not (self.maxdepth == other.maxdepth):
+            raise AssertionError("Regions must have the same maxdepth")
         self._demote_all()
         opd = set(other.get_demoted())
         self.pixeldict[self.maxdepth].difference_update(opd)
@@ -317,7 +318,8 @@ class Region(object):
         """
         # work only on the lowest level
         # TODO: Allow this to be done for regions with different depths.
-        if not (self.maxdepth == other.maxdepth): raise AssertionError("Regions must have the same maxdepth")
+        if not (self.maxdepth == other.maxdepth):
+            raise AssertionError("Regions must have the same maxdepth")
         self._demote_all()
         opd = set(other.get_demoted())
         self.pixeldict[self.maxdepth].intersection_update(opd)
@@ -337,7 +339,8 @@ class Region(object):
         """
         # work only on the lowest level
         # TODO: Allow this to be done for regions with different depths.
-        if not (self.maxdepth == other.maxdepth): raise AssertionError("Regions must have the same maxdepth")
+        if not (self.maxdepth == other.maxdepth):
+            raise AssertionError("Regions must have the same maxdepth")
         self._demote_all()
         opd = set(other.get_demoted())
         self.pixeldict[self.maxdepth].symmetric_difference_update(opd)
@@ -358,13 +361,16 @@ class Region(object):
                 for p in self.pixeldict[d]:
                     line = "fk5; polygon("
                     # the following int() gets around some problems with np.int64 that exist prior to numpy v 1.8.1
-                    vectors = list(zip(*hp.boundaries(2**d, int(p), step=1, nest=True)))
+                    vectors = list(
+                        zip(*hp.boundaries(2**d, int(p), step=1, nest=True)))
                     positions = []
                     for sky in self.vec2sky(np.array(vectors), degrees=True):
                         ra, dec = sky
                         pos = SkyCoord(ra/15, dec, unit=(u.degree, u.degree))
-                        positions.append(pos.ra.to_string(sep=':', precision=2))
-                        positions.append(pos.dec.to_string(sep=':', precision=2))
+                        positions.append(
+                            pos.ra.to_string(sep=':', precision=2))
+                        positions.append(
+                            pos.dec.to_string(sep=':', precision=2))
                     line += ','.join(positions)
                     line += ")"
                     print(line, file=out)
@@ -383,7 +389,8 @@ class Region(object):
             String to be written to fits header with key "MOCTOOL".
             Default = ''
         """
-        datafile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'MOC.fits')
+        datafile = os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), 'data', 'MOC.fits')
         hdulist = fits.open(datafile)
         cols = fits.Column(name='NPIX', array=self._uniq(), format='1K')
         tbhdu = fits.BinTableHDU.from_columns([cols])
@@ -391,13 +398,16 @@ class Region(object):
         hdulist[1].header['PIXTYPE'] = ('HEALPIX ', 'HEALPix magic code')
         hdulist[1].header['ORDERING'] = ('NUNIQ ', 'NUNIQ coding method')
         hdulist[1].header['COORDSYS'] = ('C ', 'ICRS reference frame')
-        hdulist[1].header['MOCORDER'] = (self.maxdepth, 'MOC resolution (best order)')
+        hdulist[1].header['MOCORDER'] = (
+            self.maxdepth, 'MOC resolution (best order)')
         hdulist[1].header['MOCTOOL'] = (moctool, 'Name of the MOC generator')
-        hdulist[1].header['MOCTYPE'] = ('CATALOG', 'Source type (IMAGE or CATALOG)')
+        hdulist[1].header['MOCTYPE'] = (
+            'CATALOG', 'Source type (IMAGE or CATALOG)')
         hdulist[1].header['MOCID'] = (' ', 'Identifier of the collection')
         hdulist[1].header['ORIGIN'] = (' ', 'MOC origin')
         time = datetime.datetime.utcnow()
-        hdulist[1].header['DATE'] = (datetime.datetime.strftime(time, format="%Y-%m-%dT%H:%m:%SZ"), 'MOC creation date')
+        hdulist[1].header['DATE'] = (datetime.datetime.strftime(
+            time, format="%Y-%m-%dT%H:%m:%SZ"), 'MOC creation date')
         hdulist.writeto(filename, overwrite=True)
         return
 
