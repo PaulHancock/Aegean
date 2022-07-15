@@ -4,7 +4,9 @@ Test wcs_helpers.py
 """
 
 import numpy as np
-from AegeanTools.wcs_helpers import Beam, WCSHelper
+from AegeanTools.wcs_helpers import (Beam, WCSHelper,
+                                     fix_aips_header,
+                                     get_beam, get_pixinfo)
 from astropy.io import fits
 from numpy.testing import assert_almost_equal
 
@@ -111,8 +113,8 @@ def test_vector_round_trip():
 
 def test_ellipse_round_trip():
     """
-    Converting an ellipse from pixel to sky coords and back again should give the
-    original ellipse (within some tolerance).
+    Converting an ellipse from pixel to sky coords and back again should 
+    give the original ellipse (within some tolerance).
     """
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
@@ -141,7 +143,8 @@ def test_ellipse_round_trip():
 
 def test_psf_funcs():
     """
-    For a SIN projected image, test that the beam/psf calculations are consistent at different points on the sky
+    For a SIN projected image, test that the beam/psf calculations are
+    consistent at different points on the sky
     """
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
@@ -183,6 +186,82 @@ def test_galactic_coords():
     except ValueError as e:
         raise AssertionError("galactic coordinates break WCSHelper")
     return
+
+
+def test_get_pixinfo():
+    """Test that we can get info from various header styles"""
+    header = fits.getheader('tests/test_files/1904-66_SIN.fits')
+
+    area, scale = get_pixinfo(header)
+    if not area > 0:
+        raise AssertionError()
+    if not len(scale) == 2:
+        raise AssertionError()
+
+    header['CD1_1'] = header['CDELT1']
+    del header['CDELT1']
+    header['CD2_2'] = header['CDELT2']
+    del header['CDELT2']
+    area, scale = get_pixinfo(header)
+    if not area > 0:
+        raise AssertionError()
+    if not len(scale) == 2:
+        raise AssertionError()
+
+    header['CD1_2'] = 0
+    header['CD2_1'] = 0
+    area, scale = get_pixinfo(header)
+    if not area > 0:
+        raise AssertionError()
+    if not len(scale) == 2:
+        raise AssertionError()
+
+    header['CD1_2'] = header['CD1_1']
+    header['CD2_1'] = header['CD2_2']
+    area, scale = get_pixinfo(header)
+    if not area == 0:
+        raise AssertionError()
+    if not len(scale) == 2:
+        raise AssertionError()
+
+    for f in ['CD1_1', 'CD1_2', 'CD2_2', 'CD2_1']:
+        del header[f]
+    area, scale = get_pixinfo(header)
+    if not area == 0:
+        raise AssertionError()
+    if not scale == (0, 0):
+        raise AssertionError()
+
+
+def test_get_beam():
+    """Test that we can recover the beam from the fits header"""
+    header = fits.getheader('tests/test_files/1904-66_SIN.fits')
+    beam = get_beam(header)
+    print(beam)
+    if beam is None:
+        raise AssertionError()
+    if beam.pa != header['BPA']:
+        raise AssertionError()
+
+    del header['BMAJ'], header['BMIN'], header['BPA']
+    beam = get_beam(header)
+    if beam is not None:
+        raise AssertionError()
+
+
+def test_fix_aips_header():
+    """TEst that we can fix an aips generated fits header"""
+    header = fits.getheader('tests/test_files/1904-66_SIN.fits')
+    # test when this function is not needed
+    _ = fix_aips_header(header)
+
+    # test when beam params are not present, but there is no aips history
+    del header['BMAJ'], header['BMIN'], header['BPA']
+    _ = fix_aips_header(header)
+
+    # test with some aips history
+    header['HISTORY'] = 'AIPS   CLEAN BMAJ=  1.2500E-02 BMIN=  1.2500E-02 BPA=   0.00'
+    _ = fix_aips_header(header)
 
 
 if __name__ == "__main__":
