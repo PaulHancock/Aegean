@@ -246,9 +246,10 @@ def load_image_band(filename,
     """
     if band[0] >= band[1]:
         raise AegeanError(
-            f"band number {band[0]} too large for total bands = {band[1]}")
+            "band number {0} too large for total bands = {1}".format(
+                band[0], band[1]))
     elif band[0] < 0:
-        raise AegeanError(f"band number {band[0]} not valid")
+        raise AegeanError("band number {0} not valid".format(band[0]))
 
     header = fits.getheader(filename, ext=hdu_index)
     row_min = int(header['NAXIS2']/band[1] * (band[0]))

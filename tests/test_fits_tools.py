@@ -6,6 +6,8 @@ Test fits_interp.py
 __author__ = 'Paul Hancock'
 
 from AegeanTools import fits_tools
+from AegeanTools.wcs_helpers import WCSHelper
+from AegeanTools.angle_tools import gcd
 from astropy.io import fits
 import numpy as np
 import os
@@ -99,6 +101,61 @@ def test_fits_interp_compress_then_expand():
     # cleanup
     os.remove('tests/temp/test.fits')
     os.remove('tests/temp/test2.fits')
+
+
+def test_write_fits():
+    """Test that we can save a file by providing data and a header"""
+    hdu = fits_tools.load_file_or_hdu("tests/test_files/1904-66_SIN.fits")
+    header, data = hdu[0].header, hdu[0].data
+    outname = 'tests/temp/dlme.fits'
+    fits_tools.write_fits(data, header, outname)
+    if not os.path.exists(outname):
+        raise AssertionError(
+            "Failed to write data to file {0}".format(outname))
+    os.remove(outname)
+
+
+def test_load_image_band_defaults():
+    """Load an image using default values"""
+    try:
+        data, header = fits_tools.load_image_band(
+            "tests/test_files/1904-66_AIT.fits")
+    except Exception as e:
+        raise e
+    if not isinstance(data, np.ndarray):
+        raise AssertionError("Loaded data is not an np.ndarray object")
+    if not isinstance(header, fits.Header):
+        raise AssertionError("header is not a fits.hdu.Header object")
+    return
+
+
+def test_load_image_band_multi_bands():
+    """
+    Load an image in two bands
+    Check that the adjacent bands have adjacent sky coords
+    """
+    data0, header0 = fits_tools.load_image_band(
+        "tests/test_files/1904-66_SIN.fits", band=(0, 2))
+    data1, header1 = fits_tools.load_image_band(
+        "tests/test_files/1904-66_SIN.fits", band=(1, 2))
+    # The bottom of data0 and top of data1 should be adjacent on the sky
+    wcs0 = WCSHelper.from_header(header0)
+    pos0 = wcs0.pix2sky((data0.shape[0], data0.shape[1]//2))
+    wcs1 = WCSHelper.from_header(header1)
+    pos1 = wcs1.pix2sky((0, data1.shape[1]//2))
+
+    dist = gcd(*pos0, *pos1)
+    if dist > np.hypot(header0['CDELT1'], header0['CDELT2'])/2:
+        raise AssertionError("adjacent bands don't match up at edges")
+    return
+
+
+def test_load_image_band_cube_index():
+    return
+
+
+def test_load_image_band_hdu_index():
+    return
 
 
 if __name__ == "__main__":
