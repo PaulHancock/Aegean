@@ -9,7 +9,6 @@ import sqlite3
 from time import gmtime, strftime
 
 import numpy as np
-import six
 from astropy.io import ascii, fits
 from astropy.io.votable import from_table, parse_single_table
 from astropy.io.votable import writeto as writetoVO
@@ -459,7 +458,7 @@ def writeFITSTable(filename, table):
             types = "J"
         elif isinstance(val, (float, np.float64, np.float32)):
             types = "E"
-        elif isinstance(val, six.string_types):
+        elif isinstance(val, str):
             types = "{0}A".format(len(val))
         else:
             log.warning(
@@ -750,7 +749,7 @@ def writeDB(filename, catalog, meta=None):
             # float32 is bugged and claims not to be a float
             elif isinstance(val, (float, np.float64, np.float32)):
                 types.append("FLOAT")
-            elif isinstance(val, six.string_types):
+            elif isinstance(val, str):
                 types.append("VARCHAR")
             else:
                 log.warning(

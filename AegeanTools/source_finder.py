@@ -14,7 +14,6 @@ import sys
 import lmfit
 import numpy as np
 import scipy
-import six
 from scipy.ndimage import find_objects, label
 from scipy.ndimage.filters import maximum_filter, minimum_filter
 from scipy.special import erf
@@ -2698,7 +2697,7 @@ class SourceFinder(object):
         global_data = self.global_data
 
         # load the table and convert to an input source list
-        if isinstance(catalogue, six.string_types):
+        if isinstance(catalogue, str):
             input_table = load_table(catalogue)
             input_sources = np.array(table_to_source_list(input_table))
         else:
