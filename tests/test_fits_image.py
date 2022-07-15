@@ -9,7 +9,7 @@ import AegeanTools.wcs_helpers
 import numpy as np
 from AegeanTools import fits_image as fi
 from astropy.io import fits
-from numpy.testing import assert_array_almost_equal, assert_raises
+from numpy.testing import assert_raises
 
 __author__ = 'Paul Hancock'
 
@@ -60,26 +60,6 @@ def test_init():
     # can't work with 4d data
     hdu[0].data = np.empty((3, 3, 3, 3))
     assert_raises(Exception, fi.FitsImage, hdu)
-
-
-def test_get_background_rms():
-    """Test get_background_rms"""
-    filename = 'tests/test_files/1904-66_SIN.fits'
-    hdu = fits.open(filename)
-    hdu[0].data = np.empty((40, 40))
-    im = fi.FitsImage(hdu)
-    if not (im.get_background_rms() > 0):
-        raise AssertionError()
-
-
-def test_pix2sky_sky2pix():
-    """Test pix2sky and sky2pix are conjugate"""
-    filename = 'tests/test_files/1904-66_SIN.fits'
-    hdu = fits.open(filename)
-    im = fi.FitsImage(hdu)
-    ra, dec = im.pix2sky([0, 0])
-    x, y = im.sky2pix([ra, dec])
-    assert_array_almost_equal([0, 0], [x, y])
 
 
 if __name__ == "__main__":
