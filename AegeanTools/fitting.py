@@ -131,7 +131,7 @@ def Cmatrix(x, y, sx, sy, theta):
 
 def Bmatrix(C):
     """
-    Calculate a matrix which is effectively the square root of the 
+    Calculate a matrix which is effectively the square root of the
     correlation matrix C
 
     Parameters
@@ -272,10 +272,10 @@ def emp_jacobian(pars, x, y):
 
 
 def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
-    """
-    Wrapper around :func:`AegeanTools.fitting.jacobian` 
-    and :func:`AegeanTools.fitting.emp_jacobian`
-    which gives the output in a format that is required for lmfit.
+    r"""
+    Wrapper around :func:`AegeanTools.fitting.jacobian` and
+    :func:`AegeanTools.fitting.emp_jacobian` which gives the output in a format
+    that is required for lmfit.
 
     Parameters
     ----------
@@ -292,8 +292,8 @@ def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
         a B-matrix (optional) see :func:`AegeanTools.fitting.Bmatrix`
 
     emp : bool
-        If true the use empirical Jacobian, otherwise use analytical
-        Default = False.
+        If true the use empirical Jacobian, otherwise use analytical Default =
+        False.
 
     Returns
     -------
@@ -302,8 +302,7 @@ def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
 
     See Also
     --------
-    :func:`AegeanTools.fitting.Bmatrix`
-    :func:`AegeanTools.fitting.jacobian`
+    :func:`AegeanTools.fitting.Bmatrix` :func:`AegeanTools.fitting.jacobian`
     :func:`AegeanTools.fitting.emp_jacobian`
 
     """
@@ -649,7 +648,7 @@ def emp_hessian(pars, x, y):
 
     Notes
     -----
-    Uses :func:`AegeanTools.fitting.emp_jacobian` to calculate the first order 
+    Uses :func:`AegeanTools.fitting.emp_jacobian` to calculate the first order
     derivatives.
 
     See Also
@@ -905,8 +904,9 @@ def errors(source, model, wcshelper):
     # even if the ra/dec conversion works elsewhere
     if not all(np.isfinite(ref)):
         source.flags |= flags.WCSERR
-        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = ERR_MASK
-        source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
+        source.err_peak_flux = source.err_a = source.err_b = ERR_MASK
+        source.err_pa = source.err_ra = source.err_dec = ERR_MASK
+        source.err_int_flux = ERR_MASK
         return source
 
     # position errors
@@ -921,11 +921,14 @@ def errors(source, model, wcshelper):
     if model[prefix + 'theta'].vary and np.isfinite(err_theta):
         # pa error
         off1 = wcshelper.pix2sky(
-            [xo + sx * np.cos(np.radians(theta)), yo + sy * np.sin(np.radians(theta))])
+            [xo + sx * np.cos(np.radians(theta)),
+             yo + sy * np.sin(np.radians(theta))])
         off2 = wcshelper.pix2sky(
-            [xo + sx * np.cos(np.radians(theta + err_theta)), yo + sy * np.sin(np.radians(theta + err_theta))])
+            [xo + sx * np.cos(np.radians(theta + err_theta)),
+             yo + sy * np.sin(np.radians(theta + err_theta))])
         source.err_pa = abs(
-            bear(ref[0], ref[1], off1[0], off1[1]) - bear(ref[0], ref[1], off2[0], off2[1]))
+            bear(ref[0], ref[1], off1[0], off1[1])
+            - bear(ref[0], ref[1], off2[0], off2[1]))
     else:
         source.err_pa = ERR_MASK
 
@@ -933,16 +936,20 @@ def errors(source, model, wcshelper):
             and all(np.isfinite([err_sx, err_sy])):
         # major axis error
         ref = wcshelper.pix2sky(
-            [xo + sx * np.cos(np.radians(theta)), yo + sy * np.sin(np.radians(theta))])
+            [xo + sx * np.cos(np.radians(theta)),
+             yo + sy * np.sin(np.radians(theta))])
         offset = wcshelper.pix2sky(
-            [xo + (sx + err_sx) * np.cos(np.radians(theta)), yo + sy * np.sin(np.radians(theta))])
+            [xo + (sx + err_sx) * np.cos(np.radians(theta)),
+             yo + sy * np.sin(np.radians(theta))])
         source.err_a = gcd(ref[0], ref[1], offset[0], offset[1]) * 3600
 
         # minor axis error
         ref = wcshelper.pix2sky(
-            [xo + sx * np.cos(np.radians(theta + 90)), yo + sy * np.sin(np.radians(theta + 90))])
+            [xo + sx * np.cos(np.radians(theta + 90)),
+             yo + sy * np.sin(np.radians(theta + 90))])
         offset = wcshelper.pix2sky(
-            [xo + sx * np.cos(np.radians(theta + 90)), yo + (sy + err_sy) * np.sin(np.radians(theta + 90))])
+            [xo + sx * np.cos(np.radians(theta + 90)),
+             yo + (sy + err_sy) * np.sin(np.radians(theta + 90))])
         source.err_b = gcd(ref[0], ref[1], offset[0], offset[1]) * 3600
     else:
         source.err_a = source.err_b = ERR_MASK
@@ -1052,10 +1059,12 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
     if model[prefix + 'theta'].vary:
         # pa error
         off1 = wcshelper.pix2sky(
-            [xo + sx * np.cos(np.radians(theta)), yo + sy * np.sin(np.radians(theta))])
+            [xo + sx * np.cos(np.radians(theta)),
+             yo + sy * np.sin(np.radians(theta))])
         # offset by 1 degree
         off2 = wcshelper.pix2sky(
-            [xo + sx * np.cos(np.radians(theta + 1)), yo + sy * np.sin(np.radians(theta + 1))])
+            [xo + sx * np.cos(np.radians(theta + 1)),
+             yo + sy * np.sin(np.radians(theta + 1))])
         # scale the initial theta error by this amount
         source.err_pa = abs(bear(ref[0], ref[1], off1[0], off1[1]) -
                             bear(ref[0], ref[1], off2[0], off2[1])) * err_theta
@@ -1065,19 +1074,23 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
     if model[prefix + 'sx'].vary and model[prefix + 'sy'].vary:
         # major axis error
         ref = wcshelper.pix2sky(
-            [xo + sx * np.cos(np.radians(theta)), yo + sy * np.sin(np.radians(theta))])
+            [xo + sx * np.cos(np.radians(theta)),
+             yo + sy * np.sin(np.radians(theta))])
         # offset by 0.1 pixels
         offset = wcshelper.pix2sky(
-            [xo + (sx + 0.1) * np.cos(np.radians(theta)), yo + sy * np.sin(np.radians(theta))])
+            [xo + (sx + 0.1) * np.cos(np.radians(theta)),
+             yo + sy * np.sin(np.radians(theta))])
         source.err_a = gcd(ref[0], ref[1], offset[0],
                            offset[1])/0.1 * err_sx * 3600
 
         # minor axis error
         ref = wcshelper.pix2sky(
-            [xo + sx * np.cos(np.radians(theta + 90)), yo + sy * np.sin(np.radians(theta + 90))])
+            [xo + sx * np.cos(np.radians(theta + 90)),
+             yo + sy * np.sin(np.radians(theta + 90))])
         # offset by 0.1 pixels
         offset = wcshelper.pix2sky(
-            [xo + sx * np.cos(np.radians(theta + 90)), yo + (sy + 0.1) * np.sin(np.radians(theta + 90))])
+            [xo + sx * np.cos(np.radians(theta + 90)),
+             yo + (sy + 0.1) * np.sin(np.radians(theta + 90))])
         source.err_b = gcd(ref[0], ref[1], offset[0],
                            offset[1])/0.1*err_sy * 3600
     else:
@@ -1094,8 +1107,8 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
 
 def ntwodgaussian_lmfit(params):
     """
-    Convert an lmfit.Parameters object into a function which calculates 
-    the model.
+    Convert an lmfit.Parameters object into a function which calculates the
+    model.
 
 
     Parameters
@@ -1228,7 +1241,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
 
 
 def covar_errors(params, data, errs, B, C=None):
-    """
+    r"""
     Take a set of parameters that were fit with lmfit, and replace the errors
     with the 1\sigma errors calculated using the covariance matrix.
 
@@ -1326,7 +1339,7 @@ if __name__ == "__main__":
         # This sets all nan pixels to be a nasty yellow colour
         cmap = pyplot.cm.cubehelix
         cmap.set_bad('y', 1.)
-        #kwargs = {'interpolation':'nearest','cmap':cmap,'vmin':-0.1,'vmax':1, 'origin':'lower'}
+
         kwargs = {'interpolation': 'nearest', 'cmap': cmap, 'origin': 'lower'}
         for i, jac in enumerate([emp_jacobian, lmfit_jacobian]):
             fig = pyplot.figure(i + 1, figsize=(4, 6))

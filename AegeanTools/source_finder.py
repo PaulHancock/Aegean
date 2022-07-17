@@ -19,13 +19,16 @@ from scipy.ndimage.filters import maximum_filter, minimum_filter
 from scipy.special import erf
 from tqdm import tqdm
 
+from AegeanTools import wcs_helpers
+from AegeanTools.fits_tools import write_fits
+
 from . import cluster, flags, pprocess
 from .__init__ import __date__, __version__
 from .angle_tools import bear, dec2dms, dec2hms, gcd
 from .BANE import filter_image, get_step_size
 from .catalogs import load_table, table_to_source_list
 from .exceptions import AegeanNaNModelError
-from .fits_image import FitsImage
+from .fits_tools import load_image_band
 from .fitting import (Bmatrix, Cmatrix, bias_correct, covar_errors, do_lmfit,
                       elliptical_gaussian, errors, ntwodgaussian_lmfit)
 from .models import (ComponentSource, DummyLM, GlobalFittingData,
@@ -66,9 +69,9 @@ def find_islands(im, bkg, rms,
       used to grow islands. The units are in SNR.
 
     region : :class:`AegeanTools.regions.Region` or None
-      Region over which to find islands. Islands must have at least 1 pixel overlap
-      with the region in order to be returned. Default = None, no constraints.
-      Region *requires* a wcs to be defined.
+      Region over which to find islands. Islands must have at least 1 pixel
+      overlap with the region in order to be returned.
+      Default = None, no constraints. Region *requires* a wcs to be defined.
 
     wcs : :class:`AegeanTools.wcs_helpers.WCSHelper` or None
       If a region is specified then this WCSHelper will be used to map sky->pix
@@ -97,7 +100,8 @@ def find_islands(im, bkg, rms,
         log.debug("There are no pixels above the clipping limit")
         return []
 
-    # segmentation via scipy, structure includes diagonal pixels as single island
+    # segmentation via scipy
+    # structure includes diagonal pixels as single island
     l, n = label(a, structure=np.ones((3, 3)))
     f = find_objects(l)
 
@@ -731,8 +735,9 @@ class SourceFinder(object):
                 # self.log.info("{1} Island {0} is above the inner clip limit"
                 #               .format(i, data.shape))
 
-                # Flag pixel that are either below the flood level, or belong to other
-                # islands that happen to be withing the bounding box
+                # Flag pixel that are either below the flood level
+                # or belong to other islands that happen to be within
+                # the bounding box
                 island_mask = (snr[xmin:xmax, ymin:ymax] < outerclip) | \
                               (l[xmin:xmax, ymin:ymax] != i + 1)
                 data_box = copy.deepcopy(
@@ -1235,7 +1240,7 @@ class SourceFinder(object):
             idx, idy = np.where(abs(idata) - outerclip * rms > 0)
             idx += xmin
             idy += ymin
-            self.global_data.img._pixels[[idx, idy]] = np.nan
+            self.global_data.img[[idx, idy]] = np.nan
 
         # calculate the integrated island flux if required
         if island_data.doislandflux:
@@ -1397,7 +1402,6 @@ class SourceFinder(object):
         cores : int
           Number of cores to use if different from what is autodetected.
 
-
         do_curve : bool
           If True a curvature map will be created, default=True.
 
@@ -1422,9 +1426,11 @@ class SourceFinder(object):
         # don't reload already loaded data
         if self.global_data.img is not None:
             return
-        img = FitsImage(filename, hdu_index=hdu_index,
-                        beam=beam, cube_index=cube_index)
-        beam = img.beam
+        # img = FitsImage(filename, hdu_index=hdu_index,
+        #                 beam=beam, cube_index=cube_index)
+        img, header = load_image_band(filename,
+                                      hdu_index=hdu_index,
+                                      cube_index=cube_index)
 
         debug = logging.getLogger("Aegean").isEnabledFor(logging.DEBUG)
 
@@ -1442,36 +1448,36 @@ class SourceFinder(object):
                 self.global_data.region = None
 
         self.global_data.wcshelper = WCSHelper.from_header(
-            img.get_hdu_header(), beam, psf_file=psf
+            header, beam, psf_file=psf
         )
         self.global_data.psfhelper = self.global_data.wcshelper
 
         self.global_data.beam = self.global_data.wcshelper.beam
         self.global_data.img = img
-        self.global_data.data_pix = img.get_pixels()
-        self.global_data.dtype = type(self.global_data.data_pix[0][0])
+        self.global_data.header = header
+        self.global_data.dtype = type(self.global_data.img[0][0])
         self.global_data.bkgimg = np.zeros(
-            self.global_data.data_pix.shape, dtype=self.global_data.dtype
+            self.global_data.img.shape, dtype=self.global_data.dtype
         )
         self.global_data.rmsimg = np.zeros(
-            self.global_data.data_pix.shape, dtype=self.global_data.dtype
+            self.global_data.img.shape, dtype=self.global_data.dtype
         )
-        self.global_data.pixarea = img.pixarea
+        self.global_data.pixarea = wcs_helpers.get_pixinfo(header)[0]
         self.global_data.dcurve = None
         self.global_data.cube_index = cube_index
 
         if do_curve:
             self.log.info("Calculating curvature")
             # calculate curvature but store it as -1,0,+1
-            dcurve = np.zeros(self.global_data.data_pix.shape, dtype=np.int8)
+            dcurve = np.zeros(self.global_data.img.shape, dtype=np.int8)
             peaks = scipy.ndimage.filters.maximum_filter(
-                self.global_data.data_pix, size=3
+                self.global_data.img, size=3
             )
             troughs = scipy.ndimage.filters.minimum_filter(
-                self.global_data.data_pix, size=3
+                self.global_data.img, size=3
             )
-            pmask = np.where(self.global_data.data_pix == peaks)
-            tmask = np.where(self.global_data.data_pix == troughs)
+            pmask = np.where(self.global_data.img == peaks)
+            tmask = np.where(self.global_data.img == troughs)
             dcurve[pmask] = -1
             dcurve[tmask] = 1
             self.global_data.dcurve = dcurve
@@ -1506,16 +1512,16 @@ class SourceFinder(object):
         if verb and debug:
             self.log.debug(
                 "Data max is {0}".format(
-                    np.nanmax(img.get_pixels())
+                    np.nanmax(img)
                 )
             )
             self.log.debug("Doing background subtraction")
-        img.set_pixels(img.get_pixels() - self.global_data.bkgimg)
-        self.global_data.data_pix = img.get_pixels()
+        img -= self.global_data.bkgimg
+        self.global_data.img = img
         if verb and debug:
             self.log.debug(
                 "Data max is {0}".format(
-                    np.nanmax(img.get_pixels())
+                    np.nanmax(img)
                 )
             )
 
@@ -1526,7 +1532,7 @@ class SourceFinder(object):
         self.global_data.dobias = False
 
         # check if the WCS is galactic
-        if "lon" in self.global_data.img._header["CTYPE1"].lower():
+        if "lon" in self.global_data.header["CTYPE1"].lower():
             self.log.info("Galactic coordinates detected and noted")
             SimpleSource.galactic = True
         return
@@ -1598,7 +1604,7 @@ class SourceFinder(object):
         bkgimg, rmsimg = self.global_data.bkgimg, self.global_data.rmsimg
         curve = np.array(self.global_data.dcurve, dtype=bkgimg.dtype)
         # mask these arrays have the same mask the same as the data
-        mask = np.where(np.isnan(self.global_data.data_pix))
+        mask = np.where(np.isnan(img))
         bkgimg[mask] = np.NaN
         rmsimg[mask] = np.NaN
         curve[mask] = np.NaN
@@ -1606,9 +1612,9 @@ class SourceFinder(object):
         # Generate the new FITS files by copying the existing HDU
         # and assigning new data. This gives the new files the same
         # WCS projection and other header fields.
-        new_hdu = img.hdu
+        header = self.global_data.header
         # Set the ORIGIN to indicate Aegean made this file
-        new_hdu.header["ORIGIN"] = "Aegean {0}-({1})".format(
+        header["ORIGIN"] = "Aegean {0}-({1})".format(
             __version__, __date__)
         for c in [
             "CRPIX3",
@@ -1620,8 +1626,8 @@ class SourceFinder(object):
             "CTYPE3",
             "CTYPE4",
         ]:
-            if c in new_hdu.header:
-                del new_hdu.header[c]
+            if c in header:
+                del header[c]
 
         if outbase is None:
             outbase, _ = os.path.splitext(os.path.basename(image_filename))
@@ -1630,20 +1636,16 @@ class SourceFinder(object):
         curve_out = outbase + "_crv.fits"
         snr_out = outbase + "_snr.fits"
 
-        new_hdu.data = bkgimg
-        new_hdu.writeto(background_out, overwrite=True)
+        write_fits(bkgimg, header, background_out)
         self.log.info("Wrote {0}".format(background_out))
 
-        new_hdu.data = rmsimg
-        new_hdu.writeto(noise_out, overwrite=True)
+        write_fits(rmsimg, header, noise_out)
         self.log.info("Wrote {0}".format(noise_out))
 
-        new_hdu.data = curve
-        new_hdu.writeto(curve_out, overwrite=True)
+        write_fits(curve, header, curve_out)
         self.log.info("Wrote {0}".format(curve_out))
 
-        new_hdu.data = self.global_data.data_pix / rmsimg
-        new_hdu.writeto(snr_out, overwrite=True)
+        write_fits(img/rmsimg, header, snr_out)
         self.log.info("Wrote {0}".format(snr_out))
         return
 
@@ -1657,9 +1659,8 @@ class SourceFinder(object):
         outname : str
           Name for the output file.
         """
-        hdu = self.global_data.img.hdu
-        hdu.data = self.global_data.img._pixels
-        hdu.header["ORIGIN"] = "Aegean {0}-({1})".format(__version__, __date__)
+        header = self.global_data.header
+        header["ORIGIN"] = "Aegean {0}-({1})".format(__version__, __date__)
         # delete some axes that we aren't going to need
         for c in [
             "CRPIX3",
@@ -1671,9 +1672,9 @@ class SourceFinder(object):
             "CTYPE3",
             "CTYPE4",
         ]:
-            if c in hdu.header:
-                del hdu.header[c]
-        hdu.writeto(outname, overwrite=True)
+            if c in header:
+                del header[c]
+        write_fits(self.global_data.img, header, outname)
         self.log.info("Wrote {0}".format(outname))
         return
 
@@ -1717,7 +1718,7 @@ class SourceFinder(object):
             return
 
         # use the BANE background/rms calculation
-        step_size = get_step_size(self.global_data.img._header)
+        step_size = get_step_size(self.global_data.header)
         box_size = (5 * step_size[0], 5 * step_size[1])
 
         bkg, rms = filter_image(
@@ -1742,26 +1743,27 @@ class SourceFinder(object):
 
         Parameters
         ----------
-        image : :class:`AegeanTools.fits_image.FitsImage`
+        image : :class:`numpy.ndarray`
           The main image that has already been loaded.
 
-        auxfile : str or HDUList
+        auxfile : str
           The auxiliary file to be loaded.
 
         Returns
         -------
-        aux : :class:`AegeanTools.fits_image.FitsImage`
+        aux : :class:`numpy.ndarray`
           The loaded image.
         """
-        auximg = FitsImage(auxfile, beam=self.global_data.beam).get_pixels()
-        if auximg.shape != image.get_pixels().shape:
+
+        auximg, _ = load_image_band(auxfile)
+        if auximg.shape != image.shape:
             self.log.error(
                 "file {0} is not the same size as the image map".format(
                     auxfile)
             )
             self.log.error(
                 "{0}= {1}, image = {2}".format(
-                    auxfile, auximg.shape, image.get_pixels().shape
+                    auxfile, auximg.shape, image.shape
                 )
             )
             sys.exit(1)
@@ -1796,7 +1798,7 @@ class SourceFinder(object):
         global_data = self.global_data
         sources = []
 
-        data = global_data.data_pix
+        data = global_data.img
         rmsimg = global_data.rmsimg
 
         for inum, isle in enumerate(group, start=istart):
@@ -2156,11 +2158,11 @@ class SourceFinder(object):
         # We need a 1 pix buffer (if available)
         buffx = [
             xmin - max(xmin - 1, 0),
-            min(xmax + 1, global_data.data_pix.shape[0]) - xmax,
+            min(xmax + 1, global_data.img.shape[0]) - xmax,
         ]
         buffy = [
             ymin - max(ymin - 1, 0),
-            min(ymax + 1, global_data.data_pix.shape[1]) - ymax,
+            min(ymax + 1, global_data.img.shape[1]) - ymax,
         ]
         icurve = np.zeros(
             shape=(
@@ -2171,24 +2173,24 @@ class SourceFinder(object):
         )
         # compute peaks and convert to +/-1
         peaks = scipy.ndimage.filters.maximum_filter(
-            self.global_data.data_pix[
+            self.global_data.img[
                 xmin - buffx[0]: xmax + buffx[1],
                 ymin - buffy[0]: ymax + buffy[0]],
             size=3,
         )
         pmask = np.where(
-            peaks == self.global_data.data_pix[
+            peaks == self.global_data.img[
                 xmin - buffx[0]: xmax + buffx[1],
                 ymin - buffy[0]: ymax + buffy[0]]
         )
         troughs = scipy.ndimage.filters.minimum_filter(
-            self.global_data.data_pix[
+            self.global_data.img[
                 xmin - buffx[0]: xmax + buffx[1],
                 ymin - buffy[0]: ymax + buffy[0]],
             size=3,
         )
         tmask = np.where(
-            troughs == self.global_data.data_pix[
+            troughs == self.global_data.img[
                 xmin - buffx[0]: xmax + buffx[1],
                 ymin - buffy[0]: ymax + buffy[0]]
         )
@@ -2452,7 +2454,7 @@ class SourceFinder(object):
         )
         global_data = self.global_data
         rmsimg = global_data.rmsimg
-        data = global_data.data_pix
+        data = global_data.img
 
         self.log.info(
             "beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(
@@ -2489,7 +2491,7 @@ class SourceFinder(object):
             [[xmin, xmax], [ymin, ymax]] = island.bounding_box
             island_mask = island.mask
 
-            i = copy.deepcopy(global_data.data_pix[xmin:xmax, ymin:ymax])
+            i = copy.deepcopy(global_data.img[xmin:xmax, ymin:ymax])
             i[island_mask] = np.nan
 
             # ignore empty islands
@@ -2884,12 +2886,14 @@ def check_cores(cores):
     cores = min(multiprocessing.cpu_count(), cores)
     try:
         queue = pprocess.Queue(limit=cores, reuse=1)
-    except:  # TODO: figure out what error is being thrown
+    except Exception as e:  # TODO: figure out what error is being thrown
+        logging.warn(e)
         cores = 1
     else:
         try:
             _ = queue.manage(pprocess.MakeReusable(fix_shape))
-        except:
+        except Exception as e:
+            logging.warn(e)
             cores = 1
     return cores
 

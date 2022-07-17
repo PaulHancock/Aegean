@@ -195,9 +195,9 @@ def mask_file(regionfile, infile, outfile, negate=False):
 
 def mask_table(region, table, negate=False, racol='ra', deccol='dec'):
     """
-    Apply a given mask (region) to the table, removing all the rows with 
-    ra/dec inside the region.
-    If negate=False then remove the rows with ra/dec outside the region.
+    Apply a given mask (region) to the table, removing all the rows with ra/dec
+    inside the region. If negate=False then remove the rows with ra/dec outside
+    the region.
 
 
     Parameters
@@ -209,13 +209,11 @@ def mask_table(region, table, negate=False, racol='ra', deccol='dec'):
         Table to be masked.
 
     negate :  bool
-        If True then pixels *outside* the region are masked.
-        Default = False.
+        If True then pixels *outside* the region are masked. Default = False.
 
     racol, deccol : str
-        The name of the columns in `table` that should be interpreted as
-        ra and dec.
-        Default = 'ra', 'dec'
+        The name of the columns in `table` that should be interpreted as ra and
+        dec. Default = 'ra', 'dec'
 
     Returns
     -------
@@ -234,9 +232,9 @@ def mask_catalog(regionfile, infile, outfile,
                  negate=False,
                  racol='ra', deccol='dec'):
     """
-    Apply a region file as a mask to a catalog, removing all the rows with 
-    ra/dec inside the region.
-    If negate=False then remove the rows with ra/dec outside the region.
+    Apply a region file as a mask to a catalog, removing all the rows with
+    ra/dec inside the region. If negate=False then remove the rows with ra/dec
+    outside the region.
 
 
     Parameters
@@ -252,13 +250,11 @@ def mask_catalog(regionfile, infile, outfile,
         Output catalogue.
 
     negate :  bool
-        If True then pixels *outside* the region are masked.
-        Default = False.
+        If True then pixels *outside* the region are masked. Default = False.
 
     racol, deccol : str
-        The name of the columns in `table` that should be interpreted 
-        as ra and dec.
-        Default = 'ra', 'dec'
+        The name of the columns in `table` that should be interpreted as ra and
+        dec. Default = 'ra', 'dec'
 
     See Also
     --------
@@ -466,7 +462,7 @@ def reg2mim(regfile, mimfile, maxdepth):
 
     """
     logging.info("Reading regions from {0}".format(regfile))
-    lines = (l for l in open(regfile, 'r') if not l.startswith('#'))
+    lines = (ln for ln in open(regfile, 'r') if not ln.startswith('#'))
     poly = []
     circles = []
     for line in lines:

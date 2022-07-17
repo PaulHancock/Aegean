@@ -6,12 +6,15 @@ Aegean Residual (AeRes) has the following capability:
 - write model and residual files
 """
 
-__author__ = "Paul Hancock"
 
 import logging
+
 import numpy as np
 from astropy.io import fits
+
 from AegeanTools import catalogs, fitting, wcs_helpers
+
+__author__ = "Paul Hancock"
 
 FWHM2CC = 1 / (2 * np.sqrt(2 * np.log(2)))
 
@@ -39,7 +42,7 @@ def load_sources(filename,
     """
     table = catalogs.load_table(filename)
     required_cols = [ra_col, dec_col, peak_col, a_col, b_col, pa_col]
-    #required_cols = ['ra','dec','peak_flux','a','b','pa']
+    # required_cols = ['ra','dec','peak_flux','a','b','pa']
     good = True
     for c in required_cols:
         if c not in table.colnames:
@@ -77,7 +80,8 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
         If true then mask pixels instead of subtracting or adding sources
 
     frac : float
-        pixels that are brighter than frac*peak_flux for each source will be masked if mask=True
+        pixels that are brighter than frac*peak_flux for each source will be
+        masked if mask=True
 
     sigma: float
         pixels that are brighter than rms*sigma be masked if mask=True
@@ -94,7 +98,9 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
 
     i_count = 0
     for src in sources:
-        xo, yo, sx, sy, theta = wcshelper.sky2pix_ellipse([src.ra, src.dec], src.a/3600, src.b/3600, src.pa)
+        xo, yo, sx, sy, theta = wcshelper.sky2pix_ellipse([src.ra, src.dec],
+                                                          src.a/3600,
+                                                          src.b/3600, src.pa)
         phi = np.radians(theta)
 
         # skip sources that have a center that is outside of the image
@@ -130,8 +136,10 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
             logging.debug(" sx, sy: {0} {1}".format(sx, sy))
             logging.debug(" theta, phi: {0} {1}".format(theta, phi))
             logging.debug(" xoff, yoff: {0} {1}".format(xoff, yoff))
-            logging.debug(" xmin, xmax, ymin, ymax: {0}:{1} {2}:{3}".format(xmin, xmax, ymin, ymax))
-            logging.debug(" flux, sx, sy: {0} {1} {2}".format(src.peak_flux, sx, sy))
+            logging.debug(" xmin, xmax, ymin, ymax: {0}:{1} {2}:{3}".format(
+                            xmin, xmax, ymin, ymax))
+            logging.debug(" flux, sx, sy: {0} {1} {2}".format(
+                          src.peak_flux, sx, sy))
 
         # positions for which we want to make the model
         x, y = np.mgrid[int(xmin):int(xmax), int(ymin):int(ymax)]
@@ -139,7 +147,8 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
         y = y.ravel()
 
         # TODO: understand why xo/yo -1 is needed
-        model = fitting.elliptical_gaussian(x, y, src.peak_flux, xo-1, yo-1, sx*FWHM2CC, sy*FWHM2CC, theta)
+        model = fitting.elliptical_gaussian(x, y, src.peak_flux, xo-1, yo-1,
+                                            sx*FWHM2CC, sy*FWHM2CC, theta)
 
         # Mask the output image if requested
         if mask:
@@ -150,7 +159,7 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
             # somehow m[x,y][indices] = np.nan doesn't assign any values
             # so we have to do the more complicated
             # m[x[indices],y[indices]] = np.nan
-            m[x[indices], y[indices]]= np.nan
+            m[x[indices], y[indices]] = np.nan
         else:
             m[x, y] += model
         i_count += 1
@@ -158,11 +167,13 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
     return m
 
 
-def make_residual(fitsfile, catalog, rfile, mfile=None, add=False, mask=False, frac=None, sigma=4,
+def make_residual(fitsfile, catalog, rfile, mfile=None,
+                  add=False, mask=False, frac=None, sigma=4,
                   colmap=None):
     """
-    Take an input image and catalogue, make a model of the catalogue, and then add/subtract or mask the input image.
-    Saving the residual and (optionally) model files.
+    Take an input image and catalogue, make a model of the catalogue, and then
+    add/subtract or mask the input image. Saving the residual and (optionally)
+    model files.
 
     Parameters
     ----------
@@ -176,7 +187,8 @@ def make_residual(fitsfile, catalog, rfile, mfile=None, add=False, mask=False, f
         Filename to write residual image
 
     mfile : str
-        Filename to write model image. Default=None means don't write the model file.
+        Filename to write model image. Default=None means don't write the model
+        file.
 
     add : bool
         If True add the model instead of subtracting it
@@ -185,14 +197,16 @@ def make_residual(fitsfile, catalog, rfile, mfile=None, add=False, mask=False, f
         If true then mask pixels instead of adding or subtracting the sources
 
     frac : float
-        pixels that are brighter than frac*peak_flux for each source will be masked if mask=True
+        pixels that are brighter than frac*peak_flux for each source will be
+        masked if mask=True
 
     sigma : float
-        pixels that are brighter than sigma*local_rms for each source will be masked if mask=True
+        pixels that are brighter than sigma*local_rms for each source will be
+        masked if mask=True
 
     colmap : dict
-        A mapping of column names. Default is:
-        {'ra_col':'ra', 'dec_col':'dec', 'peak_col':'peak_flux', 'a_col':'a', 'b_col':'b', 'pa_col':'pa}
+        A mapping of column names. Default is: {'ra_col':'ra', 'dec_col':'dec',
+        'peak_col':'peak_flux', 'a_col':'a', 'b_col':'b', 'pa_col':'pa}
 
     Return
     ------
@@ -206,7 +220,8 @@ def make_residual(fitsfile, catalog, rfile, mfile=None, add=False, mask=False, f
 
     if source_list is None:
         return None
-    # force two axes so that we dump redundant stokes/freq axes if they are present.
+    # force two axes so that we dump redundant stokes/freq axes if they are
+    # present.
     hdulist = fits.open(fitsfile, naxis=2)
     # ignore dimensions of length 1
     data = np.squeeze(hdulist[0].data)

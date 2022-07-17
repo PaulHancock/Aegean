@@ -4,16 +4,17 @@
 AegeanTools module.
 -------------------
 
-This module was written primarily for the Aegean source finder, and the tools BANE and MIMAS.
-The wcs_helpers and angle_tools modules contain many useful classes and methods that would be useful more
-generally.
+This module was written primarily for the Aegean source finder, and the tools
+BANE and MIMAS. The wcs_helpers and angle_tools modules contain many useful
+classes and methods that would be useful more generally.
 
 """
 __author__ = 'Paul Hancock'
 __version__ = '2.2.5'
 __date__ = '2021-11-29'
-__citation__ = """
-% If your work makes use of AegeanTools please cite the following papers as appropriate:
+__citation__ = r"""
+% If your work makes use of AegeanTools please cite the following papers as
+% appropriate:
 
 % Advanced features of Aegean, plus description of BANE, MIMAS, and AeRes
 @ARTICLE{Hancock_Aegean2_2018,
@@ -22,8 +23,8 @@ __citation__ = """
   journal = {\pasa},
 archivePrefix = "arXiv",
    eprint = {1801.05548},
- primaryClass = "astro-ph.IM",
- keywords = {radio continuum: general, catalogs, methods: statistical},
+ primaryClass = "astro-ph.IM", keywords = {radio continuum: general, catalogs,
+ methods: statistical},
      year = 2018,
     month = mar,
    volume = 35,
@@ -34,16 +35,16 @@ archivePrefix = "arXiv",
   adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
 
-% Basic description of Aegean
-@ARTICLE{Hancock_Aegean_2012,
+% Basic description of Aegean @ARTICLE{Hancock_Aegean_2012,
    author = {{Hancock}, P.~J. and {Murphy}, T. and {Gaensler}, B.~M. and
   {Hopkins}, A. and {Curran}, J.~R.},
-    title = "{Compact continuum source finding for next generation radio surveys}",
+    title = "{Compact continuum source finding for next generation radio
+    surveys}",
   journal = {\mnras},
 archivePrefix = "arXiv",
    eprint = {1202.4500},
- primaryClass = "astro-ph.IM",
- keywords = {techniques: image processing, catalogues, surveys},
+ primaryClass = "astro-ph.IM", keywords = {techniques: image processing,
+ catalogues, surveys},
      year = 2012,
     month = may,
    volume = 422,
