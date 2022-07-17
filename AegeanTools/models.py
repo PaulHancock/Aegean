@@ -515,8 +515,8 @@ class PixelIsland(object):
         """
         if len(data.shape) != self.dim:
             raise AssertionError(
-                "mask shape {0} is of the wrong dimension. " +
-                "Expecting {1}".format(data.shape, self.dim)
+                ("mask shape {0} is of the wrong dimension. " +
+                 "Expecting {1}").format(data.shape, self.dim)
                 )
         self.mask = data
         return
