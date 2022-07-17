@@ -8,6 +8,7 @@ __author__ = 'Paul Hancock'
 from AegeanTools import fits_tools
 from AegeanTools.wcs_helpers import WCSHelper
 from AegeanTools.angle_tools import gcd
+from AegeanTools.exceptions import AegeanError
 from astropy.io import fits
 import numpy as np
 import os
@@ -134,6 +135,20 @@ def test_load_image_band_multi_bands():
     Load an image in two bands
     Check that the adjacent bands have adjacent sky coords
     """
+    try:
+        _ = fits_tools.load_image_band(None, band=(0, 0))
+    except AegeanError as e:
+        pass
+    else:
+        raise AssertionError("Tried to load a total of zero bands")
+
+    try:
+        _ = fits_tools.load_image_band(None, band=(1, 1))
+    except AegeanError as e:
+        pass
+    else:
+        raise AssertionError("Tried to load an invalid band combination")
+
     data0, header0 = fits_tools.load_image_band(
         "tests/test_files/1904-66_SIN.fits", band=(0, 2))
     data1, header1 = fits_tools.load_image_band(
