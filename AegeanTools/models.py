@@ -431,9 +431,6 @@ class GlobalFittingData(object):
     beam : :class:`AegeanTools.wcs_helpers.Beam`
         The synthesized beam of the input image.
 
-    data_pix : 2d-array
-        A link to the data array that is contained within the `img`.
-
     dtype : {np.float32, np.float64}
         The data type for the input image. Will be enforced upon writing.
 
@@ -457,9 +454,8 @@ class GlobalFittingData(object):
         self.dcurve = None
         self.rmsimg = None
         self.bkgimg = None
-        self.hdu_header = None
+        self.header = None
         self.beam = None
-        self.data_pix = None
         self.dtype = None
         self.region = None
         self.wcshelper = None
