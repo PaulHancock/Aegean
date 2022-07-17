@@ -18,19 +18,19 @@ __author__ = "Paul Hancock"
 
 class Region(object):
     """
-    A Region object represents a footprint on the sky. This is done in a way similar to a MOC.
-    The region is stored as a list of healpix pixels, allowing for binary set-like operations.
+    A Region object represents a footprint on the sky. This is done in a way
+    similar to a MOC. The region is stored as a list of healpix pixels,
+    allowing for binary set-like operations.
 
     Attributes
     ----------
     maxdepth : int
-        The depth or resolution of the region.
-        At the deepest level there will be 4*2**maxdepth pixels on the sky.
-        Default = 11
+        The depth or resolution of the region. At the deepest level there will
+        be 4*2**maxdepth pixels on the sky. Default = 11
 
     pixeldict : dict
-        A dictionary of sets, each set containing the pixels within the region. The sets are indexed by their
-        layer number.
+        A dictionary of sets, each set containing the pixels within the region.
+        The sets are indexed by their layer number.
 
     demoted : set
         A representation of this region at the deepest layer.
@@ -73,7 +73,8 @@ class Region(object):
         return
 
     def __repr__(self):
-        return "Region with maximum depth {0}, and total area {1:5.2g} deg^2".format(self.maxdepth, self.get_area())
+        r = "Region with maximum depth {0}, and total area {1:5.2g} deg^2"
+        return r.format(self.maxdepth, self.get_area())
 
     def add_circles(self, ra_cen, dec_cen, radius, depth=None):
         """
@@ -82,7 +83,8 @@ class Region(object):
         Parameters
         ----------
         ra_cen, dec_cen, radius : float or list
-            The center and radius of the circle or circles to add to this region.
+            The center and radius of the circle or circles to add to this
+            region.
 
         depth : int
             The depth at which the given circles will be inserted.
@@ -112,7 +114,8 @@ class Region(object):
         Parameters
         ----------
         positions : [[ra, dec], ...]
-            Positions for the vertices of the polygon. The polygon needs to be convex and non-intersecting.
+            Positions for the vertices of the polygon. The polygon needs to be
+            convex and non-intersecting.
 
         depth : int
             The deepth at which the polygon will be inserted.
@@ -155,8 +158,8 @@ class Region(object):
         Parameters
         ----------
         degrees : bool
-            If True then return the area in square degrees, otherwise use steradians.
-            Default = True.
+            If True then return the area in square degrees, otherwise use
+            steradians. Default = True.
 
         Returns
         -------
@@ -183,9 +186,11 @@ class Region(object):
 
     def _demote_all(self):
         """
-        Convert the multi-depth pixeldict into a single set of pixels at the deepest layer.
+        Convert the multi-depth pixeldict into a single set of pixels at the
+        deepest layer.
 
-        The result is cached, and reset when any changes are made to this region.
+        The result is cached, and reset when any changes are made to this
+        region.
         """
         # only do the calculations if the demoted list is empty
         if len(self.demoted) == 0:
@@ -199,8 +204,8 @@ class Region(object):
 
     def _renorm(self):
         """
-        Remake the pixel dictionary, merging groups of pixels at level N into a single pixel
-        at level N-1
+        Remake the pixel dictionary, merging groups of pixels at level N into a
+        single pixel at level N-1
         """
         self.demoted = set()
         # convert all to lowest level
@@ -273,7 +278,8 @@ class Region(object):
         for d in range(1, min(self.maxdepth, other.maxdepth)+1):
             self.add_pixels(other.pixeldict[d], d)
 
-        # if the other region is at higher resolution, then include a degraded version of the remaining pixels.
+        # if the other region is at higher resolution, then include a degraded
+        # version of the remaining pixels.
         if self.maxdepth < other.maxdepth:
             for d in range(self.maxdepth+1, other.maxdepth+1):
                 for p in other.pixeldict[d]:
@@ -286,7 +292,8 @@ class Region(object):
 
     def without(self, other):
         """
-        Subtract another Region by performing a difference operation on their pixlists.
+        Subtract another Region by performing a difference operation on their
+        pixlists.
 
         Requires both regions to have the same maxdepth.
 
@@ -307,7 +314,8 @@ class Region(object):
 
     def intersect(self, other):
         """
-        Combine with another Region by performing intersection on their pixlists.
+        Combine with another Region by performing intersection on their
+        pixlists.
 
         Requires both regions to have the same maxdepth.
 
@@ -328,7 +336,8 @@ class Region(object):
 
     def symmetric_difference(self, other):
         """
-        Combine with another Region by performing the symmetric difference of their pixlists.
+        Combine with another Region by performing the symmetric difference of
+        their pixlists.
 
         Requires both regions to have the same maxdepth.
 
@@ -349,7 +358,8 @@ class Region(object):
 
     def write_reg(self, filename):
         """
-        Write a ds9 region file that represents this region as a set of diamonds.
+        Write a ds9 region file that represents this region as a set of
+        diamonds.
 
         Parameters
         ----------
@@ -360,7 +370,8 @@ class Region(object):
             for d in range(1, self.maxdepth+1):
                 for p in self.pixeldict[d]:
                     line = "fk5; polygon("
-                    # the following int() gets around some problems with np.int64 that exist prior to numpy v 1.8.1
+                    # the following int() gets around some problems with
+                    # np.int64 that exist prior to numpy v 1.8.1
                     vectors = list(
                         zip(*hp.boundaries(2**d, int(p), step=1, nest=True)))
                     positions = []

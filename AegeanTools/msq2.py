@@ -12,8 +12,8 @@ __author__ = "Paul Hancock"
 
 class MarchingSquares():
     """
-    Implementation of a marching squares algorithm.
-    With reference to http://devblog.phillipspiess.com/2010/02/23/better-know-an-algorithm-1-marching-squares/
+    Implementation of a marching squares algorithm. With reference to
+    http://devblog.phillipspiess.com/2010/02/23/better-know-an-algorithm-1-marching-squares/
     but written in python
     """
 
@@ -111,8 +111,8 @@ class MarchingSquares():
 
     def walk_perimeter(self, startx, starty):
         """
-        Starting at a point on the perimeter of a region, 'walk' the perimeter to return
-        to the starting point. Record the path taken.
+        Starting at a point on the perimeter of a region, 'walk' the perimeter
+        to return to the starting point. Record the path taken.
 
         Parameters
         ----------
@@ -122,7 +122,8 @@ class MarchingSquares():
         Returns
         -------
         perimeter : list
-            A list of pixel coordinates [ [x1,y1], ...] that constitute the perimeter of the region.
+            A list of pixel coordinates [ [x1,y1], ...] that constitute the
+            perimeter of the region.
         """
         # checks
         startx = max(startx, 0)

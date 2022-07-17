@@ -53,8 +53,8 @@ def sigmaclip(arr, lo, hi, reps=10):
     """
     Perform sigma clipping on an array, ignoring non finite values.
 
-    During each iteration return an array whose elements c obey:
-    mean -std*lo < c < mean + std*hi
+    During each iteration return an array whose elements c obey: mean -std*lo <
+    c < mean + std*hi
 
     where mean/std are the mean std of the input array.
 
@@ -67,8 +67,7 @@ def sigmaclip(arr, lo, hi, reps=10):
     hi : float
         The positive clipping level.
     reps : int
-        The number of iterations to perform.
-        Default = 3.
+        The number of iterations to perform. Default = 3.
 
     Returns
     -------
@@ -79,7 +78,8 @@ def sigmaclip(arr, lo, hi, reps=10):
 
     Notes
     -----
-    Scipy v0.16 now contains a comparable method that will ignore nan/inf values.
+    Scipy v0.16 now contains a comparable method that will ignore nan/inf
+    values.
     """
     clipped = np.array(arr)[np.isfinite(arr)]
 
@@ -126,15 +126,18 @@ def _sf2(args):
     # thanks to https://stackoverflow.com/a/16618842/1710603
     try:
         return sigma_filter(*args)
-    except:
+    except Exception as e:
         import traceback
+        logging.warn(e)
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
-def sigma_filter(filename, region, step_size, box_size, shape, domask, sid, cube_index):
+def sigma_filter(filename, region,
+                 step_size, box_size,
+                 shape, domask, sid, cube_index):
     """
-    Calculate the background and rms for a sub region of an image. The results are
-    written to shared memory - irms and ibkg.
+    Calculate the background and rms for a sub region of an image. The results
+    are written to shared memory - irms and ibkg.
 
     Parameters
     ----------
@@ -142,7 +145,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid, cube
         Fits file to open
 
     region : list
-        Region within the fits file that is to be processed. (row_min, row_max).
+        Region within the fits file that is to be processed. (row_min,
+        row_max).
 
     step_size : (int, int)
         The filtering step size
@@ -171,14 +175,16 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, sid, cube
     logging.debug('rows {0}-{1} starting at {2}'.format(ymin,
                   ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
-    # cut out the region of interest plus 1/2 the box size, but clip to the image size
+    # cut out the region of interest plus 1/2 the box size, but clip to the
+    # image size
     data_row_min = max(0, ymin - box_size[0]//2)
     data_row_max = min(shape[0], ymax + box_size[0]//2)
 
     # Figure out how many axes are in the datafile
     NAXIS = fits.getheader(filename)["NAXIS"]
 
-    # For some reason we can't memmap a file with BSCALE not 1.0, so we signore it now and scale it later
+    # For some reason we can't memmap a file with BSCALE not 1.0, so we signore
+    # it now and scale it later
     with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
         if NAXIS == 2:
             data = a[0].section[data_row_min:data_row_max, 0:shape[1]]
@@ -297,7 +303,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
                        cube_index=0):
     """
     Calculate the background and noise images corresponding to the input file.
-    The calculation is done via a box-car approach and uses multiple cores and shared memory.
+    The calculation is done via a box-car approach and uses multiple cores and
+    shared memory.
 
     Parameters
     ----------
@@ -314,8 +321,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
         Number of cores to use. If None then use all available.
 
     nslice : int
-        The image will be divided into this many horizontal stripes for processing.
-        Default = None = equal to cores
+        The image will be divided into this many horizontal stripes for
+        processing. Default = None = equal to cores
 
     shape : (int, int)
         The shape of the image in the given file.
@@ -324,8 +331,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
         True(Default) = copy data mask to output.
 
     cube_index : int
-        For 3d data use this index into the third dimension.
-        Default = 0
+        For 3d data use this index into the third dimension. Default = 0
 
     Returns
     -------
@@ -378,7 +384,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
         args.append((filename, region, step_size, box_size,
                     shape, domask, i, cube_index))
 
-    # start a new process for each task, hopefully to reduce residual memory use
+    # start a new process for each task, hopefully to reduce residual memory
+    # use
     pool = multiprocessing.Pool(processes=cores, maxtasksperchild=1)
     try:
         # chunksize=1 ensures that we only send a single task to each process
@@ -400,8 +407,8 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
                  cores=None, mask=True, compressed=False, nslice=None,
                  cube_index=None):
     """
-    Create a background and noise image from an input image.
-    Resulting images are written to `outbase_bkg.fits` and `outbase_rms.fits`
+    Create a background and noise image from an input image. Resulting images
+    are written to `outbase_bkg.fits` and `outbase_rms.fits`
 
     Parameters
     ----------
@@ -419,24 +426,23 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
         The size of the box in pixels
 
     twopass : bool
-        Perform a second pass calculation to ensure that the noise is not contaminated by the background.
-        Default = False. DEPRECATED
+        Perform a second pass calculation to ensure that the noise is not
+        contaminated by the background. Default = False. DEPRECATED
 
     cores : int
-        Number of CPU corse to use.
-        Default = all available
+        Number of CPU corse to use. Default = all available
 
     nslice : int
-        The image will be divided into this many horizontal stripes for processing.
-        Default = None = equal to cores
+        The image will be divided into this many horizontal stripes for
+        processing. Default = None = equal to cores
 
     mask : bool
-        Mask the output array to contain np.nna wherever the input array is nan or not finite.
-        Default = true
+        Mask the output array to contain np.nna wherever the input array is nan
+        or not finite. Default = true
 
     compressed : bool
-        Return a compressed version of the background/noise images.
-        Default = False
+        Return a compressed version of the background/noise images. Default =
+        False
 
     cube_index : int
         If the input data is 3d, then use this index for the 3rd dimension.
@@ -458,7 +464,9 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
         naxis3 = header['NAXIS3']
         if cube_index >= naxis3:
             logging.error(
-                "3rd dimension has len {0} but index {1} was passed".format(naxis3, cube_index))
+                "3rd dimension has len {0} but index {1} was passed".format(
+                    naxis3, cube_index)
+                )
             return None
 
     if step_size is None:
@@ -472,14 +480,17 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
         if not step_size[0] == step_size[1]:
             step_size = (min(step_size), min(step_size))
             logging.info(
-                "Changing grid to be {0} so we can compress the output".format(step_size))
+                "Changing grid to be {0} so we can compress the output".format(
+                    step_size)
+                )
 
     logging.info("using grid_size {0}, box_size {1}".format(
                  step_size, box_size))
     logging.info("on data shape {0}".format(shape))
-    bkg, rms = filter_mc_sharemem(im_name, step_size=step_size, box_size=box_size,
-                                  cores=cores, shape=shape, nslice=nslice, domask=mask,
-                                  cube_index=cube_index)
+    bkg, rms = filter_mc_sharemem(im_name,
+                                  step_size=step_size, box_size=box_size,
+                                  cores=cores, shape=shape, nslice=nslice,
+                                  domask=mask, cube_index=cube_index)
     logging.info("done")
 
     if out_base is not None:
@@ -540,7 +551,8 @@ def get_step_size(header):
             if 'CD1_2' in header and 'CD2_1' in header:
                 if header['CD1_2'] != 0 or header['CD2_1'] != 0:
                     logging.warning(
-                        "CD1_2 and/or CD2_1 are non-zero and I don't know what to do with them")
+                        "CD1_2 and/or CD2_1 are non-zero and " +
+                        "I don't know what to do with them")
                     logging.warning("Ingoring them")
         else:
             logging.warning(
