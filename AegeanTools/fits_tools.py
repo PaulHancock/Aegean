@@ -128,8 +128,9 @@ def expand(datafile, outfile=None):
     Expand and interpolate the given data file using the given method.
     Datafile can be a filename or an HDUList
 
-    It is assumed that the file has been compressed and that there are `BN_?` keywords in the
-    fits header that describe how the compression was done.
+    It is assumed that the file has been compressed and that there are
+    `BN_?` keywords in the fits header that describe how the compression
+    was done.
 
     Parameters
     ----------
@@ -154,7 +155,8 @@ def expand(datafile, outfile=None):
     header = hdulist[0].header
     data = hdulist[0].data
     # Check for the required key words, only expand if they exist
-    if not all(a in header for a in ['BN_CFAC', 'BN_NPX1', 'BN_NPX2', 'BN_RPX1', 'BN_RPX2']):
+    if not all(a in header for a in
+               ['BN_CFAC', 'BN_NPX1', 'BN_NPX2', 'BN_RPX1', 'BN_RPX2']):
         return hdulist
 
     factor = header['BN_CFAC']
@@ -193,7 +195,8 @@ def expand(datafile, outfile=None):
     header['HISTORY'] = 'Expanded by factor {0}'.format(factor)
 
     # don't need these any more so delete them.
-    del header['BN_CFAC'], header['BN_NPX1'], header['BN_NPX2'], header['BN_RPX1'], header['BN_RPX2']
+    del header['BN_CFAC'], header['BN_NPX1'], header['BN_NPX2']
+    del header['BN_RPX1'], header['BN_RPX2']
     hdulist[0].header = header
     if outfile is not None:
         hdulist.writeto(outfile, overwrite=True)

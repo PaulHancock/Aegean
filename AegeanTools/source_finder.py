@@ -17,9 +17,9 @@ import scipy
 from scipy.ndimage import find_objects, label
 from scipy.ndimage.filters import maximum_filter, minimum_filter
 from scipy.special import erf
-from sklearn.feature_extraction import img_to_graph
 from tqdm import tqdm
 
+from AegeanTools import wcs_helpers
 from AegeanTools.fits_tools import write_fits
 
 from . import cluster, flags, pprocess
@@ -37,7 +37,6 @@ from .models import (ComponentSource, DummyLM, GlobalFittingData,
 from .msq2 import MarchingSquares
 from .regions import Region
 from .wcs_helpers import Beam, WCSHelper
-from AegeanTools import wcs_helpers
 
 __author__ = "Paul Hancock"
 
@@ -70,9 +69,9 @@ def find_islands(im, bkg, rms,
       used to grow islands. The units are in SNR.
 
     region : :class:`AegeanTools.regions.Region` or None
-      Region over which to find islands. Islands must have at least 1 pixel overlap
-      with the region in order to be returned. Default = None, no constraints.
-      Region *requires* a wcs to be defined.
+      Region over which to find islands. Islands must have at least 1 pixel
+      overlap with the region in order to be returned.
+      Default = None, no constraints. Region *requires* a wcs to be defined.
 
     wcs : :class:`AegeanTools.wcs_helpers.WCSHelper` or None
       If a region is specified then this WCSHelper will be used to map sky->pix
@@ -101,7 +100,8 @@ def find_islands(im, bkg, rms,
         log.debug("There are no pixels above the clipping limit")
         return []
 
-    # segmentation via scipy, structure includes diagonal pixels as single island
+    # segmentation via scipy
+    # structure includes diagonal pixels as single island
     l, n = label(a, structure=np.ones((3, 3)))
     f = find_objects(l)
 
@@ -735,8 +735,9 @@ class SourceFinder(object):
                 # self.log.info("{1} Island {0} is above the inner clip limit"
                 #               .format(i, data.shape))
 
-                # Flag pixel that are either below the flood level, or belong to other
-                # islands that happen to be withing the bounding box
+                # Flag pixel that are either below the flood level
+                # or belong to other islands that happen to be within
+                # the bounding box
                 island_mask = (snr[xmin:xmax, ymin:ymax] < outerclip) | \
                               (l[xmin:xmax, ymin:ymax] != i + 1)
                 data_box = copy.deepcopy(
@@ -1753,7 +1754,7 @@ class SourceFinder(object):
         aux : :class:`numpy.ndarray`
           The loaded image.
         """
-        #auximg = FitsImage(auxfile, beam=self.global_data.beam).get_pixels()
+
         auximg, _ = load_image_band(auxfile)
         if auximg.shape != image.shape:
             self.log.error(
@@ -2885,12 +2886,14 @@ def check_cores(cores):
     cores = min(multiprocessing.cpu_count(), cores)
     try:
         queue = pprocess.Queue(limit=cores, reuse=1)
-    except:  # TODO: figure out what error is being thrown
+    except Exception as e:  # TODO: figure out what error is being thrown
+        logging.warn(e)
         cores = 1
     else:
         try:
             _ = queue.manage(pprocess.MakeReusable(fix_shape))
-        except:
+        except Exception as e:
+            logging.warn(e)
             cores = 1
     return cores
 

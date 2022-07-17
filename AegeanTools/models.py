@@ -18,7 +18,8 @@ class SimpleSource(object):
     Attributes
     ----------
     background, local_rms : float
-        Background and local noise level in the image at the location of this source.
+        Background and local noise level in the image at the location of this
+        source.
 
     ra, dec : float
         Sky location of this source. Decimal degrees.
@@ -41,7 +42,8 @@ class SimpleSource(object):
         Shape parameters for this source.
 
     uuid : str
-        Unique ID for this source. This is random and not dependent on the source properties.
+        Unique ID for this source. This is random and not dependent on the
+        source properties.
 
     See Also
     --------
@@ -51,8 +53,11 @@ class SimpleSource(object):
              "#                        Jy/beam   Jy/beam   ''    ''        deg  ZWNCPES\n" + \
              "#========================================================================"
 
-    formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.a:5.2f} {0.b:5.2f} {0.pa:6.1f} {0.flags:07b}"
-    names = ['background', 'local_rms', 'ra', 'dec', 'peak_flux', 'err_peak_flux', 'flags', 'peak_pixel', 'a', 'b',
+    formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} " + \
+                "{0.err_peak_flux: 8.6f} {0.a:5.2f} {0.b:5.2f} " + \
+                "{0.pa:6.1f} {0.flags:07b}"
+    names = ['background', 'local_rms', 'ra', 'dec', 'peak_flux',
+             'err_peak_flux', 'flags', 'peak_pixel', 'a', 'b',
              'pa', 'uuid']
     galactic = False
 
@@ -72,7 +77,8 @@ class SimpleSource(object):
 
     def _sanitise(self):
         """
-        Convert attributes of type npumpy.float32 to numpy.float64 so that they will print properly.
+        Convert attributes of type npumpy.float32 to numpy.float64 so that
+        they will print properly.
         """
         for k in self.__dict__:
             # np.float32 has a broken __str__ method
@@ -91,10 +97,10 @@ class SimpleSource(object):
         Return an *ordered* list of the source attributes
         """
         self._sanitise()
-        l = []
+        ls = []
         for name in self.names:
-            l.append(getattr(self, name))
-        return l
+            ls.append(getattr(self, name))
+        return ls
 
 
 class IslandSource(SimpleSource):
@@ -111,7 +117,8 @@ class IslandSource(SimpleSource):
         The number of components that make up this island.
 
     background, local_rms : float
-        Background and local noise level in the image at the location of this source.
+        Background and local noise level in the image at the location of
+        this source.
 
     ra, dec : float
         Sky location of the brightest pixel in this island. Decimal degrees.
@@ -131,7 +138,8 @@ class IslandSource(SimpleSource):
         Integrated flux and associated uncertainty.
 
     x_width, y_width : int
-        The extent of the island in pixel space. The width is of the smallest bounding box.
+        The extent of the island in pixel space.
+        The width is of the smallest bounding box.
 
     max_angular_size : float
         The maximum angular size of the island in sky coordinates (degrees).
@@ -146,19 +154,19 @@ class IslandSource(SimpleSource):
         The area of this island in sky coordinates (square degrees).
 
     beam_area : float
-        The area of the synthesized beam of the image at the location of the brightest pixel.
-        (square degrees).
+        The area of the synthesized beam of the image at the location of
+        the brightest pixel in square degrees.
 
     eta : float
         A factor that accounts for the difference between the integrated flux
-        counted by summing pixels, and the integrated flux that would be produced
-        by integrating an appropriately sized Gaussian.
+        counted by summing pixels, and the integrated flux that would be
+        produced by integrating an appropriately sized Gaussian.
 
     extent : float
 
     contour : list
-        A list of pixel coordinates that mark the pixel boundaries for this island
-        of pixels.
+        A list of pixel coordinates that mark the pixel boundaries for this
+        island of pixels.
 
     max_angular_size_anchors : [x1, y1, x2, y2]
         The end points of the vector that describes the maximum angular size
@@ -168,15 +176,17 @@ class IslandSource(SimpleSource):
         Flags. See :mod:`AegeanTools.flags`.
 
     uuid : str
-        Unique ID for this source. This is random and not dependent on the source properties.
+        Unique ID for this source. This is random and not dependent on the
+        source properties.
 
     See Also
     --------
     :mod:`AegeanTools.flags`
 
     """
-    names = ['island', 'components', 'background', 'local_rms', 'ra_str', 'dec_str', 'ra', 'dec',
-             'peak_flux', 'int_flux', 'err_int_flux', 'eta', 'x_width', 'y_width', 'max_angular_size', 'pa',
+    names = ['island', 'components', 'background', 'local_rms', 'ra_str',
+             'dec_str', 'ra', 'dec', 'peak_flux', 'int_flux', 'err_int_flux',
+             'eta', 'x_width', 'y_width', 'max_angular_size', 'pa',
              'pixels', 'area', 'beam_area', 'flags', 'uuid']
 
     def __init__(self):
@@ -200,7 +210,7 @@ class IslandSource(SimpleSource):
         self.beam_area = np.nan  # at the brightest pixel
         self.components = np.nan
         self.eta = np.nan
-        # not included in 'names' and thus not included by default in most output
+        # not included in 'names' and thus not included in most output
         self.extent = np.nan
         self.contour = []
         self.max_angular_size_anchors = []
@@ -254,7 +264,8 @@ class ComponentSource(SimpleSource):
         The source number within the island.
 
     background, local_rms : float
-        Background and local noise level in the image at the location of this source.
+        Background and local noise level in the image at the location
+        of this source.
 
     ra, err_ra, dec, err-dec : float
         Sky location of the source including uncertainties. Decimal degrees.
@@ -289,7 +300,8 @@ class ComponentSource(SimpleSource):
         Flags. See :mod:`AegeanTools.flags`.
 
     uuid : str
-        Unique ID for this source. This is random and not dependent on the source properties.
+        Unique ID for this source. This is random and not dependent on the
+        source properties.
 
     See Also
     --------
@@ -302,14 +314,20 @@ class ComponentSource(SimpleSource):
              "#============================================================================================================================================================================================"
 
     # formatting strings for making nice output
-    formatter = "({0.island:04d},{0.source:02d}) {0.background: 8.6f} {0.local_rms: 8.6f} " + \
-                "{0.ra_str:12s} {0.dec_str:12s} {0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} {0.err_dec: 9.7f} " + \
-                "{0.peak_flux: 8.6f} {0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} {0.err_int_flux: 8.6f} " + \
-                "{0.a:5.2f} {0.err_a:5.2f} {0.b:5.2f} {0.err_b:5.2f} " + \
-                "{0.pa:6.1f} {0.err_pa:5.1f}   {0.flags:07b}"
-    names = ['island', 'source', 'background', 'local_rms', 'ra_str', 'dec_str', 'ra', 'err_ra', 'dec', 'err_dec',
-             'peak_flux', 'err_peak_flux', 'int_flux', 'err_int_flux', 'a', 'err_a', 'b', 'err_b', 'pa', 'err_pa',
-             'flags', 'residual_mean', 'residual_std', 'uuid', 'psf_a', 'psf_b', 'psf_pa']
+    formatter = "({0.island:04d},{0.source:02d}) {0.background: 8.6f} " + \
+                "{0.local_rms: 8.6f} {0.ra_str:12s} {0.dec_str:12s} " + \
+                "{0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} " + \
+                "{0.err_dec: 9.7f} {0.peak_flux: 8.6f} " + \
+                "{0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} " + \
+                "{0.err_int_flux: 8.6f} {0.a:5.2f} {0.err_a:5.2f} " + \
+                "{0.b:5.2f} {0.err_b:5.2f} {0.pa:6.1f} {0.err_pa:5.1f}   " + \
+                "{0.flags:07b}"
+    names = ['island', 'source', 'background', 'local_rms',
+             'ra_str', 'dec_str', 'ra', 'err_ra', 'dec', 'err_dec',
+             'peak_flux', 'err_peak_flux', 'int_flux', 'err_int_flux',
+             'a', 'err_a', 'b', 'err_b', 'pa', 'err_pa',
+             'flags', 'residual_mean', 'residual_std',
+             'uuid', 'psf_a', 'psf_b', 'psf_pa']
 
     def __init__(self):
         SimpleSource.__init__(self)
@@ -409,10 +427,9 @@ class ComponentSource(SimpleSource):
 
 class GlobalFittingData(object):
     """
-    A class to hold the properties associated with an image.
-    [ These were once in the global scope of a monolithic script, hence the name].
-    (should be) Read-only once created.
-    Used by island fitting subprocesses.
+    A class to hold the properties associated with an image. [ These were once
+    in the global scope of a monolithic script, hence the name]. (should be)
+    Read-only once created. Used by island fitting subprocesses.
 
     Attributes
     ----------
@@ -441,8 +458,8 @@ class GlobalFittingData(object):
         A helper object for WCS operations, created from `hdu_header`.
 
     blank : bool
-        If true, then the input image will be blanked at the location of each of
-        the measured islands.
+        If true, then the input image will be blanked at the location of each
+        of the measured islands.
 
     cube_index : int
         If the image is a cube, use this index into the 3rd axis.
@@ -472,7 +489,8 @@ class PixelIsland(object):
     Attributes
     ----------
     dim : int
-        The number of dimensions of this island. dim >=2, default is 2 (ra/dec).
+        The number of dimensions of this island. dim >=2, default is 2
+        (ra/dec).
 
     bounding_box : [(min, max), (min, max), ...]
         A bounding box for this island. len(bounding_box)==dim.
@@ -497,14 +515,17 @@ class PixelIsland(object):
         """
         if len(data.shape) != self.dim:
             raise AssertionError(
-                "mask shape {0} is of the wrong dimension. Expecting {1}".format(data.shape, self.dim))
+                "mask shape {0} is of the wrong dimension. " +
+                "Expecting {1}".format(data.shape, self.dim)
+                )
         self.mask = data
         return
 
     def calc_bounding_box(self, data, offsets):
         """
-        Compute the bounding box for a data cube of dimension dim.
-        The bounding box will be the smallest nd-cube that bounds the non-zero entries of the cube.
+        Compute the bounding box for a data cube of dimension dim. The bounding
+        box will be the smallest nd-cube that bounds the non-zero entries of
+        the cube.
 
         Parameters
         ----------
@@ -512,11 +533,14 @@ class PixelIsland(object):
             Data array with dimension equal to self.dim
 
         offsets : [xmin, ymin, ...]
-            The offset between the image zero index and the zero index of data. len(offsets)==dim
+            The offset between the image zero index and the zero index of data.
+            len(offsets)==dim
         """
         if len(offsets) != self.dim:
             raise AssertionError(
-                "{0} offsets were passed but {1} are required".format(len(offsets), self.dim))
+                "{0} offsets were passed but {1} are required".format(
+                    len(offsets), self.dim)
+                    )
         # TODO: Figure out 3d boxes
         # set the bounding box one dimension at a time
         ndrow = np.any(data, axis=0)
@@ -533,8 +557,8 @@ class PixelIsland(object):
 
 class IslandFittingData(object):
     """
-    All the data required to fit a single island.
-    Instances are pickled and passed to the fitting subprocesses
+    All the data required to fit a single island. Instances are pickled and
+    passed to the fitting subprocesses
 
     Attributes
     ----------
@@ -545,17 +569,20 @@ class IslandFittingData(object):
         a 2D numpy array of pixel values
 
     scalars : (innerclip, outerclip, max_summits)
-        Inner and outer clipping limits (sigma), and the maximum number of components that should be fit.
+        Inner and outer clipping limits (sigma), and the maximum number of
+        components that should be fit.
 
     offsets : (xmin, xmax, ymin, ymax)
-        The offset between the boundaries of the island i, within the
-        larger image.
+        The offset between the boundaries of the island i, within the larger
+        image.
 
     doislandflux : boolean
         If true then also measure properties of the island.
     """
 
-    def __init__(self, isle_num=0, i=None, scalars=None, offsets=(0, 0, 1, 1), doislandflux=False):
+    def __init__(self, isle_num=0, i=None,
+                 scalars=None, offsets=(0, 0, 1, 1),
+                 doislandflux=False):
         self.isle_num = isle_num
         self.i = i
         self.scalars = scalars
@@ -588,8 +615,9 @@ def classify_catalog(catalog):
     Parameters
     ----------
     catalog : iterable
-        A list or iterable object of {SimpleSource, IslandSource, ComponentSource} objects, possibly mixed.
-        Any other objects will be silently ignored.
+        A list or iterable object of {SimpleSource, IslandSource,
+        ComponentSource} objects, possibly mixed. Any other objects will be
+        silently ignored.
 
     Returns
     -------
@@ -617,13 +645,14 @@ def classify_catalog(catalog):
 
 def island_itergen(catalog):
     """
-    Iterate over a catalog of sources, and return an island worth of sources at a time.
-    Yields a list of components, one island at a time
+    Iterate over a catalog of sources, and return an island worth of sources at
+    a time. Yields a list of components, one island at a time
 
     Parameters
     ----------
     catalog : iterable
-        A list or iterable of :class:`AegeanTools.models.ComponentSource` objects.
+        A list or iterable of :class:`AegeanTools.models.ComponentSource`
+        objects.
 
     Yields
     ------
@@ -631,7 +660,8 @@ def island_itergen(catalog):
         A list of all sources within an island, one island at a time.
 
     """
-    # reverse sort so that we can pop the last elements and get an increasing island number
+    # reverse sort so that we can pop the last elements and get an increasing
+    # island number
     catalog = sorted(catalog)
     catalog.reverse()
     group = []
