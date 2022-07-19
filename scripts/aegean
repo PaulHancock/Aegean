@@ -21,13 +21,6 @@ from AegeanTools.catalogs import (check_table_formats, save_catalog,
 from AegeanTools.source_finder import get_aux_files
 from AegeanTools.wcs_helpers import Beam
 
-# need Region in the name space in order to be able to unpickle it
-try:
-    from AegeanTools.regions import Region
-    region_available = True
-except ImportError:
-    region_available = False
-
 header = """#Aegean version {0}
 # on dataset: {1}"""
 
@@ -64,9 +57,6 @@ if __name__ == "__main__":
                         default=False,
                         help="Source finding mode. [default: true, unless "
                              "--save or --measure are selected]")
-    group1.add_argument("--cores", dest="cores", type=int, default=None,
-                        help="Number of CPU cores to use for processing "
-                             "background and rms images [default: all cores]")
     group1.add_argument("--hdu", dest="hdu_index", type=int, default=0,
                         help="HDU index (0-based) for cubes with multiple "
                              "images in extensions. [default: 0]")
@@ -74,8 +64,8 @@ if __name__ == "__main__":
     group1.add_argument('--beam', dest='beam', type=float, nargs=3,
                         default=None,
                         help='The beam parameters to be used is "--beam major'
-                        ' minor pa" all in degrees. '
-                        '[default: read from fits header].')
+                             ' minor pa" all in degrees. '
+                             '[default: read from fits header].')
     group1.add_argument('--slice', dest='slice', type=int, default=None,
                         help='If the input data is a cube, then this slice '
                              'will determine the array index of the image '
@@ -92,6 +82,9 @@ if __name__ == "__main__":
     group2.add_argument("--forcebkg", dest='bkg', type=float, default=None,
                         help="Assume a single image background of bkg."
                              " [default: None]")
+    group1.add_argument("--cores", dest="cores", type=int, default=None,
+                        help="Number of CPU cores to use when calculating "
+                             "background and rms images [default: all cores]")
     group2.add_argument("--noise", dest='noiseimg', default=None, type=str,
                         help="A .fits file that represents the image noise "
                              "(rms), created from Aegean with --save "
@@ -351,10 +344,6 @@ if __name__ == "__main__":
     if options.region is not None:
         if not os.path.exists(options.region):
             log.error("Region file {0} not found".format(options.region))
-            sys.exit(1)
-        if not region_available:
-            log.error("Could not import AegeanTools/regions.py")
-            log.error("(you probably need to install HealPy)")
             sys.exit(1)
 
     # Generate and save the background FITS files with the Aegean default
