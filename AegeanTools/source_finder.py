@@ -22,7 +22,7 @@ from tqdm import tqdm
 from AegeanTools import wcs_helpers
 from AegeanTools.fits_tools import write_fits
 
-from . import cluster, flags, pprocess
+from . import cluster, flags
 from .__init__ import __date__, __version__
 from .angle_tools import bear, dec2dms, dec2hms, gcd
 from .BANE import filter_image, get_step_size
@@ -2515,51 +2515,26 @@ class SourceFinder(object):
         if len(island_group) > 0:
             island_groups.append(island_group)
 
-        # now fit all the groups and put results into queue
+        # now fit all the islands
         sources = []
-        if cores == 1:
-            with tqdm(total=isle_num, desc="Fitting Islands:") as pbar:
-                for g in island_groups:
-                    for i in g:
-                        try:
-                            pbar.update(1)
-                            srcs = self._fit_island(i)
-                        except AegeanNaNModelError:
-                            continue
-                        # update bar as each individual island is fit
-                        for src in srcs:
-                            # ignore sources that we have been told to ignore
-                            if (src.peak_flux > 0 and nopositive) or (
-                                src.peak_flux < 0 and nonegative
-                            ):
-                                continue
-                            sources.append(src)
-
-        else:
-            queue = pprocess.Queue(limit=cores, reuse=1)
-            fit_parallel = queue.manage(
-                pprocess.MakeReusable(self._fit_islands))
+        with tqdm(total=isle_num, desc="Fitting Islands:") as pbar:
             for g in island_groups:
-                fit_parallel(g)
+                for i in g:
+                    try:
+                        pbar.update(1)
+                        srcs = self._fit_island(i)
+                    except AegeanNaNModelError:
+                        continue
+                    # update bar as each individual island is fit
+                    for src in srcs:
+                        # ignore sources that we have been told to ignore
+                        if (src.peak_flux > 0 and nopositive) or (
+                            src.peak_flux < 0 and nonegative
+                        ):
+                            continue
+                        sources.append(src)
 
-            with tqdm(
-                total=len(island_groups),
-                desc="Fitting Island Groups:",
-                disable=not progress,
-            ) as pbar:
-                # turn our queue into a list of sources,
-                # filtering +/- peak flux as required
-                for srcs in queue:
-                    pbar.update(1)
-                    if srcs:  # ignore empty lists
-                        for src in srcs:
-                            # ignore sources that we have been told to ignore
-                            if (src.peak_flux > 0 and nopositive) or (
-                                src.peak_flux < 0 and nonegative
-                            ):
-                                continue
-                            sources.append(src)
-
+        
         # Write the output to the output file
         if outfile:
             print(
@@ -2769,21 +2744,11 @@ class SourceFinder(object):
             desc="Refitting Island Groups",
             disable=not progress,
         ) as pbar:
-            if cores == 1:
-                for i, g in enumerate(island_groups):
-                    srcs = self._refit_islands(g, stage, outerclip, istart=i)
-                    # update bar as each individual island is fit
-                    pbar.update(1)
-                    sources.extend(srcs)
-            else:
-                queue = pprocess.Queue(limit=cores, reuse=1)
-                fit_parallel = queue.manage(
-                    pprocess.MakeReusable(self._refit_islands))
-                for i, g in enumerate(island_groups):
-                    fit_parallel(g, stage, outerclip, istart=i)
-                for srcs in queue:
-                    pbar.update(1)
-                    sources.extend(srcs)
+            for i, g in enumerate(island_groups):
+                srcs = self._refit_islands(g, stage, outerclip, istart=i)
+                # update bar as each individual island is fit
+                pbar.update(1)
+                sources.extend(srcs)
 
         sources = sorted(sources)
 
@@ -2870,7 +2835,6 @@ def theta_limit(theta):
 def check_cores(cores):
     """
     Determine how many cores we are able to use.
-    Return 1 if we are not able to make a queue via pprocess.
 
     Parameters
     ----------
@@ -2884,17 +2848,6 @@ def check_cores(cores):
 
     """
     cores = min(multiprocessing.cpu_count(), cores)
-    try:
-        queue = pprocess.Queue(limit=cores, reuse=1)
-    except Exception as e:  # TODO: figure out what error is being thrown
-        logging.warn(e)
-        cores = 1
-    else:
-        try:
-            _ = queue.manage(pprocess.MakeReusable(fix_shape))
-        except Exception as e:
-            logging.warn(e)
-            cores = 1
     return cores
 
 
