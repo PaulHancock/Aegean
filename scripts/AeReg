@@ -3,21 +3,17 @@
 A regrouping tool to accompany the Aegean source finding program.
 """
 
-from AegeanTools.cluster import (
-    regroup_dbscan,
-    resize,
-    check_attributes_for_regroup
-)
-from AegeanTools.catalogs import save_catalog, load_table, table_to_source_list
-from AegeanTools import wcs_helpers
-
-from astropy.io import fits
-import numpy as np
-
-import logging
 import argparse
-import sys
+import logging
 import os
+import sys
+
+import numpy as np
+from AegeanTools import wcs_helpers
+from AegeanTools.catalogs import load_table, save_catalog, table_to_source_list
+from AegeanTools.cluster import (check_attributes_for_regroup, regroup_dbscan,
+                                 resize)
+from astropy.io import fits
 
 __author__ = ['PaulHancock']
 __date__ = '2021-09-09'

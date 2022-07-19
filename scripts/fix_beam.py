@@ -33,7 +33,8 @@ def search_beam(hdulist):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--infile', dest='infile', default=None, required=True,
+    parser.add_argument('-i', '--infile', dest='infile', default=None,
+                        required=True,
                         help='The input fits file', metavar='<filename>')
 
     parser.add_argument('-o', '--outfile', dest='outfile', default='out.fits',
