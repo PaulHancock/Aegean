@@ -481,169 +481,6 @@ def estimate_parinfo_image(islands, im, rms, wcshelper,
     return sources
 
 
-def fit_islands_parinfo(models, im, rms, wcshelper):
-    """
-    Turn a list of sources into a set of islands and parameter estimates
-    which can then be characterised.
-
-    Parameters
-    ----------
-    models : [:class:`lmfit.Parinfo`, ... ]
-      A list of sources in the catalogue.
-
-    im : np.ndarray
-      The image map
-
-    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
-      A wcs object valid for the image map
-
-    Returns
-    -------
-    islands : [AegeanTools.models.SimpleSource, ...]
-      a list of islands
-    """
-
-    islands = []
-    for m in models:
-        pass
-    return islands
-
-
-def priorized_islands_parinfo(sources, im, wcshelper, stage=3):
-    """
-    Turn a list of sources into a set of islands and parameter estimates
-    which can then be characterised.
-
-    Parameters
-    ----------
-    sources : [AegeanTools.models.SimpleSource, ... ]
-      A list of sources in the catalogue.
-
-    im : np.ndarray
-      The image map
-
-    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
-      A wcs object valid for the image map
-
-    stage : int
-      The priorized fitting stage which determines which
-      parameters are fit/fixed. One of:
-      1 - Fit for flux only. All other params are fixed.
-      2 - Fit for flux and position. Shape parameters are fixed.
-      3 - Fit for flux, position, and shape.
-
-    Returns
-    -------
-    islands : [:class:`AegeanTools.models.ComponentSource`, ...]
-      a list of components
-    """
-
-
-def characterise_islands(
-        islands,
-        im,
-        bkg,
-        rms,
-        wcshelper,
-        err_type="best",
-        max_summits=None,
-        do_islandfit=False):
-    """
-    Do the source characterisation based on the initial estimate of
-    the island properties.
-
-    Parameters
-    ----------
-    islands : [lmfit.Parameters, ... ]
-      The initial estimate of parameters for the components within each island.
-
-    im, bkg, rms : np.ndarray
-      The image, background, and noise maps
-
-    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
-      A wcs helper object
-
-    err_type : str or None
-      The method for calculating uncertainties on parameters:
-      'best' - Uncertainties measured based on covariance matrix of the
-               fit and of the data
-               See Hancock et al. 2018 for a description of this process.
-      'raw' - uncertainties directly from the covariance matrix only
-      'none' or None - No uncertainties, all will be set to -1.
-
-    max_summits : int
-      The maximum number of summits that will be fit.
-      The final model may contain additional components but
-      only the first few will be fit.
-
-    do_islandfit : bool
-      If True, then also characterise islands as well as components.
-      Default=False.
-
-    Returns
-    -------
-    sources : [:py:class:`AegeanTools.models.SimpleSource`, ... ]
-      A list of characterised sources of type
-      :py:class:`AegeanTools.models.impleSource`,
-      :py:class:`AegeanTools.models.ComponentSource`,
-      or :py:class:`AegeanTools.models.IslandSource`.
-    """
-    sources = estimate_parinfo_image(
-        islands=islands,
-        im=im,
-        rms=rms,
-        wcshelper=wcshelper,
-        max_summits=max_summits,
-        log=log,
-    )
-    pixbeam = None  # to quiet the linter
-    for src, isle in zip(sources, islands):
-        [rmin, rmax], [cmin, cmax] = isle.bounding_box
-        i_data = im[rmin:rmax, cmin:cmax]
-        fac = 1 / np.sqrt(2)
-        if err_type == "best":
-            mx, my = np.where(np.isfinite(i_data))
-            C = Cmatrix(
-                mx, my,
-                pixbeam.a * FWHM2CC * fac,
-                pixbeam.b * FWHM2CC * fac,
-                pixbeam.pa
-            )
-            B = Bmatrix(C)
-        else:
-            C = B = None
-        result, _ = do_lmfit(i_data, src, B=B)
-
-    return sources
-
-
-def save_catalogue(sources, output, format=None):
-    """
-    Write a catalogue of sources
-
-    Parameters
-    ----------
-    sources : [AegeanTools.models.SimpleSource, ... ]
-      A list of characterised sources of type SimpleSource,
-      ComponentSource, or IslandSource.
-
-    output : str
-      Output filename
-
-    format : str
-      A descriptor of the output format. Options are:
-      # TODO add a bunch of options
-      'auto' or None - infer from filename extension
-
-    Returns
-    -------
-    None
-    """
-    # determine file format
-    # write catalogue based on source type and file format
-    return
-
-
 class SourceFinder(object):
     """
     The Aegean source finding algorithm
@@ -661,7 +498,7 @@ class SourceFinder(object):
       Default = None
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, log=log, **kwargs):
         self.global_data = GlobalFittingData()
         self.sources = []
         self.log = log  # Use a dummy logger (which never reports anything)
@@ -1490,7 +1327,6 @@ class SourceFinder(object):
                 self.log.info("Calculating background and rms data")
             self._make_bkg_rms(
                 filename=filename,
-                mesh_size=20,
                 forced_rms=rms,
                 forced_bkg=bkg,
                 cores=cores,
@@ -1679,7 +1515,7 @@ class SourceFinder(object):
         return
 
     def _make_bkg_rms(self, filename,
-                      mesh_size=20, forced_rms=None, forced_bkg=None,
+                      forced_rms=None, forced_bkg=None,
                       cores=None):
         """
         Calculate an rms image and a bkg image.
@@ -1688,9 +1524,6 @@ class SourceFinder(object):
         ----------
         filename : str
           Path of the image file.
-
-        mesh_size : int
-          Number of beams per box default = 20
 
         forced_rms : float
           The rms of the image.
@@ -2307,31 +2140,6 @@ class SourceFinder(object):
 
         return sources
 
-    def _fit_islands(self, islands):
-        """
-        Execute fitting on a list of islands
-        This function just wraps around fit_island, so that when we
-        do multiprocesing, a single process will fit multiple
-        islands before returning results.
-
-
-        Parameters
-        ----------
-        islands : list of :class:`AegeanTools.models.IslandFittingData`
-          The islands to be fit.
-
-        Returns
-        -------
-        sources : list
-          The sources that were fit.
-        """
-        self.log.debug("Fitting group of {0} islands".format(len(islands)))
-        sources = []
-        for island in islands:
-            res = self._fit_island(island)
-            sources.extend(res)
-        return sources
-
     def find_sources_in_image(
         self,
         filename,
@@ -2482,9 +2290,7 @@ class SourceFinder(object):
         self.log.info("Found {0} islands".format(len(islands)))
         self.log.info("Begin fitting")
 
-        island_groups = []  # will be a list of groups of islands
-        island_group = []  # will be a list of islands
-        group_size = 20
+        island_group = []
         isle_num = 0
 
         for island in islands:
@@ -2506,35 +2312,25 @@ class SourceFinder(object):
             island_data = IslandFittingData(
                 isle_num, i, scalars, offsets, doislandflux)
             island_group.append(island_data)
-            # If the island group is full queue it for the subprocesses to fit
-            if len(island_group) >= group_size:
-                island_groups.append(island_group)
-                island_group = []
-        # The last partially-filled island group also needs
-        # to be queued for fitting
-        if len(island_group) > 0:
-            island_groups.append(island_group)
 
         # now fit all the islands
         sources = []
         with tqdm(total=isle_num, desc="Fitting Islands:") as pbar:
-            for g in island_groups:
-                for i in g:
-                    try:
-                        pbar.update(1)
-                        srcs = self._fit_island(i)
-                    except AegeanNaNModelError:
+            for i in island_group:
+                try:
+                    pbar.update(1)
+                    srcs = self._fit_island(i)
+                except AegeanNaNModelError:
+                    continue
+                # update bar as each individual island is fit
+                for src in srcs:
+                    # ignore sources that we have been told to ignore
+                    if (src.peak_flux > 0 and nopositive) or (
+                        src.peak_flux < 0 and nonegative
+                    ):
                         continue
-                    # update bar as each individual island is fit
-                    for src in srcs:
-                        # ignore sources that we have been told to ignore
-                        if (src.peak_flux > 0 and nopositive) or (
-                            src.peak_flux < 0 and nonegative
-                        ):
-                            continue
-                        sources.append(src)
+                    sources.append(src)
 
-        
         # Write the output to the output file
         if outfile:
             print(
@@ -2830,25 +2626,6 @@ def theta_limit(theta):
     while theta > np.pi / 2:
         theta -= np.pi
     return theta
-
-
-def check_cores(cores):
-    """
-    Determine how many cores we are able to use.
-
-    Parameters
-    ----------
-    cores : int
-      The number of cores that are requested.
-
-    Returns
-    -------
-    cores : int
-      The number of cores available.
-
-    """
-    cores = min(multiprocessing.cpu_count(), cores)
-    return cores
 
 
 def get_aux_files(basename):
