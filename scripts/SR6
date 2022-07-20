@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 """
-A program to provide a command line interface to the 
-AegeanTools.fits_interp module
+A program to provide a command line interface to the
+AegeanTools.fits_tools module
 """
 import argparse
 import logging
@@ -11,7 +11,7 @@ import sys
 import numpy as np
 from AegeanTools import __citation__
 from AegeanTools.BANE import get_step_size
-from AegeanTools.fits_interp import compress, expand
+from AegeanTools.fits_tools import compress, expand
 from astropy.io import fits
 
 __author__ = "Paul Hancock"
@@ -47,8 +47,10 @@ if __name__ == "__main__":
                         default=False,
                         help='Debug output')
     group2.add_argument('--version', action='version',
-                        version='%(prog)s '+__version__+"-({0})".format(__date__))
-    group2.add_argument('--cite', dest='cite', action="store_true", default=False,
+                        version='%(prog)s {0}-({1})'.format(__version__,
+                                                            __date__))
+    group2.add_argument('--cite', dest='cite', action="store_true",
+                        default=False,
                         help='Show citation information.')
 
     results = parser.parse_args()

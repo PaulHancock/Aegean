@@ -15,8 +15,9 @@ from AegeanTools import MIMAS, __citation__
 
 
 if __name__ == "__main__":
-    epilog = 'Regions are added/subtracted in the following order, +r -r +c -c +p -p. ' + \
-             'This means that you might have to take multiple passes to construct overly complicated regions.'
+    epilog = 'Regions are added/subtracted in the following order, '\
+             '+r -r +c -c +p -p. This means that you might have to take '\
+             'multiple passes to construct overly complicated regions.'
     parser = argparse.ArgumentParser(epilog=epilog, prefix_chars='+-')
 
     group1 = parser.add_argument_group(
@@ -26,70 +27,100 @@ if __name__ == "__main__":
                         help='output filename', default=None)
     group1.add_argument('-depth', dest='maxdepth', action='store',
                         metavar='N', default=8, type=int,
-                        help='maximum nside=2**N to be used to represent this region. [Default=8]')
+                        help='maximum nside=2**N to be used to represent this'
+                             ' region. [Default=8]')
     group1.add_argument('+r', dest='add_region', action='append',
                         default=[], type=str, metavar='filename', nargs='*',
-                        help='add a region specified by the given file (.mim format)')
+                        help='add a region specified by the given file '
+                             '(.mim format)')
     group1.add_argument('-r', dest='rem_region', action='append',
                         default=[], type=str, metavar='filename', nargs='*',
-                        help='exclude a region specified by the given file ( .mim format)')
+                        help='exclude a region specified by the given file '
+                             '(.mim format)')
     # add/remove circles
     group1.add_argument('+c', dest='include_circles', action='append',
-                        default=[], type=float, metavar=('ra', 'dec', 'radius'), nargs=3,
+                        default=[], type=float,
+                        metavar=('ra', 'dec', 'radius'), nargs=3,
                         help='add a circle to this region (decimal degrees)')
     group1.add_argument('-c', dest='exclude_circles', action='append',
-                        default=[], type=float, metavar=('ra', 'dec', 'radius'), nargs=3,
+                        default=[], type=float,
+                        metavar=('ra', 'dec', 'radius'), nargs=3,
                         help='exclude the given circles from a region')
 
     # add/remove polygons
     group1.add_argument('+p', dest='include_polygons', action='append',
-                        default=[], type=float, metavar=('ra', 'dec'), nargs='*',
+                        default=[], type=float,
+                        metavar=('ra', 'dec'), nargs='*',
                         help='add a polygon to this region ( decimal degrees)')
     group1.add_argument('-p', dest='exclude_polygons', action='append',
-                        default=[], type=float, metavar=('ra', 'dec'), nargs='*',
-                        help='remove a polygon from this region ( decimal degrees)')
-    group1.add_argument('-g', dest='galactic', action='store_true', default=False,
-                        help='Interpret input coordinates are galactic instead of equatorial.')
+                        default=[], type=float,
+                        metavar=('ra', 'dec'), nargs='*',
+                        help='remove a polygon from this region '
+                             '(decimal degrees)')
+    group1.add_argument('-g', dest='galactic', action='store_true',
+                        default=False,
+                        help='Interpret input coordinates are galactic '
+                             'instead of equatorial.')
 
     group2 = parser.add_argument_group("Using already created regions")
     # tools that use .mim files
-    group2.add_argument('--mim2reg', dest='mim2reg', action='append',
-                        type=str, metavar=('region.mim', 'region.reg'), nargs=2,
+    group2.add_argument('--mim2reg', dest='mim2reg', action='append', type=str,
+                        metavar=('region.mim', 'region.reg'), nargs=2,
                         help='convert region.mim into region.reg', default=[])
-    group2.add_argument('--reg2mim', dest='reg2mim', action='append',
-                        type=str, metavar=('region.reg', 'region.mim'), nargs=2,
-                        help="Converta a .reg file into a .mim file", default=[])
+    group2.add_argument('--reg2mim', dest='reg2mim', action='append', type=str,
+                        metavar=('region.reg', 'region.mim'), nargs=2,
+                        help="Convert a .reg file into a .mim file",
+                        default=[])
     group2.add_argument('--mim2fits', dest='mim2fits', action='append',
-                        type=str, metavar=('region.mim', 'region_MOC.fits'), nargs=2,
-                        help="Convert a .mim file into a MOC.fits file", default=[])
+                        type=str, metavar=('region.mim', 'region_MOC.fits'),
+                        nargs=2,
+                        help="Convert a .mim file into a MOC.fits file",
+                        default=[])
     group2.add_argument('--mask2mim', dest='mask2mim', action='store',
                         type=str, metavar=('mask.fits', 'region.mim'), nargs=2,
-                        help="Convert a masked image into a region file", default=[])
-    group2.add_argument('--intersect', '+i', dest='intersect', action='append', type=str, default=[],
-                        metavar=('region.mim',), help="Write out the intersection of the given regions.")
+                        help="Convert a masked image into a region file",
+                        default=[])
+    group2.add_argument('--intersect', '+i', dest='intersect', action='append',
+                        type=str, default=[], metavar=('region.mim',),
+                        help="Write out the intersection of the given "
+                             "regions.")
     group2.add_argument('--area', dest='area', action='store', default=None,
-                        help="Report the area of a given region", metavar=("region.mim",))
+                        help="Report the area of a given region",
+                        metavar=("region.mim",))
     group3 = parser.add_argument_group("Masking files with regions")
     group3.add_argument('--maskcat', dest='mask_cat', action='store',
-                        type=str, metavar=('region.mim', 'INCAT', 'OUTCAT'), nargs=3, default=[],
-                        help='use region.mim as a mask on INCAT, writing OUTCAT')
+                        type=str, metavar=('region.mim', 'INCAT', 'OUTCAT'),
+                        nargs=3, default=[],
+                        help='use region.mim as a mask on INCAT, '
+                             'writing OUTCAT')
     group3.add_argument('--maskimage', dest='mask_image', action='store',
-                        type=str, metavar=('region.mim', 'file.fits', 'masked.fits'), nargs=3, default=[],
-                        help='use region.mim to mask the image file.fits and write masekd.fits')
+                        type=str,
+                        metavar=('region.mim', 'file.fits', 'masked.fits'),
+                        nargs=3, default=[],
+                        help='use region.mim to mask the image file.fits '
+                             'and write masekd.fits')
     group3.add_argument('--fitsmask', dest='fits_mask', action='store',
-                        type=str, metavar=('mask.fits', 'file.fits', 'masked_file.fits'), nargs=3, default=[],
-                        help='Use a fits file as a mask for another fits file. ' +
-                             'Values of blank/nan/zero are considered to be mask=True.')
-    group3.add_argument('--negate', dest='negate', action='store_true', default=False,
-                        help='By default all masks will exclude data that are within the given region. ' +
-                             'Use --negate to exclude data that is outside of the region instead.')
+                        type=str,
+                        metavar=('mask.fits', 'file.fits', 'masked_file.fits'),
+                        nargs=3, default=[],
+                        help='Use a fits file as a mask for another fits file.'
+                             ' Values of blank/nan/zero are considered to be '
+                             'mask=True.')
+    group3.add_argument('--negate', dest='negate', action='store_true',
+                        default=False,
+                        help='By default all masks will exclude data that are '
+                             'within the given region. Use --negate to exclude'
+                             ' data that is outside of the region instead.')
     group3.add_argument('--colnames', dest='radec_colnames', action='store',
-                        type=str, metavar=('RA_name', 'DEC_name'),  nargs=2, default=('ra', 'dec'),
-                        help='The name of the columns which contain the RA/DEC data. Default=(ra,dec).')
+                        type=str, metavar=('RA_name', 'DEC_name'),
+                        nargs=2, default=('ra', 'dec'),
+                        help='The name of the columns which contain the '
+                             'RA/DEC data. Default=(ra,dec).')
 
     group4 = parser.add_argument_group('Extra options')
     # extras
-    group4.add_argument('--threshold', dest='threshold', type=float, default=1.0,
+    group4.add_argument('--threshold', dest='threshold', type=float,
+                        default=1.0,
                         help='Threshold value for input mask file.')
     group4.add_argument('--fitsimage', dest='mim2img', action='store_true',
                         default=False, help='Save the region as a fits image')
@@ -97,7 +128,8 @@ if __name__ == "__main__":
                         help='debug mode [default=False]', default=False)
     group4.add_argument('--version', action='version', version='%(prog)s ' +
                         MIMAS.__version__+"-({0})".format(MIMAS.__date__))
-    group4.add_argument('--cite', dest='cite', action="store_true", default=False,
+    group4.add_argument('--cite', dest='cite', action="store_true",
+                        default=False,
                         help='Show citation information.')
 
     results = parser.parse_args()
