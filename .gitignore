@@ -9,7 +9,8 @@ AegeanTools.egg-info
 .cache
 .eggs
 .pytest*
-.coverage*
+.coverage
+.coverage.*
 build/
 dist/
 wiki/
