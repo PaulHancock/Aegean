@@ -99,8 +99,18 @@ def test_mim2reg():
     return
 
 
-def no_test_mim2fits():
-    # TODO
+def test_mim2fits():
+    rfile = 'circle.mim'
+    fitsfile = 'circle.fits'
+    region = Region(maxdepth=8)
+    region.add_circles(np.radians(285), np.radians(-65), 1.8)
+    region.save(rfile)
+    MIMAS.mim2fits(rfile, fitsfile)
+    if not os.path.exists(fitsfile):
+        os.remove(rfile)
+        raise AssertionError("Failed to convert mim2fits")
+    os.remove(rfile)
+    os.remove(fitsfile)
     return
 
 
