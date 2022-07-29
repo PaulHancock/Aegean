@@ -3,6 +3,7 @@
 Test MIMAS.py
 """
 from AegeanTools import MIMAS
+from AegeanTools.regions import Region
 import numpy as np
 import os
 
@@ -28,13 +29,48 @@ def test_galactic2fk5():
     return
 
 
-def no_test_mask_plane():
-    # TODO
+def test_mask_plane():
+    # This is implicitly done in test_mask_file so just pass for now
     return
 
 
-def no_test_mask_file():
-    # TODO
+def test_mask_file():
+    infile = 'tests/test_files/1904-66_SIN.fits'
+    outfile = 'test_masked.fits'
+    rfile = 'circle.mim'
+    region = Region(maxdepth=8)
+    region.add_circles(np.radians(285), np.radians(-65), 1.8)
+
+    # check for failure in relevant conditions
+    try:
+        MIMAS.mask_file('nofile', 'nofile', 'nofile')
+    except AssertionError as e:
+        if not 'fits file' in e.args[0]:
+            raise AssertionError('Failed to catch file not found err (image)')
+    
+    try:
+        MIMAS.mask_file('nofile', infile,'nofile')
+    except AssertionError as e:
+        if not 'region file' in e.args[0]:
+            raise AssertionError('Faile to catch file not found err (region)')
+    
+    # make a region file and test that a masked outfile can be made
+    region.save(rfile)
+
+    MIMAS.mask_file(rfile, infile, outfile)
+    if not os.path.exists(outfile):
+        os.remove(rfile)
+        raise AssertionError("Failed to create masked file")
+    os.remove(outfile)
+
+    MIMAS.mask_file(rfile, infile, outfile, negate=True)
+    if not os.path.exists(outfile):
+        os.remove(rfile)
+        raise AssertionError("Failed to create masked file")
+
+    # cleanup
+    os.remove(rfile)
+    os.remove(outfile)
     return
 
 
