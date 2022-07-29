@@ -84,8 +84,18 @@ def no_test_mask_catalog():
     return
 
 
-def no_test_mim2reg():
-    # TODO
+def test_mim2reg():
+    rfile = 'circle.mim'
+    regfile = 'circle.reg'
+    region = Region(maxdepth=8)
+    region.add_circles(np.radians(285), np.radians(-65), 1.8)
+    region.save(rfile)
+    MIMAS.mim2reg(rfile, regfile)
+    if not os.path.exists(regfile):
+        os.remove(rfile)
+        raise AssertionError("Failed to convert mim2reg")
+    os.remove(rfile)
+    os.remove(regfile)
     return
 
 
