@@ -497,7 +497,7 @@ class Region(object):
         Parameters
         ----------
         sky : numpy.array
-            Sky coordinates as an array of (ra,dec)
+            Sky coordinates as an array of (ra,dec) in radians
 
         Returns
         -------
@@ -523,7 +523,9 @@ class Region(object):
         vec : numpy.array
             Unit vectors as an array of (x,y,z)
 
-        degrees
+        degrees : bool
+            If true then return values in degrees.
+            Default [False] returns values in radians.
 
         Returns
         -------
