@@ -208,14 +208,40 @@ def no_test_combine_regions():
     return
 
 
-def no_test_intersect_regions():
-    # TODO
+def test_intersect_regions():
+    file1 = 'dlme1.mim'
+    file2 = 'dlme2.mim'
+
+    try:
+        MIMAS.intersect_regions([None])
+    except Exception as e:
+        if "Require" not in e.args[0]:
+            raise AssertionError("intersect_regions failed")
+
+    r1 = Region(maxdepth=3)
+    r1.add_circles(np.radians(285), np.radians(-65), 1.8)
+    r1.save(file1)
+    r1.save(file2)
+
+    a = MIMAS.intersect_regions( [file1, file2] )
+    os.remove(file1)
+    os.remove(file2)
+    if not a:
+        raise AssertionError("intersect_regions failed")
+
     return
 
 
-def no_test_save_region():
-    # TODO
+def test_save_region():
+    rfile = 'circle.mim'
+    region = Region(maxdepth=3)
+    region.add_circles(np.radians(285), np.radians(-65), 1.8)
+    MIMAS.save_region(region,rfile)
+    if not os.path.exists(rfile):
+        raise AssertionError("save_region failed")
+    os.remove(rfile)
     return
+
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
