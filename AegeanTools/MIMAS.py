@@ -181,7 +181,7 @@ def mask_file(regionfile, infile, outfile, negate=False):
     else:
         data = im[0].data
 
-    print(data.shape)
+    # print(data.shape)
     if len(data.shape) == 3:
         for plane in range(data.shape[0]):
             mask_plane(data[plane], wcs, region, negate)
@@ -551,8 +551,9 @@ def combine_regions(container):
 
     # remove polygons
     if len(container.exclude_polygons) > 0:
-        for p in container.include_polygons:
+        for p in container.exclude_polygons:
             poly = np.array(np.radians(p))
+            poly = poly.reshape((poly.shape[0]//2, 2))
             r2 = Region(container.maxdepth)
             r2.add_poly(poly)
             region.without(r2)
@@ -597,26 +598,4 @@ def save_region(region, filename):
     """
     region.save(filename)
     logging.info("Wrote {0}".format(filename))
-    return
-
-
-def save_as_image(region, filename):
-    """
-    Convert a MIMAS region (.mim) file into a image (eg .png)
-
-    Parameters
-    ----------
-    region : :class:`AegeanTools.regions.Region`
-        Region of interest.
-
-    filename : str
-        Output filename.
-    """
-    import healpy as hp
-    pixels = list(region.get_demoted())
-    order = region.maxdepth
-    m = np.arange(hp.nside2npix(2**order))
-    m[:] = 0
-    m[pixels] = 1
-    hp.write_map(filename, m, nest=True, coord='C')
     return
