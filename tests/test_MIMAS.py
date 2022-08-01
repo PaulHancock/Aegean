@@ -217,12 +217,6 @@ def no_test_save_region():
     # TODO
     return
 
-
-def no_test_save_as_image():
-    # TODO
-    return
-
-
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():

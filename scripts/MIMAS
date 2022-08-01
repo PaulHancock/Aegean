@@ -122,8 +122,6 @@ if __name__ == "__main__":
     group4.add_argument('--threshold', dest='threshold', type=float,
                         default=1.0,
                         help='Threshold value for input mask file.')
-    group4.add_argument('--fitsimage', dest='mim2img', action='store_true',
-                        default=False, help='Save the region as a fits image')
     group4.add_argument('--debug', dest='debug', action='store_true',
                         help='debug mode [default=False]', default=False)
     group4.add_argument('--version', action='version', version='%(prog)s ' +
@@ -205,11 +203,6 @@ if __name__ == "__main__":
                        mimfile=mimfile,
                        threshold=results.threshold,
                        maxdepth=results.maxdepth)
-        sys.exit()
-
-    if results.mim2img:
-        region = MIMAS.combine_regions(results)
-        MIMAS.save_as_image(region, results.outfile)
         sys.exit()
 
     if results.outfile is not None:
