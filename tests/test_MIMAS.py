@@ -4,6 +4,7 @@ Test MIMAS.py
 """
 from AegeanTools import MIMAS
 from AegeanTools.regions import Region
+from astropy.table import Table
 import numpy as np
 import os
 
@@ -74,20 +75,45 @@ def test_mask_file():
     return
 
 
-def no_test_mask_table():
-    # TODO
+def test_mask_table():
+    region = Region(maxdepth=8)
+    region.add_circles(np.radians(285), np.radians(0), np.radians(2.1))
+    ra = np.linspace(280,290, 11)
+    dec = np.zeros(11)
+    tab = Table(data=[ra,dec], names=('ra','dec'))
+    masked = MIMAS.mask_table(region, tab)
+    if len(masked) != 6:
+        print(len(masked))
+        raise AssertionError("failed to mask table correctly")
+    
+    masked = MIMAS.mask_table(region, tab, negate=True)
+    if len(masked) != 5:
+        raise AssertionError("failed to mask table correctly")
     return
 
 
-def no_test_mask_catalog():
-    # TODO
+def test_mask_catalog():
+    infile = 'tests/test_files/1904_comp.fits'
+    regionfile = 'tests/test_files/1904-66_SIN.mim'
+    outfile='dlme.fits'
+
+    MIMAS.mask_catalog(regionfile, infile, outfile)
+    if not os.path.exists(outfile):
+        raise AssertionError("failed to mask catalogue")
+    os.remove(outfile)
+
+    MIMAS.mask_catalog(regionfile,infile,outfile, negate=True)
+    if not os.path.exists(outfile):
+        raise AssertionError("failed to mask catalogue")
+    os.remove(outfile)
+
     return
 
 
 def test_mim2reg():
     rfile = 'circle.mim'
     regfile = 'circle.reg'
-    region = Region(maxdepth=8)
+    region = Region(maxdepth=4)
     region.add_circles(np.radians(285), np.radians(-65), 1.8)
     region.save(rfile)
     MIMAS.mim2reg(rfile, regfile)
@@ -138,23 +164,42 @@ def test_mask2mim():
     return
 
 
-def no_test_box2poly():
-    # TODO
+def test_box2poly():
+    box = 'box(290.3305929,-61.97230589,12720.000",10080.000",75.15517)'
+    b = MIMAS.box2poly(box)
+    if len(b) != 8:
+        raise AssertionError("box2poly failed")
     return
 
 
-def no_test_circle2circle():
-    # TODO
+def test_circle2circle():
+    circle = 'circle(19:56:03.7988,-69:00:43.304,5755.555")'
+    c = MIMAS.circle2circle(circle)
+    if len(c) != 3:
+        raise AssertionError("circle2circle failed")
+
+    circle = 'circle(203.7988,-47,360")'
+    c = MIMAS.circle2circle(circle)
+    if len(c) != 3:
+        raise AssertionError("circle2circle failed")
     return
 
 
-def no_test_poly2poly():
-    # TODO
+def test_poly2poly():
+    poly = "polygon(,,293.09,-71:13:55.511,19:28:20.4283,-69:05:34.569,19:20:41.1627,-69:00:08.332,19:10:57.4154,-70:03:28.840,18:43:29.5694,-67:46:43.665,19:03:21.1495,-72:00:50.438)"
+    r = MIMAS.poly2poly(poly)
+    if len(r) != 12:
+        raise AssertionError("poly2poly failed")
     return
 
 
-def no_test_reg2mim():
-    # TODO
+def test_reg2mim():
+    reg = 'tests/test_files/ds9.reg'
+    outfile='dlme.mim'
+    MIMAS.reg2mim(reg, outfile, maxdepth=4)
+    if not os.path.exists(outfile):
+        raise AssertionError("reg2mim failed")
+    os.remove(outfile)
     return
 
 
