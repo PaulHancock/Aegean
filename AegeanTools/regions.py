@@ -84,7 +84,7 @@ class Region(object):
         ----------
         ra_cen, dec_cen, radius : float or list
             The center and radius of the circle or circles to add to this
-            region.
+            region. Units = radians.
 
         depth : int
             The depth at which the given circles will be inserted.
