@@ -203,8 +203,34 @@ def test_reg2mim():
     return
 
 
-def no_test_combine_regions():
-    # TODO
+def test_combine_regions():
+    file1 = 'dlme1.mim'
+    file2 = 'dlme2.mim'
+    r1 = Region(maxdepth=3)
+    r1.add_circles(np.radians(285), np.radians(-65), 1.8)
+    r1.save(file1)
+    r1.save(file2)
+
+    class O(object):
+        pass
+ 
+    c = O()
+    c.maxdepth = 3
+    c.add_region = [[file1]]
+    c.rem_region = [[file2]]
+    c.include_circles = [[12, -13 ,1]]
+    c.exclude_circles = [[10, 12, 3]]
+    c.include_polygons = [[0.0, 0.0, 1.0, 0.0, 1.0, -1.0, 0.0, -1.0] ]
+    c.exclude_polygons = [[0,0, 0,1, 1,1, 1,0 ] ]
+
+    c.galactic = False
+    r = MIMAS.combine_regions(c)
+
+    c.galactic = True
+    r = MIMAS.combine_regions(c)
+
+    os.remove(file1)
+    os.remove(file2)
     return
 
 
