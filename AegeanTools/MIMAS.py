@@ -551,8 +551,9 @@ def combine_regions(container):
 
     # remove polygons
     if len(container.exclude_polygons) > 0:
-        for p in container.include_polygons:
+        for p in container.exclude_polygons:
             poly = np.array(np.radians(p))
+            poly = poly.reshape((poly.shape[0]//2, 2))
             r2 = Region(container.maxdepth)
             r2.add_poly(poly)
             region.without(r2)
