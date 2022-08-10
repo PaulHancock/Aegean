@@ -53,12 +53,12 @@ def main(argv=()):
 
     options = parser.parse_args(args=argv)
 
-    if options.image is None:
-        parser.print_help()
-        return 0
-
     if options.cite:
         print(__citation__)
+        return 0
+
+    if options.image is None:
+        parser.print_help()
         return 0
 
     # Get the BANE logger.
