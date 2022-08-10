@@ -10,8 +10,7 @@ from AegeanTools import BANE, __citation__
 __author__ = 'Paul Hancock'
 
 
-# command line version of this program runs from here.
-if __name__ == "__main__":
+def main(argv=()):
     parser = argparse.ArgumentParser(prog='BANE', prefix_chars='-')
     parser.add_argument('image', nargs='?', default=None)
     group1 = parser.add_argument_group('Configuration Options')
@@ -52,15 +51,15 @@ if __name__ == "__main__":
     parser.set_defaults(out_base=None, step_size=None, box_size=None,
                         twopass=True, cores=None, usescipy=False, debug=False)
 
-    options = parser.parse_args()
+    options = parser.parse_args(args=argv)
 
     if options.image is None:
         parser.print_help()
-        sys.exit()
+        return 0
 
     if options.cite:
         print(__citation__)
-        sys.exit(0)
+        return 0
 
     # Get the BANE logger.
     logging = BANE.logging
@@ -72,7 +71,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(options.image):
         logging.error("File not found: {0} ".format(options.image))
-        sys.exit(1)
+        return 1
 
     if options.out_base is None:
         options.out_base = os.path.splitext(options.image)[0]
@@ -84,11 +83,12 @@ if __name__ == "__main__":
             logging.error("{0} and {1} exist and you said noclobber"
                           "".format(bkgout, rmsout))
             logging.error("Not running")
-            sys.exit(1)
+            return 1
 
     BANE.filter_image(im_name=options.image, out_base=options.out_base,
-                    step_size=options.step_size,
-                    box_size=options.box_size, cores=options.cores,
-                    mask=options.mask, compressed=options.compress, 
-                    nslice=options.stripes,
-                    cube_index=options.cube_index)
+                      step_size=options.step_size,
+                      box_size=options.box_size, cores=options.cores,
+                      mask=options.mask, compressed=options.compress,
+                      nslice=options.stripes,
+                      cube_index=options.cube_index)
+    return 0
