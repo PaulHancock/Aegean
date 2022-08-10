@@ -299,10 +299,6 @@ def main(argv=()):
     # create a beam object from user input
     if options.beam is not None:
         beam = options.beam
-        if len(beam) != 3:
-            beam = beam.split()
-            print(("Beam requires 3 args. You supplied '{0}'".format(beam)))
-            sys.exit(1)
         options.beam = Beam(beam[0], beam[1], beam[2])
         log.info("Using user supplied beam parameters")
         log.info("Beam is {0} deg x {1} deg with pa {2}".format(
@@ -403,7 +399,7 @@ def main(argv=()):
         if options.ratio is not None:
             if options.ratio <= 0:
                 log.error("ratio must be positive definite")
-                sys.exit(1)
+                return 1
             if options.ratio < 1:
                 log.error("ratio <1 is not advised. Have fun!")
         if options.input is None:
