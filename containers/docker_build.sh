@@ -14,4 +14,4 @@ fi
 echo "Building with branch/checkout: ${version}"
 # build the container and update tag
 docker build --build-arg gitargs="@${version}" . -f Dockerfile -t "paulhancock/aegean:${version}" && \
-echo "Run\nDocker push paulhancock/aegean:${version}"
+echo "Run: docker push paulhancock/aegean:${version}"
