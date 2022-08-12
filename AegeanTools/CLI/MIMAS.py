@@ -130,11 +130,6 @@ def main(argv=()):
         print(__citation__)
         return 0
 
-    # TODO: see if there is an 'argparse' way of detecting no input
-    if len(sys.argv) <= 1:
-        parser.print_help()
-        return 0
-
     # get the MIMAS logger
     logging = MIMAS.logging
     logging_level = logging.DEBUG if results.debug else logging.INFO
@@ -163,7 +158,7 @@ def main(argv=()):
         return 0
 
     if results.area is not None:
-        region = MIMAS.cPickle.load(open(results.area))
+        region = MIMAS.Region.load(results.area)
         print("{0} represents an area of {1} deg^2".format(
             results.area, region.get_area()))
         return 0
