@@ -1,8 +1,4 @@
 #! /usr/bin/env python
-"""
-A program to provide a command line interface to the
-AegeanTools.fits_tools module
-"""
 import argparse
 import logging
 import os
@@ -18,8 +14,13 @@ __author__ = "Paul Hancock"
 __version__ = 'v1.2'
 __date__ = '2022-07-15'
 
+
 # command line version of this program runs from here.
-if __name__ == "__main__":
+def main(argv=()):
+    """
+    A program to provide a command line interface to the
+    AegeanTools.fits_tools module
+    """
 
     epilog = ''
     parser = argparse.ArgumentParser(epilog=epilog, prefix_chars='-')
@@ -53,15 +54,15 @@ if __name__ == "__main__":
                         default=False,
                         help='Show citation information.')
 
-    results = parser.parse_args()
+    results = parser.parse_args(args=argv)
     # print help if the user enters no options or filename
     if len(sys.argv) <= 1:
         parser.print_help()
-        sys.exit(0)
+        return 0
 
     if results.cite:
         print(__citation__)
-        sys.exit(0)
+        return 0
 
     logging_level = logging.DEBUG if results.debug else logging.INFO
     logging.basicConfig(level=logging_level,
@@ -70,7 +71,7 @@ if __name__ == "__main__":
 
     if not os.path.exists(results.infile):
         logging.error("{0} does not exist".format(results.infile))
-        sys.exit(1)
+        return 1
 
     if results.mode is not None:
         logging.warning(

@@ -1,11 +1,7 @@
 #! /usr/bin/env python
-"""
- Tool for making residual images with Aegean tables as input
-"""
 
 import argparse
 import logging
-import sys
 
 from AegeanTools.AeRes import make_residual
 
@@ -17,12 +13,17 @@ __date__ = '2020-07-30'
 # global constants
 
 
-if __name__ == "__main__":
+def main(argv=()):
+    """
+    Tool for making residual images with Aegean tables as input
+    """
+
     parser = argparse.ArgumentParser(prog='AeRes', prefix_chars='-')
     group1 = parser.add_argument_group("I/O arguments")
     group1.add_argument("-c", "--catalog", dest='catalog', default=None,
-                        help="Catalog in a format that Aegean understands." +
-                        "\nRA/DEC should be in degrees, a/b/pa should be in arcsec/arcsec/degrees.")
+                        help="Catalog in a format that Aegean understands."
+                             "\nRA/DEC should be in degrees, a/b/pa should be "
+                             "in arcsec/arcsec/degrees.")
     group1.add_argument("-f", "--fitsimage", dest='fitsfile', default=None,
                         help="Input fits file.")
     group1.add_argument("-r", "--residual", dest='rfile', default=None,
@@ -31,14 +32,18 @@ if __name__ == "__main__":
                         help="Output model file [optional].")
 
     group2 = parser.add_argument_group("Config options")
-    group2.add_argument('--add', dest='add', default=False, action='store_true',
+    group2.add_argument('--add', dest='add', default=False,
+                        action='store_true',
                         help="Add components instead of subtracting them.")
-    group2.add_argument('--mask', dest='mask', default=False, action='store_true',
+    group2.add_argument('--mask', dest='mask', default=False,
+                        action='store_true',
                         help="Instead of subtracting sources, just mask them")
     group2.add_argument('--sigma', dest='sigma', default=4, type=float,
-                        help='If masking, pixels above this SNR are masked (requires input catalogue to list rms)')
+                        help='If masking, pixels above this SNR are masked'
+                             '(requires input catalogue to list rms)')
     group2.add_argument('--frac', dest='frac', default=0, type=float,
-                        help='If masking, pixels above frac*peak_flux are masked for each source')
+                        help='If masking, pixels above frac*peak_flux are'
+                             ' masked for each source')
 
     group3 = parser.add_argument_group("Catalogue options")
     group3.add_argument('--racol', dest='ra_col', default='ra',
@@ -55,10 +60,10 @@ if __name__ == "__main__":
                         help="Position angle column name")
 
     group4 = parser.add_argument_group("Extra options")
-    group4.add_argument('--debug', dest='debug', action='store_true', default=False,
-                        help="Debug mode.")
+    group4.add_argument('--debug', dest='debug', action='store_true',
+                        default=False, help="Debug mode.")
 
-    options = parser.parse_args()
+    options = parser.parse_args(args=argv)
 
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logging.basicConfig(level=logging_level,
@@ -68,15 +73,15 @@ if __name__ == "__main__":
     if options.catalog is None:
         logging.error("input catalog is required")
         parser.print_help()
-        sys.exit(1)
+        return 1
     if options.fitsfile is None:
         logging.error("input fits file is required")
         parser.print_help()
-        sys.exit(1)
+        return 1
     if options.rfile is None:
         logging.error("output residual filename is required")
         parser.print_help()
-        sys.exit(1)
+        return 1
     # convert default value of 0 to be None.
     if options.frac <= 0:
         options.frac = None
@@ -94,6 +99,7 @@ if __name__ == "__main__":
               'pa_col': options.pa_col}
 
     make_residual(options.fitsfile, options.catalog, options.rfile,
-                  mfile=options.mfile, add=options.add, mask=options.mask, frac=options.frac, sigma=options.sigma,
+                  mfile=options.mfile, add=options.add, mask=options.mask,
+                  frac=options.frac, sigma=options.sigma,
                   colmap=colmap)
-    sys.exit(0)
+    return 0

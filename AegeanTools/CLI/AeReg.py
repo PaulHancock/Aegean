@@ -1,7 +1,4 @@
 #! /usr/bin/env python
-"""
-A regrouping tool to accompany the Aegean source finding program.
-"""
 
 import argparse
 import logging
@@ -20,7 +17,11 @@ __date__ = '2021-09-09'
 __version__ = '0.9'
 
 
-if __name__ == "__main__":
+def main(argv=()):
+    """
+    A regrouping tool to accompany the Aegean source finding program.
+    """
+
     parser = argparse.ArgumentParser(prog='regroup', prefix_chars='-')
     group1 = parser.add_argument_group("Required")
     group1.add_argument('--input', dest='input', type=str, default=None,
@@ -48,11 +49,11 @@ if __name__ == "__main__":
     group4.add_argument('--debug', dest='debug', action='store_true',
                         default=False, help="Debug mode.")
 
-    options = parser.parse_args()
+    options = parser.parse_args(args=argv)
 
     if options.input is None:
         parser.print_usage()
-        sys.exit()
+        return 0
 
     invocation_string = " ".join(sys.argv[:])
 
@@ -68,7 +69,7 @@ if __name__ == "__main__":
     filename = options.input
     if not os.path.exists(filename):
         log.error("{0} not found".format(filename))
-        sys.exit(1)
+        return 1
 
     input_table = load_table(options.input)
     input_sources = np.array(table_to_source_list(input_table))
@@ -94,7 +95,7 @@ if __name__ == "__main__":
     if options.regroup:
         if not check_attributes_for_regroup(sources):
             log.error("Cannot use catalog")
-            sys.exit(1)
+            return 1
         log.debug("Regrouping with eps={0}[arcmin]".format(options.eps))
         eps = np.sin(np.radians(options.eps/60))
         sources = regroup_dbscan(sources, eps=eps)
@@ -110,4 +111,4 @@ if __name__ == "__main__":
         for t in options.tables.split(','):
             log.debug("writing {0}".format(t))
             save_catalog(t, sources, meta=meta)
-    sys.exit()
+    return 0

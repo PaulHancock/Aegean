@@ -3,7 +3,6 @@
 # standard imports
 import argparse
 import os
-import sys
 
 from AegeanTools import BANE, __citation__
 

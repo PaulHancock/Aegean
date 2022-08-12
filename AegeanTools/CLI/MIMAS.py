@@ -1,20 +1,14 @@
 #! /usr/bin/env python
-"""
-MIMAS - The Multi-resolution Image Mask for Aegean Software
-
-Created: Paul Hancock, Oct 2014
-
-TODO: Write an in/out reader for MOC formats described by
-http://arxiv.org/abs/1505.02937
-
-"""
 
 import argparse
 import sys
 from AegeanTools import MIMAS, __citation__
 
 
-if __name__ == "__main__":
+def main(argv=()):
+    """
+    MIMAS - The Multi-resolution Image Mask for Aegean Software
+    """
     epilog = 'Regions are added/subtracted in the following order, '\
              '+r -r +c -c +p -p. This means that you might have to take '\
              'multiple passes to construct overly complicated regions.'
@@ -130,16 +124,16 @@ if __name__ == "__main__":
                         default=False,
                         help='Show citation information.')
 
-    results = parser.parse_args()
+    results = parser.parse_args(args=argv)
 
     if results.cite:
         print(__citation__)
-        sys.exit(0)
+        return 0
 
     # TODO: see if there is an 'argparse' way of detecting no input
     if len(sys.argv) <= 1:
         parser.print_help()
-        sys.exit()
+        return 0
 
     # get the MIMAS logger
     logging = MIMAS.logging
@@ -151,51 +145,51 @@ if __name__ == "__main__":
 
     if len(results.fits_mask) > 0:
         logging.info("The --fitsmask option is not yet implemented.")
-        sys.exit(1)
+        return 1
 
     if len(results.mim2reg) > 0:
         for i, o in results.mim2reg:
             MIMAS.mim2reg(i, o)
-        sys.exit()
+        return 0
 
     if len(results.reg2mim) > 0:
         for i, o in results.reg2mim:
             MIMAS.reg2mim(i, o, results.maxdepth)
-        sys.exit()
+        return 0
 
     if len(results.mim2fits) > 0:
         for i, o in results.mim2fits:
             MIMAS.mim2fits(i, o)
-        sys.exit()
+        return 0
 
     if results.area is not None:
         region = MIMAS.cPickle.load(open(results.area))
         print("{0} represents an area of {1} deg^2".format(
             results.area, region.get_area()))
-        sys.exit()
+        return 0
 
     if len(results.intersect) > 0:
         if len(results.intersect) == 1:
             print("intersections requires at least two regions")
-            sys.exit(1)
+            return 1
         elif results.outfile is None:
             print("outfile is required")
-            sys.exit(1)
+            return 1
         else:
             region = MIMAS.intersect_regions(results.intersect)
             MIMAS.save_region(region, results.outfile)
-        sys.exit()
+        return 0
 
     if len(results.mask_image) > 0:
         m, i, o = results.mask_image
         MIMAS.mask_file(m, i, o, results.negate)
-        sys.exit()
+        return 0
 
     if len(results.mask_cat) > 0:
         m, i, o = results.mask_cat
         racol, deccol = results.radec_colnames
         MIMAS.mask_catalog(m, i, o, results.negate, racol, deccol)
-        sys.exit()
+        return 0
 
     if len(results.mask2mim) > 0:
         maskfile, mimfile = results.mask2mim
@@ -203,7 +197,7 @@ if __name__ == "__main__":
                        mimfile=mimfile,
                        threshold=results.threshold,
                        maxdepth=results.maxdepth)
-        sys.exit()
+        return 0
 
     if results.outfile is not None:
         region = MIMAS.combine_regions(results)
