@@ -38,8 +38,6 @@ def main(argv=()):
     group1.add_argument('-x', dest='expand', action='store_true',
                         default=False,
                         help='Operation is expand instead of compress.')
-    group1.add_argument('-i', dest='mode', default=None,
-                        help='Deprecated')
     group1.add_argument('-m', dest='maskfile', action='store',
                         default=None, type=str, metavar='MaskFile',
                         help="File to use for masking pixels.")
@@ -56,7 +54,7 @@ def main(argv=()):
 
     results = parser.parse_args(args=argv)
     # print help if the user enters no options or filename
-    if len(sys.argv) <= 1:
+    if len(argv) == 0:
         parser.print_help()
         return 0
 
@@ -73,17 +71,13 @@ def main(argv=()):
         logging.error("{0} does not exist".format(results.infile))
         return 1
 
-    if results.mode is not None:
-        logging.warning(
-            "option -i MODE is deprecated. Interpolation is always linear.")
-
     if results.expand:
         if results.maskfile and os.path.exists(results.maskfile):
             maskdata = fits.open(results.maskfile)[0].data
             mask = np.where(np.isnan(maskdata))
             hdulist = expand(results.infile)
             hdulist[0].data[mask] = np.nan
-            hdulist.writeto(results.outfile, clobber=True)
+            hdulist.writeto(results.outfile, overwrite=True)
             logging.info("Wrote masked file: {0}".format(results.outfile))
         elif results.maskfile is None:
             expand(results.infile, results.outfile)
