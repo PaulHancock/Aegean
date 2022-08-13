@@ -51,11 +51,7 @@ def main(argv=()):
 
     options = parser.parse_args(args=argv)
 
-    if options.input is None:
-        parser.print_usage()
-        return 0
-
-    invocation_string = " ".join(sys.argv[:])
+    invocation_string = " ".join(argv)
 
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
