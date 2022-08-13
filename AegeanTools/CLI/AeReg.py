@@ -3,7 +3,6 @@
 import argparse
 import logging
 import os
-import sys
 
 import numpy as np
 from AegeanTools import wcs_helpers
@@ -24,9 +23,9 @@ def main(argv=()):
 
     parser = argparse.ArgumentParser(prog='regroup', prefix_chars='-')
     group1 = parser.add_argument_group("Required")
-    group1.add_argument('--input', dest='input', type=str, default=None,
+    group1.add_argument('--input', dest='input', type=str,
                         required=True, help='The input catalogue.')
-    group1.add_argument("--table", dest='tables', default=None, type=str,
+    group1.add_argument("--table", dest='tables', type=str,
                         required=True,
                         help="Table outputs, format inferred from extension.")
 
@@ -94,7 +93,8 @@ def main(argv=()):
             return 1
         log.debug("Regrouping with eps={0}[arcmin]".format(options.eps))
         eps = np.sin(np.radians(options.eps/60))
-        sources = regroup_dbscan(sources, eps=eps)
+        groups = regroup_dbscan(sources, eps=eps)
+        sources = [source for group in groups for source in group]
         log.debug("{0} sources regrouped".format(len(sources)))
     else:
         log.debug("Not regrouping")
