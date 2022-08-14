@@ -4,18 +4,17 @@
 This module contains all of the BANE specific code
 The function filter_image should be imported from elsewhere and run as is.
 """
-# standard imports
-from astropy.io import fits
 import copy
 import logging
 import multiprocessing
-from multiprocessing import Barrier
-from multiprocessing.shared_memory import SharedMemory
-import numpy as np
 import os
-from scipy.interpolate import RegularGridInterpolator
 import sys
+from multiprocessing.shared_memory import SharedMemory
 from time import gmtime, strftime
+
+import numpy as np
+from astropy.io import fits
+from scipy.interpolate import RegularGridInterpolator
 
 # Aegean tools
 from .fits_interp import compress
@@ -24,11 +23,17 @@ __author__ = 'Paul Hancock'
 __version__ = 'v1.9.5'
 __date__ = '2021-11-30'
 
-# global variables for multiprocessing
-# ibkg = irms = None
-# bkg_events = []
-# mask_events = []
+# global barrier for multiprocessing
 barrier = None
+
+
+def init(b):
+    """
+    Set the global barrier
+    """
+    global barrier
+    barrier = b
+
 
 def sigmaclip(arr, lo, hi, reps=10):
     """
@@ -112,7 +117,8 @@ def _sf2(args):
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
-def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_index):
+def sigma_filter(filename, region, step_size, box_size, shape, domask,
+                 cube_index):
     """
     Calculate the background and rms for a sub region of an image. The results are
     written to shared memory - irms and ibkg.
@@ -185,7 +191,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
     # force float64 for consistency
     data = data.astype(np.float64)
 
-    row_len = shape[1]
+    # row_len = shape[1]
 
     logging.debug('data size is {0}'.format(data.shape))
     logging.debug('data format is {0}'.format(data.dtype))
@@ -347,8 +353,6 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
     logging.debug("ymins {0}".format(ymins))
     logging.debug("ymaxs {0}".format(ymaxs))
 
-    global barrier
-    barrier = Barrier(parties=len(ymaxs))
     args = []
     for i, region in enumerate(zip(ymins, ymaxs)):
         args.append((filename, region, step_size, box_size,
@@ -360,10 +364,18 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
         ibkg = SharedMemory(name='ibkg', create=True, size=nbytes)
         irms = SharedMemory(name='irms', create=True, size=nbytes)
 
-        # start a new process for each task, hopefully to reduce residual memory use
-        pool = multiprocessing.Pool(processes=cores, maxtasksperchild=1)
+        # start a new process for each task, hopefully to reduce residual
+        # memory use
+        method = 'spawn'
+        if sys.platform.startswith('linux'):
+            method = 'fork'
+        ctx = multiprocessing.get_context(method)
+        barrier = ctx.Barrier(parties=len(ymaxs))
+        pool = ctx.Pool(processes=cores, maxtasksperchild=1,
+                        initializer=init, initargs=(barrier,))
         try:
-            # chunksize=1 ensures that we only send a single task to each process
+            # chunksize=1 ensures that we only send a single task to each
+            # process
             pool.map_async(_sf2, args, chunksize=1).get(timeout=10000000)
         except KeyboardInterrupt:
             logging.error("Caught keyboard interrupt")
