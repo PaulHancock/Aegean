@@ -151,10 +151,6 @@ def save_catalog(filename, catalog, meta=None, prefix=None):
         :class:`AegeanTools.models.SimpleSource`, or
         :class:`AegeanTools.models.IslandSource`.
 
-    prefix : str
-        Prepend each column name with "prefix_". Default is to prepend
-        nothing.
-
     meta : dict
         Meta data to be written to the output file. Support for metadata
         depends on file type.
@@ -362,10 +358,6 @@ def write_catalog(filename, catalog, fmt=None, meta=None, prefix=None):
 
     fmt : str
         The file format extension.
-
-    prefix : str
-        Prepend each column name with "prefix_". Default is to prepend
-        nothing.
 
     meta : dict
         A dictionary to be used as metadata for some file types (fits,
