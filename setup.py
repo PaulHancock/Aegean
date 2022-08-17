@@ -23,7 +23,6 @@ def get_version():
 
 
 reqs = ['scipy>=0.16',
-        'six>=1.11',
         'tqdm>=4',
         'numpy>=1.16',
         'astropy>=2.0',

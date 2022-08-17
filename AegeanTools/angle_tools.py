@@ -83,7 +83,7 @@ def dec2dms(x):
     x = abs(x)
     d = int(math.floor(x))
     m = int(math.floor((x - d) * 60))
-    s = float(( (x - d) * 60 - m) * 60)
+    s = float(((x - d) * 60 - m) * 60)
     return '{0}{1:02d}:{2:02d}:{3:05.2f}'.format(sign, d, m, s)
 
 
@@ -115,19 +115,19 @@ def dec2hms(x):
     return '{0:02d}:{1:02d}:{2:05.2f}'.format(h, m, s)
 
 
-# The following functions are explained at http://www.movable-type.co.uk/scripts/latlong.html
-# phi ~ lat ~ Dec
-# lambda ~ lon ~ RA
+# The following functions are explained at
+# http://www.movable-type.co.uk/scripts/latlong.html phi ~ lat ~ Dec lambda ~
+# lon ~ RA
 def gcd(ra1, dec1, ra2, dec2):
     """
-    Calculate the great circle distance between to points using the haversine formula [1]_.
+    Calculate the great circle distance between to points using the haversine
+    formula [1]_.
 
 
     Parameters
     ----------
     ra1, dec1, ra2, dec2 : float
-        The coordinates of the two points of interest.
-        Units are in degrees.
+        The coordinates of the two points of interest. Units are in degrees.
 
     Returns
     -------
@@ -136,23 +136,29 @@ def gcd(ra1, dec1, ra2, dec2):
 
     Notes
     -----
-    This duplicates the functionality of astropy but is faster as there is no creation of SkyCoords objects.
+    This duplicates the functionality of astropy but is faster as there is no
+    creation of SkyCoords objects.
 
-    .. [1] `Haversine formula <https://en.wikipedia.org/wiki/Haversine_formula>`_
+    .. [1] `Haversine formula
+        <https://en.wikipedia.org/wiki/Haversine_formula>`_
     """
-    # TODO:  Vincenty formula see - https://en.wikipedia.org/wiki/Great-circle_distance
+    # TODO:  Vincenty formula see -
+    # https://en.wikipedia.org/wiki/Great-circle_distance
     dlon = ra2 - ra1
     dlat = dec2 - dec1
     a = np.sin(np.radians(dlat) / 2) ** 2
-    a += np.cos(np.radians(dec1)) * np.cos(np.radians(dec2)) * np.sin(np.radians(dlon) / 2) ** 2
+    a += np.cos(np.radians(dec1)) \
+        * np.cos(np.radians(dec2)) \
+        * np.sin(np.radians(dlon) / 2) ** 2
     sep = np.degrees(2 * np.arcsin(np.minimum(1, np.sqrt(a))))
     return sep
 
 
 def bear(ra1, dec1, ra2, dec2):
     """
-    Calculate the bearing of point 2 from point 1 along a great circle.
-    The bearing is East of North and is in [0, 360), whereas position angle is also East of North but (-180,180]
+    Calculate the bearing of point 2 from point 1 along a great circle. The
+    bearing is East of North and is in [0, 360), whereas position angle is also
+    East of North but (-180,180]
 
     Parameters
     ----------
@@ -175,7 +181,8 @@ def bear(ra1, dec1, ra2, dec2):
 
 def translate(ra, dec, r, theta):
     """
-    Translate a given point a distance r in the (initial) direction theta, along a  great circle.
+    Translate a given point a distance r in the (initial) direction theta,
+    along a  great circle.
 
 
     Parameters
@@ -191,11 +198,15 @@ def translate(ra, dec, r, theta):
         The translated position (degrees).
     """
     factor = np.sin(np.radians(dec)) * np.cos(np.radians(r))
-    factor += np.cos(np.radians(dec)) * np.sin(np.radians(r)) * np.cos(np.radians(theta))
+    factor += np.cos(np.radians(dec)) \
+            * np.sin(np.radians(r)) \
+            * np.cos(np.radians(theta))
     dec_out = np.degrees(np.arcsin(factor))
 
-    y = np.sin(np.radians(theta)) * np.sin(np.radians(r)) * np.cos(np.radians(dec))
-    x = np.cos(np.radians(r)) - np.sin(np.radians(dec)) * np.sin(np.radians(dec_out))
+    y = np.sin(np.radians(theta)) * np.sin(np.radians(r)) \
+        * np.cos(np.radians(dec))
+    x = np.cos(np.radians(r)) - np.sin(np.radians(dec)) \
+        * np.sin(np.radians(dec_out))
     ra_out = ra + np.degrees(np.arctan2(y, x))
     return ra_out, dec_out
 
@@ -239,8 +250,9 @@ def dist_rhumb(ra1, dec1, ra2, dec2):
 
 def bear_rhumb(ra1, dec1, ra2, dec2):
     """
-    Calculate the bearing of point 2 from point 1 along a Rhumb line.
-    The bearing is East of North and is in [0, 360), whereas position angle is also East of North but (-180,180]
+    Calculate the bearing of point 2 from point 1 along a Rhumb line. The
+    bearing is East of North and is in [0, 360), whereas position angle is also
+    East of North but (-180,180]
 
     Parameters
     ----------
@@ -267,7 +279,8 @@ def bear_rhumb(ra1, dec1, ra2, dec2):
 
 def translate_rhumb(ra, dec, r, theta):
     """
-    Translate a given point a distance r in the (initial) direction theta, along a Rhumb line.
+    Translate a given point a distance r in the (initial) direction theta,
+    along a Rhumb line.
 
     Parameters
     ----------
@@ -291,7 +304,8 @@ def translate_rhumb(ra, dec, r, theta):
     if abs(dphi) < 1e-9:
         q = np.cos(phi1)
     else:
-        dpsi = np.log(np.tan(np.pi / 4 + phi2 / 2) / np.tan(np.pi / 4 + phi1 / 2))
+        dpsi = np.log(np.tan(np.pi / 4 + phi2 / 2)
+                      / np.tan(np.pi / 4 + phi1 / 2))
         q = dphi / dpsi
 
     lambda1 = np.radians(ra)

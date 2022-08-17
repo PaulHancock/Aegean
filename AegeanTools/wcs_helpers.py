@@ -5,13 +5,13 @@ part of the WCS toolkit, as well as some wrappers around the provided tools
 to make them a lot easier to use.
 """
 
-from __future__ import print_function
-
-from astropy.wcs import WCS
-from astropy.io import fits
-import numpy as np
 import logging
-from .angle_tools import gcd, bear, translate
+
+import numpy as np
+from astropy.io import fits
+from astropy.wcs import WCS
+
+from .angle_tools import bear, gcd, translate
 
 __author__ = "Paul Hancock"
 
@@ -20,9 +20,11 @@ log = logging.getLogger("Aegean")
 
 class WCSHelper(object):
     """
-    A wrapper around astropy.wcs that provides extra functionality, and hides the c/fortran indexing troubles.
+    A wrapper around astropy.wcs that provides extra functionality, and hides
+    the c/fortran indexing troubles.
 
-    Additionally allow psf information to be described in a map instead of the fits header of the image.
+    Additionally allow psf information to be described in a map instead of the
+    fits header of the image.
 
     Useful functions not provided by astropy.wcs
 
@@ -30,11 +32,13 @@ class WCSHelper(object):
     - functions for calculating the beam in sky/pixel coords
     - the ability to change the beam according to dec-lat
 
-    This class tracks both the synthesized beam of the image (beam) and the point spread function (psf).
-    You may think that these things are the same and interchangeable but they are not always.
-    The beam is defined in the wcs of the image header, while the psf can be defined by
-    providing a new image file with 3 dimensions (ra, dec, psf) where the psf is (a, b, pa).
-    # TODO: Check that the above is consistent with the code, and adjust until they are.
+    This class tracks both the synthesized beam of the image (beam) and the
+    point spread function (psf). You may think that these things are the same
+    and interchangeable but they are not always. The beam is defined in the wcs
+    of the image header, while the psf can be defined by providing a new image
+    file with 3 dimensions (ra, dec, psf) where the psf is (a, b, pa). # TODO:
+    Check that the above is consistent with the code, and adjust until they
+    are.
 
     Attributes
     ----------
@@ -42,7 +46,8 @@ class WCSHelper(object):
         WCS object
 
     beam : :class:`AegeanTools.wcs_helpers.Beam`
-        The synthesized beam as defined by the fits header (at the reference location).
+        The synthesized beam as defined by the fits header (at the reference
+        location).
 
     pixscale : (float, float)
         The pixel scale at the reference location (degrees)
@@ -81,7 +86,8 @@ class WCSHelper(object):
         """
         self.wcs = wcs
         self.beam = (
-            beam  # the beam as per the fits header (at the reference coordiante)
+            # the beam as per the fits header (at the reference coordiante)
+            beam
         )
         self.pixscale = pixscale
         self.refpix = refpix
@@ -89,8 +95,8 @@ class WCSHelper(object):
         self._psf_map = None  # image data for the psf
         self._psf_wcs = None  # wcs for the psf map
 
-        # until we can determine the difference between ra/dec based only on the wcs
-        # we must avoid using this sorting option
+        # until we can determine the difference between ra/dec based only on
+        # the wcs we must avoid using this sorting option
         self.ra_dec_order = False
 
         # the psf in pixel coords, at the reference coordinate
@@ -101,15 +107,16 @@ class WCSHelper(object):
         if self.psf_file is None:
             ra, dec = self.pix2sky([self.refpix[1], self.refpix[0]])
             pos = [ra, dec]
-            _, _, self._psf_a, self._psf_b, self._psf_theta = self.sky2pix_ellipse(
-                pos, self.beam.a, self.beam.b, self.beam.pa
-            )
+            _, _, self._psf_a, self._psf_b, self._psf_theta = \
+              self.sky2pix_ellipse(pos, self.beam.a, self.beam.b, self.beam.pa)
 
-    # This construct gives us an attribute 'self.psf_map' which is only loaded on demand
+    # This construct gives us an attribute 'self.psf_map' which is only loaded
+    # on demand
     @property
     def psf_map(self):
         if self._psf_map is None:
-            # use memory mapping to avoid loading large files, when only a small subset of the pixels are actually needed
+            # use memory mapping to avoid loading large files, when only a
+            # small subset of the pixels are actually needed
             self._psf_map = fits.open(self.psf_file, memmap=True)[0].data
             if len(self._psf_map.shape) != 3:
                 log.critical(
@@ -142,7 +149,8 @@ class WCSHelper(object):
             The header to be used to create the WCS helper
 
         beam : :class:`AegeanTools.wcs_helpers.Beam` or None
-            The synthesized beam. If the supplied beam is None then one is constructed form the header.
+            The synthesized beam. If the supplied beam is None then one is
+            constructed form the header.
 
         psf_file : str
             Filename for a psf map
@@ -181,7 +189,8 @@ class WCSHelper(object):
             The file to be read
 
         beam : :class:`AegeanTools.wcs_helpers.Beam` or None
-            The synthesized beam. If the supplied beam is None then one is constructed form the header.
+            The synthesized beam. If the supplied beam is None then one is
+            constructed form the header.
 
         psf_file : str
             Filename for a psf map
@@ -212,7 +221,8 @@ class WCSHelper(object):
         """
         x, y = pixel
         # wcs and python have opposite ideas of x/y
-        return self.wcs.all_pix2world([[y, x]], 1, ra_dec_order=self.ra_dec_order)[0]
+        return self.wcs.all_pix2world([[y, x]], 1, 
+                                      ra_dec_order=self.ra_dec_order)[0]
 
     def sky2pix(self, pos):
         """
@@ -230,7 +240,8 @@ class WCSHelper(object):
             The (x,y) pixel coordinates
 
         """
-        pixel = self.wcs.all_world2pix([pos], 1, ra_dec_order=self.ra_dec_order)
+        pixel = self.wcs.all_world2pix(
+            [pos], 1, ra_dec_order=self.ra_dec_order)
         # wcs and python have opposite ideas of x/y
         return [pixel[0][1], pixel[0][0]]
 
@@ -252,7 +263,8 @@ class WCSHelper(object):
         """
         # wcs and python have opposite ideas of x/y
         if self.psf_wcs is not None:
-            pixel = self.psf_wcs.all_world2pix([pos], 1, ra_dec_order=self.ra_dec_order)
+            pixel = self.psf_wcs.all_world2pix(
+                [pos], 1, ra_dec_order=self.ra_dec_order)
             return [pixel[0][1], pixel[0][0]]
         return None
 
@@ -312,7 +324,8 @@ class WCSHelper(object):
         """
         ra1, dec1 = self.pix2sky(pixel)
         x, y = pixel
-        a = (x + r * np.cos(np.radians(theta)), y + r * np.sin(np.radians(theta)))
+        a = (x + r * np.cos(np.radians(theta)),
+             y + r * np.sin(np.radians(theta)))
         locations = self.pix2sky(a)
         ra2, dec2 = locations
         a = gcd(ra1, dec1, ra2, dec2)
@@ -328,7 +341,8 @@ class WCSHelper(object):
         pos : (float, float)
             The (ra, dec) of the ellipse center (degrees).
         a, b, pa: float
-            The semi-major axis, semi-minor axis and position angle of the ellipse (degrees).
+            The semi-major axis, semi-minor axis and position angle of the
+            ellipse (degrees).
 
         Returns
         -------
@@ -337,8 +351,8 @@ class WCSHelper(object):
         sx, sy : float
             The major and minor axes (FWHM) in pixels.
         theta : float
-            The rotation angle of the ellipse (degrees).
-            theta = 0 corresponds to the ellipse being aligned with the x-axis.
+            The rotation angle of the ellipse (degrees). theta = 0 corresponds
+            to the ellipse being aligned with the x-axis.
 
         """
         ra, dec = pos
@@ -352,9 +366,9 @@ class WCSHelper(object):
         sy = np.hypot((x - x_off), (y - y_off))
         theta2 = np.arctan2((y_off - y), (x_off - x)) - np.pi / 2
 
-        # The a/b vectors are perpendicular in sky space, but not always in pixel space
-        # so we have to account for this by calculating the angle between the two vectors
-        # and modifying the minor axis length
+        # The a/b vectors are perpendicular in sky space, but not always in
+        # pixel space so we have to account for this by calculating the angle
+        # between the two vectors and modifying the minor axis length
         defect = theta - theta2
         sy *= abs(np.cos(defect))
 
@@ -387,7 +401,8 @@ class WCSHelper(object):
         """
         ra, dec = self.pix2sky(pixel)
         x, y = pixel
-        v_sx = (x + sx * np.cos(np.radians(theta)), y + sx * np.sin(np.radians(theta)))
+        v_sx = (x + sx * np.cos(np.radians(theta)),
+                y + sx * np.sin(np.radians(theta)))
         ra2, dec2 = self.pix2sky(v_sx)
         major = gcd(ra, dec, ra2, dec2)
         pa = bear(ra, dec, ra2, dec2)
@@ -400,17 +415,17 @@ class WCSHelper(object):
         minor = gcd(ra, dec, ra2, dec2)
         pa2 = bear(ra, dec, ra2, dec2) - 90
 
-        # The a/b vectors are perpendicular in sky space, but not always in pixel space
-        # so we have to account for this by calculating the angle between the two vectors
-        # and modifying the minor axis length
+        # The a/b vectors are perpendicular in sky space, but not always in
+        # pixel space so we have to account for this by calculating the angle
+        # between the two vectors and modifying the minor axis length
         defect = pa - pa2
         minor *= abs(np.cos(np.radians(defect)))
         return ra, dec, major, minor, pa
 
     def get_psf_sky2sky(self, ra, dec):
         """
-        Determine the point spread function in sky coordinates at a given sky location.
-        The psf is returned in degrees.
+        Determine the point spread function in sky coordinates at a given sky
+        location. The psf is returned in degrees.
 
 
         Parameters
@@ -421,9 +436,9 @@ class WCSHelper(object):
         Returns
         -------
         a, b, pa : (float, float, float)
-            The psf semi-major axis, semi-minor axis, and position angle in (degrees).
-            If a psf is defined then it is the psf that is returned, otherwise the image
-            restoring beam is returned.
+            The psf semi-major axis, semi-minor axis, and position angle in
+            (degrees). If a psf is defined then it is the psf that is returned,
+            otherwise the image restoring beam is returned.
         """
 
         # If we don't have a psf map then we just fall back to using the beam
@@ -435,8 +450,9 @@ class WCSHelper(object):
             )
             return a, b, pa
 
-        # We leave the interpolation in the hands of whoever is making these images
-        # clamping the x,y coords at the image boundaries just makes sense
+        # We leave the interpolation in the hands of whoever is making these
+        # images clamping the x,y coords at the image boundaries just makes
+        # sense
         x, y = self.psf_sky2pix((ra, dec))
 
         log.debug("sky2sky {0}, {1}, {2}, {3}".format(ra, dec, x, y))
@@ -448,8 +464,8 @@ class WCSHelper(object):
 
     def get_psf_sky2pix(self, ra, dec):
         """
-        Determine the psf (a,b,pa) at a given sky location.
-        The psf is in pixel coordinates.
+        Determine the psf (a,b,pa) at a given sky location. The psf is in pixel
+        coordinates.
 
         Parameters
         ----------
@@ -459,9 +475,9 @@ class WCSHelper(object):
         Returns
         -------
         a, b, pa : (float, float, float)
-            The psf semi-major axis (pixels), semi-minor axis (pixels), and rotation angle (degrees).
-            If a psf is defined then it is the psf that is returned, otherwise the image
-            restoring beam is returned.
+            The psf semi-major axis (pixels), semi-minor axis (pixels), and
+            rotation angle (degrees). If a psf is defined then it is the psf
+            that is returned, otherwise the image restoring beam is returned.
         """
         # If we don't have a psf map then we just fall back to using the beam
         # from the fits header (pre computed in pix coords)
@@ -476,8 +492,8 @@ class WCSHelper(object):
 
     def get_psf_pix2pix(self, x, y):
         """
-        Determine the beam in pixels at the given location in pixel coordinates.
-        The psf is in pixel coordinates.
+        Determine the beam in pixels at the given location in pixel
+        coordinates. The psf is in pixel coordinates.
 
         Parameters
         ----------
@@ -487,9 +503,9 @@ class WCSHelper(object):
         Returns
         -------
         a, b, theta : (float, float, float)
-            The psf semi-major axis (pixels), semi-minor axis (pixels), and rotation angle (degrees).
-            If a psf is defined then it is the psf that is returned, otherwise the image
-            restoring beam is returned.
+            The psf semi-major axis (pixels), semi-minor axis (pixels), and
+            rotation angle (degrees). If a psf is defined then it is the psf
+            that is returned, otherwise the image restoring beam is returned.
         """
         # If we don't have a psf map then we just fall back to using the beam
         # from the fits header (pre computed in pix coords)
@@ -582,8 +598,8 @@ class WCSHelper(object):
 
 class Beam(object):
     """
-    Small class to hold the properties of the beam.
-    Properties are a,b,pa. No assumptions are made as to the units, but both a and b have to be >0.
+    Small class to hold the properties of the beam. Properties are a,b,pa. No
+    assumptions are made as to the units, but both a and b have to be >0.
     """
 
     def __init__(self, a, b, pa):
@@ -601,9 +617,9 @@ class Beam(object):
 
 def get_pixinfo(header):
     """
-    Return some pixel information based on the given hdu header
-    pixarea - the area of a single pixel in deg2
-    pixscale - the side lengths of a pixel (assuming they are square)
+    Return some pixel information based on the given hdu header pixarea - the
+    area of a single pixel in deg2 pixscale - the side lengths of a pixel
+    (assuming they are square)
 
     Parameters
     ----------
@@ -620,25 +636,28 @@ def get_pixinfo(header):
 
     Notes
     -----
-    The reference location is not always at the image center, and the pixel scale/area may
-    change over the image, depending on the projection.
+    The reference location is not always at the image center, and the pixel
+    scale/area may change over the image, depending on the projection.
     """
     if all(a in header for a in ["CDELT1", "CDELT2"]):
         pixarea = abs(header["CDELT1"] * header["CDELT2"])
         pixscale = (header["CDELT1"], header["CDELT2"])
     elif all(a in header for a in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]):
         pixarea = abs(
-            header["CD1_1"] * header["CD2_2"] - header["CD1_2"] * header["CD2_1"]
+            header["CD1_1"] * header["CD2_2"] -
+            header["CD1_2"] * header["CD2_1"]
         )
         pixscale = (header["CD1_1"], header["CD2_2"])
         if not (header["CD1_2"] == 0 and header["CD2_1"] == 0):
-            log.warning("Pixels don't appear to be square -> pixscale is wrong")
+            log.warning(
+                "Pixels don't appear to be square -> pixscale is wrong")
     elif all(a in header for a in ["CD1_1", "CD2_2"]):
         pixarea = abs(header["CD1_1"] * header["CD2_2"])
         pixscale = (header["CD1_1"], header["CD2_2"])
     else:
         log.critical(
-            "cannot determine pixel area, using zero EVEN THOUGH THIS IS WRONG!"
+            "cannot determine pixel area" +
+            "using zero EVEN THOUGH THIS IS WRONG!"
         )
         pixarea = 0
         pixscale = (0, 0)
@@ -702,7 +721,8 @@ def fix_aips_header(header):
     Returns
     -------
     header : :class:`astropy.io.fits.HDUHeader`
-        A header which has BMAJ, BMIN, and BPA keys, as well as a new HISTORY card.
+        A header which has BMAJ, BMIN, and BPA keys, as well as a new HISTORY
+        card.
     """
     if "BMAJ" in header and "BMIN" in header and "BPA" in header:
         # The header already has the required keys so there is nothing to do

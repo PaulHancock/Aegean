@@ -1,16 +1,18 @@
 #! /usr/bin/env python
 
 """
-A module to allow fits files to be shrunk in size using decimation, and to be
-grown in size using interpolation.
+A module for fits file utility functions.
 """
-import numpy as np
-from astropy.io import fits
-from scipy.interpolate import  RegularGridInterpolator
 import logging
 
+import numpy as np
+from astropy.io import fits
+from scipy.interpolate import RegularGridInterpolator
+
+from .exceptions import AegeanError
+
 __author__ = 'Paul Hancock'
-__date__ = '2018-08-09'
+__date__ = '2022-07-15'
 
 
 def load_file_or_hdu(filename):
@@ -126,8 +128,9 @@ def expand(datafile, outfile=None):
     Expand and interpolate the given data file using the given method.
     Datafile can be a filename or an HDUList
 
-    It is assumed that the file has been compressed and that there are `BN_?` keywords in the
-    fits header that describe how the compression was done.
+    It is assumed that the file has been compressed and that there are
+    `BN_?` keywords in the fits header that describe how the compression
+    was done.
 
     Parameters
     ----------
@@ -152,7 +155,8 @@ def expand(datafile, outfile=None):
     header = hdulist[0].header
     data = hdulist[0].data
     # Check for the required key words, only expand if they exist
-    if not all(a in header for a in ['BN_CFAC', 'BN_NPX1', 'BN_NPX2', 'BN_RPX1', 'BN_RPX2']):
+    if not all(a in header for a in
+               ['BN_CFAC', 'BN_NPX1', 'BN_NPX2', 'BN_RPX1', 'BN_RPX2']):
         return hdulist
 
     factor = header['BN_CFAC']
@@ -165,7 +169,8 @@ def expand(datafile, outfile=None):
     cols = (np.arange(data.shape[1]) + int(lcy/factor))*factor
 
     # Do the interpolation
-    hdulist[0].data = np.array(RegularGridInterpolator((rows,cols), data)((gx, gy)), dtype=np.float32)
+    hdulist[0].data = np.array(RegularGridInterpolator(
+        (rows, cols), data)((gx, gy)), dtype=np.float32)
 
     # update the fits keywords so that the WCS is correct
     header['CRPIX1'] = (header['CRPIX1'] - 1) * factor + 1
@@ -190,9 +195,88 @@ def expand(datafile, outfile=None):
     header['HISTORY'] = 'Expanded by factor {0}'.format(factor)
 
     # don't need these any more so delete them.
-    del header['BN_CFAC'], header['BN_NPX1'], header['BN_NPX2'], header['BN_RPX1'], header['BN_RPX2']
+    del header['BN_CFAC'], header['BN_NPX1'], header['BN_NPX2']
+    del header['BN_RPX1'], header['BN_RPX2']
     hdulist[0].header = header
     if outfile is not None:
         hdulist.writeto(outfile, overwrite=True)
         logging.info("Wrote: {0}".format(outfile))
     return hdulist
+
+
+def write_fits(data, header, file_name):
+    """
+    Combine data and a fits header to write a fits file.
+
+    Parameters
+    ----------
+    data : numpy.ndarray
+        The data to be written.
+
+    header : astropy.io.fits.hduheader
+        The header for the fits file.
+
+    file_name : string
+        The file to write
+
+    Returns
+    -------
+    None
+    """
+    hdu = fits.PrimaryHDU(data)
+    hdu.header = header
+    hdulist = fits.HDUList([hdu])
+    hdulist.writeto(file_name, overwrite=True)
+    logging.info("Wrote {0}".format(file_name))
+    return
+
+
+def load_image_band(filename,
+                    band=(0, 1),
+                    hdu_index=0,
+                    cube_index=0):
+    """
+    Load a subset of an image from a given filename.
+    The subset is controlled using the band, which is (this band, total bands)
+
+    parameters
+    ----------
+    filename : str
+
+    band : (int, int)
+        (this band, total bands)
+        Default (0,1)
+    """
+    if band[1] <= 0:
+        raise AegeanError(
+            "band[1] number {0} not valid".format(band[1])
+        )
+    elif band[0] >= band[1]:
+        raise AegeanError(
+            "band number {0} too large for total bands = {1}".format(
+                band[0], band[1]))
+    elif band[0] < 0:
+        raise AegeanError("band[0] number {0} not valid".format(band[0]))
+
+    header = fits.getheader(filename, ext=hdu_index)
+    row_min = int(header['NAXIS2']/band[1] * (band[0]))
+    row_max = int(header['NAXIS2']/band[1] * (band[0]+1))
+    # Figure out how many axes are in the datafile
+    NAXIS = header["NAXIS"]
+    with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
+        if NAXIS == 2:
+            data = a[hdu_index].section[row_min:row_max, 0:header['NAXIS1']]
+        elif NAXIS == 3:
+            data = a[hdu_index].section[cube_index,
+                                        row_min:row_max, 0:header['NAXIS1']]
+        elif NAXIS == 4:
+            data = a[hdu_index].section[0, cube_index,
+                                        row_min:row_max, 0:header['NAXIS1']]
+        else:
+            raise Exception(f"Too many NAXIS: {NAXIS}>4")
+    if 'BSCALE' in header:
+        data *= header['BSCALE']
+    # adjust the header to match the data shape
+    header['NAXIS2'] = row_max-row_min
+    header['CRPIX2'] -= row_min
+    return data, header
