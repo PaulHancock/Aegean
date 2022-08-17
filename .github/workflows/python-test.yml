@@ -53,6 +53,7 @@ jobs:
           htmlcov/
           coverage_${{ matrix.python-version }}.xml
   finalise:
+    needs: build
     runs-on: ubuntu-latest
     steps:
     - name: Finish coverage report
