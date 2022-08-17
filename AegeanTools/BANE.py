@@ -4,14 +4,17 @@
 This module contains all of the BANE specific code
 The function filter_image should be imported from elsewhere and run as is.
 """
-
 import copy
 import logging
 import multiprocessing
-import multiprocessing.sharedctypes
 import os
 import sys
+from multiprocessing.shared_memory import SharedMemory
 from time import gmtime, strftime
+
+import numpy as np
+from astropy.io import fits
+from scipy.interpolate import RegularGridInterpolator
 
 import numpy as np
 from astropy.io import fits
@@ -21,40 +24,27 @@ from scipy.interpolate import RegularGridInterpolator
 from .fits_tools import compress
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.9.1'
-__date__ = '2022-07-15'
+__version__ = 'v1.10.0'
+__date__ = '2022-08-17'
 
-# global variables for multiprocessing
-ibkg = irms = None
-bkg_events = []
-mask_events = []
+# global barrier for multiprocessing
+barrier = None
 
 
-def barrier(events, sid, kind='neighbour'):
+def init(b):
     """
-    act as a multiprocessing barrier
+    Set the global barrier
     """
-    events[sid].set()
-    # only wait for the neighbours
-    if kind == 'neighbour':
-        if sid > 0:
-            logging.debug("{0} is waiting for {1}".format(sid, sid - 1))
-            events[sid - 1].wait()
-        if sid < len(bkg_events) - 1:
-            logging.debug("{0} is waiting for {1}".format(sid, sid + 1))
-            events[sid + 1].wait()
-    # wait for all
-    else:
-        [e.wait() for e in events]
-    return
+    global barrier
+    barrier = b
 
 
 def sigmaclip(arr, lo, hi, reps=10):
     """
     Perform sigma clipping on an array, ignoring non finite values.
 
-    During each iteration return an array whose elements c obey: mean -std*lo <
-    c < mean + std*hi
+    During each iteration return an array whose elements c obey:
+    mean -std*lo < c < mean + std*hi
 
     where mean/std are the mean std of the input array.
 
@@ -132,9 +122,8 @@ def _sf2(args):
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
-def sigma_filter(filename, region,
-                 step_size, box_size,
-                 shape, domask, sid, cube_index):
+def sigma_filter(filename, region, step_size, box_size, shape, domask,
+                 cube_index):
     """
     Calculate the background and rms for a sub region of an image. The results
     are written to shared memory - irms and ibkg.
@@ -160,9 +149,6 @@ def sigma_filter(filename, region,
     domask : bool
         If true then copy the data mask to the output.
 
-    sid : int
-        The stripe number
-
     cube_index : int
         The index into the 3rd dimension (if present)
 
@@ -175,16 +161,16 @@ def sigma_filter(filename, region,
     logging.debug('rows {0}-{1} starting at {2}'.format(ymin,
                   ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
-    # cut out the region of interest plus 1/2 the box size, but clip to the
-    # image size
+    # cut out the region of interest plus 1/2 the box size
+    # and clip to the image size
     data_row_min = max(0, ymin - box_size[0]//2)
     data_row_max = min(shape[0], ymax + box_size[0]//2)
 
     # Figure out how many axes are in the datafile
     NAXIS = fits.getheader(filename)["NAXIS"]
 
-    # For some reason we can't memmap a file with BSCALE not 1.0, so we signore
-    # it now and scale it later
+    # For some reason we can't memmap a file with BSCALE not 1.0
+    # so we ignore it now and scale it later
     with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
         if NAXIS == 2:
             data = a[0].section[data_row_min:data_row_max, 0:shape[1]]
@@ -208,9 +194,13 @@ def sigma_filter(filename, region,
     if 'BSCALE' in header:
         data *= header['BSCALE']
 
-    row_len = shape[1]
+    # force float64 for consistency
+    data = data.astype(np.float64)
+
+    # row_len = shape[1]
 
     logging.debug('data size is {0}'.format(data.shape))
+    logging.debug('data format is {0}'.format(data.dtype))
 
     def box(r, c):
         """
@@ -243,24 +233,29 @@ def sigma_filter(filename, region,
     # indices of all the pixels within our region
     gr, gc = np.mgrid[ymin-data_row_min:ymax-data_row_min, 0:shape[1]]
 
+    # Find the shared memory and create a numpy array interface
+    ibkg_shm = SharedMemory(name='ibkg', create=False)
+    ibkg = np.ndarray(shape, dtype=np.float64, buffer=ibkg_shm.buf)
+    irms_shm = SharedMemory(name='irms', create=False)
+    irms = np.ndarray(shape, dtype=np.float64, buffer=irms_shm.buf)
+
     logging.debug("Interpolating bkg to sharemem")
     ifunc = RegularGridInterpolator((rows, cols), vals)
-    for i in range(gr.shape[0]):
-        row = np.array(ifunc((gr[i], gc[i])), dtype=np.float32)
-        start_idx = np.ravel_multi_index((ymin+i, 0), shape)
-        end_idx = start_idx + row_len
-        ibkg[start_idx:end_idx] = row  # np.ctypeslib.as_ctypes(row)
-    del ifunc
+    interp_bkg = np.array(ifunc((gr, gc)), dtype=np.float64)
+    ibkg[ymin:ymax, :] = interp_bkg
+    del ifunc, interp_bkg
     logging.debug(" ... done writing bkg")
 
-    # signal that the bkg is done for this region, and wait for neighbours
-    barrier(bkg_events, sid)
+    # wait for all to complete
+    i = barrier.wait()
+    if i == 0:
+        barrier.reset()
 
-    logging.debug("{0} background subtraction".format(sid))
-    for i in range(data_row_max - data_row_min):
-        start_idx = np.ravel_multi_index((data_row_min + i, 0), shape)
-        end_idx = start_idx + row_len
-        data[i, :] = data[i, :] - ibkg[start_idx:end_idx]
+    logging.debug("background subtraction")
+    data[0 + ymin - data_row_min: data.shape[0] -
+         (data_row_max - ymax), :] -= ibkg[ymin:ymax, :]
+    logging.debug(".. done ")
+
     # reset/recycle the vals array
     vals[:] = 0
 
@@ -272,27 +267,27 @@ def sigma_filter(filename, region,
             _, rms = sigmaclip(new, 3, 3)
             vals[i, j] = rms
 
-    logging.debug("Interpolating rm to sharemem rms")
+    logging.debug("Interpolating rms to sharemem")
     ifunc = RegularGridInterpolator((rows, cols), vals)
-    for i in range(gr.shape[0]):
-        row = np.array(ifunc((gr[i], gc[i])), dtype=np.float32)
-        start_idx = np.ravel_multi_index((ymin+i, 0), shape)
-        end_idx = start_idx + row_len
-        irms[start_idx:end_idx] = row  # np.ctypeslib.as_ctypes(row)
-    del ifunc
+    interp_rms = np.array(ifunc((gr, gc)), dtype=np.float64)
+    irms[ymin:ymax, :] = interp_rms
+    del ifunc, interp_rms
     logging.debug(" .. done writing rms")
 
     if domask:
-        barrier(mask_events, sid)
+        # wait for all to complete
+        i = barrier.wait()
+        if i == 0:
+            barrier.reset()
+
+
         logging.debug("applying mask")
-        for i in range(gr.shape[0]):
-            mask = np.where(np.bitwise_not(
-                np.isfinite(data[i + ymin-data_row_min, :])))[0]
-            for j in mask:
-                idx = np.ravel_multi_index((i + ymin, j), shape)
-                ibkg[idx] = np.nan
-                irms[idx] = np.nan
-        logging.debug(" ... done applying mask")
+        mask = ~np.isfinite(
+            data[0 + ymin - data_row_min: data.shape[0] -
+                 (data_row_max - ymax), :])
+        ibkg[ymin:ymax, :][mask] = np.nan
+        irms[ymin:ymax, :][mask] = np.nan
+        logging.debug("... done applying mask")
     logging.debug('rows {0}-{1} finished at {2}'.format(ymin,
                   ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     return
@@ -345,16 +340,6 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
         nslice = cores
 
     img_y, img_x = shape
-    # initialise some shared memory
-    global ibkg
-    # bkg = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
-    # ibkg = multiprocessing.sharedctypes.Array(bkg._type_, bkg, lock=True)
-    ibkg = multiprocessing.Array('f', img_y*img_x)
-
-    global irms
-    # rms = np.ctypeslib.as_ctypes(np.empty(shape, dtype=np.float32))
-    # irms = multiprocessing.sharedctypes.Array(rms._type_, rms, lock=True)
-    irms = multiprocessing.Array('f', img_y * img_x)
 
     logging.info("using {0} cores".format(cores))
     logging.info("using {0} stripes".format(nslice))
@@ -374,31 +359,48 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
     logging.debug("ymins {0}".format(ymins))
     logging.debug("ymaxs {0}".format(ymaxs))
 
-    # create an event per stripe
-    global bkg_events, mask_events
-    bkg_events = [multiprocessing.Event() for _ in range(len(ymaxs))]
-    mask_events = [multiprocessing.Event() for _ in range(len(ymaxs))]
-
     args = []
     for i, region in enumerate(zip(ymins, ymaxs)):
         args.append((filename, region, step_size, box_size,
-                    shape, domask, i, cube_index))
+                    shape, domask, cube_index))
 
-    # start a new process for each task, hopefully to reduce residual memory
-    # use
-    pool = multiprocessing.Pool(processes=cores, maxtasksperchild=1)
+    exit = False
     try:
-        # chunksize=1 ensures that we only send a single task to each process
-        pool.map_async(_sf2, args, chunksize=1).get(timeout=10000000)
-    except KeyboardInterrupt:
-        logging.error("Caught keyboard interrupt")
-        pool.close()
-        sys.exit(1)
-    pool.close()
-    pool.join()
-    bkg = np.reshape(np.array(ibkg[:], dtype=np.float32), shape)
-    rms = np.reshape(np.array(irms[:], dtype=np.float32), shape)
-    del ibkg, irms
+        nbytes = np.prod(shape) * np.float64(1).nbytes
+        ibkg = SharedMemory(name='ibkg', create=True, size=nbytes)
+        irms = SharedMemory(name='irms', create=True, size=nbytes)
+
+        # start a new process for each task, hopefully to reduce residual
+        # memory use
+        method = 'spawn'
+        if sys.platform.startswith('linux'):
+            method = 'fork'
+        ctx = multiprocessing.get_context(method)
+        barrier = ctx.Barrier(parties=len(ymaxs))
+        pool = ctx.Pool(processes=cores, maxtasksperchild=1,
+                        initializer=init, initargs=(barrier,))
+        try:
+            # chunksize=1 ensures that we only send a single task to each
+            # process
+            pool.map_async(_sf2, args, chunksize=1).get(timeout=10000000)
+        except KeyboardInterrupt:
+            logging.error("Caught keyboard interrupt")
+            pool.close()
+            exit = True
+        else:
+            pool.close()
+            pool.join()
+            bkg = np.ndarray(shape, buffer=ibkg.buf,
+                             dtype=np.float64).astype(np.float32)
+            rms = np.ndarray(shape, buffer=irms.buf,
+                             dtype=np.float64).astype(np.float32)
+    finally:
+        ibkg.close()
+        ibkg.unlink()
+        irms.close()
+        irms.unlink()
+        if exit:
+            sys.exit(1)
     return bkg, rms
 
 
