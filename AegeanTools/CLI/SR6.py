@@ -2,7 +2,6 @@
 import argparse
 import logging
 import os
-import sys
 
 import numpy as np
 from AegeanTools import __citation__
