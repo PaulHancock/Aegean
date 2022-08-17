@@ -21,8 +21,8 @@ from .catalogs import load_table, write_table
 from .regions import Region
 
 __author__ = "Paul Hancock"
-__version__ = 'v1.3.1'
-__date__ = '2018-08-29'
+__version__ = 'v1.4.0'
+__date__ = '2022-08-01'
 
 
 # globals

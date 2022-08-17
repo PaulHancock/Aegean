@@ -21,8 +21,8 @@ from scipy.interpolate import RegularGridInterpolator
 from .fits_tools import compress
 
 __author__ = 'Paul Hancock'
-__version__ = 'v1.9.1'
-__date__ = '2022-07-15'
+__version__ = 'v1.10.0'
+__date__ = '2022-08-17'
 
 # global variables for multiprocessing
 ibkg = irms = None
