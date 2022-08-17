@@ -5,7 +5,7 @@ name: Python test and doc
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
   pull_request:
     branches: [ main, dev ]
 
@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.8", "3.9", "3.10"]
 
     steps:
     - uses: actions/checkout@v2
@@ -39,7 +39,13 @@ jobs:
     - name: Test and coverage
       run: |
         coverage run -m pytest
-        coverage combine      
+        coverage combine
+        coverage html
+    - name: Archive coverage results
+      uses: actions/upload-artifact@v3
+      with:
+        name: code-coverage-report
+        path: htmlcov/
 # currently fails with a complaint about the repo token being wrong.
 #    - name: Coveralls Finished
 #      run: |
