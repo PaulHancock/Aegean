@@ -42,6 +42,9 @@ jobs:
         coverage combine
         coverage html
         coverage xml -o coverage_${{ matrix.python-version }}.xml
+        export CODACY_PROJECT_TOKEN=${{ secrets.CODACY_API_TOKEN }}
+        bash <(curl -Ls https://coverage.codacy.com/get.sh) report \
+        --partial -l python -r coverage__${{ matrix.python-version }}.xml
     - name: Archive coverage results
       uses: actions/upload-artifact@v3
       with:
@@ -49,8 +52,10 @@ jobs:
         path: |
           htmlcov/
           coverage_${{ matrix.python-version }}.xml
-    - name: Upload coverage report
-      uses: codacy/codacy-coverage-reporter-action@v1
-      with:
-        api-token: ${{ secrets.CODACY_API_TOKEN }}
-        coverage-reports: coverage_${{ matrix.python-version }}.xml
+  finalise:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Finish coverage report
+      run: |
+        export CODACY_PROJECT_TOKEN=${{ secrets.CODACY_API_TOKEN }}
+        bash <(curl -Ls https://coverage.codacy.com/get.sh) final
