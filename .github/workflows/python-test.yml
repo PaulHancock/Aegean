@@ -5,7 +5,7 @@ name: Python test and doc
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main ]
   pull_request:
     branches: [ main, dev ]
 
@@ -41,8 +41,16 @@ jobs:
         coverage run -m pytest
         coverage combine
         coverage html
+        coverage xml
     - name: Archive coverage results
       uses: actions/upload-artifact@v3
       with:
         name: code-coverage-report
-        path: htmlcov/
+        path: |
+          htmlcov/
+          coverage.xml
+    - name: Upload coverage report
+      uses: codacy/codacy-coverage-reporter-action@v1
+      with:
+        api-token: ${{ secrets.CODACY_API_TOKEN }}
+        coverage-reports: coverage.xml
