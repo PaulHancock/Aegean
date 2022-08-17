@@ -45,7 +45,7 @@ Status
 
 [![Documentation Status](https://readthedocs.org/projects/aegeantools/badge/?version=latest)](http://aegeantools.readthedocs.io/en/latest/?badge=latest)
  
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/014fb9c86b3f42b49ad94cd4384cfa78)](https://www.codacy.com/app/mr.paul.hancock/Aegean?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=PaulHancock/Aegean&amp;utm_campaign=Badge_Grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/7126a16b98804879af2f534e21492b13)](https://www.codacy.com/gh/PaulHancock/Aegean/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=PaulHancock/Aegean&amp;utm_campaign=Badge_Grade)
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3474072.svg)](https://doi.org/10.5281/zenodo.3474072)
 
