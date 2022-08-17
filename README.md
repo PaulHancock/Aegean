@@ -39,13 +39,10 @@ Until there is a more appropriate method for crediting software development and 
 
 Status
 =====
-[![Build Status](https://travis-ci.org/PaulHancock/Aegean.svg?branch=master)](https://travis-ci.org/PaulHancock/Aegean) 
+[![Build Status](https://travis-ci.org/PaulHancock/Aegean.svg?branch=master)](https://travis-ci.org/PaulHancock/Aegean) [![Documentation Status](https://readthedocs.org/projects/aegeantools/badge/?version=latest)](http://aegeantools.readthedocs.io/en/latest/?badge=latest)
 
-[![Coverage Status](https://coveralls.io/repos/github/PaulHancock/Aegean/badge.svg?branch=master)](https://coveralls.io/github/PaulHancock/Aegean?branch=master)
-
-[![Documentation Status](https://readthedocs.org/projects/aegeantools/badge/?version=latest)](http://aegeantools.readthedocs.io/en/latest/?badge=latest)
  
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/7126a16b98804879af2f534e21492b13)](https://www.codacy.com/gh/PaulHancock/Aegean/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=PaulHancock/Aegean&amp;utm_campaign=Badge_Grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/7126a16b98804879af2f534e21492b13)](https://www.codacy.com/gh/PaulHancock/Aegean/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=PaulHancock/Aegean&amp;utm_campaign=Badge_Grade) [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/7126a16b98804879af2f534e21492b13)](https://www.codacy.com/gh/PaulHancock/Aegean/dashboard?utm_source=github.com&utm_medium=referral&utm_content=PaulHancock/Aegean&utm_campaign=Badge_Coverage)
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3474072.svg)](https://doi.org/10.5281/zenodo.3474072)
 
