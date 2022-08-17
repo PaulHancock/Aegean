@@ -29,16 +29,10 @@ cluster
 .. automodule:: AegeanTools.cluster
     :members:
 
-fits_image
-----------
-
-.. automodule:: AegeanTools.fits_image
-    :members:
-
-fits_interp
+fits_tools
 -----------
 
-.. automodule:: AegeanTools.fits_interp
+.. automodule:: AegeanTools.fits_tools
     :members:
 
 fitting

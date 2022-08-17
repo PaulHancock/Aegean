@@ -6,24 +6,22 @@ If you have an image that you, for some reason, want to compress using a super-l
 
 Usage is:
 
-```
-usage: SR6.py [-h] [-o OutputFile] [-f factor] [-x]
-              [-i {linear,nearest,cubic}] [-m MaskFile] [--debug] [--version]
-              infile
+```console
+usage: SR6 [-h] [-o OutputFile] [-f factor] [-x] [-m MaskFile] [--debug] [--version] [--cite] [infile]
 
 optional arguments:
-  -h, --help            show this help message and exit
+  -h, --help     show this help message and exit
 
 Shrinking and expanding files:
-  infile                input filename
-  -o OutputFile         output filename
-  -f factor             reduction factor
-  -x                    Operation is expand instead of compress.
-  -i {linear,nearest,cubic}
-                        Interpolation method
-  -m MaskFile           File to use for masking pixels.
-  --debug               Debug output
-  --version             show program's version number and exit
+  infile         input filename
+  -o OutputFile  output filename
+  -f factor      reduction factor. Default is 4x psf.
+  -x             Operation is expand instead of compress.
+  -m MaskFile    File to use for masking pixels.
+
+Other options:
+  --debug        Debug output
+  --version      show program's version number and exit
 ```
 
 In order to be able to expand a file, the file needs to have some special keywords in the fits header. These are inserted automatically by BANE, but you could probably fidget them for yourself if you had the need.

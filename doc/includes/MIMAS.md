@@ -29,19 +29,14 @@ MIMAS has five modes of operation:
 * use a region file and a .fits image to create a new fits image where pixels that are OUTSIDE the given region have been masked.
 
 The operation of MIMAS is explained by the following help text:
-```
-usage: MIMAS [-h] [-o OUTFILE] [-depth N] [+r [filename [filename ...]]]
-             [-r [filename [filename ...]]] [+c ra dec radius]
-             [-c ra dec radius] [+p [ra [dec ...]]] [-p [ra [dec ...]]] [-g]
-             [--mim2reg region.mim region.reg]
-             [--reg2mim region.reg region.mim]
-             [--mim2fits region.mim region_MOC.fits]
-             [--mask2mim mask.fits region.mim] [--intersect region.mim]
-             [--area region.mim] [--maskcat region.mim INCAT OUTCAT]
-             [--maskimage region.mim file.fits masked.fits]
-             [--fitsmask mask.fits file.fits masked_file.fits] [--negate]
-             [--colnames RA_name DEC_name] [--threshold THRESHOLD]
-             [--fitsimage] [--debug] [--version] [--cite]
+```console
+usage: MIMAS [-h] [-o OUTFILE] [-depth N] [+r [filename [filename ...]]] [-r [filename [filename ...]]]
+             [+c ra dec radius] [-c ra dec radius] [+p [ra [dec ...]]] [-p [ra [dec ...]]] [-g]
+             [--mim2reg region.mim region.reg] [--reg2mim region.reg region.mim] [--mim2fits region.mim region_MOC.fits]
+             [--mask2mim mask.fits region.mim] [--intersect region.mim] [--area region.mim]
+             [--maskcat region.mim INCAT OUTCAT] [--maskimage region.mim file.fits masked.fits]
+             [--fitsmask mask.fits file.fits masked_file.fits] [--negate] [--colnames RA_name DEC_name]
+             [--threshold THRESHOLD] [--debug] [--version] [--cite]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -50,19 +45,16 @@ Creating/modifying regions:
   Must specify -o, plus or more [+-][cr]
 
   -o OUTFILE            output filename
-  -depth N              maximum nside=2**N to be used to represent this
-                        region. [Default=8]
+  -depth N              maximum nside=2**N to be used to represent this region. [Default=8]
   +r [filename [filename ...]]
                         add a region specified by the given file (.mim format)
   -r [filename [filename ...]]
-                        exclude a region specified by the given file ( .mim
-                        format)
+                        exclude a region specified by the given file (.mim format)
   +c ra dec radius      add a circle to this region (decimal degrees)
   -c ra dec radius      exclude the given circles from a region
   +p [ra [dec ...]]     add a polygon to this region ( decimal degrees)
-  -p [ra [dec ...]]     remove a polygon from this region ( decimal degrees)
-  -g                    Interpret input coordinates are galactic instead of
-                        equatorial.
+  -p [ra [dec ...]]     remove a polygon from this region (decimal degrees)
+  -g                    Interpret input coordinates are galactic instead of equatorial.
 
 Using already created regions:
   --mim2reg region.mim region.reg
@@ -81,31 +73,23 @@ Masking files with regions:
   --maskcat region.mim INCAT OUTCAT
                         use region.mim as a mask on INCAT, writing OUTCAT
   --maskimage region.mim file.fits masked.fits
-                        use region.mim to mask the image file.fits and write
-                        masked.fits
+                        use region.mim to mask the image file.fits and write masekd.fits
   --fitsmask mask.fits file.fits masked_file.fits
-                        Use a fits file as a mask for another fits file.
-                        Values of blank/nan/zero are considered to be
+                        Use a fits file as a mask for another fits file. Values of blank/nan/zero are considered to be
                         mask=True.
-  --negate              By default all masks will exclude data that are within
-                        the given region. Use --negate to exclude data that is
-                        outside of the region instead.
+  --negate              By default all masks will exclude data that are within the given region. Use --negate to exclude
+                        data that is outside of the region instead.
   --colnames RA_name DEC_name
-                        The name of the columns which contain the RA/DEC data.
-                        Default=(ra,dec).
+                        The name of the columns which contain the RA/DEC data. Default=(ra,dec).
 
 Extra options:
   --threshold THRESHOLD
                         Threshold value for input mask file.
-  --fitsimage           Save the region as a fits image
   --debug               debug mode [default=False]
   --version             show program's version number and exit
   --cite                Show citation information.
 
-Regions are added/subtracted in the following order, +r -r +c -c +p -p. This
-means that you might have to take multiple passes to construct overly
-complicated regions.
-
+Regions are added/subtracted in the following order, +r -r +c -c +p -p. This means that you might have to take multiple passes to construct overly complicated regions.
 ```
 
 ### Data model and operation 

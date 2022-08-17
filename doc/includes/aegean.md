@@ -1,4 +1,4 @@
-d# aegean
+# aegean
 
 ## Simple usage
 Suggested basic usage (with mostly default parameters):
@@ -7,19 +7,15 @@ Suggested basic usage (with mostly default parameters):
 
 Usage and short description can be obtained via `aegean`, which is replicated below.
 
-```
-This is Aegean 2.2.2-(2020-06-07)
-usage: aegean [-h] [--find] [--cores CORES] [--hdu HDU_INDEX]
-              [--beam BEAM BEAM BEAM] [--telescope TELESCOPE] [--lat LAT]
-              [--slice SLICE] [--forcerms RMS] [--forcebkg BKG]
-              [--noise NOISEIMG] [--background BACKGROUNDIMG] [--psf IMGPSF]
-              [--autoload] [--out OUTFILE] [--table TABLES] [--tformats]
-              [--blankout] [--colprefix COLUMN_PREFIX]
-              [--maxsummits MAX_SUMMITS] [--seedclip INNERCLIP]
-              [--floodclip OUTERCLIP] [--island] [--nopositive] [--negative]
-              [--region REGION] [--nocov] [--condon] [--priorized PRIORIZED]
-              [--ratio RATIO] [--noregroup] [--input INPUT] [--catpsf CATPSF]
-              [--save] [--outbase OUTBASE] [--debug] [--versions] [--cite]
+```console
+This is Aegean 2.3.0-(2022-08-17)
+usage: aegean [-h] [--find] [--hdu HDU_INDEX] [--beam BEAM BEAM BEAM] [--slice SLICE] [--progress] [--forcerms RMS]
+              [--forcebkg BKG] [--cores CORES] [--noise NOISEIMG] [--background BACKGROUNDIMG] [--psf IMGPSF]
+              [--autoload] [--out OUTFILE] [--table TABLES] [--tformats] [--blankout] [--colprefix COLUMN_PREFIX]
+              [--maxsummits MAX_SUMMITS] [--seedclip INNERCLIP] [--floodclip OUTERCLIP] [--island] [--nopositive]
+              [--negative] [--region REGION] [--nocov] [--priorized PRIORIZED] [--ratio RATIO] [--noregroup]
+              [--input INPUT] [--catpsf CATPSF] [--regroup-eps REGROUP_EPS] [--save] [--outbase OUTBASE] [--debug]
+              [--versions] [--cite]
               [image]
 
 positional arguments:
@@ -29,98 +25,71 @@ optional arguments:
   -h, --help            show this help message and exit
 
 Configuration Options:
-  --find                Source finding mode. [default: true, unless --save or
-                        --measure are selected]
-  --cores CORES         Number of CPU cores to use for processing [default:
-                        all cores]
-  --hdu HDU_INDEX       HDU index (0-based) for cubes with multiple images in
-                        extensions. [default: 0]
+  --find                Source finding mode. [default: true, unless --save or --measure are selected]
+  --hdu HDU_INDEX       HDU index (0-based) for cubes with multiple images in extensions. [default: 0]
   --beam BEAM BEAM BEAM
-                        The beam parameters to be used is "--beam major minor
-                        pa" all in degrees. [default: read from fits header].
-  --telescope TELESCOPE
-                        DEPRECATED
-  --lat LAT             DEPRECATED
-  --slice SLICE         If the input data is a cube, then this slice will
-                        determine the array index of the image which will be
-                        processed by aegean
+                        The beam parameters to be used is "--beam major minor pa" all in degrees. [default: read from
+                        fits header].
+  --slice SLICE         If the input data is a cube, then this slice will determine the array index of the image which
+                        will be processed by aegean
+  --progress            Provide a progress bar as islands are being fit. [default: False]
+  --cores CORES         Number of CPU cores to use when calculating background and rms images [default: all cores]
 
-Input Options:                                                                                                                                                                      [29/99695]
+Input Options:
   --forcerms RMS        Assume a single image noise of rms. [default: None]
-  --forcebkg BKG        Assume a single image background of bkg. [default:
-                        None]
-  --noise NOISEIMG      A .fits file that represents the image noise (rms),
-                        created from Aegean with --save or BANE. [default:
-                        none]
+  --forcebkg BKG        Assume a single image background of bkg. [default: None]
+  --noise NOISEIMG      A .fits file that represents the image noise (rms), created from Aegean with --save or BANE.
+                        [default: none]
   --background BACKGROUNDIMG
-                        A .fits file that represents the background level,
-                        created from Aegean with --save or BANE. [default:
-                        none]
+                        A .fits file that represents the background level, created from Aegean with --save or BANE.
+                        [default: none]
   --psf IMGPSF          A .fits file that represents the local PSF.
-  --autoload            Automatically look for background, noise, region, and
-                        psf files using the input filename as a hint.
-                        [default: don't do this]
+  --autoload            Automatically look for background, noise, region, and psf files using the input filename as a
+                        hint. [default: don't do this]
 
 Output Options:
-  --out OUTFILE         Destination of Aegean catalog output. [default: No
-                        output]
-  --table TABLES        Additional table outputs, format inferred from
-                        extension. [default: none]
-  --tformats            Show a list of table formats supported in this
-                        install, and their extensions
-  --blankout            Create a blanked output image. [Only works if
-                        cores=1].
+  --out OUTFILE         Destination of Aegean catalog output. [default: No output]
+  --table TABLES        Additional table outputs, format inferred from extension. [default: none]
+  --tformats            Show a list of table formats supported in this install, and their extensions
+  --blankout            Create a blanked output image. [Only works if cores=1].
   --colprefix COLUMN_PREFIX
-                        Prepend each column name with "prefix_". Default =
-                        prepend nothing
+                        Prepend each column name with "prefix_". [Default = prepend nothing]
 
 Source finding/fitting configuration options:
   --maxsummits MAX_SUMMITS
-                        If more than *maxsummits* summits are detected in an
-                        island, no fitting is done, only estimation. [default:
-                        no limit]
-  --seedclip INNERCLIP  The clipping value (in sigmas) for seeding islands.
-                        [default: 5]
+                        If more than *maxsummits* summits are detected in an island, no fitting is done, only
+                        estimation. [default: no limit]
+  --seedclip INNERCLIP  The clipping value (in sigmas) for seeding islands. [default: 5]
   --floodclip OUTERCLIP
-                        The clipping value (in sigmas) for growing islands.
-                        [default: 4]
-  --island              Also calculate the island flux in addition to the
-                        individual components. [default: false]
-  --nopositive          Don't report sources with positive fluxes. [default:
-                        false]
+                        The clipping value (in sigmas) for growing islands. [default: 4]
+  --island              Also calculate the island flux in addition to the individual components. [default: false]
+  --nopositive          Don't report sources with positive fluxes. [default: false]
   --negative            Report sources with negative fluxes. [default: false]
-  --region REGION       Use this regions file to restrict source finding in
-                        this image. Use MIMAS region (.mim) files.
-  --nocov               Don't use the covariance of the data in the fitting
-                        procces. [Default = False]
-  --condon              replace errors with those suggested by Condon'97.
-                        [Default = False]
+  --region REGION       Use this regions file to restrict source finding in this image. Use MIMAS region (.mim) files.
+  --nocov               Don't use the covariance of the data in the fitting proccess. [Default = False]
 
 Priorized Fitting config options:
   in addition to the above source fitting options
 
   --priorized PRIORIZED
-                        Enable priorized fitting level n=[1,2,3]. 1=fit flux,
-                        2=fit flux/position, 3=fit flux/position/shape. See
-                        the GitHub wiki for more details.
-  --ratio RATIO         The ratio of synthesized beam sizes (image psf / input
-                        catalog psf). For use with priorized.
-  --noregroup           Do not regroup islands before priorized fitting.
-  --input INPUT         If --priorized is used, this gives the filename for a
-                        catalog of locations at which fluxes will be measured.
-  --catpsf CATPSF       A psf map corresponding to the input catalog. This
-                        will allow for the correct resizing of sources when
-                        the catalog and image psfs differ.
+                        Enable priorized fitting level n=[1,2,3]. 1=fit flux, 2=fit flux/position, 3=fit
+                        flux/position/shape. See the GitHub wiki for more details.
+  --ratio RATIO         The ratio of synthesized beam sizes (image psf / input catalog psf). For use with priorized.
+  --noregroup           Do not regroup islands before priorized fitting
+  --input INPUT         If --priorized is used, this gives the filename for a catalog of locations at which fluxes will
+                        be measured.
+  --catpsf CATPSF       A psf map corresponding to the input catalog. This will allow for the correct resizing of
+                        sources when the catalog and image psfs differ
+  --regroup-eps REGROUP_EPS
+                        The size in arcminutes that is used to regroup nearby components into a single set of components
+                        that will be solved for simultaneously
 
 Extra options:
-  --save                Enable the saving of the background and noise images.
-                        Sets --find to false. [default: false]
-  --outbase OUTBASE     If --save is True, then this specifies the base name
-                        of the background and noise images. [default: inferred
-                        from input image]
+  --save                Enable the saving of the background and noise images. Sets --find to false. [default: false]
+  --outbase OUTBASE     If --save is True, then this specifies the base name of the background and noise images.
+                        [default: inferred from input image]
   --debug               Enable debug mode. [default: false]
-  --versions            Show the file versions of relevant modules. [default:
-                        false]
+  --versions            Show the file versions of relevant modules. [default: false]
   --cite                Show citation information.
 ```
 
@@ -254,15 +223,15 @@ There are six different flags that can be set by Aegean during the source findin
 In the `STDOUT` version of the Aegean catalog the flags column is written in binary format with a header that read ZWNCPES. These six flags correspond to:
 
 
-| Abbreviation | Name | Numerical value | description |
-| ----- | ---- | ---- | ---- |
-| S | FITERRSMAL | 1 | This flag is set when islands are not able to be fit due to there being fewer pixels than free parameters. |
-| E | FITERR | 2 | This flag is set when an error occurs during the fitting process. eg the fit doesn't converge.|
-| P | FIXED2PSF | 4 | If a component is forced to have the shape of the local point spread function then this flag is set. This flag is often set at the same time as the FITERRSMALL, or FIXEDCRICULAR | 
-| C | FIXEDCRICULAR | 8 | If a source is forced to have a circular shape then this flag will be fit. | 
-| N | NOTFIT | 16 | If a component is not fit then this flag is set. This can because and island has reached the `--maxsummits` limit, or `--measure` mode has been invoked. | 
-| W | WCSERR | 32 | If the conversion from pixel to sky coordinates doesn't work then this flag will be set. This can happen for strange projections, but more likely when an image contains pixles that don't have valid sky coordinates. |
-| Z | PRIORIZED | 64 | This flag is set when the source was fit using priorized fitting. |
+| Abbreviation | Name          | Numerical value | description                                                                                                                                                                                                            |
+| ------------ | ------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S            | FITERRSMAL    | 1               | This flag is set when islands are not able to be fit due to there being fewer pixels than free parameters.                                                                                                             |
+| E            | FITERR        | 2               | This flag is set when an error occurs during the fitting process. eg the fit doesn't converge.                                                                                                                         |
+| P            | FIXED2PSF     | 4               | If a component is forced to have the shape of the local point spread function then this flag is set. This flag is often set at the same time as the FITERRSMALL, or FIXEDCRICULAR                                      |
+| C            | FIXEDCRICULAR | 8               | If a source is forced to have a circular shape then this flag will be fit.                                                                                                                                             |
+| N            | NOTFIT        | 16              | If a component is not fit then this flag is set. This can because and island has reached the `--maxsummits` limit, or `--measure` mode has been invoked.                                                               |
+| W            | WCSERR        | 32              | If the conversion from pixel to sky coordinates doesn't work then this flag will be set. This can happen for strange projections, but more likely when an image contains pixles that don't have valid sky coordinates. |
+| Z            | PRIORIZED     | 64              | This flag is set when the source was fit using priorized fitting.                                                                                                                                                      |
 
 Note that the flags column will be the summation of the numerical value of the above flags. So flags=7 means that flags P, E, and S have been set. This all makes more sense when you print the flags in binary format.
 

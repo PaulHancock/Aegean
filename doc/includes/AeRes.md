@@ -6,27 +6,40 @@ AeRes will take an image, and Aegean catalog, and write a new image with all the
 
 You can use AeRes as shown below:
 
-```
-Usage: AeRes -c input.vot -f image.fits -r residual.fits [-m model.fits]
+```console
+usage: AeRes [-h] [-c CATALOG] [-f FITSFILE] [-r RFILE] [-m MFILE] [--add] [--mask] [--sigma SIGMA] [--frac FRAC]
+             [--racol RA_COL] [--deccol DEC_COL] [--peakcol PEAK_COL] [--acol A_COL] [--bcol B_COL] [--pacol PA_COL]
+             [--debug]
 
-Options:
+optional arguments:
   -h, --help            show this help message and exit
-  -c CATALOG, --catalog=CATALOG
-                        Catalog in a format that Aegean understands. RA/DEC
-                        should be in degrees, a/b/pa should be in
+
+I/O arguments:
+  -c CATALOG, --catalog CATALOG
+                        Catalog in a format that Aegean understands. RA/DEC should be in degrees, a/b/pa should be in
                         arcsec/arcsec/degrees.
-  -f FITSFILE, --fitsimage=FITSFILE
+  -f FITSFILE, --fitsimage FITSFILE
                         Input fits file.
-  -r RFILE, --residual=RFILE
+  -r RFILE, --residual RFILE
                         Output residual fits file.
-  -m MFILE, --model=MFILE
+  -m MFILE, --model MFILE
                         Output model file [optional].
+
+Config options:
   --add                 Add components instead of subtracting them.
   --mask                Instead of subtracting sources, just mask them
-  --sigma=SIGMA         If masking, pixels above this SNR are masked (requires
-                        input catalogue to list rms)
-  --frac=FRAC           If masking, pixels above frac*peak_flux are masked for
-                        each source
+  --sigma SIGMA         If masking, pixels above this SNR are masked(requires input catalogue to list rms)
+  --frac FRAC           If masking, pixels above frac*peak_flux are masked for each source
+
+Catalogue options:
+  --racol RA_COL        RA column name
+  --deccol DEC_COL      Dec column name
+  --peakcol PEAK_COL    Peak flux column name
+  --acol A_COL          Major axis column name
+  --bcol B_COL          Minor axis column name
+  --pacol PA_COL        Position angle column name
+
+Extra options:
   --debug               Debug mode.
 ```
 

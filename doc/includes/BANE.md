@@ -38,10 +38,9 @@ The implementation of the process isn't that important but the idea is as follow
 ## Usage
 
 The usage of BANE is described in the help text as follows:
-```
-usage: BANE [-h] [--out OUT_BASE] [--grid STEP_SIZE STEP_SIZE]
-            [--box BOX_SIZE BOX_SIZE] [--cores CORES] [--stripes STRIPES]
-            [--nomask] [--noclobber] [--debug] [--compress] [--cite]
+```console
+usage: BANE [-h] [--out OUT_BASE] [--grid STEP_SIZE STEP_SIZE] [--box BOX_SIZE BOX_SIZE] [--cores CORES]
+            [--stripes STRIPES] [--slice CUBE_INDEX] [--nomask] [--noclobber] [--debug] [--compress] [--cite]
             [image]
 
 positional arguments:
@@ -51,19 +50,17 @@ optional arguments:
   -h, --help            show this help message and exit
 
 Configuration Options:
-  --out OUT_BASE        Basename for output images default:
-                        FileName_{bkg,rms}.fits
+  --out OUT_BASE        Basename for output images default: FileName_{bkg,rms}.fits
   --grid STEP_SIZE STEP_SIZE
-                        The [x,y] size of the grid to use. Default = ~4* beam
-                        size square.
+                        The [x,y] size of the grid to use. Default = ~4* beam size square.
   --box BOX_SIZE BOX_SIZE
-                        The [x,y] size of the box over which the rms/bkg is
-                        calculated. Default = 5*grid.
+                        The [x,y] size of the box over which the rms/bkg is calculated. Default = 5*grid.
   --cores CORES         Number of cores to use. Default = all available.
   --stripes STRIPES     Number of slices.
+  --slice CUBE_INDEX    If the input data is a cube, then this slice will determine the array index of the image which
+                        will be processed by BANE
   --nomask              Don't mask the output array [default = mask]
-  --noclobber           Don't run if output files already exist. Default is to
-                        run+overwrite.
+  --noclobber           Don't run if output files already exist. Default is to run+overwrite.
   --debug               debug mode, default=False
   --compress            Produce a compressed output file.
   --cite                Show citation information.

@@ -3,8 +3,9 @@
 The regrouping and rescaling operations that were introduced as part of the priorized fitting have been moved into the cluster module.
 The script `AeReg` will allow a user to access these operations from the command line such that they can see how the regrouping and rescaling operations will work before having to do the priorized fitting.
 
-```
-usage: regroup [-h] --input INPUT --table TABLES [--eps EPS] [--noregroup] [--ratio RATIO] [--psfheader PSFHEADER] [--debug]
+```console
+usage: regroup [-h] --input INPUT --table TABLES [--eps EPS] [--noregroup] [--ratio RATIO] [--psfheader PSFHEADER]
+               [--debug]
 
 optional arguments:
   -h, --help            show this help message and exit

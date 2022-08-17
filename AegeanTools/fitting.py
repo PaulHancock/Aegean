@@ -273,8 +273,8 @@ def emp_jacobian(pars, x, y):
 
 def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
     r"""
-    Wrapper around :func:`AegeanTools.fitting.jacobian` and
-    :func:`AegeanTools.fitting.emp_jacobian` which gives the output in a format
+    Wrapper around `AegeanTools.fitting.jacobian` and
+    `AegeanTools.fitting.emp_jacobian` which gives the output in a format
     that is required for lmfit.
 
     Parameters
@@ -289,7 +289,7 @@ def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
         a vector of 1\sigma errors (optional). Default = None
 
     B : 2d-array
-        a B-matrix (optional) see :func:`AegeanTools.fitting.Bmatrix`
+        a B-matrix (optional) see `AegeanTools.fitting.Bmatrix`
 
     emp : bool
         If true the use empirical Jacobian, otherwise use analytical Default =
@@ -302,8 +302,9 @@ def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
 
     See Also
     --------
-    :func:`AegeanTools.fitting.Bmatrix` :func:`AegeanTools.fitting.jacobian`
-    :func:`AegeanTools.fitting.emp_jacobian`
+    `AegeanTools.fitting.Bmatrix`
+    `AegeanTools.fitting.jacobian`
+    `AegeanTools.fitting.emp_jacobian`
 
     """
     if emp:
