@@ -46,7 +46,3 @@ jobs:
       with:
         name: code-coverage-report
         path: htmlcov/
-# currently fails with a complaint about the repo token being wrong.
-#    - name: Coveralls Finished
-#      run: |
-#        COVERALLS_REPO_TOKEN=${{ secrets.COVERALLS_REPO_TOKEN }} coveralls --finish 
