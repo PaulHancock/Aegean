@@ -13,14 +13,15 @@ Programs included:
 
 Installing
 =====
-AegeanTools is built and tested on python 3.6 and 3.7.
+AegeanTools is built and tested on python 3.8-3.10.
 
 You can install via pip using 
 `pip install git+https://github.com/PaulHancock/Aegean.git` (latest)
 `pip install AegeanTools` (stable)
 
-Or you can clone or download the repository and then use `python setup.py install` or `pip install .`
+Or you can clone or download the repository and then use `pip install .`
 
+You can use a pre-built version of AegeanTools from [dockerhub](https://hub.docker.com/r/paulhancock/aegean), using `docker pull paulhancock/aegean`
 
 
 Help

@@ -2,17 +2,16 @@
 """
 Test BANE.py
 """
-from __future__ import print_function
-
-from AegeanTools import BANE
-from astropy.io import fits
-import numpy as np
 import os
 
+import numpy as np
+from AegeanTools import BANE
+from astropy.io import fits
+
 __author__ = 'Paul Hancock'
-__date__ = '23/08/2017'
 
 import logging
+
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
 

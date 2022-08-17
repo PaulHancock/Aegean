@@ -2,11 +2,12 @@
 """
 Test wcs_helpers.py
 """
-from __future__ import print_function
 
-from AegeanTools.wcs_helpers import WCSHelper, Beam
-from astropy.io import fits
 import numpy as np
+from AegeanTools.wcs_helpers import (Beam, WCSHelper,
+                                     fix_aips_header,
+                                     get_beam, get_pixinfo)
+from astropy.io import fits
 from numpy.testing import assert_almost_equal
 
 __author__ = 'Paul Hancock'
@@ -14,10 +15,14 @@ __author__ = 'Paul Hancock'
 
 def verify_beam(beam):
     """fail if the given beam is not valid"""
-    if beam is None: raise AssertionError()
-    if not (beam.a > 0): raise AssertionError()
-    if not (beam.b > 0): raise AssertionError()
-    if beam.pa is None: raise AssertionError()
+    if beam is None:
+        raise AssertionError()
+    if not (beam.a > 0):
+        raise AssertionError()
+    if not (beam.b > 0):
+        raise AssertionError()
+    if beam.pa is None:
+        raise AssertionError()
 
 
 def test_from_header():
@@ -25,7 +30,8 @@ def test_from_header():
     fname = 'tests/test_files/1904-66_SIN.fits'
     header = fits.getheader(fname)
     helper = WCSHelper.from_header(header)
-    if helper.beam is None: raise AssertionError()
+    if helper.beam is None:
+        raise AssertionError()
     del header['BMAJ'], header['BMIN'], header['BPA']
     # Raise an error when the beam information can't be determined
     try:
@@ -33,7 +39,8 @@ def test_from_header():
     except AssertionError as e:
         pass
     else:
-        raise AssertionError("Header with no beam information should thrown an exception.")
+        raise AssertionError(
+            "Header with no beam information should thrown an exception.")
     return
 
 
@@ -41,7 +48,8 @@ def test_from_file():
     """Test that we can load from a file"""
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
-    if helper.beam is None: raise AssertionError()
+    if helper.beam is None:
+        raise AssertionError()
 
 
 def test_get_pixbeam():
@@ -59,9 +67,11 @@ def test_get_pixbeam():
     verify_beam(beam)
 
     area = helper.get_beamarea_pix(285, -66)
-    if not (area > 0): raise AssertionError()
+    if not (area > 0):
+        raise AssertionError()
     area = helper.get_beamarea_deg2(285, -66)
-    if not (area >0): raise AssertionError()
+    if not (area > 0):
+        raise AssertionError()
 
 
 def test_psf_files():
@@ -82,7 +92,8 @@ def test_sky_sep():
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
     dist = helper.sky_sep((0, 0), (1, 1))
-    if not (dist > 0): raise AssertionError()
+    if not (dist > 0):
+        raise AssertionError()
 
 
 def test_vector_round_trip():
@@ -95,14 +106,15 @@ def test_vector_round_trip():
     initial = [1, 45]  # r,theta = 1,45 (degrees)
     ref = helper.refpix
     ra, dec, dist, ang = helper.pix2sky_vec(ref, *initial)
-    _, _ , r, theta = helper.sky2pix_vec((ra, dec), dist, ang)
-    if not ((abs(r - initial[0]) < 1e-9) and (abs(theta - initial[1]) < 1e-9)): raise AssertionError()
+    _, _, r, theta = helper.sky2pix_vec((ra, dec), dist, ang)
+    if not ((abs(r - initial[0]) < 1e-9) and (abs(theta - initial[1]) < 1e-9)):
+        raise AssertionError()
 
 
 def test_ellipse_round_trip():
     """
-    Converting an ellipse from pixel to sky coords and back again should give the
-    original ellipse (within some tolerance).
+    Converting an ellipse from pixel to sky coords and back again should 
+    give the original ellipse (within some tolerance).
     """
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
@@ -117,17 +129,22 @@ def test_ellipse_round_trip():
         if ra < 0:
             ra += 360
         x, y, sx, sy, theta = helper.sky2pix_ellipse((ra, dec), a, b, pa)
-        ra_f, dec_f, major, minor, pa_f = helper.pix2sky_ellipse((x, y), sx, sy, theta)
+        ra_f, dec_f, major, minor, pa_f = helper.pix2sky_ellipse(
+            (x, y), sx, sy, theta)
         assert_almost_equal(ra, ra_f)
         assert_almost_equal(dec, dec_f)
-        if not (abs(a-major)/a < 0.05): raise AssertionError()
-        if not (abs(b-minor)/b < 0.05): raise AssertionError()
-        if not (abs(pa-pa_f) < 1): raise AssertionError()
+        if not (abs(a-major)/a < 0.05):
+            raise AssertionError()
+        if not (abs(b-minor)/b < 0.05):
+            raise AssertionError()
+        if not (abs(pa-pa_f) < 1):
+            raise AssertionError()
 
 
 def test_psf_funcs():
     """
-    For a SIN projected image, test that the beam/psf calculations are consistent at different points on the sky
+    For a SIN projected image, test that the beam/psf calculations are
+    consistent at different points on the sky
     """
     fname = 'tests/test_files/1904-66_SIN.fits'
     helper = WCSHelper.from_file(fname)
@@ -146,14 +163,15 @@ def test_psf_funcs():
     if not abs(beam_ref_coord.pa - beam_ref_pix.pa) < 1e-5:
         raise AssertionError(msg)
 
-    psf_zero = helper.get_psf_sky2pix(0,0)
+    psf_zero = helper.get_psf_sky2pix(0, 0)
     psf_refcoord = helper.get_psf_sky2pix(*refcoord)
 
     diff = np.subtract(psf_zero, psf_refcoord)
     if not np.all(diff < 1e-5):
         raise AssertionError("psf varies in pixel coordinates (it should not)")
 
-    diff = np.subtract(psf_refcoord, (helper._psf_a, helper._psf_b, helper._psf_theta))
+    diff = np.subtract(psf_refcoord, (helper._psf_a,
+                       helper._psf_b, helper._psf_theta))
     if not np.all(diff < 1e-5):
         raise AssertionError("psf varies in pixel coordinates (it should not)")
     return
@@ -168,6 +186,82 @@ def test_galactic_coords():
     except ValueError as e:
         raise AssertionError("galactic coordinates break WCSHelper")
     return
+
+
+def test_get_pixinfo():
+    """Test that we can get info from various header styles"""
+    header = fits.getheader('tests/test_files/1904-66_SIN.fits')
+
+    area, scale = get_pixinfo(header)
+    if not area > 0:
+        raise AssertionError()
+    if not len(scale) == 2:
+        raise AssertionError()
+
+    header['CD1_1'] = header['CDELT1']
+    del header['CDELT1']
+    header['CD2_2'] = header['CDELT2']
+    del header['CDELT2']
+    area, scale = get_pixinfo(header)
+    if not area > 0:
+        raise AssertionError()
+    if not len(scale) == 2:
+        raise AssertionError()
+
+    header['CD1_2'] = 0
+    header['CD2_1'] = 0
+    area, scale = get_pixinfo(header)
+    if not area > 0:
+        raise AssertionError()
+    if not len(scale) == 2:
+        raise AssertionError()
+
+    header['CD1_2'] = header['CD1_1']
+    header['CD2_1'] = header['CD2_2']
+    area, scale = get_pixinfo(header)
+    if not area == 0:
+        raise AssertionError()
+    if not len(scale) == 2:
+        raise AssertionError()
+
+    for f in ['CD1_1', 'CD1_2', 'CD2_2', 'CD2_1']:
+        del header[f]
+    area, scale = get_pixinfo(header)
+    if not area == 0:
+        raise AssertionError()
+    if not scale == (0, 0):
+        raise AssertionError()
+
+
+def test_get_beam():
+    """Test that we can recover the beam from the fits header"""
+    header = fits.getheader('tests/test_files/1904-66_SIN.fits')
+    beam = get_beam(header)
+    print(beam)
+    if beam is None:
+        raise AssertionError()
+    if beam.pa != header['BPA']:
+        raise AssertionError()
+
+    del header['BMAJ'], header['BMIN'], header['BPA']
+    beam = get_beam(header)
+    if beam is not None:
+        raise AssertionError()
+
+
+def test_fix_aips_header():
+    """TEst that we can fix an aips generated fits header"""
+    header = fits.getheader('tests/test_files/1904-66_SIN.fits')
+    # test when this function is not needed
+    _ = fix_aips_header(header)
+
+    # test when beam params are not present, but there is no aips history
+    del header['BMAJ'], header['BMIN'], header['BPA']
+    _ = fix_aips_header(header)
+
+    # test with some aips history
+    header['HISTORY'] = 'AIPS   CLEAN BMAJ=  1.2500E-02 BMIN=  1.2500E-02 BPA=   0.00'
+    _ = fix_aips_header(header)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,29 @@
-Nov 29
-======
+V 2.3.0
+=========
+General
+- dropped support for version of python prior to 3.8
+- Added new module `CLI` which contains the CLI interface for all scripts
+- Scripts are now wrappers around the CLI module
+- Rename `AegeanTools.fits_interp` to `AegeanTools.fits_tools`
+- Remove the `fits_image.FitsImage` class 
+- Move functions from `AegeanTools.fits_image` into `AegeanTools.fits_tools`
+- Remove dependency on `pprocess` and remove it from this repo
+- Added a build script in `containers/` for making docker images of AegeanTools
+
+BANE
+- Multiprocessing now uses 'fork' for linux machines and 'spawn' for all others
+
+Aegean
+- Calculation and reporting of 'condon' errors has been removed
+- `aegean` will no longer use multiprocessing but instead rely on the underlying parallel processing provided by system linear algebra libraries
+- `--cores` is now passed to `BANE` but not used for Aegean
+
+MIMAS
+- Dropped support for `--fitsimage`
+
+
+Nov 29 2021
+===========
 BANE
 - Allow BANE to run on a single slice of an image cube using the `slice` option (see #86).
 

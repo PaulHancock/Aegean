@@ -6,24 +6,23 @@ TODO: Write an in/out reader for MOC formats described by
 http://arxiv.org/abs/1505.02937
 """
 
-from __future__ import print_function
-
 import logging
-import numpy as np
-
 import os
 import re
-from astropy.coordinates import Angle, SkyCoord
+
 import astropy.units as u
+import healpy as hp
+import numpy as np
+from astropy.coordinates import Angle, SkyCoord
 from astropy.io import fits as pyfits
 from astropy.wcs import wcs as pywcs
-import healpy as hp
-from .regions import Region
+
 from .catalogs import load_table, write_table
+from .regions import Region
 
 __author__ = "Paul Hancock"
-__version__ = 'v1.3.1'
-__date__ = '2018-08-29'
+__version__ = 'v1.4.0'
+__date__ = '2022-08-01'
 
 
 # globals
@@ -60,9 +59,10 @@ class Dummy():
         Default = 8.
 
     galactic: bool
-        If true then all ra/dec coordinates will be interpreted as if they were in galactic
-        lat/lon (degrees)
+        If true then all ra/dec coordinates will be interpreted as if they
+        were in galactic lat/lon (degrees)
     """
+
     def __init__(self, maxdepth=8):
         self.add_region = []
         self.rem_region = []
@@ -119,16 +119,14 @@ def mask_plane(data, wcs, region, negate=False):
     """
     # create an array but don't set the values (they are random)
     indexes = np.empty((data.shape[0]*data.shape[1], 2), dtype=int)
-    # since I know exactly what the index array needs to look like i can construct
-    # it faster than list comprehension would allow
-    # we do this only once and then recycle it
     idx = np.array([(j, 0) for j in range(data.shape[1])])
     j = data.shape[1]
     for i in range(data.shape[0]):
         idx[:, 1] = i
         indexes[i*j:(i+1)*j] = idx
 
-    # put ALL the pixles into our vectorized functions and minimise our overheads
+    # put ALL the pixles into our vectorized functions
+    # and minimise our overheads
     ra, dec = wcs.wcs_pix2world(indexes, 1).transpose()
     bigmask = region.sky_within(ra, dec, degin=True)
     if not negate:
@@ -166,9 +164,12 @@ def mask_file(regionfile, infile, outfile, negate=False):
     :func:`AegeanTools.MIMAS.mask_plane`
     """
     # Check that the input file is accessible and then open it
-    if not os.path.exists(infile): raise AssertionError("Cannot locate fits file {0}".format(infile))
+    if not os.path.exists(infile):
+        raise AssertionError("Cannot locate fits file {0}".format(infile))
     im = pyfits.open(infile)
-    if not os.path.exists(regionfile): raise AssertionError("Cannot locate region file {0}".format(regionfile))
+    if not os.path.exists(regionfile):
+        raise AssertionError(
+            "Cannot locate region file {0}".format(regionfile))
     region = Region.load(regionfile)
     try:
         wcs = pywcs.WCS(im[0].header, naxis=2)
@@ -180,7 +181,7 @@ def mask_file(regionfile, infile, outfile, negate=False):
     else:
         data = im[0].data
 
-    print(data.shape)
+    # print(data.shape)
     if len(data.shape) == 3:
         for plane in range(data.shape[0]):
             mask_plane(data[plane], wcs, region, negate)
@@ -194,8 +195,9 @@ def mask_file(regionfile, infile, outfile, negate=False):
 
 def mask_table(region, table, negate=False, racol='ra', deccol='dec'):
     """
-    Apply a given mask (region) to the table, removing all the rows with ra/dec inside the region
-    If negate=False then remove the rows with ra/dec outside the region.
+    Apply a given mask (region) to the table, removing all the rows with ra/dec
+    inside the region. If negate=False then remove the rows with ra/dec outside
+    the region.
 
 
     Parameters
@@ -207,12 +209,11 @@ def mask_table(region, table, negate=False, racol='ra', deccol='dec'):
         Table to be masked.
 
     negate :  bool
-        If True then pixels *outside* the region are masked.
-        Default = False.
+        If True then pixels *outside* the region are masked. Default = False.
 
     racol, deccol : str
-        The name of the columns in `table` that should be interpreted as ra and dec.
-        Default = 'ra', 'dec'
+        The name of the columns in `table` that should be interpreted as ra and
+        dec. Default = 'ra', 'dec'
 
     Returns
     -------
@@ -227,10 +228,13 @@ def mask_table(region, table, negate=False, racol='ra', deccol='dec'):
     return table[mask]
 
 
-def mask_catalog(regionfile, infile, outfile, negate=False, racol='ra', deccol='dec'):
+def mask_catalog(regionfile, infile, outfile,
+                 negate=False,
+                 racol='ra', deccol='dec'):
     """
-    Apply a region file as a mask to a catalog, removing all the rows with ra/dec inside the region
-    If negate=False then remove the rows with ra/dec outside the region.
+    Apply a region file as a mask to a catalog, removing all the rows with
+    ra/dec inside the region. If negate=False then remove the rows with ra/dec
+    outside the region.
 
 
     Parameters
@@ -246,12 +250,11 @@ def mask_catalog(regionfile, infile, outfile, negate=False, racol='ra', deccol='
         Output catalogue.
 
     negate :  bool
-        If True then pixels *outside* the region are masked.
-        Default = False.
+        If True then pixels *outside* the region are masked. Default = False.
 
     racol, deccol : str
-        The name of the columns in `table` that should be interpreted as ra and dec.
-        Default = 'ra', 'dec'
+        The name of the columns in `table` that should be interpreted as ra and
+        dec. Default = 'ra', 'dec'
 
     See Also
     --------
@@ -263,7 +266,8 @@ def mask_catalog(regionfile, infile, outfile, negate=False, racol='ra', deccol='
     region = Region.load(regionfile)
     logging.info("Loading catalog from {0}".format(infile))
     table = load_table(infile)
-    masked_table = mask_table(region, table, negate=negate, racol=racol, deccol=deccol)
+    masked_table = mask_table(
+        region, table, negate=negate, racol=racol, deccol=deccol)
     write_table(masked_table, outfile)
     return
 
@@ -300,7 +304,8 @@ def mim2fits(mimfile, fitsfile):
         Output file.
     """
     region = Region.load(mimfile)
-    region.write_fits(fitsfile, moctool='MIMAS {0}-{1}'.format(__version__, __date__))
+    region.write_fits(
+        fitsfile, moctool='MIMAS {0}-{1}'.format(__version__, __date__))
     logging.info("Converted {0} -> {1}".format(mimfile, fitsfile))
     return
 
@@ -309,8 +314,8 @@ def mask2mim(maskfile, mimfile, threshold=1.0, maxdepth=8):
     """
     Use a fits file as a mask to create a region file.
 
-    Pixels in mask file that are equal or above the threshold will be included in the reigon,
-    while those that are below the threshold will not.
+    Pixels in mask file that are equal or above the threshold will be included
+    in the reigon, while those that are below the threshold will not.
 
     Parameters
     ----------
@@ -347,7 +352,8 @@ def mask2mim(maskfile, mimfile, threshold=1.0, maxdepth=8):
 
 def box2poly(line):
     """
-    Convert a string that describes a box in ds9 format, into a polygon that is given by the corners of the box
+    Convert a string that describes a box in ds9 format, into a polygon that
+    is given by the corners of the box.
 
     Parameters
     ----------
@@ -410,7 +416,8 @@ def poly2poly(line):
     """
     Parse a string of text containing a DS9 description of a polygon.
 
-    This function works but is not very robust due to the constraints of healpy.
+    This function works but is not very robust due to the constraints of
+    healpy.
 
     Parameters
     ----------
@@ -455,7 +462,7 @@ def reg2mim(regfile, mimfile, maxdepth):
 
     """
     logging.info("Reading regions from {0}".format(regfile))
-    lines = (l for l in open(regfile, 'r') if not l.startswith('#'))
+    lines = (ln for ln in open(regfile, 'r') if not ln.startswith('#'))
     poly = []
     circles = []
     for line in lines:
@@ -464,7 +471,8 @@ def reg2mim(regfile, mimfile, maxdepth):
         elif line.startswith('circle'):
             circles.append(circle2circle(line))
         elif line.startswith('polygon'):
-            logging.warning("Polygons break a lot, but I'll try this one anyway.")
+            logging.warning(
+                "Polygons break a lot, but I'll try this one anyway.")
             poly.append(poly2poly(line))
         else:
             logging.warning("Not sure what to do with {0}".format(line[:-1]))
@@ -479,11 +487,12 @@ def reg2mim(regfile, mimfile, maxdepth):
 
 def combine_regions(container):
     """
-    Return a region that is the combination of those specified in the container.
-    The container is typically a results instance that comes from argparse.
+    Return a region that is the combination of those specified in the
+    container. The container is typically a results instance that
+    comes from argparse.
 
-    Order of construction is: add regions, subtract regions, add circles, subtract circles,
-    add polygons, subtract polygons.
+    Order of construction is: add regions, subtract regions,
+    add circles, subtract circles, add polygons, subtract polygons.
 
     Parameters
     ----------
@@ -508,7 +517,6 @@ def combine_regions(container):
         logging.info("removing region from {0}".format(r))
         r2 = Region.load(r[0])
         region.without(r2)
-
 
     # add circles
     if len(container.include_circles) > 0:
@@ -543,8 +551,9 @@ def combine_regions(container):
 
     # remove polygons
     if len(container.exclude_polygons) > 0:
-        for p in container.include_polygons:
+        for p in container.exclude_polygons:
             poly = np.array(np.radians(p))
+            poly = poly.reshape((poly.shape[0]//2, 2))
             r2 = Region(container.maxdepth)
             r2.add_poly(poly)
             region.without(r2)
@@ -554,8 +563,8 @@ def combine_regions(container):
 
 def intersect_regions(flist):
     """
-    Construct a region which is the intersection of all regions described in the given
-    list of file names.
+    Construct a region which is the intersection of all regions described in
+    the given list of file names.
 
     Parameters
     ----------
@@ -589,26 +598,4 @@ def save_region(region, filename):
     """
     region.save(filename)
     logging.info("Wrote {0}".format(filename))
-    return
-
-
-def save_as_image(region, filename):
-    """
-    Convert a MIMAS region (.mim) file into a image (eg .png)
-
-    Parameters
-    ----------
-    region : :class:`AegeanTools.regions.Region`
-        Region of interest.
-
-    filename : str
-        Output filename.
-    """
-    import healpy as hp
-    pixels = list(region.get_demoted())
-    order = region.maxdepth
-    m = np.arange(hp.nside2npix(2**order))
-    m[:] = 0
-    m[pixels] = 1
-    hp.write_map(filename, m, nest=True, coord='C')
     return

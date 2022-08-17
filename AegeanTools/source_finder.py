@@ -2,68 +2,41 @@
 """
 The Aegean source finding program.
 """
-from __future__ import print_function
 
-# standard imports
-import sys
-import six
-import os
-import numpy as np
-import math
 import copy
 import logging
 import logging.config
+import math
+import multiprocessing
+import os
+import sys
+
 import lmfit
+import numpy as np
 import scipy
+from scipy.ndimage import find_objects, label
+from scipy.ndimage.filters import maximum_filter, minimum_filter
 from scipy.special import erf
-from scipy.ndimage import label, find_objects
-from scipy.ndimage.filters import minimum_filter, maximum_filter
 from tqdm import tqdm
 
-# AegeanTools
+from AegeanTools import wcs_helpers
+from AegeanTools.fits_tools import write_fits
+
+from . import cluster, flags
+from .__init__ import __date__, __version__
+from .angle_tools import bear, dec2dms, dec2hms, gcd
 from .BANE import filter_image, get_step_size
-from .fitting import (
-    do_lmfit,
-    Cmatrix,
-    Bmatrix,
-    errors,
-    covar_errors,
-    ntwodgaussian_lmfit,
-    bias_correct,
-    elliptical_gaussian,
-)
-from .wcs_helpers import WCSHelper
-from .fits_image import FitsImage
-from AegeanTools.wcs_helpers import Beam
-from .msq2 import MarchingSquares
-from .angle_tools import dec2hms, dec2dms, gcd, bear
 from .catalogs import load_table, table_to_source_list
-from .models import (
-    SimpleSource,
-    ComponentSource,
-    IslandSource,
-    island_itergen,
-    GlobalFittingData,
-    IslandFittingData,
-    DummyLM,
-)
-from .models import PixelIsland
-from . import cluster
-from . import flags
-
-# need Region in the name space in order to be able to unpickle it
+from .exceptions import AegeanNaNModelError
+from .fits_tools import load_image_band
+from .fitting import (Bmatrix, Cmatrix, bias_correct, covar_errors, do_lmfit,
+                      elliptical_gaussian, errors, ntwodgaussian_lmfit)
+from .models import (ComponentSource, DummyLM, GlobalFittingData,
+                     IslandFittingData, IslandSource, PixelIsland,
+                     SimpleSource, island_itergen)
+from .msq2 import MarchingSquares
 from .regions import Region
-
-if six.PY2:
-    import cPickle
-else:
-    import _pickle as cPickle
-
-# multiple cores support
-from . import pprocess
-import multiprocessing
-
-from .__init__ import __version__, __date__
+from .wcs_helpers import Beam, WCSHelper
 
 __author__ = "Paul Hancock"
 
@@ -96,9 +69,9 @@ def find_islands(im, bkg, rms,
       used to grow islands. The units are in SNR.
 
     region : :class:`AegeanTools.regions.Region` or None
-      Region over which to find islands. Islands must have at least 1 pixel overlap
-      with the region in order to be returned. Default = None, no constraints.
-      Region *requires* a wcs to be defined.
+      Region over which to find islands. Islands must have at least 1 pixel
+      overlap with the region in order to be returned.
+      Default = None, no constraints. Region *requires* a wcs to be defined.
 
     wcs : :class:`AegeanTools.wcs_helpers.WCSHelper` or None
       If a region is specified then this WCSHelper will be used to map sky->pix
@@ -127,7 +100,8 @@ def find_islands(im, bkg, rms,
         log.debug("There are no pixels above the clipping limit")
         return []
 
-    # segmentation via scipy, structure includes diagonal pixels as single island
+    # segmentation via scipy
+    # structure includes diagonal pixels as single island
     l, n = label(a, structure=np.ones((3, 3)))
     f = find_objects(l)
 
@@ -507,170 +481,6 @@ def estimate_parinfo_image(islands, im, rms, wcshelper,
     return sources
 
 
-def fit_islands_parinfo(models, im, rms, wcshelper):
-    """
-    Turn a list of sources into a set of islands and parameter estimates
-    which can then be characterised.
-
-    Parameters
-    ----------
-    models : [:class:`lmfit.Parinfo`, ... ]
-      A list of sources in the catalogue.
-
-    im : np.ndarray
-      The image map
-
-    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
-      A wcs object valid for the image map
-
-    Returns
-    -------
-    islands : [AegeanTools.models.SimpleSource, ...]
-      a list of islands
-    """
-
-    islands = []
-    for m in models:
-        pass
-    return islands
-
-
-def priorized_islands_parinfo(sources, im, wcshelper, stage=3):
-    """
-    Turn a list of sources into a set of islands and parameter estimates
-    which can then be characterised.
-
-    Parameters
-    ----------
-    sources : [AegeanTools.models.SimpleSource, ... ]
-      A list of sources in the catalogue.
-
-    im : np.ndarray
-      The image map
-
-    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
-      A wcs object valid for the image map
-
-    stage : int
-      The priorized fitting stage which determines which
-      parameters are fit/fixed. One of:
-      1 - Fit for flux only. All other params are fixed.
-      2 - Fit for flux and position. Shape parameters are fixed.
-      3 - Fit for flux, position, and shape.
-
-    Returns
-    -------
-    islands : [:class:`AegeanTools.models.ComponentSource`, ...]
-      a list of components
-    """
-
-
-def characterise_islands(
-        islands,
-        im,
-        bkg,
-        rms,
-        wcshelper,
-        err_type="best",
-        max_summits=None,
-        do_islandfit=False):
-    """
-    Do the source characterisation based on the initial estimate of
-    the island properties.
-
-    Parameters
-    ----------
-    islands : [lmfit.Parameters, ... ]
-      The initial estimate of parameters for the components within each island.
-
-    im, bkg, rms : np.ndarray
-      The image, background, and noise maps
-
-    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
-      A wcs helper object
-
-    err_type : str or None
-      The method for calculating uncertainties on parameters:
-      'best' - Uncertainties measured based on covariance matrix of the
-               fit and of the data
-               See Hancock et al. 2018 for a description of this process.
-      'condon' - Uncertainties are *calculated* based on Condon'98 (?year)
-      'raw' - uncertainties directly from the covariance matrix only
-      'none' or None - No uncertainties, all will be set to -1.
-
-    max_summits : int
-      The maximum number of summits that will be fit.
-      The final model may contain additional components but
-      only the first few will be fit.
-
-    do_islandfit : bool
-      If True, then also characterise islands as well as components.
-      Default=False.
-
-    Returns
-    -------
-    sources : [:py:class:`AegeanTools.models.SimpleSource`, ... ]
-      A list of characterised sources of type
-      :py:class:`AegeanTools.models.impleSource`,
-      :py:class:`AegeanTools.models.ComponentSource`,
-      or :py:class:`AegeanTools.models.IslandSource`.
-    """
-    sources = estimate_parinfo_image(
-        islands=islands,
-        im=im,
-        rms=rms,
-        wcshelper=wcshelper,
-        max_summits=max_summits,
-        log=log,
-    )
-    pixbeam = None  # to quiet the linter
-    for src, isle in zip(sources, islands):
-        [rmin, rmax], [cmin, cmax] = isle.bounding_box
-        i_data = im[rmin:rmax, cmin:cmax]
-        fac = 1 / np.sqrt(2)
-        if err_type == "best":
-            mx, my = np.where(np.isfinite(i_data))
-            C = Cmatrix(
-                mx, my,
-                pixbeam.a * FWHM2CC * fac,
-                pixbeam.b * FWHM2CC * fac,
-                pixbeam.pa
-            )
-            B = Bmatrix(C)
-        else:
-            C = B = None
-        result, _ = do_lmfit(i_data, src, B=B)
-
-    return sources
-
-
-def save_catalogue(sources, output, format=None):
-    """
-    Write a catalogue of sources
-
-    Parameters
-    ----------
-    sources : [AegeanTools.models.SimpleSource, ... ]
-      A list of characterised sources of type SimpleSource,
-      ComponentSource, or IslandSource.
-
-    output : str
-      Output filename
-
-    format : str
-      A descriptor of the output format. Options are:
-      # TODO add a bunch of options
-      'auto' or None - infer from filename extension
-
-    Returns
-    -------
-    None
-    """
-    # determine file format
-    # write catalogue based on source type and file format
-    return
-
-
 class SourceFinder(object):
     """
     The Aegean source finding algorithm
@@ -688,7 +498,7 @@ class SourceFinder(object):
       Default = None
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, log=log, **kwargs):
         self.global_data = GlobalFittingData()
         self.sources = []
         self.log = log  # Use a dummy logger (which never reports anything)
@@ -762,8 +572,9 @@ class SourceFinder(object):
                 # self.log.info("{1} Island {0} is above the inner clip limit"
                 #               .format(i, data.shape))
 
-                # Flag pixel that are either below the flood level, or belong to other
-                # islands that happen to be withing the bounding box
+                # Flag pixel that are either below the flood level
+                # or belong to other islands that happen to be within
+                # the bounding box
                 island_mask = (snr[xmin:xmax, ymin:ymax] < outerclip) | \
                               (l[xmin:xmax, ymin:ymax] != i + 1)
                 data_box = copy.deepcopy(
@@ -1266,7 +1077,7 @@ class SourceFinder(object):
             idx, idy = np.where(abs(idata) - outerclip * rms > 0)
             idx += xmin
             idy += ymin
-            self.global_data.img._pixels[[idx, idy]] = np.nan
+            self.global_data.img[[idx, idy]] = np.nan
 
         # calculate the integrated island flux if required
         if island_data.doislandflux:
@@ -1428,7 +1239,6 @@ class SourceFinder(object):
         cores : int
           Number of cores to use if different from what is autodetected.
 
-
         do_curve : bool
           If True a curvature map will be created, default=True.
 
@@ -1453,9 +1263,11 @@ class SourceFinder(object):
         # don't reload already loaded data
         if self.global_data.img is not None:
             return
-        img = FitsImage(filename, hdu_index=hdu_index,
-                        beam=beam, cube_index=cube_index)
-        beam = img.beam
+        # img = FitsImage(filename, hdu_index=hdu_index,
+        #                 beam=beam, cube_index=cube_index)
+        img, header = load_image_band(filename,
+                                      hdu_index=hdu_index,
+                                      cube_index=cube_index)
 
         debug = logging.getLogger("Aegean").isEnabledFor(logging.DEBUG)
 
@@ -1473,36 +1285,36 @@ class SourceFinder(object):
                 self.global_data.region = None
 
         self.global_data.wcshelper = WCSHelper.from_header(
-            img.get_hdu_header(), beam, psf_file=psf
+            header, beam, psf_file=psf
         )
         self.global_data.psfhelper = self.global_data.wcshelper
 
         self.global_data.beam = self.global_data.wcshelper.beam
         self.global_data.img = img
-        self.global_data.data_pix = img.get_pixels()
-        self.global_data.dtype = type(self.global_data.data_pix[0][0])
+        self.global_data.header = header
+        self.global_data.dtype = type(self.global_data.img[0][0])
         self.global_data.bkgimg = np.zeros(
-            self.global_data.data_pix.shape, dtype=self.global_data.dtype
+            self.global_data.img.shape, dtype=self.global_data.dtype
         )
         self.global_data.rmsimg = np.zeros(
-            self.global_data.data_pix.shape, dtype=self.global_data.dtype
+            self.global_data.img.shape, dtype=self.global_data.dtype
         )
-        self.global_data.pixarea = img.pixarea
+        self.global_data.pixarea = wcs_helpers.get_pixinfo(header)[0]
         self.global_data.dcurve = None
         self.global_data.cube_index = cube_index
 
         if do_curve:
             self.log.info("Calculating curvature")
             # calculate curvature but store it as -1,0,+1
-            dcurve = np.zeros(self.global_data.data_pix.shape, dtype=np.int8)
+            dcurve = np.zeros(self.global_data.img.shape, dtype=np.int8)
             peaks = scipy.ndimage.filters.maximum_filter(
-                self.global_data.data_pix, size=3
+                self.global_data.img, size=3
             )
             troughs = scipy.ndimage.filters.minimum_filter(
-                self.global_data.data_pix, size=3
+                self.global_data.img, size=3
             )
-            pmask = np.where(self.global_data.data_pix == peaks)
-            tmask = np.where(self.global_data.data_pix == troughs)
+            pmask = np.where(self.global_data.img == peaks)
+            tmask = np.where(self.global_data.img == troughs)
             dcurve[pmask] = -1
             dcurve[tmask] = 1
             self.global_data.dcurve = dcurve
@@ -1515,7 +1327,6 @@ class SourceFinder(object):
                 self.log.info("Calculating background and rms data")
             self._make_bkg_rms(
                 filename=filename,
-                mesh_size=20,
                 forced_rms=rms,
                 forced_bkg=bkg,
                 cores=cores,
@@ -1537,16 +1348,16 @@ class SourceFinder(object):
         if verb and debug:
             self.log.debug(
                 "Data max is {0}".format(
-                    np.nanmax(img.get_pixels())
+                    np.nanmax(img)
                 )
             )
             self.log.debug("Doing background subtraction")
-        img.set_pixels(img.get_pixels() - self.global_data.bkgimg)
-        self.global_data.data_pix = img.get_pixels()
+        img -= self.global_data.bkgimg
+        self.global_data.img = img
         if verb and debug:
             self.log.debug(
                 "Data max is {0}".format(
-                    np.nanmax(img.get_pixels())
+                    np.nanmax(img)
                 )
             )
 
@@ -1557,7 +1368,7 @@ class SourceFinder(object):
         self.global_data.dobias = False
 
         # check if the WCS is galactic
-        if "lon" in self.global_data.img._header["CTYPE1"].lower():
+        if "lon" in self.global_data.header["CTYPE1"].lower():
             self.log.info("Galactic coordinates detected and noted")
             SimpleSource.galactic = True
         return
@@ -1629,7 +1440,7 @@ class SourceFinder(object):
         bkgimg, rmsimg = self.global_data.bkgimg, self.global_data.rmsimg
         curve = np.array(self.global_data.dcurve, dtype=bkgimg.dtype)
         # mask these arrays have the same mask the same as the data
-        mask = np.where(np.isnan(self.global_data.data_pix))
+        mask = np.where(np.isnan(img))
         bkgimg[mask] = np.NaN
         rmsimg[mask] = np.NaN
         curve[mask] = np.NaN
@@ -1637,9 +1448,9 @@ class SourceFinder(object):
         # Generate the new FITS files by copying the existing HDU
         # and assigning new data. This gives the new files the same
         # WCS projection and other header fields.
-        new_hdu = img.hdu
+        header = self.global_data.header
         # Set the ORIGIN to indicate Aegean made this file
-        new_hdu.header["ORIGIN"] = "Aegean {0}-({1})".format(
+        header["ORIGIN"] = "Aegean {0}-({1})".format(
             __version__, __date__)
         for c in [
             "CRPIX3",
@@ -1651,8 +1462,8 @@ class SourceFinder(object):
             "CTYPE3",
             "CTYPE4",
         ]:
-            if c in new_hdu.header:
-                del new_hdu.header[c]
+            if c in header:
+                del header[c]
 
         if outbase is None:
             outbase, _ = os.path.splitext(os.path.basename(image_filename))
@@ -1661,20 +1472,16 @@ class SourceFinder(object):
         curve_out = outbase + "_crv.fits"
         snr_out = outbase + "_snr.fits"
 
-        new_hdu.data = bkgimg
-        new_hdu.writeto(background_out, overwrite=True)
+        write_fits(bkgimg, header, background_out)
         self.log.info("Wrote {0}".format(background_out))
 
-        new_hdu.data = rmsimg
-        new_hdu.writeto(noise_out, overwrite=True)
+        write_fits(rmsimg, header, noise_out)
         self.log.info("Wrote {0}".format(noise_out))
 
-        new_hdu.data = curve
-        new_hdu.writeto(curve_out, overwrite=True)
+        write_fits(curve, header, curve_out)
         self.log.info("Wrote {0}".format(curve_out))
 
-        new_hdu.data = self.global_data.data_pix / rmsimg
-        new_hdu.writeto(snr_out, overwrite=True)
+        write_fits(img/rmsimg, header, snr_out)
         self.log.info("Wrote {0}".format(snr_out))
         return
 
@@ -1688,9 +1495,8 @@ class SourceFinder(object):
         outname : str
           Name for the output file.
         """
-        hdu = self.global_data.img.hdu
-        hdu.data = self.global_data.img._pixels
-        hdu.header["ORIGIN"] = "Aegean {0}-({1})".format(__version__, __date__)
+        header = self.global_data.header
+        header["ORIGIN"] = "Aegean {0}-({1})".format(__version__, __date__)
         # delete some axes that we aren't going to need
         for c in [
             "CRPIX3",
@@ -1702,14 +1508,14 @@ class SourceFinder(object):
             "CTYPE3",
             "CTYPE4",
         ]:
-            if c in hdu.header:
-                del hdu.header[c]
-        hdu.writeto(outname, overwrite=True)
+            if c in header:
+                del header[c]
+        write_fits(self.global_data.img, header, outname)
         self.log.info("Wrote {0}".format(outname))
         return
 
     def _make_bkg_rms(self, filename,
-                      mesh_size=20, forced_rms=None, forced_bkg=None,
+                      forced_rms=None, forced_bkg=None,
                       cores=None):
         """
         Calculate an rms image and a bkg image.
@@ -1718,9 +1524,6 @@ class SourceFinder(object):
         ----------
         filename : str
           Path of the image file.
-
-        mesh_size : int
-          Number of beams per box default = 20
 
         forced_rms : float
           The rms of the image.
@@ -1748,7 +1551,7 @@ class SourceFinder(object):
             return
 
         # use the BANE background/rms calculation
-        step_size = get_step_size(self.global_data.img._header)
+        step_size = get_step_size(self.global_data.header)
         box_size = (5 * step_size[0], 5 * step_size[1])
 
         bkg, rms = filter_image(
@@ -1773,26 +1576,27 @@ class SourceFinder(object):
 
         Parameters
         ----------
-        image : :class:`AegeanTools.fits_image.FitsImage`
+        image : :class:`numpy.ndarray`
           The main image that has already been loaded.
 
-        auxfile : str or HDUList
+        auxfile : str
           The auxiliary file to be loaded.
 
         Returns
         -------
-        aux : :class:`AegeanTools.fits_image.FitsImage`
+        aux : :class:`numpy.ndarray`
           The loaded image.
         """
-        auximg = FitsImage(auxfile, beam=self.global_data.beam).get_pixels()
-        if auximg.shape != image.get_pixels().shape:
+
+        auximg, _ = load_image_band(auxfile)
+        if auximg.shape != image.shape:
             self.log.error(
                 "file {0} is not the same size as the image map".format(
                     auxfile)
             )
             self.log.error(
                 "{0}= {1}, image = {2}".format(
-                    auxfile, auximg.shape, image.get_pixels().shape
+                    auxfile, auximg.shape, image.shape
                 )
             )
             sys.exit(1)
@@ -1827,7 +1631,7 @@ class SourceFinder(object):
         global_data = self.global_data
         sources = []
 
-        data = global_data.data_pix
+        data = global_data.img
         rmsimg = global_data.rmsimg
 
         for inum, isle in enumerate(group, start=istart):
@@ -2187,11 +1991,11 @@ class SourceFinder(object):
         # We need a 1 pix buffer (if available)
         buffx = [
             xmin - max(xmin - 1, 0),
-            min(xmax + 1, global_data.data_pix.shape[0]) - xmax,
+            min(xmax + 1, global_data.img.shape[0]) - xmax,
         ]
         buffy = [
             ymin - max(ymin - 1, 0),
-            min(ymax + 1, global_data.data_pix.shape[1]) - ymax,
+            min(ymax + 1, global_data.img.shape[1]) - ymax,
         ]
         icurve = np.zeros(
             shape=(
@@ -2202,24 +2006,24 @@ class SourceFinder(object):
         )
         # compute peaks and convert to +/-1
         peaks = scipy.ndimage.filters.maximum_filter(
-            self.global_data.data_pix[
+            self.global_data.img[
                 xmin - buffx[0]: xmax + buffx[1],
                 ymin - buffy[0]: ymax + buffy[0]],
             size=3,
         )
         pmask = np.where(
-            peaks == self.global_data.data_pix[
+            peaks == self.global_data.img[
                 xmin - buffx[0]: xmax + buffx[1],
                 ymin - buffy[0]: ymax + buffy[0]]
         )
         troughs = scipy.ndimage.filters.minimum_filter(
-            self.global_data.data_pix[
+            self.global_data.img[
                 xmin - buffx[0]: xmax + buffx[1],
                 ymin - buffy[0]: ymax + buffy[0]],
             size=3,
         )
         tmask = np.where(
-            troughs == self.global_data.data_pix[
+            troughs == self.global_data.img[
                 xmin - buffx[0]: xmax + buffx[1],
                 ymin - buffy[0]: ymax + buffy[0]]
         )
@@ -2334,31 +2138,6 @@ class SourceFinder(object):
         sources = self.result_to_components(
             result, model, island_data, is_flag)
 
-        return sources
-
-    def _fit_islands(self, islands):
-        """
-        Execute fitting on a list of islands
-        This function just wraps around fit_island, so that when we
-        do multiprocesing, a single process will fit multiple
-        islands before returning results.
-
-
-        Parameters
-        ----------
-        islands : list of :class:`AegeanTools.models.IslandFittingData`
-          The islands to be fit.
-
-        Returns
-        -------
-        sources : list
-          The sources that were fit.
-        """
-        self.log.debug("Fitting group of {0} islands".format(len(islands)))
-        sources = []
-        for island in islands:
-            res = self._fit_island(island)
-            sources.extend(res)
         return sources
 
     def find_sources_in_image(
@@ -2483,7 +2262,7 @@ class SourceFinder(object):
         )
         global_data = self.global_data
         rmsimg = global_data.rmsimg
-        data = global_data.data_pix
+        data = global_data.img
 
         self.log.info(
             "beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(
@@ -2511,16 +2290,14 @@ class SourceFinder(object):
         self.log.info("Found {0} islands".format(len(islands)))
         self.log.info("Begin fitting")
 
-        island_groups = []  # will be a list of groups of islands
-        island_group = []  # will be a list of islands
-        group_size = 20
+        island_group = []
         isle_num = 0
 
         for island in islands:
             [[xmin, xmax], [ymin, ymax]] = island.bounding_box
             island_mask = island.mask
 
-            i = copy.deepcopy(global_data.data_pix[xmin:xmax, ymin:ymax])
+            i = copy.deepcopy(global_data.img[xmin:xmax, ymin:ymax])
             i[island_mask] = np.nan
 
             # ignore empty islands
@@ -2535,56 +2312,24 @@ class SourceFinder(object):
             island_data = IslandFittingData(
                 isle_num, i, scalars, offsets, doislandflux)
             island_group.append(island_data)
-            # If the island group is full queue it for the subprocesses to fit
-            if len(island_group) >= group_size:
-                island_groups.append(island_group)
-                island_group = []
-        # The last partially-filled island group also needs
-        # to be queued for fitting
-        if len(island_group) > 0:
-            island_groups.append(island_group)
 
-        # now fit all the groups and put results into queue
+        # now fit all the islands
         sources = []
-        if cores == 1:
-            with tqdm(total=isle_num, desc="Fitting Islands:") as pbar:
-                for g in island_groups:
-                    for i in g:
-                        srcs = self._fit_island(i)
-                        # update bar as each individual island is fit
-                        pbar.update(1)
-                        for src in srcs:
-                            # ignore sources that we have been told to ignore
-                            if (src.peak_flux > 0 and nopositive) or (
-                                src.peak_flux < 0 and nonegative
-                            ):
-                                continue
-                            sources.append(src)
-
-        else:
-            queue = pprocess.Queue(limit=cores, reuse=1)
-            fit_parallel = queue.manage(
-                pprocess.MakeReusable(self._fit_islands))
-            for g in island_groups:
-                fit_parallel(g)
-
-            with tqdm(
-                total=len(island_groups),
-                desc="Fitting Island Groups:",
-                disable=not progress,
-            ) as pbar:
-                # turn our queue into a list of sources,
-                # filtering +/- peak flux as required
-                for srcs in queue:
+        with tqdm(total=isle_num, desc="Fitting Islands:") as pbar:
+            for i in island_group:
+                try:
                     pbar.update(1)
-                    if srcs:  # ignore empty lists
-                        for src in srcs:
-                            # ignore sources that we have been told to ignore
-                            if (src.peak_flux > 0 and nopositive) or (
-                                src.peak_flux < 0 and nonegative
-                            ):
-                                continue
-                            sources.append(src)
+                    srcs = self._fit_island(i)
+                except AegeanNaNModelError:
+                    continue
+                # update bar as each individual island is fit
+                for src in srcs:
+                    # ignore sources that we have been told to ignore
+                    if (src.peak_flux > 0 and nopositive) or (
+                        src.peak_flux < 0 and nonegative
+                    ):
+                        continue
+                    sources.append(src)
 
         # Write the output to the output file
         if outfile:
@@ -2725,7 +2470,7 @@ class SourceFinder(object):
         global_data = self.global_data
 
         # load the table and convert to an input source list
-        if isinstance(catalogue, six.string_types):
+        if isinstance(catalogue, str):
             input_table = load_table(catalogue)
             input_sources = np.array(table_to_source_list(input_table))
         else:
@@ -2795,21 +2540,11 @@ class SourceFinder(object):
             desc="Refitting Island Groups",
             disable=not progress,
         ) as pbar:
-            if cores == 1:
-                for i, g in enumerate(island_groups):
-                    srcs = self._refit_islands(g, stage, outerclip, istart=i)
-                    # update bar as each individual island is fit
-                    pbar.update(1)
-                    sources.extend(srcs)
-            else:
-                queue = pprocess.Queue(limit=cores, reuse=1)
-                fit_parallel = queue.manage(
-                    pprocess.MakeReusable(self._refit_islands))
-                for i, g in enumerate(island_groups):
-                    fit_parallel(g, stage, outerclip, istart=i)
-                for srcs in queue:
-                    pbar.update(1)
-                    sources.extend(srcs)
+            for i, g in enumerate(island_groups):
+                srcs = self._refit_islands(g, stage, outerclip, istart=i)
+                # update bar as each individual island is fit
+                pbar.update(1)
+                sources.extend(srcs)
 
         sources = sorted(sources)
 
@@ -2891,35 +2626,6 @@ def theta_limit(theta):
     while theta > np.pi / 2:
         theta -= np.pi
     return theta
-
-
-def check_cores(cores):
-    """
-    Determine how many cores we are able to use.
-    Return 1 if we are not able to make a queue via pprocess.
-
-    Parameters
-    ----------
-    cores : int
-      The number of cores that are requested.
-
-    Returns
-    -------
-    cores : int
-      The number of cores available.
-
-    """
-    cores = min(multiprocessing.cpu_count(), cores)
-    try:
-        queue = pprocess.Queue(limit=cores, reuse=1)
-    except:  # TODO: figure out what error is being thrown
-        cores = 1
-    else:
-        try:
-            _ = queue.manage(pprocess.MakeReusable(fix_shape))
-        except:
-            cores = 1
-    return cores
 
 
 def get_aux_files(basename):

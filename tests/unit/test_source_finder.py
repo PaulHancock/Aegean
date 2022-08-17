@@ -34,9 +34,9 @@ def test_psf_with_nans():
     hdu.writeto('dlme_psf.fits')
 
     try:
-        found = sfinder.find_sources_in_image(filename,
-                                              cores=1, rms=0.5, bkg=0,
-                                              imgpsf='dlme_psf.fits')
+        _ = sfinder.find_sources_in_image(filename,
+                                          cores=1, rms=0.5, bkg=0,
+                                          imgpsf='dlme_psf.fits')
     except AssertionError as e:
         os.remove('dlme_psf.fits')
         if 'major' in e.args[0]:
@@ -185,9 +185,13 @@ def test_find_and_prior_sources():
 
     # now with some options
     aux_files = sf.get_aux_files(filename)
-    found2 = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
-                                           rmsin=aux_files['rms'], bkgin=aux_files['bkg'],
-                                           mask=aux_files['mask'], cores=1, docov=False)
+    found2 = sfinder.find_sources_in_image(filename, doislandflux=True,
+                                           outfile=open('dlme', 'w'),
+                                           nonegative=False,
+                                           rmsin=aux_files['rms'],
+                                           bkgin=aux_files['bkg'],
+                                           mask=aux_files['mask'],
+                                           cores=1, docov=False)
     if not (len(found2) == ntot):
         raise AssertionError(
             "Found the wrong number of sources {0}".format(len(found2)))
@@ -204,14 +208,22 @@ def test_find_and_prior_sources():
     # some more tests, now using multiple cores
     cores = 2
 
-    priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=False, ratio=1.2, cores=cores,
-                                              rmsin=aux_files['rms'], bkgin=aux_files['bkg'], docov=False)
+    priorized = sfinder.priorized_fit_islands(filename, catalogue=found,
+                                              doregroup=False,
+                                              ratio=1.2, cores=cores,
+                                              rmsin=aux_files['rms'],
+                                              bkgin=aux_files['bkg'],
+                                              docov=False)
     if not (len(priorized) == nsrc):
         raise AssertionError(
             "Found the wrong number of sources {0}".format(len(priorized)))
 
-    priorized = sfinder.priorized_fit_islands(filename, catalogue=found, doregroup=True, cores=1,
-                                              rmsin=aux_files['rms'], bkgin=aux_files['bkg'], outfile=open('dlme', 'w'), stage=1)
+    priorized = sfinder.priorized_fit_islands(filename, catalogue=found,
+                                              doregroup=True, cores=1,
+                                              rmsin=aux_files['rms'],
+                                              bkgin=aux_files['bkg'],
+                                              outfile=open('dlme', 'w'),
+                                              stage=1)
     if not (len(priorized) == nsrc):
         raise AssertionError(
             "Found the wrong number of sources {0}".format(len(priorized)))
@@ -243,20 +255,26 @@ def dont_test_find_and_prior_parallel():
     log.info("fitting with supplied bkg/rms and 2 cores")
     cores = 2
     sfinder = sf.SourceFinder(log=log)
-    _ = sfinder.find_sources_in_image(filename, doislandflux=True, outfile=open('dlme', 'w'), nonegative=False,
-                                      rmsin=aux_files['rms'], bkgin=aux_files['bkg'],
-                                      mask=aux_files['mask'], cores=cores)
+    _ = sfinder.find_sources_in_image(filename, doislandflux=True,
+                                      outfile=open('dlme', 'w'),
+                                      nonegative=False,
+                                      rmsin=aux_files['rms'],
+                                      bkgin=aux_files['bkg'],
+                                      mask=aux_files['mask'],
+                                      cores=cores)
 
     log.info('now priorised fitting')
-    _ = sfinder.priorized_fit_islands(
-        filename, catalogue=found, doregroup=True, cores=cores, outfile=open('dlme', 'w'))
+    _ = sfinder.priorized_fit_islands(filename, catalogue=found,
+                                      doregroup=True, cores=cores,
+                                      outfile=open('dlme', 'w'))
     os.remove('dlme')
 
     del sfinder
     log.info('fitting negative sources')
     sfinder = sf.SourceFinder(log=log)
-    sfinder.find_sources_in_image(
-        'tests/test_files/1904-66_SIN_neg.fits', doislandflux=True, nonegative=False, cores=cores)
+    sfinder.find_sources_in_image('tests/test_files/1904-66_SIN_neg.fits',
+                                  doislandflux=True, nonegative=False,
+                                  cores=cores)
 
 
 def test_save_files():
@@ -302,8 +320,9 @@ def test_esimate_lmfit_parinfo():
     # should run error because curve is the wrong shape
     curve = np.zeros((3, 4))
     try:
-        sfinder.estimate_lmfit_parinfo(data=data, rmsimg=rmsimg, curve=curve,
-                                       beam=beam, innerclip=5, outerclip=outerclip)
+        sfinder.estimate_lmfit_parinfo(data=data, rmsimg=rmsimg,
+                                       curve=curve, beam=beam,
+                                       innerclip=5, outerclip=outerclip)
     except AssertionError as e:
         e.message = 'Passed'
     else:
@@ -318,23 +337,22 @@ def test_island_contours():
     log = logging.getLogger("Aegean")
     sfinder = sf.SourceFinder(log=log)
     filename = 'tests/test_files/synthetic_test.fits'
-    nsrc = 98
-    nisl = 97
-    ntot = nsrc+nisl
 
     # vanilla source finding
     found = sfinder.find_sources_in_image(
         filename, cores=1, rms=0.5, bkg=0, doislandflux=True)
 
     components, islands, simples = classify_catalog(found)
-    isle_0_contour = np.array([(41, 405), (41, 406), (41, 407), (42, 407), (42, 408), (42, 409), (43, 409), (43, 410),
-                               (44, 410), (45, 410), (46, 410), (47, 410), (47,
-                                                                            409), (48, 409), (48, 408), (49, 408),
-                               (49, 407), (49, 406), (49, 405), (48, 405), (48,
-                                                                            404), (48, 403), (47, 403), (46, 403),
-                               (45, 403), (44, 403), (43, 403), (43, 404), (42, 404), (42, 405)])
+    isle_0_contour = np.array([(41, 405), (41, 406), (41, 407), (42, 407),
+                               (42, 408), (42, 409), (43, 409), (43, 410),
+                               (44, 410), (45, 410), (46, 410), (47, 410),
+                               (47, 409), (48, 409), (48, 408), (49, 408),
+                               (49, 407), (49, 406), (49, 405), (48, 405),
+                               (48, 404), (48, 403), (47, 403), (46, 403),
+                               (45, 403), (44, 403), (43, 403), (43, 404),
+                               (42, 404), (42, 405)])
     if not np.all(np.array(islands[0].contour) == isle_0_contour):
-        raise AssertionError("Island contour for island 0 is incoorect")
+        raise AssertionError("Island contour for island 0 is incorrect")
     return
 
 
@@ -364,22 +382,30 @@ def test_find_islands():
 
     if len(islands) != 1:
         raise AssertionError(
-            "Incorrect number of islands found {0}, expecting 1".format(len(islands)))
+            "Incorrect number of islands found {0}, expecting 1".format(
+                len(islands))
+        )
     if not isinstance(islands[0], models.PixelIsland):
         raise AssertionError(
-            "Islands[0] is not a PixelIsland but instead a {0}".format(type(islands[0])))
+            "Islands[0] is not a PixelIsland but instead a {0}".format(
+                type(islands[0]))
+        )
 
     correct_box = [[3, 6], [4, 7]]
     if not np.all(islands[0].bounding_box == correct_box):
-        raise AssertionError("Bounding box incorrect, should be {0}, but is {1}".format(
-            correct_box, islands[0].bounding_box))
+        raise AssertionError(
+            "Bounding box incorrect, should be {0}, but is {1}".format(
+                correct_box, islands[0].bounding_box)
+        )
 
     # add another island that is between the seed/flood thresholds
     im[7:9, 2:5] = 4.5
     islands = sf.find_islands(im, bkg, rms, log=log)
     if len(islands) != 1:
         raise AssertionError(
-            "Incorrect number of islands found {0}, expecting 1".format(len(islands)))
+            "Incorrect number of islands found {0}, expecting 1".format(
+                len(islands))
+        )
 
     return
 
@@ -405,13 +431,17 @@ def test_estimate_parinfo_image():
 
     if len(sources) != 1:
         raise AssertionError(
-            "Incorrect number of sources found {0}, expecting 1".format(len(sources)))
+            "Incorrect number of sources found {0}, expecting 1".format(
+                len(sources))
+        )
     if not sources[0]['components'].value == 1:
         raise AssertionError("Found {0} components, expecting 1".format(
-            sources[0]['components'].value))
+            sources[0]['components'].value)
+        )
     if not sources[0]['c0_amp'].value == 8.0:
         raise AssertionError("c0_amp is not 8.0 (is {0})".format(
-            sources[0]['c0_amp'].value))
+            sources[0]['c0_amp'].value)
+        )
 
     # test on a negative island
     im *= -1.
@@ -421,13 +451,17 @@ def test_estimate_parinfo_image():
 
     if len(sources) != 1:
         raise AssertionError(
-            "Incorrect number of sources found {0}, expecting 1".format(len(sources)))
+            "Incorrect number of sources found {0}, expecting 1".format(
+                len(sources))
+        )
     if not sources[0]['components'].value == 1:
         raise AssertionError("Found {0} components, expecting 1".format(
-            sources[0]['components'].value))
+            sources[0]['components'].value)
+        )
     if not sources[0]['c0_amp'].value == -8.0:
         raise AssertionError(
-            "c0_amp is not -8.0 (is {0})".format(sources[0]['c0_amp'].value))
+            "c0_amp is not -8.0 (is {0})".format(sources[0]['c0_amp'].value)
+        )
 
     # test on a small island
     im[:, :] = np.nan
@@ -439,7 +473,9 @@ def test_estimate_parinfo_image():
         islands, im=im, rms=rms, wcshelper=wcshelper, log=log)
     if len(sources) != 1:
         raise AssertionError(
-            "Incorrect number of sources found {0}, expecting 1".format(len(sources)))
+            "Incorrect number of sources found {0}, expecting 1".format(
+                len(sources))
+        )
     if not sources[0]['components'].value == 1:
         raise AssertionError("Found {0} components, expecting 1".format(
             sources[0]['components'].value))
