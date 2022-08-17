@@ -41,16 +41,16 @@ jobs:
         coverage run -m pytest
         coverage combine
         coverage html
-        coverage xml
+        coverage xml -o coverage_${{ matrix.python-version }}.xml
     - name: Archive coverage results
       uses: actions/upload-artifact@v3
       with:
         name: code-coverage-report
         path: |
           htmlcov/
-          coverage.xml
+          coverage_${{ matrix.python-version }}.xml
     - name: Upload coverage report
       uses: codacy/codacy-coverage-reporter-action@v1
       with:
         api-token: ${{ secrets.CODACY_API_TOKEN }}
-        coverage-reports: coverage.xml
+        coverage-reports: coverage_${{ matrix.python-version }}.xml
