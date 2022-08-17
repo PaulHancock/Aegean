@@ -49,9 +49,9 @@ Aegean
 -  Fix a bug which allowed components of one island to appear in nearby islands (see #158)
 -  Update documentation and associated [website](http://aegeantools.rtfd.io/)
 -  Change the regrouping algorithm to be crazy fast (compared to stupid slow)
-  - adds `scikit-learn>=0.24.2` as a dependency
-  - see `AeReg` above
-  - use `--regroup-eps` to set the radius, default is 4x the average source major axis size
+  -  adds `scikit-learn>=0.24.2` as a dependency
+  -  see `AeReg` above
+  -  use `--regroup-eps` to set the radius, default is 4x the average source major axis size
 
 BANE
 -  Update sigma clipping to be better (see #159)
@@ -85,7 +85,7 @@ Aegean
 
 MIMAS
 -  added new functionality, `--mask2mim`, which will convert a fits file into a region file.
-  - new option `--threshold` will determine which pixels in the input image are in/out of the mask. Default is 1.
+  -  new option `--threshold` will determine which pixels in the input image are in/out of the mask. Default is 1.
 
 BANE
 -  fix a bug that would cause a crash if BSCALE was present and not 1.0
@@ -107,7 +107,7 @@ Aegean
 Aegean
 -  Internal bkg/rms calculations have been replaced with calls to BANE
 -  Handling of the image psf has been drastically improved, but at the expense of only supporting SIN images
-  - Images that are not in SIN projection are supported but should use an external psf map
+  -  Images that are not in SIN projection are supported but should use an external psf map
 -  `--telescope` and `--lat` options have been deprecated as they are no longer required
 
 ### v2.1.1
@@ -165,8 +165,8 @@ BANE
 -  address a segfault problem that occurs on large images when `--onepass` is not used (#75)
 -  making use of `--stripes` greater than 1 requires at least `--cores=2`
 -  further reduce memory footprint:
-  - reduce the amount of interpolation stages that are required by 1 per stripe
-  - do background subtraction and masking in the sub-processes to avoid loading the entire image in the main process
+  -  reduce the amount of interpolation stages that are required by 1 per stripe
+  -  do background subtraction and masking in the sub-processes to avoid loading the entire image in the main process
 -  deprecate options `--onepass`/`--twopass` and set a warning when used
 
 MIMAS
@@ -202,12 +202,12 @@ AeRes
 ### 2018-06-28
 
 BANE
- - multiple changes that allow BANE to be run in memory constrained enviornments
- - force image segmentation to always be in horizontal stripes
- - add new option `--stripes` to control the number of stripes
- - allow `--stripes` and `--cores` to be different
- - make better use of shared memory to reduce memory footprint
- - update BANE to version 1.6.0
+-  multiple changes that allow BANE to be run in memory constrained enviornments
+-  force image segmentation to always be in horizontal stripes
+-  add new option `--stripes` to control the number of stripes
+-  allow `--stripes` and `--cores` to be different
+-  make better use of shared memory to reduce memory footprint
+-  update BANE to version 1.6.0
 
 ### v2.0.2
 
@@ -321,12 +321,12 @@ Aegean
 
 ### v1.9.5-0-gd86d0e9 (May 14 2015)
 -  Aegean
- -  Least Squares fitting is now done via module [[lmfit|http://lmfit.github.io/lmfit-py/]] which wraps ``scipy.optimize`` functions, which in turn rely on ``MINPACK`` code written in c/fortran. ``lmfit`` can be installed with ``pip`` and is faster than ``mpfit``.
- -  New option ``--priorized`` has been implemented. This should be used in place of ``--measure``. See [[Priorized Fitting|Priorized Fitting]] for details on how this option works.
- -  Catalogs of sources now include a ``uuid`` column that will make exact matching easier for ``--priorized`` fitting.
+  -  Least Squares fitting is now done via module [[lmfit|http://lmfit.github.io/lmfit-py/]] which wraps ``scipy.optimize`` functions, which in turn rely on ``MINPACK`` code written in c/fortran. ``lmfit`` can be installed with ``pip`` and is faster than ``mpfit``.
+  -  New option ``--priorized`` has been implemented. This should be used in place of ``--measure``. See [[Priorized Fitting|Priorized Fitting]] for details on how this option works.
+  -  Catalogs of sources now include a ``uuid`` column that will make exact matching easier for ``--priorized`` fitting.
  -  Added new output formats:
    -  Fits binary tables with extension ``.fits``.
-    -  HDF5 tables with extension ``.hdf5`` (requires module ``h5py``)
+     -  HDF5 tables with extension ``.hdf5`` (requires module ``h5py``)
  -  New options ``--tformats`` prints a list of file formats that are avilable for writing. [H/T David Kaplan for this suggestion and the new formats].
  -  Updated kvis component annotations file to include an (isle,source) label as is done in the ds9 region files. [Thanks to Shane O'Sullivan for the suggestion and formatting]
 -  AegeanTools
@@ -376,37 +376,37 @@ Aegean
 ### v1.9rc1-104-gbfe836c (Feb 4 2015)
 
 -  SR6 - NEW!
- -  Shrink Ray-6 is a command line wrapper for the new `AegeanTools.fits_interp` module
- -  `SR6.py <inputfile> -f 10 -o <outputfile>` will decimated a file by sampling every 10th pixel
- -  `SR6.py <inputfile> -x -o <outputfile>` will expand a file to full resolution using information stored in the fits header
- -  `-m <filename>` will use the given file as a model to mask the output. Pixels which are masked in the model file will be masked in the output file. WCS is ignored, but pixel dimensions must be identical.
- -  `-i [linear|nearest|cubic]` controls the interpolation method used. *linear* is default (and recommended), whilst *cubic* is unstable and time consuming.
- -  `fits_interp` handles the compression/expansion of fits files using decimation and interpolation
-   -  when combined with BANE and Aegean `fits_interp` allows for a great reduction in the size of the background and noise images.
+  -  Shrink Ray-6 is a command line wrapper for the new `AegeanTools.fits_interp` module
+  -  `SR6.py <inputfile> -f 10 -o <outputfile>` will decimated a file by sampling every 10th pixel
+  -  `SR6.py <inputfile> -x -o <outputfile>` will expand a file to full resolution using information stored in the fits header
+  -  `-m <filename>` will use the given file as a model to mask the output. Pixels which are masked in the model file will be masked in the output file. WCS is ignored, but pixel dimensions must be identical.
+  -  `-i [linear|nearest|cubic]` controls the interpolation method used. *linear* is default (and recommended), whilst *cubic* is unstable and time consuming.
+  -  `fits_interp` handles the compression/expansion of fits files using decimation and interpolation
+    -  when combined with BANE and Aegean `fits_interp` allows for a great reduction in the size of the background and noise images.
 
 -  BANE
- -  added option `--compress` which will cause BANE to write background an noise images that are low resolution. The lower resolution does not destroy information as the previous 'full-resolution' maps are just interpolated versions of these lower resolution images.
-   -  `--compress`-ed images are smaller by a factor of about grid^2
+  -  added option `--compress` which will cause BANE to write background an noise images that are low resolution. The lower resolution does not destroy information as the previous 'full-resolution' maps are just interpolated versions of these lower resolution images.
+    -  `--compress`-ed images are smaller by a factor of about grid^2
     -  `--compress`-ed images have correct WCS and can thus be used by any program that you would normally use
     -  `--compress`-ed images have key words added to the fits header so that they can be expanded to 'full-resolution' images correctly
  -  added option `--nomask` that will stop BANE from masking the output image to match the input image
 
 
 -  Aegean
- -  `fits_image` has been modified to automatically detect files that have been created with `--compress` and will expand/interpolate them before loading.
+  -  `fits_image` has been modified to automatically detect files that have been created with `--compress` and will expand/interpolate them before loading.
 
 ### v1.9rc1-84-g63325f4 (Feb 2 2015)
 
 -  Aegean
- -  fixed a bug that was stopping negative sources from being found
- -  fixed a bug that caused a crash when a fit failed
+  -  fixed a bug that was stopping negative sources from being found
+  -  fixed a bug that caused a crash when a fit failed
 
 ### v1.9rc1-80-gf3cc16f (Jan 21 2015)
 
 -  Aegean
- -  Errors on all parameters have now been more correctly calculated. In most cases the errors will decrease. Error calculation is now inline with what the extensive doc string of `mpfit.py` suggests.
- -  added new command line option `--autoload`
-   -  `--autoload` will look for background (_bkg.fits), noise (_rms.fits), and region (.mim) files that have the same base name as the input image. If found these files will be loaded, if not, Aegean proceeds as if you had not specified them.
+  -  Errors on all parameters have now been more correctly calculated. In most cases the errors will decrease. Error calculation is now inline with what the extensive doc string of `mpfit.py` suggests.
+  -  added new command line option `--autoload`
+    -  `--autoload` will look for background (_bkg.fits), noise (_rms.fits), and region (.mim) files that have the same base name as the input image. If found these files will be loaded, if not, Aegean proceeds as if you had not specified them.
     -  `--autoload` is handy, but can be dangerous as it will not complain about missing files
 
 ### v1.9rc1-78-gc4461b1 (Jan 19 2015)
@@ -419,15 +419,15 @@ Aegean
 ### v1.9rc1-70-gbcd531d (Jan 16 2015)
 
 -  Aegean
- -  Sources near the edge of the image (the edge of the valid WCS area of the image) are no longer cuasing crazy problems.
+  -  Sources near the edge of the image (the edge of the valid WCS area of the image) are no longer cuasing crazy problems.
 
 ### v1.9rc1-68-g1ad3d25 (Jan 14 2015)
 
 -  Aegean
- -  `find_sources_in_image` now accepts mask=region as either a filename or an instance of `AegeanTools.regions.Region`
+  -  `find_sources_in_image` now accepts mask=region as either a filename or an instance of `AegeanTools.regions.Region`
 
 ### v1.9rc1-66-g2fdde1a (Jan 13 2015)
 
 -  Aegean
- -  VOTables, databases, and .reg files now contain metadata
-  -  Currently this is just the Aegean version
+  -  VOTables, databases, and .reg files now contain metadata
+    -  Currently this is just the Aegean version
