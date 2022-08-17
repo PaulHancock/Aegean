@@ -1,4 +1,4 @@
-Aug 2022
+V 2.3.0
 =========
 General
 - dropped support for version of python prior to 3.8
