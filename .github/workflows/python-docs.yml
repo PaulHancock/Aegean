@@ -35,4 +35,4 @@ jobs:
       with:
         name: documentation
         path: |
-          docs/_build/html
+          _build/html
