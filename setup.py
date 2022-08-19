@@ -3,7 +3,7 @@
 Setup for AegeanTools
 """
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
 
 # Utility function to read the README file.
 # Used for the long_description.  It's nice, because now 1) we have a top level
@@ -34,7 +34,7 @@ data_dir = 'AegeanTools/data'
 
 setup(
     name="AegeanTools",
-    packages=['AegeanTools'],
+    packages=find_packages(exclude='test'),
     version=get_version(),
     licence='afl-3.0',
 
