@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 
 from AegeanTools.CLI import BANE
-import os
 
 image_SIN = 'tests/test_files/1904-66_SIN.fits'
 image_AIT = 'tests/test_files/1904-66_AIT.fits'

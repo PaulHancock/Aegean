@@ -14,7 +14,7 @@ __author__ = 'Paul Hancock'
 def test_Dummy():
     """Test dummy class"""
     try:
-        d = MIMAS.Dummy()
+        MIMAS.Dummy()
     except:
         raise AssertionError("Dummy.__init__ is broken")
     return
@@ -24,7 +24,7 @@ def test_galactic2fk5():
     """test function"""
     try:
         l, b = np.radians(13), np.radians(-41)
-        ra, dec = MIMAS.galactic2fk5(l, b)
+        MIMAS.galactic2fk5(l, b)
     except:
         raise AssertionError("galactic2fk5 is broken")
     return
@@ -48,13 +48,13 @@ def test_mask_file():
     except AssertionError as e:
         if not 'fits file' in e.args[0]:
             raise AssertionError('Failed to catch file not found err (image)')
-    
+
     try:
-        MIMAS.mask_file('nofile', infile,'nofile')
+        MIMAS.mask_file('nofile', infile, 'nofile')
     except AssertionError as e:
         if not 'region file' in e.args[0]:
             raise AssertionError('Faile to catch file not found err (region)')
-    
+
     # make a region file and test that a masked outfile can be made
     region.save(rfile)
 
@@ -78,14 +78,14 @@ def test_mask_file():
 def test_mask_table():
     region = Region(maxdepth=8)
     region.add_circles(np.radians(285), np.radians(0), np.radians(2.1))
-    ra = np.linspace(280,290, 11)
+    ra = np.linspace(280, 290, 11)
     dec = np.zeros(11)
-    tab = Table(data=[ra,dec], names=('ra','dec'))
+    tab = Table(data=[ra, dec], names=('ra', 'dec'))
     masked = MIMAS.mask_table(region, tab)
     if len(masked) != 6:
         print(len(masked))
         raise AssertionError("failed to mask table correctly")
-    
+
     masked = MIMAS.mask_table(region, tab, negate=True)
     if len(masked) != 5:
         raise AssertionError("failed to mask table correctly")
@@ -95,14 +95,14 @@ def test_mask_table():
 def test_mask_catalog():
     infile = 'tests/test_files/1904_comp.fits'
     regionfile = 'tests/test_files/1904-66_SIN.mim'
-    outfile='dlme.fits'
+    outfile = 'dlme.fits'
 
     MIMAS.mask_catalog(regionfile, infile, outfile)
     if not os.path.exists(outfile):
         raise AssertionError("failed to mask catalogue")
     os.remove(outfile)
 
-    MIMAS.mask_catalog(regionfile,infile,outfile, negate=True)
+    MIMAS.mask_catalog(regionfile, infile, outfile, negate=True)
     if not os.path.exists(outfile):
         raise AssertionError("failed to mask catalogue")
     os.remove(outfile)
@@ -195,7 +195,7 @@ def test_poly2poly():
 
 def test_reg2mim():
     reg = 'tests/test_files/ds9.reg'
-    outfile='dlme.mim'
+    outfile = 'dlme.mim'
     MIMAS.reg2mim(reg, outfile, maxdepth=4)
     if not os.path.exists(outfile):
         raise AssertionError("reg2mim failed")
@@ -213,21 +213,21 @@ def test_combine_regions():
 
     class O(object):
         pass
- 
+
     c = O()
     c.maxdepth = 3
     c.add_region = [[file1]]
     c.rem_region = [[file2]]
-    c.include_circles = [[12, -13 ,1]]
+    c.include_circles = [[12, -13, 1]]
     c.exclude_circles = [[10, 12, 3]]
-    c.include_polygons = [[0.0, 0.0, 1.0, 0.0, 1.0, -1.0, 0.0, -1.0] ]
-    c.exclude_polygons = [[0,0, 0,1, 1,1, 1,0 ] ]
+    c.include_polygons = [[0.0, 0.0, 1.0, 0.0, 1.0, -1.0, 0.0, -1.0]]
+    c.exclude_polygons = [[0, 0, 0, 1, 1, 1, 1, 0]]
 
     c.galactic = False
-    r = MIMAS.combine_regions(c)
+    MIMAS.combine_regions(c)
 
     c.galactic = True
-    r = MIMAS.combine_regions(c)
+    MIMAS.combine_regions(c)
 
     os.remove(file1)
     os.remove(file2)
@@ -249,7 +249,7 @@ def test_intersect_regions():
     r1.save(file1)
     r1.save(file2)
 
-    a = MIMAS.intersect_regions( [file1, file2] )
+    a = MIMAS.intersect_regions([file1, file2])
     os.remove(file1)
     os.remove(file2)
     if not a:
@@ -262,7 +262,7 @@ def test_save_region():
     rfile = 'circle.mim'
     region = Region(maxdepth=3)
     region.add_circles(np.radians(285), np.radians(-65), 1.8)
-    MIMAS.save_region(region,rfile)
+    MIMAS.save_region(region, rfile)
     if not os.path.exists(rfile):
         raise AssertionError("save_region failed")
     os.remove(rfile)

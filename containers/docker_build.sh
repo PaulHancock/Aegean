@@ -1,10 +1,5 @@
 #! /usr/bin/env bash
 
-function usage {
-        echo "Usage: $(basename $0) [git branch name or commit hash]" 2>&1
-        exit 1
-}
-
 if [[ ${#} -eq 0 ]]; then
    version='main';
 else

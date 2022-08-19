@@ -217,7 +217,7 @@ def load_catalog(filename):
         try:
             catalog = [(float(a[0]), float(a[1])) for a in lines]
         except ValueError as e:
-            log.warn(e)
+            log.warning(e)
             log.error("Expecting two columns of floats but failed to parse")
             log.error("Catalog file {0} not loaded".format(filename))
             raise Exception("Could not determine file format")
@@ -524,8 +524,8 @@ def writeIslandContours(filename, catalog, fmt='reg'):
     out = open(filename, 'w')
     print("#Aegean island contours", file=out)
     print("#AegeanTools.catalogs version {0}-({1})".format(
-                __version__, __date__),
-          file=out)
+        __version__, __date__),
+        file=out)
     line_fmt = 'image;line({0},{1},{2},{3})'
     text_fmt = 'fk5; text({0},{1}) # text={{{2}}}'
     mas_fmt = 'image; line({1},{0},{3},{2}) #color = yellow'

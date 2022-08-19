@@ -4,6 +4,7 @@
 This module contains all of the BANE specific code
 The function filter_image should be imported from elsewhere and run as is.
 """
+
 import copy
 import logging
 import multiprocessing
@@ -16,11 +17,6 @@ import numpy as np
 from astropy.io import fits
 from scipy.interpolate import RegularGridInterpolator
 
-import numpy as np
-from astropy.io import fits
-from scipy.interpolate import RegularGridInterpolator
-
-# Aegean tools
 from .fits_tools import compress
 
 __author__ = 'Paul Hancock'
@@ -94,7 +90,7 @@ def sigmaclip(arr, lo, hi, reps=10):
         prev_valid = curr_valid
     else:
         logging.debug(
-            "No stopping criteria was reached after {0} cycles".format(reps))
+            "No stopping criteria was reached after {0} cycles".format(count))
 
     return mean, std
 
@@ -280,7 +276,6 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
         if i == 0:
             barrier.reset()
 
-
         logging.debug("applying mask")
         mask = ~np.isfinite(
             data[0 + ymin - data_row_min: data.shape[0] -
@@ -360,7 +355,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
     logging.debug("ymaxs {0}".format(ymaxs))
 
     args = []
-    for i, region in enumerate(zip(ymins, ymaxs)):
+    for region in zip(ymins, ymaxs):
         args.append((filename, region, step_size, box_size,
                     shape, domask, cube_index))
 
@@ -468,7 +463,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
             logging.error(
                 "3rd dimension has len {0} but index {1} was passed".format(
                     naxis3, cube_index)
-                )
+            )
             return None
 
     if step_size is None:
@@ -484,7 +479,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
             logging.info(
                 "Changing grid to be {0} so we can compress the output".format(
                     step_size)
-                )
+            )
 
     logging.info("using grid_size {0}, box_size {1}".format(
                  step_size, box_size))

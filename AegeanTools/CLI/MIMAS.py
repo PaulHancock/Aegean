@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 
 import argparse
-import sys
 from AegeanTools import MIMAS, __citation__
 
 

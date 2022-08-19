@@ -26,7 +26,7 @@ def test_defaults():
 def test_multi_islands():
     """Test with two islands"""
     # make a C and a + on a background of zeros
-    data = np.zeros((7, 9), dtype=np.int)
+    data = np.zeros((7, 9), dtype=int)
     data[1, [1, 2, 3]] = 1
     data[2, [1, 3, 6]] = 1
     data[3, [1, 5, 6, 7]] = 1

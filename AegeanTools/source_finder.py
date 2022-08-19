@@ -14,8 +14,7 @@ import sys
 import lmfit
 import numpy as np
 import scipy
-from scipy.ndimage import find_objects, label
-from scipy.ndimage.filters import maximum_filter, minimum_filter
+from scipy.ndimage import find_objects, label, maximum_filter, minimum_filter
 from scipy.special import erf
 from tqdm import tqdm
 
@@ -1307,12 +1306,8 @@ class SourceFinder(object):
             self.log.info("Calculating curvature")
             # calculate curvature but store it as -1,0,+1
             dcurve = np.zeros(self.global_data.img.shape, dtype=np.int8)
-            peaks = scipy.ndimage.filters.maximum_filter(
-                self.global_data.img, size=3
-            )
-            troughs = scipy.ndimage.filters.minimum_filter(
-                self.global_data.img, size=3
-            )
+            peaks = maximum_filter(self.global_data.img, size=3)
+            troughs = minimum_filter(self.global_data.img, size=3)
             pmask = np.where(self.global_data.img == peaks)
             tmask = np.where(self.global_data.img == troughs)
             dcurve[pmask] = -1
@@ -2005,7 +2000,7 @@ class SourceFinder(object):
             dtype=np.int8,
         )
         # compute peaks and convert to +/-1
-        peaks = scipy.ndimage.filters.maximum_filter(
+        peaks = maximum_filter(
             self.global_data.img[
                 xmin - buffx[0]: xmax + buffx[1],
                 ymin - buffy[0]: ymax + buffy[0]],
@@ -2016,7 +2011,7 @@ class SourceFinder(object):
                 xmin - buffx[0]: xmax + buffx[1],
                 ymin - buffy[0]: ymax + buffy[0]]
         )
-        troughs = scipy.ndimage.filters.minimum_filter(
+        troughs = minimum_filter(
             self.global_data.img[
                 xmin - buffx[0]: xmax + buffx[1],
                 ymin - buffy[0]: ymax + buffy[0]],
