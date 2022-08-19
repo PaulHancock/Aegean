@@ -48,9 +48,9 @@ setup(
     install_requires=reqs,
     scripts=['scripts/aegean', 'scripts/BANE',
              'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS',
-             'scripts/AeReg'],
+             'scripts/AeReg', 'scripts/fix_beam.py'],
     data_files=[('AegeanTools', [os.path.join(data_dir, 'MOC.fits')])],
-    python_requires='>=3.6',
+    python_requires='>=3.8',
     setup_requires=['pytest-runner'],
     tests_require=['pytest', 'nose'],
 
@@ -62,9 +62,8 @@ setup(
         'Intended Audience :: Science/Research',
         'Topic :: Scientific/Engineering :: Astronomy',
         'License :: OSI Approved :: Academic Free License (AFL)',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
     ],
 )
