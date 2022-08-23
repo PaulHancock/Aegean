@@ -10,6 +10,7 @@ import logging
 import multiprocessing
 import os
 import sys
+import uuid
 from multiprocessing.shared_memory import SharedMemory
 from time import gmtime, strftime
 
@@ -25,14 +26,16 @@ __date__ = '2022-08-17'
 
 # global barrier for multiprocessing
 barrier = None
+memory_id = None
 
 
-def init(b):
+def init(b, mem):
     """
-    Set the global barrier
+    Set the global barrier and memory_id
     """
-    global barrier
+    global barrier, memory_id
     barrier = b
+    memory_id = mem
 
 
 def sigmaclip(arr, lo, hi, reps=10):
@@ -230,9 +233,9 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
     gr, gc = np.mgrid[ymin-data_row_min:ymax-data_row_min, 0:shape[1]]
 
     # Find the shared memory and create a numpy array interface
-    ibkg_shm = SharedMemory(name='ibkg', create=False)
+    ibkg_shm = SharedMemory(name=f'ibkg_{memory_id}', create=False)
     ibkg = np.ndarray(shape, dtype=np.float64, buffer=ibkg_shm.buf)
-    irms_shm = SharedMemory(name='irms', create=False)
+    irms_shm = SharedMemory(name=f'irms_{memory_id}', create=False)
     irms = np.ndarray(shape, dtype=np.float64, buffer=irms_shm.buf)
 
     logging.debug("Interpolating bkg to sharemem")
@@ -361,9 +364,11 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
 
     exit = False
     try:
+        global memory_id
+        memory_id = str(uuid.uuid4())
         nbytes = np.prod(shape) * np.float64(1).nbytes
-        ibkg = SharedMemory(name='ibkg', create=True, size=nbytes)
-        irms = SharedMemory(name='irms', create=True, size=nbytes)
+        ibkg = SharedMemory(name=f'ibkg_{memory_id}', create=True, size=nbytes)
+        irms = SharedMemory(name=f'irms_{memory_id}', create=True, size=nbytes)
 
         # start a new process for each task, hopefully to reduce residual
         # memory use
@@ -373,7 +378,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
         ctx = multiprocessing.get_context(method)
         barrier = ctx.Barrier(parties=len(ymaxs))
         pool = ctx.Pool(processes=cores, maxtasksperchild=1,
-                        initializer=init, initargs=(barrier,))
+                        initializer=init, initargs=(barrier, memory_id))
         try:
             # chunksize=1 ensures that we only send a single task to each
             # process
