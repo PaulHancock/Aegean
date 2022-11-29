@@ -1,3 +1,9 @@
+### Nov 29 2022
+
+Aegean
+- Set default value of `--slice` to be 0
+- Fix a bug (#193) where Aegean was unable to load background and noise files created by `BANE --compress`
+
 ### v2.3.0
 
 General

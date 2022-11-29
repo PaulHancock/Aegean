@@ -12,7 +12,7 @@ from scipy.interpolate import RegularGridInterpolator
 from .exceptions import AegeanError
 
 __author__ = 'Paul Hancock'
-__date__ = '2022-07-15'
+__date__ = '2022-11-29'
 
 
 def load_file_or_hdu(filename):
