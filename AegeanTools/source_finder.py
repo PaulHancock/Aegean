@@ -9,11 +9,9 @@ import logging.config
 import math
 import multiprocessing
 import os
-import sys
 
 import lmfit
 import numpy as np
-import scipy
 from scipy.ndimage import find_objects, label, maximum_filter, minimum_filter
 from scipy.special import erf
 from tqdm import tqdm
