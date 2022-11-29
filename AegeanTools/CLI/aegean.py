@@ -66,7 +66,7 @@ def main(argv=()):
                         help='The beam parameters to be used is "--beam major'
                         ' minor pa" all in degrees. '
                         '[default: read from fits header].')
-    group1.add_argument('--slice', dest='slice', type=int, default=None,
+    group1.add_argument('--slice', dest='slice', type=int, default=0,
                         help='If the input data is a cube, then this slice '
                         'will determine the array index of the image '
                         'which will be processed by aegean')
