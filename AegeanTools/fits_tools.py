@@ -123,6 +123,26 @@ def compress(datafile, factor, outfile=None):
     return hdulist
 
 
+def is_compressed(header):
+    """
+    Check a fits header (or dict) for a set of keywords which indicate
+    that the data have been compressed with BANE.
+    Return true if the file was compressed.
+
+    Parameters
+    ----------
+    header : HDUList.header or dict
+        The header from the fits file
+
+    Returns
+    -------
+    compressed : bool
+        True if the file was compressed
+    """
+    return all(a in header for a in
+               ['BN_CFAC', 'BN_NPX1', 'BN_NPX2', 'BN_RPX1', 'BN_RPX2'])
+
+
 def expand(datafile, outfile=None):
     """
     Expand and interpolate the given data file using the given method.
@@ -154,9 +174,7 @@ def expand(datafile, outfile=None):
 
     header = hdulist[0].header
     data = hdulist[0].data
-    # Check for the required key words, only expand if they exist
-    if not all(a in header for a in
-               ['BN_CFAC', 'BN_NPX1', 'BN_NPX2', 'BN_RPX1', 'BN_RPX2']):
+    if not is_compressed(header):
         return hdulist
 
     factor = header['BN_CFAC']
@@ -259,8 +277,19 @@ def load_image_band(filename,
         raise AegeanError("band[0] number {0} not valid".format(band[0]))
 
     header = fits.getheader(filename, ext=hdu_index)
+
+    compressed = is_compressed(header)
+
+    if compressed:
+        hdulist = expand(filename)
+        header = hdulist[0].header
+
     row_min = int(header['NAXIS2']/band[1] * (band[0]))
     row_max = int(header['NAXIS2']/band[1] * (band[0]+1))
+
+    if compressed:
+        return hdulist[0].data[row_min:row_max, :], header
+
     # Figure out how many axes are in the datafile
     NAXIS = header["NAXIS"]
     with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
