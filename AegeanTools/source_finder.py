@@ -26,7 +26,7 @@ from .__init__ import __date__, __version__
 from .angle_tools import bear, dec2dms, dec2hms, gcd
 from .BANE import filter_image, get_step_size
 from .catalogs import load_table, table_to_source_list
-from .exceptions import AegeanNaNModelError
+from .exceptions import AegeanNaNModelError, AegeanError
 from .fits_tools import load_image_band
 from .fitting import (Bmatrix, Cmatrix, bias_correct, covar_errors, do_lmfit,
                       elliptical_gaussian, errors, ntwodgaussian_lmfit)
@@ -1584,6 +1584,7 @@ class SourceFinder(object):
         """
 
         auximg, _ = load_image_band(auxfile)
+
         if auximg.shape != image.shape:
             self.log.error(
                 "file {0} is not the same size as the image map".format(
@@ -1594,7 +1595,10 @@ class SourceFinder(object):
                     auxfile, auximg.shape, image.shape
                 )
             )
-            sys.exit(1)
+            raise AegeanError(
+                "file {0} is not the same size as the image map"
+                .format(auxfile))
+            # sys.exit(1)
         return auximg
 
     ##
