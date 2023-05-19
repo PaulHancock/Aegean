@@ -5,17 +5,17 @@ BANE: Background and Noise Estimation
 ...but with FFTs
 """
 
-from pathlib import Path
-from typing import Tuple, List, Union
 import os
+from pathlib import Path
 from time import time
+from typing import List, Tuple, Union
 
 import numba as nb
 import numpy as np
 from astropy.io import fits
-from AegeanTools import BANE as bane
 from scipy import interpolate, ndimage
 
+from AegeanTools import BANE as bane
 
 logging = bane.logging
 
@@ -91,11 +91,7 @@ def bane_fft(
     avg_rms = fft_average(rms, kernel, kern_sum)
     return mean, avg_rms
 
-# @nb.njit(
-#     nb.float32[:, :](nb.int32),
-#     fastmath=True,
-#     parallel=True,
-# )
+
 def tophat_kernel(radius: int):
     """Make a tophat kernel
 
@@ -162,44 +158,6 @@ def chunk_image(image_shape: Tuple[int, int], box_size: int) -> np.ndarray:
     return chunks
 
 
-
-@nb.njit(
-    nb.types.UniTuple(
-        nb.float32[:, :],
-        2
-    )(nb.float32[:, :], nb.int32[:, :], nb.float32[:, :], nb.float32),
-    fastmath=True,
-    parallel=True,
-)
-def _bane_loop(
-    image: np.ndarray, 
-    chunks: np.ndarray,
-    kernel: np.ndarray,
-    kern_sum: float,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Loop over the chunks and run BANE
-
-    Args:
-        image (np.ndarray): Image to find background and RMS of
-        chunks (np.ndarray): List of tuples of chunk coordinates (start, end)
-
-    Returns:
-        Tuple[np.ndarray, np.ndarray]: Mean and RMS of the image
-    """
-    mean = np.zeros_like(image)
-    rms = np.zeros_like(image)
-
-    for idx in nb.prange(len(chunks)):
-        chunk = chunks[idx]
-        start = int(chunk[0])
-        stop = int(chunk[1])
-
-        _mean, _rms = bane_fft(image[start:stop], kernel, kern_sum)
-        mean[chunk[0] : chunk[1]] = _mean
-        rms[chunk[0] : chunk[1]] = _rms
-
-    return mean, rms
-
 def robust_bane(
     image: np.ndarray, header: Union[fits.Header, dict]
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -222,12 +180,7 @@ def robust_bane(
     # Downsample the image
     image_ds = image_mask[::step_size, ::step_size]
 
-    # Get the chunks
-    # chunks = chunk_image(image.shape, box_size)
-
-    # Get the mean and RMS of each chunk
     # Round 1
-    # mean, avg_rms = _bane_loop(image_ds, chunks, kernel, kern_sum)
     mean, avg_rms = bane_fft(image_ds, kernel, kern_sum)
     # Round 2
     # Repeat with masked values filled in with noise
@@ -237,7 +190,6 @@ def robust_bane(
     image_masked[mask] = np.random.normal(
         loc=0, scale=avg_rms.mean(), size=image_masked[mask].shape
     )
-    # mean, avg_rms = _bane_loop(image_masked, chunks, kernel, kern_sum)
     mean, avg_rms = bane_fft(image_masked, kernel, kern_sum)
 
     # Upsample the mean and RMS to the original image size
