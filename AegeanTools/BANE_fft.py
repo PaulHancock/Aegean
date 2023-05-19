@@ -6,81 +6,18 @@ BANE: Background and Noise Estimation
 """
 
 from pathlib import Path
-from typing import Tuple, List
+from typing import Tuple, List, Union
 import os
 from time import time
-import logging
 
 import numba as nb
 import numpy as np
-from astropy.convolution import Tophat2DKernel
 from astropy.io import fits
-from astropy.wcs import WCS
-from spectral_cube import StokesSpectralCube
-from spectral_cube.utils import FITSReadError
-
 from AegeanTools import BANE as bane
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-logger.addHandler(ch)
-
-@nb.njit(
-    nb.float32[:, :](nb.float32[:, :], nb.complex64[:, :], nb.float32),
-    fastmath=True,
-    parallel=True,
-)
-def fft_average(
-    image: np.ndarray, kernel_fft: np.ndarray, kern_sum: float
-) -> np.ndarray:
-    """Compute an average with FFT magic
-
-    Args:
-        image (np.ndarray): 2D image to average spatially
-        kernel_fft (np.ndarray): 2D kernel in Fourier space
-        kern_sum (float): Sum of the kernel in image space
-
-    Returns:
-        np.ndarray: Averaged image
-    """
-    image_fft = np.fft.rfft2(image)
-
-    smooth_fft = image_fft * kernel_fft
-
-    smooth = np.fft.irfft2(smooth_fft) / kern_sum
-    return smooth
+from scipy import interpolate, ndimage
 
 
-@nb.njit(
-    nb.types.UniTuple(
-        nb.float32[:, :],
-        2
-    )(nb.float32[:, :], nb.complex64[:, :], nb.float32),
-    fastmath=True,
-    parallel=True,
-)
-def bane_fft(
-    image: np.ndarray,
-    kernel_fft: np.ndarray,
-    kern_sum: float,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """BANE but with FFTs
-
-    Args:
-        image (np.ndarray): Image to find background and RMS of
-        kernel_fft (np.ndarray): Tophat kernel in Fourier domain
-        kern_sum (float): Sum of the kernel in image domain
-
-    Returns:
-        Tuple[np.ndarray, np.ndarray]: Mean and RMS of the image
-    """
-    mean = fft_average(image, kernel_fft, kern_sum)
-    rms = np.sqrt((image - mean) ** 2)
-    avg_rms = fft_average(rms, kernel_fft, kern_sum)
-    return mean, avg_rms
-
+logging = bane.logging
 
 @nb.njit(
     fastmath=True,
@@ -99,67 +36,226 @@ def _ft_kernel(kernel: np.ndarray, shape: tuple) -> np.ndarray:
     return np.fft.rfft2(kernel, s=shape)
 
 
-def get_kernel(header: fits.Header) -> Tuple[np.ndarray, float]:
+@nb.njit(
+    nb.float32[:, :](nb.float32[:, :], nb.float32[:, :], nb.float32),
+    fastmath=True,
+    parallel=True,
+)
+def fft_average(
+    image: np.ndarray, kernel: np.ndarray, kern_sum: float
+) -> np.ndarray:
+    """Compute an average with FFT magic
+
+    Args:
+        image (np.ndarray): 2D image to average spatially
+        kernel (np.ndarray): 2D kernel
+        kern_sum (float): Sum of the kernel in image space
+
+    Returns:
+        np.ndarray: Averaged image
+    """
+    image_fft = np.fft.rfft2(image)
+    kernel_fft = _ft_kernel(kernel, shape=image.shape)
+
+    smooth_fft = image_fft * kernel_fft
+
+    smooth = np.fft.irfft2(smooth_fft) / kern_sum
+    return smooth
+
+
+@nb.njit(
+    nb.types.UniTuple(
+        nb.float32[:, :],
+        2
+    )(nb.float32[:, :], nb.float32[:, :], nb.float32),
+    fastmath=True,
+    parallel=True,
+)
+def bane_fft(
+    image: np.ndarray,
+    kernel: np.ndarray,
+    kern_sum: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """BANE but with FFTs
+
+    Args:
+        image (np.ndarray): Image to find background and RMS of
+        kernel (np.ndarray): Tophat kernel
+        kern_sum (float): Sum of the kernel in image domain
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Mean and RMS of the image
+    """
+    mean = fft_average(image, kernel, kern_sum)
+    rms = np.sqrt((image - mean) ** 2)
+    avg_rms = fft_average(rms, kernel, kern_sum)
+    return mean, avg_rms
+
+# @nb.njit(
+#     nb.float32[:, :](nb.int32),
+#     fastmath=True,
+#     parallel=True,
+# )
+def tophat_kernel(radius: int):
+    """Make a tophat kernel
+
+    Args:
+        radius (int): Radius of the kernel
+
+    Returns:
+        np.ndarray: Tophat kernel
+    """
+    kernel = np.zeros((radius * 2 + 1, radius * 2 + 1), dtype=np.float32)
+    xx = np.arange(-radius, radius + 1)
+    yy = np.arange(-radius, radius + 1)
+    X, Y = np.meshgrid(xx, yy)
+    mask = X ** 2 + Y ** 2 <= radius ** 2
+    kernel[mask] = 1
+    return kernel
+
+
+def get_kernel(header: Union[fits.Header, dict]) -> Tuple[np.ndarray, float, int]:
     """Get the kernel for FFT BANE
 
     Args:
-        header (fits.Header): Header of the image
+        header (Union[fits.Header, dict]): Header of the image
 
     Returns:
-        Tuple[np.ndarray, float]: FFT of the kernel and sum of the kernel
+        Tuple[np.ndarray, float]: The kernel and sum of the kernel
     """
-    step_size = bane.get_step_size(header)
-    kernel = Tophat2DKernel(radius=step_size[0] // 2 * 5).array.astype(np.float32)
+    step_size = max(bane.get_step_size(header))
+    box_size = step_size * 6
+    kernel = tophat_kernel(radius=box_size // 2)
     kernel /= kernel.max()
-    wcs = WCS(header)
 
-    kernel_fft = _ft_kernel(kernel, shape=wcs.celestial.array_shape)
     kern_sum = kernel.sum()
 
-    return kernel_fft, kern_sum
+    return kernel, kern_sum, step_size
 
+@nb.njit(
+    nb.int32[:, :](nb.types.UniTuple(nb.int32, 2), nb.int32),
+    fastmath=True,
+    parallel=True,
+)
+def chunk_image(image_shape: Tuple[int, int], box_size: int) -> np.ndarray:
+    """Divide the image into chunks that overlap by half the box size
+
+    Chunk only the y-axis
+
+    Args:
+        image_shape (Tuple[int, int]): Shape of the image
+        box_size (int): Size of the box
+
+    Returns:
+        np.ndarray: Chunk coordinates (start, end) x nchunks
+    """
+
+    nchunks = image_shape[0] // (box_size // 2) - 1
+
+    chunks = np.zeros((nchunks, 2), dtype=np.int32)
+
+    for i in nb.prange(nchunks):
+        chunks[i] = [i * (box_size // 2), (i + 2) * (box_size // 2)]
+
+    chunks[-1, 1] = image_shape[0]
+
+    return chunks
+
+
+
+@nb.njit(
+    nb.types.UniTuple(
+        nb.float32[:, :],
+        2
+    )(nb.float32[:, :], nb.int32[:, :], nb.float32[:, :], nb.float32),
+    fastmath=True,
+    parallel=True,
+)
+def _bane_loop(
+    image: np.ndarray, 
+    chunks: np.ndarray,
+    kernel: np.ndarray,
+    kern_sum: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Loop over the chunks and run BANE
+
+    Args:
+        image (np.ndarray): Image to find background and RMS of
+        chunks (np.ndarray): List of tuples of chunk coordinates (start, end)
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Mean and RMS of the image
+    """
+    mean = np.zeros_like(image)
+    rms = np.zeros_like(image)
+
+    for idx in nb.prange(len(chunks)):
+        chunk = chunks[idx]
+        start = int(chunk[0])
+        stop = int(chunk[1])
+
+        _mean, _rms = bane_fft(image[start:stop], kernel, kern_sum)
+        mean[chunk[0] : chunk[1]] = _mean
+        rms[chunk[0] : chunk[1]] = _rms
+
+    return mean, rms
 
 def robust_bane(
-    image: np.ndarray, header: fits.Header
+    image: np.ndarray, header: Union[fits.Header, dict]
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Two-round BANE with FFTs
 
     Args:
         image (np.ndarray): Image to find background and RMS of
-        header (fits.Header): Header of the image
+        header (Union[fits.Header, dict]): Header of the image
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: Mean and RMS of the image
     """
-    logger.info("Running FFT BANE")
+    logging.info("Running FFT BANE")
     tick = time()
     # Setups
-    kernel_fft, kern_sum = get_kernel(header)
+    kernel, kern_sum, step_size = get_kernel(header)
     nan_mask = ~np.isfinite(image)
-    image = np.nan_to_num(image)
+    image_mask = np.nan_to_num(image)
+    
+    # Downsample the image
+    image_ds = image_mask[::step_size, ::step_size]
 
+    # Get the chunks
+    # chunks = chunk_image(image.shape, box_size)
+
+    # Get the mean and RMS of each chunk
     # Round 1
-    mean, avg_rms = bane_fft(image, kernel_fft, kern_sum)
+    # mean, avg_rms = _bane_loop(image_ds, chunks, kernel, kern_sum)
+    mean, avg_rms = bane_fft(image_ds, kernel, kern_sum)
     # Round 2
     # Repeat with masked values filled in with noise
-    snr = np.abs(image) / avg_rms
+    snr = np.abs(image_ds) / avg_rms
     mask = snr > 5
-    image_masked = image.copy()
+    image_masked = image_ds.copy()
     image_masked[mask] = np.random.normal(
         loc=0, scale=avg_rms.mean(), size=image_masked[mask].shape
     )
-    # image_masked = inpaint.inpaint_biharmonic(image, mask)
-    mean, avg_rms = bane_fft(image_masked, kernel_fft, kern_sum)
+    # mean, avg_rms = _bane_loop(image_masked, chunks, kernel, kern_sum)
+    mean, avg_rms = bane_fft(image_masked, kernel, kern_sum)
+
+    # Upsample the mean and RMS to the original image size
+    zoom_x = image.shape[1] / image_ds.shape[1]
+    zoom_y = image.shape[0] / image_ds.shape[0]
+    zoom = (zoom_y, zoom_x)
+    mean_us = ndimage.zoom(mean, zoom, order=1)
+    avg_rms_us = ndimage.zoom(avg_rms, zoom, order=1)
 
     # Reapply mask
-    mean[nan_mask] = np.nan
-    avg_rms[nan_mask] = np.nan
+    mean_us[nan_mask] = np.nan
+    avg_rms_us[nan_mask] = np.nan
 
     tock = time()
 
-    logger.info(f"FFT BANE took {tock - tick:.2f} seconds")
+    logging.info(f"FFT BANE took {tock - tick:.2f} seconds")
 
-    return mean, avg_rms
+    return mean_us, avg_rms_us
 
 def init_outputs(
     fits_file: Path,
@@ -171,7 +267,7 @@ def init_outputs(
         fits_file (Path): Input FITS file
         ext (int, optional): HDU extension. Defaults to 0.
     """    
-    logger.info("Initializing output files")
+    logging.info("Initializing output files")
     out_files: List[Path] = []
     with fits.open(fits_file, memmap=True, mode="denywrite") as hdul:
         header = hdul[ext].header
@@ -193,7 +289,7 @@ def init_outputs(
             )
             fobj.write(b"\0")
 
-        logger.info(f"Created {out_file}")
+        logging.info(f"Created {out_file}")
         out_files.append(out_file)
 
     return out_files
@@ -205,17 +301,54 @@ def write_outputs(
 ):
     rms_file, bkg_file = out_files
     with fits.open(rms_file, memmap=True, mode="update") as hdul:
-        logger.info(f"Writing RMS to {rms_file}")
+        logging.info(f"Writing RMS to {rms_file}")
         hdul[0].data = rms
         hdul.flush()
-    logger.info(f"Wrote RMS to {rms_file}")
+    logging.info(f"Wrote RMS to {rms_file}")
 
     with fits.open(bkg_file, memmap=True, mode="update") as hdul:
-        logger.info(f"Writing background to {bkg_file}")
+        logging.info(f"Writing background to {bkg_file}")
         hdul[0].data = mean
         hdul.flush()
-    logger.info(f"Wrote background to {bkg_file}")
+    logging.info(f"Wrote background to {bkg_file}")
 
+
+def bane_2d(
+        image: np.ndarray,
+        header: Union[fits.Header, dict],
+        out_files: List[Path],
+) -> Tuple[np.ndarray, np.ndarray]:
+    logging.info(f"Running BANE on image {image.shape}")
+    # Run BANE
+    bkg, rms = robust_bane(image, header)
+    write_outputs(out_files, bkg, rms)
+
+    return bkg, rms
+
+
+def bane_3d_loop(
+    cube: np.ndarray,
+    rms: np.ndarray,
+    bkg: np.ndarray,
+    header: dict,
+):
+    for idx in nb.prange(cube.shape[0]):
+        bkg[idx], rms[idx] = robust_bane(cube[idx], header)
+
+def bane_3d(
+        cube: np.ndarray,
+        header: Union[fits.Header, dict],
+        out_files: List[Path],
+        ext: int = 0,
+):
+    logging.info(f"Running BANE on cube {cube.shape}")
+    # Run BANE
+    rms_file, bkg_file = out_files
+    with fits.open(rms_file, memmap=True, mode="update") as rms_hdul, fits.open(bkg_file, memmap=True, mode="update") as bkg_hdul:
+        rms = rms_hdul[ext].data
+        bkg = bkg_hdul[ext].data
+
+    return bkg, rms
 
 def main(
     fits_file: Path,
@@ -224,31 +357,30 @@ def main(
     # Init output files
     out_files = init_outputs(fits_file, ext=ext)
     # Check for frequency axis and Stokes axis
-    try:
-        cube = StokesSpectralCube.read(fits_file)
-        is_stokes_cube = len(cube.shape) > 3 and cube.shape[-1] > 1
-        if is_stokes_cube:
-            logger.info("Detected Stokes cube")
-            raise NotImplementedError("Stokes cube not implemented")
+    logging.info(f"Opening FITS file {fits_file}")
+    with fits.open(fits_file, memmap=True, mode="denywrite") as hdul:
+        data = hdul[ext].data.astype(np.float32)
+        header = hdul[ext].header
         
-    except FITSReadError:
-        logger.info("Input FITS file is an image")
-        with fits.open(fits_file, memmap=True, mode="denywrite") as hdul:
-            image = hdul[ext].data.astype(np.float32)
-            header = hdul[ext].header
+    is_stokes_cube = len(data.shape) > 3 and data.shape[-1] > 1
+    is_cube = len(data.shape) == 3
+
+    if is_stokes_cube:
+        logging.info("Detected Stokes cube")
+        raise NotImplementedError("Stokes cube not implemented")
+
+
+    if is_cube:
+        logging.info("Detected cube")
+        raise NotImplementedError("Cube not implemented")
+
         
-        assert len(image.shape) == 2, "Input image must be 2D"
+    else:
+        logging.info("Detected 2D image")
+        bkg, rms = bane_2d(data, header, out_files)
 
-        logger.info(f"Running BANE on image ({image.shape})")
 
-        # Run BANE
-        bkg, rms = robust_bane(image, header)
-
-    finally:
-        # Write output
-        write_outputs(out_files, bkg, rms)
-
-        logger.info("Done")
+    logging.info("Done")
 
     return bkg, rms
 
@@ -268,7 +400,16 @@ def cli():
         default=0,
         help="HDU extension",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Debug mode",
+    )
     args = parser.parse_args()
+
+    logging_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(level=logging_level,
+                        format="%(process)d:%(levelname)s %(message)s")
 
     _ = main(
         Path(args.fits_file),
