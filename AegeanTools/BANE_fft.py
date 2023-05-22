@@ -27,7 +27,7 @@ logging = bane.logging
 
 @nb.njit(
     fastmath=True,
-    # parallel=True,
+    cache=True,
 )
 def _ft_kernel(kernel: np.ndarray, shape: tuple) -> np.ndarray:
     """Compute the Fourier transform of a kernel
@@ -45,7 +45,7 @@ def _ft_kernel(kernel: np.ndarray, shape: tuple) -> np.ndarray:
 @nb.njit(
     nb.float32[:, :](nb.float32[:, :], nb.float32[:, :], nb.float32),
     fastmath=True,
-    # parallel=True,
+    cache=True,
 )
 def fft_average(
     image: np.ndarray, kernel: np.ndarray, kern_sum: float
@@ -75,7 +75,7 @@ def fft_average(
         2
     )(nb.float32[:, :], nb.float32[:, :], nb.float32),
     fastmath=True,
-    # parallel=True,
+    cache=True,
 )
 def bane_fft(
     image: np.ndarray,
@@ -118,6 +118,7 @@ def tophat_kernel(radius: int):
 
 @nb.njit(
     nb.boolean[:, :](nb.float32[:, :], nb.float32[:, :]),
+    cache=True,
 )
 def get_nan_mask(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     """Get a mask of NaNs in the image
@@ -148,22 +149,28 @@ def get_kernel(header: Union[fits.Header, dict], step_size: Optional[int] = None
     Returns:
         Tuple[np.ndarray, float]: The kernel and sum of the kernel
     """
-    if not step_size or step_size < 0:
-        npix_step = 3 if not step_size else abs(step_size)
-        logging.info(f"Using step size of {npix_step} pixels per beam")
+
+    if not step_size or step_size < 0 or not box_size or box_size < 0:
+        # Use the beam to determine the step/box size
         try:
             beam = Beam.from_fits_header(header)
             logging.info(f"Beam: {beam.__repr__()}")
         except ValueError:
             raise ValueError("Could not parse beam from header - try specifying step size")
+
+        # Step size
+        npix_step = 3 if not step_size else abs(step_size)
+        logging.info(f"Using step size of {npix_step} pixels per beam")
         scales  = proj_plane_pixel_scales(WCS(header)) * u.deg
         pix_per_beam = beam.minor / scales.min()
         step_size = int(np.ceil(pix_per_beam / npix_step))
+
+        # Box size
         logging.info(f"Using step size of {step_size} pixels")
-    if not box_size or box_size < 0:
         npix_box = 10 if not box_size else abs(box_size)
         logging.info(f"Using a box size of {npix_box} per beam")
         box_size = int(np.ceil(pix_per_beam * npix_box / step_size))
+
     logging.info(f"Using box size of {box_size} pixels (scaled by step size)")
     kernel = tophat_kernel(radius=box_size // 2)
     kernel /= kernel.max()
@@ -175,7 +182,7 @@ def get_kernel(header: Union[fits.Header, dict], step_size: Optional[int] = None
 @nb.njit(
     nb.int32[:, :](nb.types.UniTuple(nb.int32, 2), nb.int32),
     fastmath=True,
-    # parallel=True,
+    cache=True,
 )
 def chunk_image(image_shape: Tuple[int, int], box_size: int) -> np.ndarray:
     """Divide the image into chunks that overlap by half the box size
@@ -201,6 +208,84 @@ def chunk_image(image_shape: Tuple[int, int], box_size: int) -> np.ndarray:
 
     return chunks
 
+@nb.njit(
+    nb.float32(
+        nb.float32[:, :],
+        nb.types.unicode_type,
+        nb.int32,
+        nb.float32,
+        nb.float32,
+        nb.boolean,
+    ),
+    cache=True,
+)
+def estimate_rms(
+    data: np.ndarray,
+    mode: str = "mad",
+    clip_rounds: int = 2,
+    bin_perc: float = 0.25,
+    outlier_thres: float = 3.0,
+) -> float:
+    """Calculates to RMS of an image, primiarily for radio interferometric images. First outlying
+    pixels will be flagged. To the remaining valid pixels a Guassian distribution is fitted to the
+    pixel distribution histogram, with the standard deviation being return. 
+    
+    Arguments:
+        data (np.ndarray) -- Data to estimate the noise level of
+    
+    Keyword Arguments:
+        mode (str) -- Clipping mode used to flag outlying pixels, either made on the median absolute deviation (`mad`) or standard deviation (`std`) (default: ('mad'))
+        clip_rounds (int) -- Number of times to perform the clipping of outlying pixels (default: (2))
+        bin_perc (float) -- Bins need to have `bin_perc*MAX(BINS)` of counts to be included in the fitting procedure (default: (0.25))
+        outlier_thres (float) -- Number of units of the adopted outlier statistic required for a item to be considered an outlier (default: (3))
+        nan_check (bool) -- If true, non-finite values will be removed from the `data` which would otherwise cause the rms derivation to fail. If fail `data` remains untouched (default: (True))
+
+    Raises:
+        ValueError: Raised if a mode is specified but not supported
+    
+    Returns:
+        float -- Estimated RMS of the supploed image
+    """
+    if bin_perc > 1.0:
+        bin_perc /= 100.0
+
+    if mode == "std":
+        clipping_func = lambda data: np.std(data)
+
+    elif mode == "mad":
+        clipping_func = lambda data: np.median(np.abs(data - np.median(data)))
+
+    else:
+        raise ValueError(
+            f"{mode} not supported as a clipping mode, available modes are `std` and `mad`. "
+        )
+    
+    cen_func = lambda data: np.median(data)
+
+    for i in range(clip_rounds):
+        data = data[np.abs(data - cen_func(data)) < outlier_thres * clipping_func(data)]
+
+    # Attempts to ensure a sane number of bins to fit against
+    mask_counts = 0
+    loop = 1
+    while mask_counts < 5 and loop < 5:
+        counts, binedges = np.histogram(data, bins=50 * loop)
+        binc = (binedges[:-1] + binedges[1:]) / 2
+
+        mask = counts >= bin_perc * np.max(counts)
+        mask_counts = np.sum(mask)
+        loop += 1
+
+    p = np.polyfit(binc[mask], np.log10(counts[mask] / np.max(counts)), 2)
+    a, b, c = p
+
+    x1 = (-b + np.sqrt(b ** 2 - 4.0 * a * (c - np.log10(0.5)))) / (2.0 * a)
+    x2 = (-b - np.sqrt(b ** 2 - 4.0 * a * (c - np.log10(0.5)))) / (2.0 * a)
+    fwhm = np.abs(x1 - x2)
+    noise = fwhm / 2.355
+
+    return noise
+
 
 def robust_bane(
     image: np.ndarray, 
@@ -224,7 +309,23 @@ def robust_bane(
     # nan_mask = get_nan_mask(image, kernel)
     nan_mask = ~np.isfinite(image)
     image_mask = np.nan_to_num(image)
-    
+
+    # Quick and dirty rms estimate
+    rms_est = estimate_rms(
+        data=image_mask,
+        mode="mad",
+        clip_rounds=2,
+        bin_perc=0.25,
+        outlier_thres=3.0,
+    )
+    snr = np.abs(image_mask) / rms_est
+    mask = snr > 5
+    # Fill sources with noise
+    image_mask[mask] = np.random.normal(
+        loc=0, scale=rms_est, size=image_mask[mask].shape
+    )
+
+
     # Downsample the image
     # Create slice for downsampled image
     # Ensure downsampled image has even number of pixels
@@ -248,6 +349,7 @@ def robust_bane(
     # Round 1
     mean, avg_rms = bane_fft(image_ds, kernel, kern_sum)
 
+    """
     # Round 2
     # Repeat with masked values filled in with noise
     snr = np.abs(image_mask) / np.nanmedian(avg_rms)
@@ -260,14 +362,15 @@ def robust_bane(
     # Downsample the masked image
     image_masked_ds = image_masked[(y_slice, x_slice)]
     mean_masked, avg_rms_masked = bane_fft(image_masked_ds, kernel, kern_sum)
-
+    """
     # Upsample the mean and RMS to the original image size
-    mean_us = ndimage.zoom(mean_masked, zoom, order=1)
-    avg_rms_us = ndimage.zoom(avg_rms_masked, zoom, order=1)
+    mean_us = ndimage.zoom(mean, zoom, order=1)
+    avg_rms_us = ndimage.zoom(avg_rms, zoom, order=1)
 
     # Reapply mask
     mean_us[nan_mask] = np.nan
     avg_rms_us[nan_mask] = np.nan
+
 
     tock = time()
 
@@ -525,7 +628,7 @@ def cli():
         "--ncores",
         type=int,
         default=None,
-        help="Number of cores to use (only sppeds up cube). Default is all cores.",
+        help="Number of cores to use (only sppeds up cube processing). Default is all cores.",
     )
     args = parser.parse_args()
 
