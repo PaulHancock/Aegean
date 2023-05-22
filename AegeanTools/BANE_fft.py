@@ -416,8 +416,10 @@ def robust_bane(
     mean, avg_rms = bane_fft(image_ds, kernel, kern_sum)
 
     # Upsample the mean and RMS to the original image size
-    mean_us = ndimage.shift(ndimage.zoom(mean, zoom, order=3, grid_mode=True), step_size*2)
-    avg_rms_us = ndimage.shift(ndimage.zoom(avg_rms, zoom, order=3, grid_mode=True), step_size*2)
+    mean_shift = ndimage.shift(mean, -box_size)
+    avg_rms_shift = ndimage.shift(avg_rms, -box_size)
+    mean_us = ndimage.zoom(mean_shift, zoom, order=3, grid_mode=True)
+    avg_rms_us = ndimage.zoom(avg_rms_shift, zoom, order=3, grid_mode=True)
 
     # Reapply mask
     mean_us[nan_mask] = np.nan
