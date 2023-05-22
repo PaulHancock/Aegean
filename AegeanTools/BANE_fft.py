@@ -416,10 +416,11 @@ def robust_bane(
     mean, avg_rms = bane_fft(image_ds, kernel, kern_sum)
 
     # Upsample the mean and RMS to the original image size
-    mean_shift = ndimage.shift(mean, -box_size)
-    avg_rms_shift = ndimage.shift(avg_rms, -box_size)
-    mean_us = ndimage.zoom(mean_shift, zoom, order=3, grid_mode=True)
-    avg_rms_us = ndimage.zoom(avg_rms_shift, zoom, order=3, grid_mode=True)
+    # Trying a shift first to see if it helps with the edge effects
+    # mean_shift = ndimage.shift(mean, box_size*step_size)
+    # avg_rms_shift = ndimage.shift(avg_rms, box_size*step_size)
+    mean_us = ndimage.zoom(mean, zoom, order=3, grid_mode=True)
+    avg_rms_us = ndimage.zoom(avg_rms, zoom, order=3, grid_mode=True)
 
     # Reapply mask
     mean_us[nan_mask] = np.nan
