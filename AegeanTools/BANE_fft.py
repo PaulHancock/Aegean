@@ -6,6 +6,7 @@ BANE: Background and Noise Estimation
 """
 
 import os
+import multiprocessing as mp
 from pathlib import Path
 from time import time
 from typing import List, Tuple, Union
@@ -279,13 +280,25 @@ def bane_2d(
 
 
 def bane_3d_loop(
-    cube: np.ndarray,
-    rms: np.ndarray,
-    bkg: np.ndarray,
-    header: dict,
+    plane: np.ndarray,
+    idx: int,
+    header: Union[fits.Header, dict],
+    out_files: List[Path],
+    ext: int = 0,
 ):
-    for idx in nb.prange(cube.shape[0]):
-        bkg[idx], rms[idx] = robust_bane(cube[idx], header)
+    rms_file, bkg_file = out_files
+    with fits.open(
+        rms_file, memmap=True, mode="update"
+    ) as rms_hdul, fits.open(
+        bkg_file, memmap=True, mode="update"
+    ) as bkg_hdul:
+        rms = rms_hdul[ext].data
+        bkg = bkg_hdul[ext].data
+        logging.info(f"Running BANE on plane {idx}")
+        bkg[idx], rms[idx] = robust_bane(plane, header)
+        rms_hdul.flush()
+        bkg_hdul.flush()
+    logging.info(f"Finished BANE on plane {idx}")
 
 def bane_3d(
         cube: np.ndarray,
@@ -295,11 +308,24 @@ def bane_3d(
 ):
     logging.info(f"Running BANE on cube {cube.shape}")
     # Run BANE
+    with mp.Pool(mp.cpu_count()) as pool:
+        pool.starmap(
+            bane_3d_loop,
+            [
+                (cube[ii], ii, header, out_files, ext)
+                for ii in range(cube.shape[0])
+            ],
+        )       
+        
+    logging.info(f"Finished BANE on cube")
     rms_file, bkg_file = out_files
-    with fits.open(rms_file, memmap=True, mode="update") as rms_hdul, fits.open(bkg_file, memmap=True, mode="update") as bkg_hdul:
+    with fits.open(
+        rms_file, memmap=True, mode="denywrite"
+    ) as rms_hdul, fits.open(
+        bkg_file, memmap=True, mode="denywrite"
+    ) as bkg_hdul:
         rms = rms_hdul[ext].data
         bkg = bkg_hdul[ext].data
-
     return bkg, rms
 
 def main(
@@ -317,6 +343,9 @@ def main(
     is_stokes_cube = len(data.shape) > 3 and data.shape[-1] > 1
     is_cube = len(data.shape) == 3
 
+    from IPython import embed
+    embed()
+
     if is_stokes_cube:
         logging.info("Detected Stokes cube")
         raise NotImplementedError("Stokes cube not implemented")
@@ -324,7 +353,7 @@ def main(
 
     if is_cube:
         logging.info("Detected cube")
-        raise NotImplementedError("Cube not implemented")
+        bkg, rms = bane_3d(data, header, out_files, ext=ext)
 
         
     else:
