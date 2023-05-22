@@ -119,6 +119,7 @@ def tophat_kernel(diameter: int):
     kernel[mask] = 1
     return kernel
 
+
 def gaussian_kernel(fwhm: int) -> np.ndarray:
     """Make a Gaussian kernel
 
@@ -186,7 +187,7 @@ def get_kernel(
             raise ValueError(
                 "Could not parse beam from header - try specifying step size"
             )
-        
+
     if not step_size or step_size < 0:
         # Step size
         npix_step = 3 if not step_size else abs(step_size)
@@ -362,8 +363,8 @@ def robust_bane(
     tick = time()
     # Setups
     kernel, kern_sum, step_size = get_kernel(
-        header=header, 
-        step_size=step_size, 
+        header=header,
+        step_size=step_size,
         box_size=box_size,
         kernel_func=kernel_func,
     )
@@ -398,12 +399,8 @@ def robust_bane(
         stop_y -= mody
         divy, mody = divmod(stop_y, step_size)
 
-    x_slice = slice(
-        start_idx, stop_x, step_size
-    )
-    y_slice = slice(
-        start_idx, stop_y, step_size
-    )
+    x_slice = slice(start_idx, stop_x, step_size)
+    y_slice = slice(start_idx, stop_y, step_size)
     image_ds = image_mask[(y_slice, x_slice)]
     logging.info(f"Downsampled image to {image_ds.shape}")
     for i in range(2):
@@ -515,12 +512,12 @@ def bane_2d(
     logging.info(f"Running BANE on image {image.shape}")
     # Run BANE
     bkg, rms = robust_bane(
-        image.astype(np.float32), 
-        header, 
-        step_size=step_size, 
+        image.astype(np.float32),
+        header,
+        step_size=step_size,
         box_size=box_size,
         kernel_func=kernel_func,
-        rms_estimator=rms_estimator
+        rms_estimator=rms_estimator,
     )
     write_outputs(out_files, bkg, rms)
 
@@ -546,12 +543,12 @@ def bane_3d_loop(
         bkg = bkg_hdul[ext].data
         logging.info(f"Running BANE on plane {idx}")
         bkg[idx], rms[idx] = robust_bane(
-            plane.astype(np.float32), 
-            header, 
-            step_size=step_size, 
-            box_size=box_size, 
+            plane.astype(np.float32),
+            header,
+            step_size=step_size,
+            box_size=box_size,
             kernel_func=kernel_func,
-            rms_estimator=rms_estimator
+            rms_estimator=rms_estimator,
         )
         rms_hdul.flush()
         bkg_hdul.flush()
@@ -578,13 +575,13 @@ def bane_3d(
             bane_3d_loop,
             [
                 (
-                    cube[ii], 
-                    ii, 
-                    header, 
-                    out_files, 
-                    ext, 
-                    step_size, 
-                    box_size, 
+                    cube[ii],
+                    ii,
+                    header,
+                    out_files,
+                    ext,
+                    step_size,
+                    box_size,
                     kernel_func,
                     rms_estimator,
                 )
@@ -702,10 +699,10 @@ def main(
     else:
         logging.info("Detected 2D image")
         bkg, rms = bane_2d(
-            image=data, 
-            header=header, 
-            out_files=out_files, 
-            step_size=step_size, 
+            image=data,
+            header=header,
+            out_files=out_files,
+            step_size=step_size,
             box_size=box_size,
             kernel_func=kernels.get(kernel_str, gaussian_kernel),
             rms_estimator=estimators.get(estimator_str, mad_std),
