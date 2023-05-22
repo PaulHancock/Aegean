@@ -23,7 +23,7 @@ from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from numpy import fft
 from radio_beam import Beam
-from scipy import interpolate, ndimage
+from scipy import ndimage
 
 from AegeanTools import BANE as bane
 from AegeanTools import numba_polyfit
@@ -162,28 +162,30 @@ def get_kernel(
         try:
             beam = Beam.from_fits_header(header)
             logging.info(f"Beam: {beam.__repr__()}")
+            scales = proj_plane_pixel_scales(WCS(header)) * u.deg
+            pix_per_beam = beam.minor / scales.min()
         except ValueError:
             raise ValueError(
                 "Could not parse beam from header - try specifying step size"
             )
-
+        
+    if not step_size or step_size < 0:
         # Step size
         npix_step = 3 if not step_size else abs(step_size)
         logging.info(f"Using step size of {npix_step} pixels per beam")
-        scales = proj_plane_pixel_scales(WCS(header)) * u.deg
-        pix_per_beam = beam.minor / scales.min()
         step_size = int(np.ceil(pix_per_beam / npix_step))
+    logging.info(f"Using step size of {step_size} pixels")
 
+    if not box_size or box_size < 0:
         # Box size
         logging.info(f"Using step size of {step_size} pixels")
         npix_box = 10 if not box_size else abs(box_size)
         logging.info(f"Using a box size of {npix_box} per beam")
         box_size = int(np.ceil(pix_per_beam * npix_box / step_size))
-
     logging.info(f"Using box size of {box_size} pixels (scaled by step size)")
+
     kernel = tophat_kernel(radius=box_size // 2)
     kernel /= kernel.max()
-
     kern_sum = kernel.sum()
 
     return kernel, kern_sum, step_size
@@ -357,11 +359,23 @@ def robust_bane(
     # Downsample the image
     # Create slice for downsampled image
     # Ensure downsampled image has even number of pixels
+    start_idx = 0
+    stop_x = image_mask.shape[1]
+    stop_y = image_mask.shape[0]
+
+    divx, modx = divmod(stop_x, step_size)
+    divy, mody = divmod(stop_y, step_size)
+
+    if (divx + 1) % 2 != 0:
+        stop_x -= step_size
+    if (divy + 1) % 2 != 0:
+        stop_y -= step_size
+
     x_slice = slice(
-        0, image_mask.shape[1] - (image_mask.shape[1] % step_size) + 1, step_size
+        start_idx, stop_x, step_size
     )
     y_slice = slice(
-        0, image_mask.shape[0] - (image_mask.shape[0] % step_size) + 1, step_size
+        start_idx, stop_y, step_size
     )
     image_ds = image_mask[(y_slice, x_slice)]
     logging.info(f"Downsampled image to {image_ds.shape}")
@@ -633,7 +647,7 @@ def main(
         logging.info("Detected 2D image")
         bkg, rms = bane_2d(
             image=data, 
-            heaader=header, 
+            header=header, 
             out_files=out_files, 
             step_size=step_size, 
             box_size=box_size,
@@ -696,7 +710,7 @@ def cli():
         "-v",
         "--version",
         action="version",
-        version=f"%(prog)s {__version__}",
+        version=f"%(prog)s: {__doc__} -- version {__version__}",
     )
     args = parser.parse_args()
 
