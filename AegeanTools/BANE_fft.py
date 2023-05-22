@@ -197,7 +197,6 @@ def get_kernel(
 
     if not box_size or box_size < 0:
         # Box size
-        logging.info(f"Using step size of {step_size} pixels")
         npix_box = 10 if not box_size else abs(box_size)
         logging.info(f"Using a box size of {npix_box} per beam")
         box_size = int(np.ceil(pix_per_beam * npix_box / step_size))
@@ -391,12 +390,12 @@ def robust_bane(
     divx, modx = divmod(stop_x, step_size)
     divy, mody = divmod(stop_y, step_size)
 
-    while (divx + 1) % 2 != 0:
-        stop_x -= modx
+    while divx % 2 != 0:
+        stop_x -= 1
         divx, modx = divmod(stop_x, step_size)
 
-    while (divy + 1) % 2 != 0:
-        stop_y -= mody
+    while divy % 2 != 0:
+        stop_y -= 1
         divy, mody = divmod(stop_y, step_size)
 
     x_slice = slice(start_idx, stop_x, step_size)
@@ -417,8 +416,8 @@ def robust_bane(
     mean, avg_rms = bane_fft(image_ds, kernel, kern_sum)
 
     # Upsample the mean and RMS to the original image size
-    mean_us = ndimage.zoom(mean, zoom, order=3, grid_mode=True)
-    avg_rms_us = ndimage.zoom(avg_rms, zoom, order=3, grid_mode=True)
+    mean_us = ndimage.shift(ndimage.zoom(mean, zoom, order=3, grid_mode=True), step_size*2)
+    avg_rms_us = ndimage.shift(ndimage.zoom(avg_rms, zoom, order=3, grid_mode=True), step_size*2)
 
     # Reapply mask
     mean_us[nan_mask] = np.nan
