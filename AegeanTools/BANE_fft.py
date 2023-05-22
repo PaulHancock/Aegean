@@ -413,23 +413,9 @@ def robust_bane(
     zoom_y = image.shape[0] / image_ds.shape[0]
     zoom = (zoom_y, zoom_x)
 
-    # Round 1
+    # Run the FFT
     mean, avg_rms = bane_fft(image_ds, kernel, kern_sum)
 
-    """
-    # Round 2
-    # Repeat with masked values filled in with noise
-    snr = np.abs(image_mask) / np.nanmedian(avg_rms)
-    mask = snr > 5
-    image_masked = image_mask.copy()
-    # Fill sources with noise
-    image_masked[mask] = np.random.normal(
-        loc=0, scale=avg_rms.mean(), size=image_masked[mask].shape
-    )
-    # Downsample the masked image
-    image_masked_ds = image_masked[(y_slice, x_slice)]
-    mean_masked, avg_rms_masked = bane_fft(image_masked_ds, kernel, kern_sum)
-    """
     # Upsample the mean and RMS to the original image size
     mean_us = ndimage.zoom(mean, zoom, order=3, grid_mode=True)
     avg_rms_us = ndimage.zoom(avg_rms, zoom, order=3, grid_mode=True)
