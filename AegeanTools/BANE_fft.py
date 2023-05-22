@@ -17,7 +17,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 import astropy.units as u
-from scipy import interpolate, ndimage
+from scipy import interpolate, ndimage, fft
 from radio_beam import Beam
 
 from AegeanTools import BANE as bane
@@ -38,7 +38,7 @@ def _ft_kernel(kernel: np.ndarray, shape: tuple) -> np.ndarray:
     Returns:
         np.ndarray: FFT of the kernel
     """
-    return np.fft.rfft2(kernel, s=shape)
+    return fft.rfft2(kernel, s=shape)
 
 
 @nb.njit(
@@ -59,12 +59,12 @@ def fft_average(
     Returns:
         np.ndarray: Averaged image
     """
-    image_fft = np.fft.rfft2(image)
+    image_fft = fft.rfft2(image)
     kernel_fft = _ft_kernel(kernel, shape=image.shape)
 
     smooth_fft = image_fft * kernel_fft
 
-    smooth = np.fft.irfft2(smooth_fft) / kern_sum
+    smooth = fft.irfft2(smooth_fft) / kern_sum
     return smooth
 
 
@@ -114,6 +114,12 @@ def tophat_kernel(radius: int):
     kernel[mask] = 1
     return kernel
 
+
+@nb.njit(
+    nb.boolean[:, :](nb.float32[:, :], nb.float32[:, :]),
+    fastmath=True,
+    # parallel=True,
+)
 def get_nan_mask(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     """Get a mask of NaNs in the image
 
@@ -124,10 +130,11 @@ def get_nan_mask(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
         np.ndarray: Mask of NaNs
     """
     immask = np.isfinite(image)
-    immask_fft = np.fft.rfft2(immask)
+    immask_fft = fft.rfft2(immask)
     kernel_fft = _ft_kernel(kernel, shape=image.shape)
-    conv = np.fft.irfft2(immask_fft * kernel_fft)
-    return conv < 1
+    conv = fft.irfft2(immask_fft * kernel_fft)
+    mask = conv < 1
+    return mask
 
 
 def get_kernel(header: Union[fits.Header, dict], step_size: Optional[int] = None, box_size: Optional[int] = None) -> Tuple[np.ndarray, float, int]:
@@ -151,7 +158,6 @@ def get_kernel(header: Union[fits.Header, dict], step_size: Optional[int] = None
         except ValueError:
             raise ValueError("Could not parse beam from header - try specifying step size")
         scales  = proj_plane_pixel_scales(WCS(header)) * u.deg
-        logging.info("Using 3 pixels per beam")
         pix_per_beam = beam.minor / scales.min()
         step_size = int(np.ceil(pix_per_beam / npix_step))
         logging.info(f"Using step size of {step_size} pixels")
@@ -198,7 +204,10 @@ def chunk_image(image_shape: Tuple[int, int], box_size: int) -> np.ndarray:
 
 
 def robust_bane(
-    image: np.ndarray, header: Union[fits.Header, dict]
+    image: np.ndarray, 
+    header: Union[fits.Header, dict],
+    step_size: Optional[int] = None,
+    box_size: Optional[int] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Two-round BANE with FFTs
 
@@ -212,7 +221,7 @@ def robust_bane(
     logging.info("Running FFT BANE")
     tick = time()
     # Setups
-    kernel, kern_sum, step_size = get_kernel(header)
+    kernel, kern_sum, step_size = get_kernel(header, step_size, box_size)
     nan_mask = get_nan_mask(image, kernel)
     image_mask = np.nan_to_num(image)
     
@@ -242,7 +251,7 @@ def robust_bane(
     # Round 2
     # Repeat with masked values filled in with noise
     snr = np.abs(image_mask) / np.nanmedian(avg_rms)
-    mask = snr >= 5
+    mask = snr > 5
     image_masked = image_mask.copy()
     # Fill sources with noise
     image_masked[mask] = np.random.normal(
@@ -326,10 +335,12 @@ def bane_2d(
         image: np.ndarray,
         header: Union[fits.Header, dict],
         out_files: List[Path],
+        step_size: Optional[int] = None,
+        box_size: Optional[int] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     logging.info(f"Running BANE on image {image.shape}")
     # Run BANE
-    bkg, rms = robust_bane(image.astype(np.float32), header)
+    bkg, rms = robust_bane(image.astype(np.float32), header, step_size=step_size, box_size=box_size)
     write_outputs(out_files, bkg, rms)
 
     return bkg, rms
@@ -341,6 +352,8 @@ def bane_3d_loop(
     header: Union[fits.Header, dict],
     out_files: List[Path],
     ext: int = 0,
+    step_size: Optional[int] = None,
+    box_size: Optional[int] = None,
 ):
     rms_file, bkg_file = out_files
     with fits.open(
@@ -351,7 +364,7 @@ def bane_3d_loop(
         rms = rms_hdul[ext].data
         bkg = bkg_hdul[ext].data
         logging.info(f"Running BANE on plane {idx}")
-        bkg[idx], rms[idx] = robust_bane(plane.astype(np.float32), header)
+        bkg[idx], rms[idx] = robust_bane(plane.astype(np.float32), header, step_size=step_size, box_size=box_size)
         rms_hdul.flush()
         bkg_hdul.flush()
     logging.info(f"Finished BANE on plane {idx}")
@@ -361,14 +374,16 @@ def bane_3d(
         header: Union[fits.Header, dict],
         out_files: List[Path],
         ext: int = 0,
-):
+        step_size: Optional[int] = None,
+        box_size: Optional[int] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
     logging.info(f"Running BANE on cube {cube.shape}")
     # Run BANE
     with mp.Pool(mp.cpu_count()) as pool:
         pool.starmap(
             bane_3d_loop,
             [
-                (cube[ii], ii, header, out_files, ext)
+                (cube[ii], ii, header, out_files, ext, step_size, box_size)
                 for ii in range(cube.shape[0])
             ],
         )       
@@ -426,6 +441,8 @@ def find_stokes_axis(header: Union[fits.Header, dict]) -> int:
 def main(
     fits_file: Path,
     ext: int = 0,
+    step_size: Optional[int] = None,
+    box_size: Optional[int] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     # Init output files
     out_files = init_outputs(fits_file, ext=ext)
@@ -456,11 +473,11 @@ def main(
 
     if is_cube:
         logging.info("Detected cube")
-        bkg, rms = bane_3d(data, header, out_files, ext=ext)
+        bkg, rms = bane_3d(data, header, out_files, ext=ext, step_size=step_size, box_size=box_size)
 
     else:
         logging.info("Detected 2D image")
-        bkg, rms = bane_2d(data, header, out_files)
+        bkg, rms = bane_2d(data, header, out_files, step_size=step_size, box_size=box_size)
 
 
     logging.info("Done")
@@ -488,6 +505,18 @@ def cli():
         action="store_true",
         help="Debug mode",
     )
+    parser.add_argument(
+        "--step-size",
+        type=int,
+        default=None,
+        help="Step size for BANE. Negative values will be interpreted as number of pixels per beam.",
+    )
+    parser.add_argument(
+        "--box-size",
+        type=int,
+        default=None,
+        help="Box size for BANE. Negative values will be interpreted as number of pixels per beam.",
+    )
     args = parser.parse_args()
 
     logging_level = logging.DEBUG if args.debug else logging.INFO
@@ -497,6 +526,8 @@ def cli():
     _ = main(
         Path(args.fits_file),
         ext=args.ext,
+        step_size=args.step_size,
+        box_size=args.box_size,
     )
 
     return 0
