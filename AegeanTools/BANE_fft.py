@@ -326,6 +326,7 @@ def robust_bane(
     header: Union[fits.Header, dict],
     step_size: Optional[int] = None,
     box_size: Optional[int] = None,
+    rms_estimator: Callable = mad_std,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Two-round BANE with FFTs
 
@@ -345,19 +346,10 @@ def robust_bane(
     image_mask = np.nan_to_num(image)
 
     # Quick and dirty rms estimate
-    from IPython import embed
-
-    embed()
-    rms_est = estimate_rms(
-        data=image[~nan_mask].flatten(),
-        mode="mad",
-        clip_rounds=2,
-        bin_perc=0.25,
-        outlier_thres=3.0,
-    )
+    rms_est = rms_estimator(image_mask[~nan_mask].ravel())
     snr = np.abs(image_mask) / rms_est
     mask = snr > 5
-    # Fill sources with noise
+    # Clip and fill sources with noise
     image_mask[mask] = np.random.normal(
         loc=0, scale=rms_est, size=image_mask[mask].shape
     )
@@ -476,11 +468,12 @@ def bane_2d(
     out_files: List[Path],
     step_size: Optional[int] = None,
     box_size: Optional[int] = None,
+    rms_estimator: Callable = mad_std,
 ) -> Tuple[np.ndarray, np.ndarray]:
     logging.info(f"Running BANE on image {image.shape}")
     # Run BANE
     bkg, rms = robust_bane(
-        image.astype(np.float32), header, step_size=step_size, box_size=box_size
+        image.astype(np.float32), header, step_size=step_size, box_size=box_size, rms_estimator=rms_estimator
     )
     write_outputs(out_files, bkg, rms)
 
@@ -495,6 +488,7 @@ def bane_3d_loop(
     ext: int = 0,
     step_size: Optional[int] = None,
     box_size: Optional[int] = None,
+    rms_estimator: Callable = mad_std,
 ):
     rms_file, bkg_file = out_files
     with fits.open(rms_file, memmap=True, mode="update") as rms_hdul, fits.open(
@@ -504,7 +498,7 @@ def bane_3d_loop(
         bkg = bkg_hdul[ext].data
         logging.info(f"Running BANE on plane {idx}")
         bkg[idx], rms[idx] = robust_bane(
-            plane.astype(np.float32), header, step_size=step_size, box_size=box_size
+            plane.astype(np.float32), header, step_size=step_size, box_size=box_size, rms_estimator=rms_estimator
         )
         rms_hdul.flush()
         bkg_hdul.flush()
@@ -519,6 +513,7 @@ def bane_3d(
     step_size: Optional[int] = None,
     box_size: Optional[int] = None,
     ncores: Optional[int] = None,
+    rms_estimator: Callable = mad_std,
 ) -> Tuple[np.ndarray, np.ndarray]:
     logging.info(f"Running BANE on cube {cube.shape}")
     # Run BANE
@@ -528,7 +523,7 @@ def bane_3d(
         pool.starmap(
             bane_3d_loop,
             [
-                (cube[ii], ii, header, out_files, ext, step_size, box_size)
+                (cube[ii], ii, header, out_files, ext, step_size, box_size, rms_estimator)
                 for ii in range(cube.shape[0])
             ],
         )
@@ -587,7 +582,7 @@ def main(
     step_size: Optional[int] = None,
     box_size: Optional[int] = None,
     ncores: Optional[int] = None,
-    estimator: str = "mad_std",
+    estimator_str: str = "mad_std",
 ) -> Tuple[np.ndarray, np.ndarray]:
     # Init output files
     out_files = init_outputs(fits_file, ext=ext)
@@ -624,19 +619,25 @@ def main(
     if is_cube:
         logging.info("Detected cube")
         bkg, rms = bane_3d(
-            data,
-            header,
-            out_files,
+            cube=data,
+            header=header,
+            out_files=out_files,
             ext=ext,
             step_size=step_size,
             box_size=box_size,
             ncores=ncores,
+            rms_estimator=estimators.get(estimator_str, mad_std),
         )
 
     else:
         logging.info("Detected 2D image")
         bkg, rms = bane_2d(
-            data, header, out_files, step_size=step_size, box_size=box_size
+            image=data, 
+            heaader=header, 
+            out_files=out_files, 
+            step_size=step_size, 
+            box_size=box_size,
+            rms_estimator=estimators.get(estimator_str, mad_std),
         )
 
     logging.info("Done")
@@ -683,6 +684,13 @@ def cli():
         type=int,
         default=None,
         help="Number of cores to use (only sppeds up cube processing). Default is all cores.",
+    )
+    parser.add_argument(
+        "--estimator",
+        type=str,
+        default="mad_std",
+        choices=["mad_std", "galvin", "astropy"],
+        help="RMS estimator to use",
     )
     parser.add_argument(
         "-v",
