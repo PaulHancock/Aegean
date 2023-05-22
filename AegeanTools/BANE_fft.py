@@ -5,6 +5,8 @@ BANE: Background and Noise Estimation
 ...but with FFTs
 """
 
+# TODO: Images come out with a slight offset. Need to figure out why.
+
 __author__ = ["Alec Thomson", "Tim Galvin"]
 __version__ = "0.0.0"
 
