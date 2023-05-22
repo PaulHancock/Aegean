@@ -5,6 +5,9 @@ BANE: Background and Noise Estimation
 ...but with FFTs
 """
 
+__author__ = ["Alec Thomson", "Tim Galvin"]
+__version__ = "0.0.0"
+
 import os
 import multiprocessing as mp
 from pathlib import Path
@@ -210,12 +213,11 @@ def chunk_image(image_shape: Tuple[int, int], box_size: int) -> np.ndarray:
 
 @nb.njit(
     nb.float32(
-        nb.float32[:, :],
+        nb.float32[:],
         nb.types.unicode_type,
         nb.int32,
         nb.float32,
         nb.float32,
-        nb.boolean,
     ),
     cache=True,
 )
@@ -231,7 +233,7 @@ def estimate_rms(
     pixel distribution histogram, with the standard deviation being return. 
     
     Arguments:
-        data (np.ndarray) -- Data to estimate the noise level of
+        data (np.ndarray) -- 1D data to estimate the noise level of
     
     Keyword Arguments:
         mode (str) -- Clipping mode used to flag outlying pixels, either made on the median absolute deviation (`mad`) or standard deviation (`std`) (default: ('mad'))
@@ -312,7 +314,7 @@ def robust_bane(
 
     # Quick and dirty rms estimate
     rms_est = estimate_rms(
-        data=image_mask,
+        data=image_mask.flatten(),
         mode="mad",
         clip_rounds=2,
         bin_perc=0.25,
@@ -629,6 +631,12 @@ def cli():
         type=int,
         default=None,
         help="Number of cores to use (only sppeds up cube processing). Default is all cores.",
+    )
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     args = parser.parse_args()
 
