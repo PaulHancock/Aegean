@@ -9,12 +9,16 @@ import os
 import multiprocessing as mp
 from pathlib import Path
 from time import time
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
 
 import numba as nb
 import numpy as np
 from astropy.io import fits
+from astropy.wcs import WCS
+from astropy.wcs.utils import proj_plane_pixel_scales
+import astropy.units as u
 from scipy import interpolate, ndimage
+from radio_beam import Beam
 
 from AegeanTools import BANE as bane
 
@@ -40,7 +44,7 @@ def _ft_kernel(kernel: np.ndarray, shape: tuple) -> np.ndarray:
 @nb.njit(
     nb.float32[:, :](nb.float32[:, :], nb.float32[:, :], nb.float32),
     fastmath=True,
-    parallel=True,
+    # parallel=True,
 )
 def fft_average(
     image: np.ndarray, kernel: np.ndarray, kern_sum: float
@@ -70,7 +74,7 @@ def fft_average(
         2
     )(nb.float32[:, :], nb.float32[:, :], nb.float32),
     fastmath=True,
-    parallel=True,
+    # parallel=True,
 )
 def bane_fft(
     image: np.ndarray,
@@ -110,18 +114,52 @@ def tophat_kernel(radius: int):
     kernel[mask] = 1
     return kernel
 
+def get_nan_mask(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+    """Get a mask of NaNs in the image
 
-def get_kernel(header: Union[fits.Header, dict]) -> Tuple[np.ndarray, float, int]:
+    Args:
+        image (np.ndarray): Image to mask
+
+    Returns:
+        np.ndarray: Mask of NaNs
+    """
+    immask = np.isfinite(image)
+    immask_fft = np.fft.rfft2(immask)
+    kernel_fft = _ft_kernel(kernel, shape=image.shape)
+    conv = np.fft.irfft2(immask_fft * kernel_fft)
+    return conv < 1
+
+
+def get_kernel(header: Union[fits.Header, dict], step_size: Optional[int] = None, box_size: Optional[int] = None) -> Tuple[np.ndarray, float, int]:
     """Get the kernel for FFT BANE
 
     Args:
         header (Union[fits.Header, dict]): Header of the image
+        step_size (Optional[int], optional): Step size in pixels. Defaults to 3/beam. Values of < 0 will specify the number of pixels per beam.
+        box_size (Optional[int], optional): Box size in pixels. Defaults to None. Values of < 0 will specify the number of pixels per beam.
+
 
     Returns:
         Tuple[np.ndarray, float]: The kernel and sum of the kernel
     """
-    step_size = max(bane.get_step_size(header))
-    box_size = step_size * 6
+    if not step_size or step_size < 0:
+        npix_step = 3 if not step_size else abs(step_size)
+        logging.info(f"Using step size of {npix_step} pixels per beam")
+        try:
+            beam = Beam.from_fits_header(header)
+            logging.info(f"Beam: {beam.__repr__()}")
+        except ValueError:
+            raise ValueError("Could not parse beam from header - try specifying step size")
+        scales  = proj_plane_pixel_scales(WCS(header)) * u.deg
+        logging.info("Using 3 pixels per beam")
+        pix_per_beam = beam.minor / scales.min()
+        step_size = int(np.ceil(pix_per_beam / npix_step))
+        logging.info(f"Using step size of {step_size} pixels")
+    if not box_size or box_size < 0:
+        npix_box = 10 if not box_size else abs(box_size)
+        logging.info(f"Using a box size of {npix_box} per beam")
+        box_size = int(np.ceil(pix_per_beam * npix_box / step_size))
+    logging.info(f"Using box size of {box_size} pixels (scaled by step size)")
     kernel = tophat_kernel(radius=box_size // 2)
     kernel /= kernel.max()
 
@@ -132,7 +170,7 @@ def get_kernel(header: Union[fits.Header, dict]) -> Tuple[np.ndarray, float, int
 @nb.njit(
     nb.int32[:, :](nb.types.UniTuple(nb.int32, 2), nb.int32),
     fastmath=True,
-    parallel=True,
+    # parallel=True,
 )
 def chunk_image(image_shape: Tuple[int, int], box_size: int) -> np.ndarray:
     """Divide the image into chunks that overlap by half the box size
@@ -175,30 +213,48 @@ def robust_bane(
     tick = time()
     # Setups
     kernel, kern_sum, step_size = get_kernel(header)
-    nan_mask = ~np.isfinite(image)
+    nan_mask = get_nan_mask(image, kernel)
     image_mask = np.nan_to_num(image)
     
     # Downsample the image
-    image_ds = image_mask[::step_size, ::step_size]
-
-    # Round 1
-    mean, avg_rms = bane_fft(image_ds, kernel, kern_sum)
-    # Round 2
-    # Repeat with masked values filled in with noise
-    snr = np.abs(image_ds) / avg_rms
-    mask = snr > 5
-    image_masked = image_ds.copy()
-    image_masked[mask] = np.random.normal(
-        loc=0, scale=avg_rms.mean(), size=image_masked[mask].shape
+    # Create slice for downsampled image
+    # Ensure downsampled image has even number of pixels
+    x_slice = slice(
+        0, image_mask.shape[1] - (image_mask.shape[1] % step_size) + 1, step_size
     )
-    mean, avg_rms = bane_fft(image_masked, kernel, kern_sum)
+    y_slice = slice(
+        0, image_mask.shape[0] - (image_mask.shape[0] % step_size) + 1, step_size
+    )
+    image_ds = image_mask[(y_slice, x_slice)]
+    logging.info(f"Downsampled image to {image_ds.shape}")
+    for i in range(2):
+        assert image_ds.shape[i] % 2 == 0, "Downsampled image must have even number of pixels"
 
-    # Upsample the mean and RMS to the original image size
+    # Create zoom factor for upsampling
     zoom_x = image.shape[1] / image_ds.shape[1]
     zoom_y = image.shape[0] / image_ds.shape[0]
     zoom = (zoom_y, zoom_x)
-    mean_us = ndimage.zoom(mean, zoom, order=1)
-    avg_rms_us = ndimage.zoom(avg_rms, zoom, order=1)
+
+
+    # Round 1
+    mean, avg_rms = bane_fft(image_ds, kernel, kern_sum)
+
+    # Round 2
+    # Repeat with masked values filled in with noise
+    snr = np.abs(image_mask) / np.nanmedian(avg_rms)
+    mask = snr >= 5
+    image_masked = image_mask.copy()
+    # Fill sources with noise
+    image_masked[mask] = np.random.normal(
+        loc=0, scale=avg_rms.mean(), size=image_masked[mask].shape
+    )
+    # Downsample the masked image
+    image_masked_ds = image_masked[(y_slice, x_slice)]
+    mean_masked, avg_rms_masked = bane_fft(image_masked_ds, kernel, kern_sum)
+
+    # Upsample the mean and RMS to the original image size
+    mean_us = ndimage.zoom(mean_masked, zoom, order=1)
+    avg_rms_us = ndimage.zoom(avg_rms_masked, zoom, order=1)
 
     # Reapply mask
     mean_us[nan_mask] = np.nan
@@ -273,7 +329,7 @@ def bane_2d(
 ) -> Tuple[np.ndarray, np.ndarray]:
     logging.info(f"Running BANE on image {image.shape}")
     # Run BANE
-    bkg, rms = robust_bane(image, header)
+    bkg, rms = robust_bane(image.astype(np.float32), header)
     write_outputs(out_files, bkg, rms)
 
     return bkg, rms
@@ -295,7 +351,7 @@ def bane_3d_loop(
         rms = rms_hdul[ext].data
         bkg = bkg_hdul[ext].data
         logging.info(f"Running BANE on plane {idx}")
-        bkg[idx], rms[idx] = robust_bane(plane, header)
+        bkg[idx], rms[idx] = robust_bane(plane.astype(np.float32), header)
         rms_hdul.flush()
         bkg_hdul.flush()
     logging.info(f"Finished BANE on plane {idx}")
@@ -328,6 +384,45 @@ def bane_3d(
         bkg = bkg_hdul[ext].data
     return bkg, rms
 
+
+def fits_idx_to_np(
+    fits_idx: int,
+    header: Union[fits.Header, dict],
+) -> int:
+    """Convert FITS index to numpy index
+
+    Args:
+        fits_idx (int): FITS index
+        header (Union[fits.Header, dict]): FITS header
+
+    Returns:
+        int: numpy index
+    """
+    # FITS index is 1, 2, 3, ...
+    # numpy index is 0, 1, 2, ...
+    # numpy index is reversed
+    return header["NAXIS"] - fits_idx
+
+
+def find_stokes_axis(header: Union[fits.Header, dict]) -> int:
+    """Find the Stokes axis
+
+    Args:
+        header (Union[fits.Header, dict]): FITS header
+
+    Returns:
+        int: Stokes axis (numpy index)
+    """    
+    stokes_axis = None
+    for ii in range(1, header["NAXIS"] + 1):
+        if header[f"CTYPE{ii}"] == "STOKES":
+            stokes_axis = ii
+            break
+    if stokes_axis is None:
+        raise ValueError("No Stokes axis found")
+    return fits_idx_to_np(stokes_axis, header)
+
+
 def main(
     fits_file: Path,
     ext: int = 0,
@@ -337,25 +432,32 @@ def main(
     # Check for frequency axis and Stokes axis
     logging.info(f"Opening FITS file {fits_file}")
     with fits.open(fits_file, memmap=True, mode="denywrite") as hdul:
-        data = hdul[ext].data.astype(np.float32)
+        data = hdul[ext].data
         header = hdul[ext].header
         
     is_stokes_cube = len(data.shape) > 3 and data.shape[-1] > 1
     is_cube = len(data.shape) == 3
 
-    from IPython import embed
-    embed()
-
     if is_stokes_cube:
         logging.info("Detected Stokes cube")
-        raise NotImplementedError("Stokes cube not implemented")
+
+        # Check if Stokes axis is unitary
+        stokes_axis = find_stokes_axis(header)
+        if data.shape[stokes_axis] != 1:
+            raise NotImplementedError("Stokes cube not implemented")
+        
+        # Remove Stokes axis
+        # Create slice to index all but Stokes axis
+        slices = [slice(None)] * len(data.shape)
+        slices[stokes_axis] = 0
+        data = data[tuple(slices)]
+        is_cube = True
 
 
     if is_cube:
         logging.info("Detected cube")
         bkg, rms = bane_3d(data, header, out_files, ext=ext)
 
-        
     else:
         logging.info("Detected 2D image")
         bkg, rms = bane_2d(data, header, out_files)
