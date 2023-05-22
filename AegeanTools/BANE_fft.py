@@ -12,19 +12,20 @@ import os
 import multiprocessing as mp
 from pathlib import Path
 from time import time
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Union, Optional, Callable, Dict
 
 import numba as nb
 import numpy as np
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
+from astropy.stats import mad_std, sigma_clip
 import astropy.units as u
 from scipy import interpolate, ndimage
 from numpy import fft
 from radio_beam import Beam
 
-from AegeanTools import BANE as bane
+from AegeanTools import BANE as bane, numba_polyfit
 
 logging = bane.logging
 
@@ -278,7 +279,8 @@ def estimate_rms(
         mask_counts = np.sum(mask)
         loop += 1
 
-    p = np.polyfit(binc[mask], np.log10(counts[mask] / np.max(counts)), 2)
+    # p = np.polyfit(binc[mask], np.log10(counts[mask] / np.max(counts)), 2)
+    p = numba_polyfit.fit_poly(binc[mask], np.log10(counts[mask] / np.max(counts)), 2)
     a, b, c = p
 
     x1 = (-b + np.sqrt(b ** 2 - 4.0 * a * (c - np.log10(0.5)))) / (2.0 * a)
@@ -287,6 +289,21 @@ def estimate_rms(
     noise = fwhm / 2.355
 
     return noise
+
+
+def estimate_rms_astropy(image: np.ndarray):
+    """Estimate the RMS of an image using astropy
+
+    Args:
+        image (np.ndarray): Image to estimate the RMS of
+
+    Returns:
+        float: RMS of the image
+    """
+
+    # Sigma clip the image
+    clipped_image = sigma_clip(image, sigma=3, maxiters=None, cenfunc=np.nanmedian, stdfunc=mad_std, masked=False, copy=False)
+    return mad_std(clipped_image)
 
 
 def robust_bane(
@@ -313,8 +330,9 @@ def robust_bane(
     image_mask = np.nan_to_num(image)
 
     # Quick and dirty rms estimate
+    from IPython import embed; embed()
     rms_est = estimate_rms(
-        data=image_mask.flatten(),
+        data=image[~nan_mask].flatten(),
         mode="mad",
         clip_rounds=2,
         bin_perc=0.25,
@@ -552,6 +570,7 @@ def main(
     step_size: Optional[int] = None,
     box_size: Optional[int] = None,
     ncores: Optional[int] = None,
+    estimator: str = "mad_std",
 ) -> Tuple[np.ndarray, np.ndarray]:
     # Init output files
     out_files = init_outputs(fits_file, ext=ext)
@@ -563,6 +582,12 @@ def main(
         
     is_stokes_cube = len(data.shape) > 3 and data.shape[-1] > 1
     is_cube = len(data.shape) == 3
+
+    estimators: Dict[str, Callable] = {
+        "galvin": estimate_rms,
+        "mad_std": mad_std,
+        "astropy": estimate_rms_astropy,
+    }
 
     if is_stokes_cube:
         logging.info("Detected Stokes cube")
