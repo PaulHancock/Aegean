@@ -101,7 +101,7 @@ def bane_fft(
     return mean, avg_rms
 
 
-def tophat_kernel(radius: int):
+def tophat_kernel(diameter: int):
     """Make a tophat kernel
 
     Args:
@@ -110,6 +110,7 @@ def tophat_kernel(radius: int):
     Returns:
         np.ndarray: Tophat kernel
     """
+    radius = diameter // 2
     kernel = np.zeros((radius * 2 + 1, radius * 2 + 1), dtype=np.float32)
     xx = np.arange(-radius, radius + 1)
     yy = np.arange(-radius, radius + 1)
@@ -117,6 +118,22 @@ def tophat_kernel(radius: int):
     mask = X**2 + Y**2 <= radius**2
     kernel[mask] = 1
     return kernel
+
+def gaussian_kernel(fwhm: int) -> np.ndarray:
+    """Make a Gaussian kernel
+
+    Args:
+        fwhm (int): FWHM of the kernel in pixels
+
+    Returns:
+        np.ndarray: Gaussian kernel
+    """
+    kernel = np.zeros((fwhm * 2 + 1, fwhm * 2 + 1), dtype=np.float32)
+    xx = np.arange(-fwhm, fwhm + 1)
+    yy = np.arange(-fwhm, fwhm + 1)
+    X, Y = np.meshgrid(xx, yy)
+    kernel = np.exp(-4 * np.log(2) * (X**2 + Y**2) / fwhm**2)
+    return kernel.astype(np.float32)
 
 
 @nb.njit(
@@ -144,6 +161,7 @@ def get_kernel(
     header: Union[fits.Header, dict],
     step_size: Optional[int] = None,
     box_size: Optional[int] = None,
+    kernel_func: Callable = gaussian_kernel,
 ) -> Tuple[np.ndarray, float, int]:
     """Get the kernel for FFT BANE
 
@@ -184,7 +202,7 @@ def get_kernel(
         box_size = int(np.ceil(pix_per_beam * npix_box / step_size))
     logging.info(f"Using box size of {box_size} pixels (scaled by step size)")
 
-    kernel = tophat_kernel(radius=box_size // 2)
+    kernel = kernel_func(box_size)
     kernel /= kernel.max()
     kern_sum = kernel.sum()
 
@@ -328,6 +346,7 @@ def robust_bane(
     header: Union[fits.Header, dict],
     step_size: Optional[int] = None,
     box_size: Optional[int] = None,
+    kernel_func: Callable = gaussian_kernel,
     rms_estimator: Callable = mad_std,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Two-round BANE with FFTs
@@ -342,7 +361,12 @@ def robust_bane(
     logging.info("Running FFT BANE")
     tick = time()
     # Setups
-    kernel, kern_sum, step_size = get_kernel(header, step_size, box_size)
+    kernel, kern_sum, step_size = get_kernel(
+        header=header, 
+        step_size=step_size, 
+        box_size=box_size,
+        kernel_func=kernel_func,
+    )
     # nan_mask = get_nan_mask(image, kernel)
     nan_mask = ~np.isfinite(image)
     image_mask = np.nan_to_num(image)
@@ -359,17 +383,20 @@ def robust_bane(
     # Downsample the image
     # Create slice for downsampled image
     # Ensure downsampled image has even number of pixels
-    start_idx = 0
-    stop_x = image_mask.shape[1]
-    stop_y = image_mask.shape[0]
+    start_idx = step_size
+    stop_x = image_mask.shape[1] - step_size
+    stop_y = image_mask.shape[0] - step_size
 
     divx, modx = divmod(stop_x, step_size)
     divy, mody = divmod(stop_y, step_size)
 
-    if (divx + 1) % 2 != 0:
-        stop_x -= step_size
-    if (divy + 1) % 2 != 0:
-        stop_y -= step_size
+    while (divx + 1) % 2 != 0:
+        stop_x -= modx
+        divx, modx = divmod(stop_x, step_size)
+
+    while (divy + 1) % 2 != 0:
+        stop_y -= mody
+        divy, mody = divmod(stop_y, step_size)
 
     x_slice = slice(
         start_idx, stop_x, step_size
@@ -407,8 +434,8 @@ def robust_bane(
     mean_masked, avg_rms_masked = bane_fft(image_masked_ds, kernel, kern_sum)
     """
     # Upsample the mean and RMS to the original image size
-    mean_us = ndimage.zoom(mean, zoom, order=1)
-    avg_rms_us = ndimage.zoom(avg_rms, zoom, order=1)
+    mean_us = ndimage.zoom(mean, zoom, order=3, grid_mode=True)
+    avg_rms_us = ndimage.zoom(avg_rms, zoom, order=3, grid_mode=True)
 
     # Reapply mask
     mean_us[nan_mask] = np.nan
@@ -482,12 +509,18 @@ def bane_2d(
     out_files: List[Path],
     step_size: Optional[int] = None,
     box_size: Optional[int] = None,
+    kernel_func: Callable = gaussian_kernel,
     rms_estimator: Callable = mad_std,
 ) -> Tuple[np.ndarray, np.ndarray]:
     logging.info(f"Running BANE on image {image.shape}")
     # Run BANE
     bkg, rms = robust_bane(
-        image.astype(np.float32), header, step_size=step_size, box_size=box_size, rms_estimator=rms_estimator
+        image.astype(np.float32), 
+        header, 
+        step_size=step_size, 
+        box_size=box_size,
+        kernel_func=kernel_func,
+        rms_estimator=rms_estimator
     )
     write_outputs(out_files, bkg, rms)
 
@@ -502,6 +535,7 @@ def bane_3d_loop(
     ext: int = 0,
     step_size: Optional[int] = None,
     box_size: Optional[int] = None,
+    kernel_func: Callable = gaussian_kernel,
     rms_estimator: Callable = mad_std,
 ):
     rms_file, bkg_file = out_files
@@ -512,7 +546,12 @@ def bane_3d_loop(
         bkg = bkg_hdul[ext].data
         logging.info(f"Running BANE on plane {idx}")
         bkg[idx], rms[idx] = robust_bane(
-            plane.astype(np.float32), header, step_size=step_size, box_size=box_size, rms_estimator=rms_estimator
+            plane.astype(np.float32), 
+            header, 
+            step_size=step_size, 
+            box_size=box_size, 
+            kernel_func=kernel_func,
+            rms_estimator=rms_estimator
         )
         rms_hdul.flush()
         bkg_hdul.flush()
@@ -527,6 +566,7 @@ def bane_3d(
     step_size: Optional[int] = None,
     box_size: Optional[int] = None,
     ncores: Optional[int] = None,
+    kernel_func: Callable = gaussian_kernel,
     rms_estimator: Callable = mad_std,
 ) -> Tuple[np.ndarray, np.ndarray]:
     logging.info(f"Running BANE on cube {cube.shape}")
@@ -537,7 +577,17 @@ def bane_3d(
         pool.starmap(
             bane_3d_loop,
             [
-                (cube[ii], ii, header, out_files, ext, step_size, box_size, rms_estimator)
+                (
+                    cube[ii], 
+                    ii, 
+                    header, 
+                    out_files, 
+                    ext, 
+                    step_size, 
+                    box_size, 
+                    kernel_func,
+                    rms_estimator,
+                )
                 for ii in range(cube.shape[0])
             ],
         )
@@ -596,6 +646,7 @@ def main(
     step_size: Optional[int] = None,
     box_size: Optional[int] = None,
     ncores: Optional[int] = None,
+    kernel_str: str = "gauss",
     estimator_str: str = "mad_std",
 ) -> Tuple[np.ndarray, np.ndarray]:
     # Init output files
@@ -613,6 +664,10 @@ def main(
         "galvin": estimate_rms,
         "mad_std": mad_std,
         "astropy": estimate_rms_astropy,
+    }
+    kernels: Dict[str, Callable] = {
+        "gauss": gaussian_kernel,
+        "tophat": tophat_kernel,
     }
 
     if is_stokes_cube:
@@ -640,6 +695,7 @@ def main(
             step_size=step_size,
             box_size=box_size,
             ncores=ncores,
+            kernel_func=kernels.get(kernel_str, gaussian_kernel),
             rms_estimator=estimators.get(estimator_str, mad_std),
         )
 
@@ -651,6 +707,7 @@ def main(
             out_files=out_files, 
             step_size=step_size, 
             box_size=box_size,
+            kernel_func=kernels.get(kernel_str, gaussian_kernel),
             rms_estimator=estimators.get(estimator_str, mad_std),
         )
 
@@ -700,6 +757,13 @@ def cli():
         help="Number of cores to use (only sppeds up cube processing). Default is all cores.",
     )
     parser.add_argument(
+        "--kernel",
+        type=str,
+        default="gauss",
+        choices=["gauss", "tophat"],
+        help="Kernel to use for convolution",
+    )
+    parser.add_argument(
         "--estimator",
         type=str,
         default="mad_std",
@@ -725,6 +789,8 @@ def cli():
         step_size=args.step_size,
         box_size=args.box_size,
         ncores=args.ncores,
+        kernel_str=args.kernel,
+        estimator_str=args.estimator,
     )
 
     return 0
