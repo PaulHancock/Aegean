@@ -8,26 +8,28 @@ BANE: Background and Noise Estimation
 __author__ = ["Alec Thomson", "Tim Galvin"]
 __version__ = "0.0.0"
 
-import os
 import multiprocessing as mp
+import os
 from pathlib import Path
 from time import time
-from typing import List, Tuple, Union, Optional, Callable, Dict
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
+import astropy.units as u
 import numba as nb
 import numpy as np
 from astropy.io import fits
+from astropy.stats import mad_std, sigma_clip
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-from astropy.stats import mad_std, sigma_clip
-import astropy.units as u
-from scipy import interpolate, ndimage
 from numpy import fft
 from radio_beam import Beam
+from scipy import interpolate, ndimage
 
-from AegeanTools import BANE as bane, numba_polyfit
+from AegeanTools import BANE as bane
+from AegeanTools import numba_polyfit
 
 logging = bane.logging
+
 
 @nb.njit(
     fastmath=True,
@@ -51,9 +53,7 @@ def _ft_kernel(kernel: np.ndarray, shape: tuple) -> np.ndarray:
     fastmath=True,
     cache=True,
 )
-def fft_average(
-    image: np.ndarray, kernel: np.ndarray, kern_sum: float
-) -> np.ndarray:
+def fft_average(image: np.ndarray, kernel: np.ndarray, kern_sum: float) -> np.ndarray:
     """Compute an average with FFT magic
 
     Args:
@@ -74,10 +74,9 @@ def fft_average(
 
 
 @nb.njit(
-    nb.types.UniTuple(
-        nb.float32[:, :],
-        2
-    )(nb.float32[:, :], nb.float32[:, :], nb.float32),
+    nb.types.UniTuple(nb.float32[:, :], 2)(
+        nb.float32[:, :], nb.float32[:, :], nb.float32
+    ),
     fastmath=True,
     cache=True,
 )
@@ -115,7 +114,7 @@ def tophat_kernel(radius: int):
     xx = np.arange(-radius, radius + 1)
     yy = np.arange(-radius, radius + 1)
     X, Y = np.meshgrid(xx, yy)
-    mask = X ** 2 + Y ** 2 <= radius ** 2
+    mask = X**2 + Y**2 <= radius**2
     kernel[mask] = 1
     return kernel
 
@@ -141,7 +140,11 @@ def get_nan_mask(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     return mask
 
 
-def get_kernel(header: Union[fits.Header, dict], step_size: Optional[int] = None, box_size: Optional[int] = None) -> Tuple[np.ndarray, float, int]:
+def get_kernel(
+    header: Union[fits.Header, dict],
+    step_size: Optional[int] = None,
+    box_size: Optional[int] = None,
+) -> Tuple[np.ndarray, float, int]:
     """Get the kernel for FFT BANE
 
     Args:
@@ -160,12 +163,14 @@ def get_kernel(header: Union[fits.Header, dict], step_size: Optional[int] = None
             beam = Beam.from_fits_header(header)
             logging.info(f"Beam: {beam.__repr__()}")
         except ValueError:
-            raise ValueError("Could not parse beam from header - try specifying step size")
+            raise ValueError(
+                "Could not parse beam from header - try specifying step size"
+            )
 
         # Step size
         npix_step = 3 if not step_size else abs(step_size)
         logging.info(f"Using step size of {npix_step} pixels per beam")
-        scales  = proj_plane_pixel_scales(WCS(header)) * u.deg
+        scales = proj_plane_pixel_scales(WCS(header)) * u.deg
         pix_per_beam = beam.minor / scales.min()
         step_size = int(np.ceil(pix_per_beam / npix_step))
 
@@ -182,6 +187,7 @@ def get_kernel(header: Union[fits.Header, dict], step_size: Optional[int] = None
     kern_sum = kernel.sum()
 
     return kernel, kern_sum, step_size
+
 
 @nb.njit(
     nb.int32[:, :](nb.types.UniTuple(nb.int32, 2), nb.int32),
@@ -212,6 +218,7 @@ def chunk_image(image_shape: Tuple[int, int], box_size: int) -> np.ndarray:
 
     return chunks
 
+
 @nb.njit(
     nb.float32(
         nb.float32[:],
@@ -231,11 +238,11 @@ def estimate_rms(
 ) -> float:
     """Calculates to RMS of an image, primiarily for radio interferometric images. First outlying
     pixels will be flagged. To the remaining valid pixels a Guassian distribution is fitted to the
-    pixel distribution histogram, with the standard deviation being return. 
-    
+    pixel distribution histogram, with the standard deviation being return.
+
     Arguments:
         data (np.ndarray) -- 1D data to estimate the noise level of
-    
+
     Keyword Arguments:
         mode (str) -- Clipping mode used to flag outlying pixels, either made on the median absolute deviation (`mad`) or standard deviation (`std`) (default: ('mad'))
         clip_rounds (int) -- Number of times to perform the clipping of outlying pixels (default: (2))
@@ -245,7 +252,7 @@ def estimate_rms(
 
     Raises:
         ValueError: Raised if a mode is specified but not supported
-    
+
     Returns:
         float -- Estimated RMS of the supploed image
     """
@@ -262,7 +269,7 @@ def estimate_rms(
         raise ValueError(
             f"{mode} not supported as a clipping mode, available modes are `std` and `mad`. "
         )
-    
+
     cen_func = lambda data: np.median(data)
 
     for i in range(clip_rounds):
@@ -283,8 +290,8 @@ def estimate_rms(
     p = numba_polyfit.fit_poly(binc[mask], np.log10(counts[mask] / np.max(counts)), 2)
     a, b, c = p
 
-    x1 = (-b + np.sqrt(b ** 2 - 4.0 * a * (c - np.log10(0.5)))) / (2.0 * a)
-    x2 = (-b - np.sqrt(b ** 2 - 4.0 * a * (c - np.log10(0.5)))) / (2.0 * a)
+    x1 = (-b + np.sqrt(b**2 - 4.0 * a * (c - np.log10(0.5)))) / (2.0 * a)
+    x2 = (-b - np.sqrt(b**2 - 4.0 * a * (c - np.log10(0.5)))) / (2.0 * a)
     fwhm = np.abs(x1 - x2)
     noise = fwhm / 2.355
 
@@ -302,12 +309,20 @@ def estimate_rms_astropy(image: np.ndarray):
     """
 
     # Sigma clip the image
-    clipped_image = sigma_clip(image, sigma=3, maxiters=None, cenfunc=np.nanmedian, stdfunc=mad_std, masked=False, copy=False)
+    clipped_image = sigma_clip(
+        image,
+        sigma=3,
+        maxiters=None,
+        cenfunc=np.nanmedian,
+        stdfunc=mad_std,
+        masked=False,
+        copy=False,
+    )
     return mad_std(clipped_image)
 
 
 def robust_bane(
-    image: np.ndarray, 
+    image: np.ndarray,
     header: Union[fits.Header, dict],
     step_size: Optional[int] = None,
     box_size: Optional[int] = None,
@@ -330,7 +345,9 @@ def robust_bane(
     image_mask = np.nan_to_num(image)
 
     # Quick and dirty rms estimate
-    from IPython import embed; embed()
+    from IPython import embed
+
+    embed()
     rms_est = estimate_rms(
         data=image[~nan_mask].flatten(),
         mode="mad",
@@ -345,7 +362,6 @@ def robust_bane(
         loc=0, scale=rms_est, size=image_mask[mask].shape
     )
 
-
     # Downsample the image
     # Create slice for downsampled image
     # Ensure downsampled image has even number of pixels
@@ -358,13 +374,14 @@ def robust_bane(
     image_ds = image_mask[(y_slice, x_slice)]
     logging.info(f"Downsampled image to {image_ds.shape}")
     for i in range(2):
-        assert image_ds.shape[i] % 2 == 0, "Downsampled image must have even number of pixels"
+        assert (
+            image_ds.shape[i] % 2 == 0
+        ), "Downsampled image must have even number of pixels"
 
     # Create zoom factor for upsampling
     zoom_x = image.shape[1] / image_ds.shape[1]
     zoom_y = image.shape[0] / image_ds.shape[0]
     zoom = (zoom_y, zoom_x)
-
 
     # Round 1
     mean, avg_rms = bane_fft(image_ds, kernel, kern_sum)
@@ -391,12 +408,12 @@ def robust_bane(
     mean_us[nan_mask] = np.nan
     avg_rms_us[nan_mask] = np.nan
 
-
     tock = time()
 
     logging.info(f"FFT BANE took {tock - tick:.2f} seconds")
 
     return mean_us, avg_rms_us
+
 
 def init_outputs(
     fits_file: Path,
@@ -407,7 +424,7 @@ def init_outputs(
     Args:
         fits_file (Path): Input FITS file
         ext (int, optional): HDU extension. Defaults to 0.
-    """    
+    """
     logging.info("Initializing output files")
     out_files: List[Path] = []
     with fits.open(fits_file, memmap=True, mode="denywrite") as hdul:
@@ -419,9 +436,7 @@ def init_outputs(
             os.remove(out_file)
 
         header.tofile(out_file)
-        shape = tuple(
-            header[f"NAXIS{ii}"] for ii in range(1, header["NAXIS"] + 1)
-        )
+        shape = tuple(header[f"NAXIS{ii}"] for ii in range(1, header["NAXIS"] + 1))
         with open(out_file, "rb+") as fobj:
             fobj.seek(
                 len(header.tostring())
@@ -435,10 +450,11 @@ def init_outputs(
 
     return out_files
 
+
 def write_outputs(
-        out_files: List[Path],
-        mean: np.ndarray,
-        rms: np.ndarray,
+    out_files: List[Path],
+    mean: np.ndarray,
+    rms: np.ndarray,
 ):
     rms_file, bkg_file = out_files
     with fits.open(rms_file, memmap=True, mode="update") as hdul:
@@ -455,15 +471,17 @@ def write_outputs(
 
 
 def bane_2d(
-        image: np.ndarray,
-        header: Union[fits.Header, dict],
-        out_files: List[Path],
-        step_size: Optional[int] = None,
-        box_size: Optional[int] = None,
+    image: np.ndarray,
+    header: Union[fits.Header, dict],
+    out_files: List[Path],
+    step_size: Optional[int] = None,
+    box_size: Optional[int] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     logging.info(f"Running BANE on image {image.shape}")
     # Run BANE
-    bkg, rms = robust_bane(image.astype(np.float32), header, step_size=step_size, box_size=box_size)
+    bkg, rms = robust_bane(
+        image.astype(np.float32), header, step_size=step_size, box_size=box_size
+    )
     write_outputs(out_files, bkg, rms)
 
     return bkg, rms
@@ -479,27 +497,28 @@ def bane_3d_loop(
     box_size: Optional[int] = None,
 ):
     rms_file, bkg_file = out_files
-    with fits.open(
-        rms_file, memmap=True, mode="update"
-    ) as rms_hdul, fits.open(
+    with fits.open(rms_file, memmap=True, mode="update") as rms_hdul, fits.open(
         bkg_file, memmap=True, mode="update"
     ) as bkg_hdul:
         rms = rms_hdul[ext].data
         bkg = bkg_hdul[ext].data
         logging.info(f"Running BANE on plane {idx}")
-        bkg[idx], rms[idx] = robust_bane(plane.astype(np.float32), header, step_size=step_size, box_size=box_size)
+        bkg[idx], rms[idx] = robust_bane(
+            plane.astype(np.float32), header, step_size=step_size, box_size=box_size
+        )
         rms_hdul.flush()
         bkg_hdul.flush()
     logging.info(f"Finished BANE on plane {idx}")
 
+
 def bane_3d(
-        cube: np.ndarray,
-        header: Union[fits.Header, dict],
-        out_files: List[Path],
-        ext: int = 0,
-        step_size: Optional[int] = None,
-        box_size: Optional[int] = None,
-        ncores: Optional[int] = None,
+    cube: np.ndarray,
+    header: Union[fits.Header, dict],
+    out_files: List[Path],
+    ext: int = 0,
+    step_size: Optional[int] = None,
+    box_size: Optional[int] = None,
+    ncores: Optional[int] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     logging.info(f"Running BANE on cube {cube.shape}")
     # Run BANE
@@ -512,13 +531,11 @@ def bane_3d(
                 (cube[ii], ii, header, out_files, ext, step_size, box_size)
                 for ii in range(cube.shape[0])
             ],
-        )       
-        
+        )
+
     logging.info(f"Finished BANE on cube")
     rms_file, bkg_file = out_files
-    with fits.open(
-        rms_file, memmap=True, mode="denywrite"
-    ) as rms_hdul, fits.open(
+    with fits.open(rms_file, memmap=True, mode="denywrite") as rms_hdul, fits.open(
         bkg_file, memmap=True, mode="denywrite"
     ) as bkg_hdul:
         rms = rms_hdul[ext].data
@@ -553,7 +570,7 @@ def find_stokes_axis(header: Union[fits.Header, dict]) -> int:
 
     Returns:
         int: Stokes axis (numpy index)
-    """    
+    """
     stokes_axis = None
     for ii in range(1, header["NAXIS"] + 1):
         if header[f"CTYPE{ii}"] == "STOKES":
@@ -579,7 +596,7 @@ def main(
     with fits.open(fits_file, memmap=True, mode="denywrite") as hdul:
         data = hdul[ext].data
         header = hdul[ext].header
-        
+
     is_stokes_cube = len(data.shape) > 3 and data.shape[-1] > 1
     is_cube = len(data.shape) == 3
 
@@ -596,7 +613,7 @@ def main(
         stokes_axis = find_stokes_axis(header)
         if data.shape[stokes_axis] != 1:
             raise NotImplementedError("Stokes cube not implemented")
-        
+
         # Remove Stokes axis
         # Create slice to index all but Stokes axis
         slices = [slice(None)] * len(data.shape)
@@ -604,22 +621,32 @@ def main(
         data = data[tuple(slices)]
         is_cube = True
 
-
     if is_cube:
         logging.info("Detected cube")
-        bkg, rms = bane_3d(data, header, out_files, ext=ext, step_size=step_size, box_size=box_size, ncores=ncores)
+        bkg, rms = bane_3d(
+            data,
+            header,
+            out_files,
+            ext=ext,
+            step_size=step_size,
+            box_size=box_size,
+            ncores=ncores,
+        )
 
     else:
         logging.info("Detected 2D image")
-        bkg, rms = bane_2d(data, header, out_files, step_size=step_size, box_size=box_size)
-
+        bkg, rms = bane_2d(
+            data, header, out_files, step_size=step_size, box_size=box_size
+        )
 
     logging.info("Done")
 
     return bkg, rms
 
+
 def cli():
     import argparse
+
     parser = argparse.ArgumentParser(
         description=__doc__,
     )
@@ -666,8 +693,9 @@ def cli():
     args = parser.parse_args()
 
     logging_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(level=logging_level,
-                        format="%(process)d:%(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging_level, format="%(process)d:%(levelname)s %(message)s"
+    )
 
     _ = main(
         Path(args.fits_file),
@@ -678,6 +706,7 @@ def cli():
     )
 
     return 0
+
 
 if __name__ == "__main__":
     cli()
