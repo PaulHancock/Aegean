@@ -17,7 +17,8 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 import astropy.units as u
-from scipy import interpolate, ndimage, fft
+from scipy import interpolate, ndimage
+from numpy import fft
 from radio_beam import Beam
 
 from AegeanTools import BANE as bane
@@ -117,8 +118,6 @@ def tophat_kernel(radius: int):
 
 @nb.njit(
     nb.boolean[:, :](nb.float32[:, :], nb.float32[:, :]),
-    fastmath=True,
-    # parallel=True,
 )
 def get_nan_mask(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     """Get a mask of NaNs in the image
@@ -222,7 +221,8 @@ def robust_bane(
     tick = time()
     # Setups
     kernel, kern_sum, step_size = get_kernel(header, step_size, box_size)
-    nan_mask = get_nan_mask(image, kernel)
+    # nan_mask = get_nan_mask(image, kernel)
+    nan_mask = ~np.isfinite(image)
     image_mask = np.nan_to_num(image)
     
     # Downsample the image
@@ -376,10 +376,13 @@ def bane_3d(
         ext: int = 0,
         step_size: Optional[int] = None,
         box_size: Optional[int] = None,
+        ncores: Optional[int] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     logging.info(f"Running BANE on cube {cube.shape}")
     # Run BANE
-    with mp.Pool(mp.cpu_count()) as pool:
+    ncores = mp.cpu_count() if not ncores else ncores
+    logging.info(f"Running BANE with {ncores} cores")
+    with mp.Pool(ncores) as pool:
         pool.starmap(
             bane_3d_loop,
             [
@@ -443,6 +446,7 @@ def main(
     ext: int = 0,
     step_size: Optional[int] = None,
     box_size: Optional[int] = None,
+    ncores: Optional[int] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     # Init output files
     out_files = init_outputs(fits_file, ext=ext)
@@ -473,7 +477,7 @@ def main(
 
     if is_cube:
         logging.info("Detected cube")
-        bkg, rms = bane_3d(data, header, out_files, ext=ext, step_size=step_size, box_size=box_size)
+        bkg, rms = bane_3d(data, header, out_files, ext=ext, step_size=step_size, box_size=box_size, ncores=ncores)
 
     else:
         logging.info("Detected 2D image")
@@ -517,6 +521,12 @@ def cli():
         default=None,
         help="Box size for BANE. Negative values will be interpreted as number of pixels per beam.",
     )
+    parser.add_argument(
+        "--ncores",
+        type=int,
+        default=None,
+        help="Number of cores to use (only sppeds up cube). Default is all cores.",
+    )
     args = parser.parse_args()
 
     logging_level = logging.DEBUG if args.debug else logging.INFO
@@ -528,6 +538,7 @@ def cli():
         ext=args.ext,
         step_size=args.step_size,
         box_size=args.box_size,
+        ncores=args.ncores,
     )
 
     return 0
