@@ -425,8 +425,8 @@ def robust_bane(
     avg_rms_us = ndimage.zoom(avg_rms, zoom, order=3, grid_mode=True)
 
     # Reapply mask
-    # mean_us[nan_mask] = np.nan
-    # avg_rms_us[nan_mask] = np.nan
+    mean_us[nan_mask] = np.nan
+    avg_rms_us[nan_mask] = np.nan
 
     tock = time()
 
