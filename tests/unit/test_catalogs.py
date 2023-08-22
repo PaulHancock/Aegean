@@ -17,7 +17,7 @@ __author__ = 'Paul Hancock'
 
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
-log.setLevel(logging.INFO)
+log.setLevel(logger.info)
 
 
 def test_nulls():

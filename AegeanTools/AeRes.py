@@ -13,6 +13,7 @@ import numpy as np
 from astropy.io import fits
 
 from AegeanTools import catalogs, fitting, wcs_helpers
+from AegeanTools.logging import logger
 
 __author__ = "Paul Hancock"
 
@@ -46,10 +47,10 @@ def load_sources(filename,
     good = True
     for c in required_cols:
         if c not in table.colnames:
-            logging.error("Column {0} not found".format(c))
+            logger.error("Column {0} not found".format(c))
             good = False
     if not good:
-        logging.error("Some required columns missing or mis-labeled")
+        logger.error("Some required columns missing or mis-labeled")
         return None
     # rename the table columns
     for old, new in zip([ra_col, dec_col, peak_col, a_col, b_col, pa_col],
@@ -57,7 +58,7 @@ def load_sources(filename,
         table.rename_column(old, new)
 
     catalog = catalogs.table_to_source_list(table)
-    logging.info("read {0} sources from {1}".format(len(catalog), filename))
+    logger.info("read {0} sources from {1}".format(len(catalog), filename))
     return catalog
 
 
@@ -105,10 +106,10 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
 
         # skip sources that have a center that is outside of the image
         if not 0 < xo < shape[0]:
-            logging.debug("source {0} is not within image".format(src.island))
+            logger.debug("source {0} is not within image".format(src.island))
             continue
         if not 0 < yo < shape[1]:
-            logging.debug("source {0} is not within image".format(src.island))
+            logger.debug("source {0} is not within image".format(src.island))
             continue
 
         # pixels over which this model is calculated
@@ -130,15 +131,15 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
         if not np.all(np.isfinite([ymin, ymax, xmin, xmax])):
             continue
 
-        if logging.getLogger().isEnabledFor(logging.DEBUG):  # pragma: no cover
-            logging.debug("Source ({0},{1})".format(src.island, src.source))
-            logging.debug(" xo, yo: {0} {1}".format(xo, yo))
-            logging.debug(" sx, sy: {0} {1}".format(sx, sy))
-            logging.debug(" theta, phi: {0} {1}".format(theta, phi))
-            logging.debug(" xoff, yoff: {0} {1}".format(xoff, yoff))
-            logging.debug(" xmin, xmax, ymin, ymax: {0}:{1} {2}:{3}".format(
+        if logging.getLogger().isEnabledFor(logger.debug):  # pragma: no cover
+            logger.debug("Source ({0},{1})".format(src.island, src.source))
+            logger.debug(" xo, yo: {0} {1}".format(xo, yo))
+            logger.debug(" sx, sy: {0} {1}".format(sx, sy))
+            logger.debug(" theta, phi: {0} {1}".format(theta, phi))
+            logger.debug(" xoff, yoff: {0} {1}".format(xoff, yoff))
+            logger.debug(" xmin, xmax, ymin, ymax: {0}:{1} {2}:{3}".format(
                             xmin, xmax, ymin, ymax))
-            logging.debug(" flux, sx, sy: {0} {1} {2}".format(
+            logger.debug(" flux, sx, sy: {0} {1} {2}".format(
                           src.peak_flux, sx, sy))
 
         # positions for which we want to make the model
@@ -163,7 +164,7 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
         else:
             m[x, y] += model
         i_count += 1
-    logging.info("modeled {0} sources".format(i_count))
+    logger.info("modeled {0} sources".format(i_count))
     return m
 
 
@@ -238,9 +239,9 @@ def make_residual(fitsfile, catalog, rfile, mfile=None,
 
     hdulist[0].data = residual
     hdulist.writeto(rfile, overwrite=True)
-    logging.info("wrote residual to {0}".format(rfile))
+    logger.info("wrote residual to {0}".format(rfile))
     if mfile is not None:
         hdulist[0].data = model
         hdulist.writeto(mfile, overwrite=True)
-        logging.info("wrote model to {0}".format(mfile))
+        logger.info("wrote model to {0}".format(mfile))
     return

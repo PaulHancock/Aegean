@@ -53,7 +53,7 @@ def main(argv=()):
     invocation_string = " ".join(argv)
 
     # configure logging
-    logging_level = logging.DEBUG if options.debug else logging.INFO
+    logging_level = logger.debug if options.debug else logger.info
     log = logging.getLogger("Aegean")
     logging.basicConfig(level=logging_level,
                         format="%(process)d:%(levelname)s %(message)s")

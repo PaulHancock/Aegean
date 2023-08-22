@@ -15,10 +15,11 @@ from sklearn.cluster import DBSCAN
 from .angle_tools import bear, gcd
 from .catalogs import load_table, table_to_source_list
 from .wcs_helpers import Beam
+from AegeanTools.logging import logger
 
 __author__ = "Paul Hancock"
 
-log = logging.getLogger('Aegean')
+log = logger
 
 cc2fwhm = (2 * math.sqrt(2 * math.log(2)))
 fwhm2cc = 1/cc2fwhm

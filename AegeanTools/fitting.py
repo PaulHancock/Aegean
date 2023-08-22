@@ -4,7 +4,6 @@ Provide fitting routines and helper functions to Aegean
 """
 
 import copy
-import logging
 import math
 
 import lmfit
@@ -14,11 +13,12 @@ from scipy.linalg import eigh, inv
 from . import flags
 from .angle_tools import bear, gcd
 from .exceptions import AegeanNaNModelError
+from AegeanTools.logging import logger
 
 __author__ = "Paul Hancock"
 
 # join the Aegean logger
-log = logging.getLogger('Aegean')
+log = logger 
 
 # ERR_MASK is used to indicate that the err_x value can't be determined
 ERR_MASK = -1.0

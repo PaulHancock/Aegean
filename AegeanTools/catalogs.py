@@ -15,6 +15,7 @@ from astropy.io.votable import writeto as writetoVO
 from astropy.table.table import Table
 
 from .models import ComponentSource, classify_catalog
+from AegeanTools.logging import logger
 
 __author__ = "Paul Hancock"
 __version__ = "1.1"

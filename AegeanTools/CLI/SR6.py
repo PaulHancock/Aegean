@@ -61,13 +61,13 @@ def main(argv=()):
         print(__citation__)
         return 0
 
-    logging_level = logging.DEBUG if results.debug else logging.INFO
+    logging_level = logger.debug if results.debug else logger.info
     logging.basicConfig(level=logging_level,
                         format="%(process)d:%(levelname)s %(message)s")
-    logging.info("This is SR6 {0}-({1})".format(__version__, __date__))
+    logger.info("This is SR6 {0}-({1})".format(__version__, __date__))
 
     if not os.path.exists(results.infile):
-        logging.error("{0} does not exist".format(results.infile))
+        logger.error("{0} does not exist".format(results.infile))
         return 1
 
     if results.expand:
@@ -77,16 +77,16 @@ def main(argv=()):
             hdulist = expand(results.infile)
             hdulist[0].data[mask] = np.nan
             hdulist.writeto(results.outfile, overwrite=True)
-            logging.info("Wrote masked file: {0}".format(results.outfile))
+            logger.info("Wrote masked file: {0}".format(results.outfile))
         elif results.maskfile is None:
             expand(results.infile, results.outfile)
         else:
-            logging.error("Can't find {0}".format(results.maskfile))
+            logger.error("Can't find {0}".format(results.maskfile))
 
     else:
         if results.factor is None:
             header = fits.getheader(results.infile)
             results.factor = get_step_size(header)[0]
-            logging.info(
+            logger.info(
                 "Using compression factor of {0}".format(results.factor))
         compress(results.infile, results.factor, results.outfile)

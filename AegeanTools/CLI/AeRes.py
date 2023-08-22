@@ -65,31 +65,31 @@ def main(argv=()):
 
     options = parser.parse_args(args=argv)
 
-    logging_level = logging.DEBUG if options.debug else logging.INFO
+    logging_level = logger.debug if options.debug else logger.info
     logging.basicConfig(level=logging_level,
                         format="%(process)d:%(levelname)s %(message)s")
-    logging.info("This is AeRes {0}-({1})".format(__version__, __date__))
+    logger.info("This is AeRes {0}-({1})".format(__version__, __date__))
 
     if options.catalog is None:
-        logging.error("input catalog is required")
+        logger.error("input catalog is required")
         parser.print_help()
         return 1
     if options.fitsfile is None:
-        logging.error("input fits file is required")
+        logger.error("input fits file is required")
         parser.print_help()
         return 1
     if options.rfile is None:
-        logging.error("output residual filename is required")
+        logger.error("output residual filename is required")
         parser.print_help()
         return 1
     # convert default value of 0 to be None.
     if options.frac <= 0:
         options.frac = None
 
-    logging.info("Using {0} and {1} to make {2}".format(
+    logger.info("Using {0} and {1} to make {2}".format(
         options.fitsfile, options.catalog, options.rfile))
     if options.mfile is not None:
-        logging.info(" and writing model to {0}".format(options.mfile))
+        logger.info(" and writing model to {0}".format(options.mfile))
 
     colmap = {'ra_col': options.ra_col,
               'dec_col': options.dec_col,

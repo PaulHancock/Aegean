@@ -19,7 +19,7 @@ import os
 
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
-log.setLevel(logging.INFO)
+log.setLevel(logger.info)
 
 
 def test_psf_with_nans():
@@ -307,7 +307,7 @@ def test_save_image():
 def test_esimate_lmfit_parinfo():
     """Test estimate_lmfit_parinfo"""
     log = logging.getLogger("Aegean")
-    # log.setLevel(logging.DEBUG)
+    # log.setLevel(logger.debug)
     sfinder = sf.SourceFinder(log=log)
 
     data = np.zeros(shape=(3, 3))
@@ -414,7 +414,7 @@ def test_find_islands():
 def test_estimate_parinfo_image():
     """Test"""
     log = logging.getLogger("Aegean")
-    # log.setLevel(logging.DEBUG)
+    # log.setLevel(logger.debug)
 
     wcshelper = WCSHelper.from_file(
         filename='tests/test_files/1904-66_SIN.fits')

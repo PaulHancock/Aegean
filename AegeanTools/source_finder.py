@@ -18,6 +18,7 @@ from tqdm import tqdm
 
 from AegeanTools import wcs_helpers
 from AegeanTools.fits_tools import write_fits
+from AegeanTools.logging import logger
 
 from . import cluster, flags
 from .__init__ import __date__, __version__
@@ -184,7 +185,7 @@ def estimate_parinfo_image(islands, im, rms, wcshelper,
     sources : [:py:class:`lmfit.Parameters`, ... ]
       The initial estimate of parameters for the components within each island.
     """
-    debug_on = log.isEnabledFor(logging.DEBUG)
+    debug_on = log.isEnabledFor(logger.debug)
     sources = []
 
     for island in islands:
@@ -656,7 +657,7 @@ class SourceFinder(object):
           within this island.
         """
 
-        debug_on = self.log.isEnabledFor(logging.DEBUG)
+        debug_on = self.log.isEnabledFor(logger.debug)
         is_flag = 0
         global_data = self.global_data
 
@@ -1266,7 +1267,7 @@ class SourceFinder(object):
                                       hdu_index=hdu_index,
                                       cube_index=cube_index)
 
-        debug = logging.getLogger("Aegean").isEnabledFor(logging.DEBUG)
+        debug = logging.getLogger("Aegean").isEnabledFor(logger.debug)
 
         if mask is None:
             self.global_data.region = None

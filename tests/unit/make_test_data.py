@@ -120,7 +120,7 @@ if __name__ == "__main__":
     # configure logging
     logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
     log = logging.getLogger("Aegean")
-    logging_level = logging.DEBUG  # if options.debug else logging.INFO
+    logging_level = logger.debug  # if options.debug else logger.info
     log.setLevel(logging_level)
 
     image, wcs = make_noise_image()

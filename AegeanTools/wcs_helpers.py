@@ -12,10 +12,11 @@ from astropy.io import fits
 from astropy.wcs import WCS
 
 from .angle_tools import bear, gcd, translate
+from AegeanTools.logging import logger
 
 __author__ = "Paul Hancock"
 
-log = logging.getLogger("Aegean")
+log = logger
 
 
 class WCSHelper(object):
@@ -171,7 +172,7 @@ class WCSHelper(object):
             beam = beam
 
         if beam is None:
-            logging.critical("Cannot determine beam information")
+            logger.critical("Cannot determine beam information")
             raise AssertionError("Cannot determine beam information")
 
         _, pixscale = get_pixinfo(header)
