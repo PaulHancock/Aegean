@@ -6,7 +6,6 @@ TODO: Write an in/out reader for MOC formats described by
 http://arxiv.org/abs/1505.02937
 """
 
-import logging
 import os
 import re
 
@@ -16,6 +15,8 @@ import numpy as np
 from astropy.coordinates import Angle, SkyCoord
 from astropy.io import fits as pyfits
 from astropy.wcs import wcs as pywcs
+
+from AegeanTools.logging import logger, logging
 
 from .catalogs import load_table, write_table
 from .regions import Region

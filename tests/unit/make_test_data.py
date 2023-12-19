@@ -1,14 +1,15 @@
 #! /usr/bin/env python
-import logging
 from copy import deepcopy
 
 import numpy as np
-from AegeanTools import AeRes, models
-from AegeanTools.source_finder import FWHM2CC
-from AegeanTools.wcs_helpers import WCSHelper
 from astropy.io import fits
 from astropy.wcs import WCS
 from scipy.ndimage import gaussian_filter
+
+from AegeanTools import AeRes, models
+from AegeanTools.logging import logger, logging
+from AegeanTools.source_finder import FWHM2CC
+from AegeanTools.wcs_helpers import WCSHelper
 
 __author__ = 'Paul Hancock'
 

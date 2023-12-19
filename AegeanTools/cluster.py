@@ -6,11 +6,12 @@ Includes:
 - DBSCAN clustering
 """
 
-import logging
 import math
 
 import numpy as np
 from sklearn.cluster import DBSCAN
+
+from AegeanTools.logging import logger, logging
 
 from .angle_tools import bear, gcd
 from .catalogs import load_table, table_to_source_list

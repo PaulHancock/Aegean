@@ -5,11 +5,11 @@ part of the WCS toolkit, as well as some wrappers around the provided tools
 to make them a lot easier to use.
 """
 
-import logging
-
 import numpy as np
 from astropy.io import fits
 from astropy.wcs import WCS
+
+from AegeanTools.logging import logger, logging
 
 from .angle_tools import bear, gcd, translate
 

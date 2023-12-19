@@ -1,15 +1,16 @@
 #! /usr/bin/env python
 
 import argparse
-import logging
 import os
 
 import numpy as np
+from astropy.io import fits
+
 from AegeanTools import wcs_helpers
 from AegeanTools.catalogs import load_table, save_catalog, table_to_source_list
 from AegeanTools.cluster import (check_attributes_for_regroup, regroup_dbscan,
                                  resize)
-from astropy.io import fits
+from AegeanTools.logging import logger, logging
 
 __author__ = ['PaulHancock']
 __date__ = '2021-09-09'

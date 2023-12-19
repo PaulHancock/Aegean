@@ -1,13 +1,14 @@
 #! /usr/bin/env python
 import argparse
-import logging
 import os
 
 import numpy as np
+from astropy.io import fits
+
 from AegeanTools import __citation__
 from AegeanTools.BANE import get_step_size
 from AegeanTools.fits_tools import compress, expand
-from astropy.io import fits
+from AegeanTools.logging import logger, logging
 
 __author__ = "Paul Hancock"
 __version__ = 'v1.2'

@@ -3,15 +3,16 @@
 Test catalogues.py
 """
 
-import logging
 import os
 
 import numpy as np
-from AegeanTools import catalogs as cat
-from AegeanTools.models import ComponentSource, IslandSource, SimpleSource
-from AegeanTools.msq2 import MarchingSquares
 from astropy import table
 from numpy.testing import assert_raises
+
+from AegeanTools import catalogs as cat
+from AegeanTools.logging import logger, logging
+from AegeanTools.models import ComponentSource, IslandSource, SimpleSource
+from AegeanTools.msq2 import MarchingSquares
 
 __author__ = 'Paul Hancock'
 

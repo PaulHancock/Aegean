@@ -4,12 +4,13 @@ Provide fitting routines and helper functions to Aegean
 """
 
 import copy
-import logging
 import math
 
 import lmfit
 import numpy as np
 from scipy.linalg import eigh, inv
+
+from AegeanTools.logging import logger, logging
 
 from . import flags
 from .angle_tools import bear, gcd

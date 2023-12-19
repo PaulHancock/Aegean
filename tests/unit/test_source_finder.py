@@ -5,17 +5,19 @@ Test source_finder.py
 
 __author__ = 'Paul Hancock'
 
+import os
+from copy import deepcopy
+
+import numpy as np
 from astropy.io import fits
+
+from AegeanTools import flags, models
 from AegeanTools import source_finder as sf
-from AegeanTools.wcs_helpers import Beam, WCSHelper
-from AegeanTools import models, flags
+from AegeanTools.exceptions import AegeanError
+from AegeanTools.logging import logger, logging
 from AegeanTools.models import classify_catalog
 from AegeanTools.regions import Region
-from AegeanTools.exceptions import AegeanError
-from copy import deepcopy
-import numpy as np
-import logging
-import os
+from AegeanTools.wcs_helpers import Beam, WCSHelper
 
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")

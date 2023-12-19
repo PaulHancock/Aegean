@@ -3,11 +3,11 @@
 """
 A module for fits file utility functions.
 """
-import logging
-
 import numpy as np
 from astropy.io import fits
 from scipy.interpolate import RegularGridInterpolator
+
+from AegeanTools.logging import logger, logging
 
 from .exceptions import AegeanError
 

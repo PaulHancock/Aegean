@@ -4,8 +4,7 @@ The Aegean source finding program.
 """
 
 import copy
-import logging
-import logging.config
+# import logging.config
 import math
 import multiprocessing
 import os
@@ -18,13 +17,14 @@ from tqdm import tqdm
 
 from AegeanTools import wcs_helpers
 from AegeanTools.fits_tools import write_fits
+from AegeanTools.logging import logger, logging
 
 from . import cluster, flags
 from .__init__ import __date__, __version__
 from .angle_tools import bear, dec2dms, dec2hms, gcd
 from .BANE import filter_image, get_step_size
 from .catalogs import load_table, table_to_source_list
-from .exceptions import AegeanNaNModelError, AegeanError
+from .exceptions import AegeanError, AegeanNaNModelError
 from .fits_tools import load_image_band
 from .fitting import (Bmatrix, Cmatrix, bias_correct, covar_errors, do_lmfit,
                       elliptical_gaussian, errors, ntwodgaussian_lmfit)

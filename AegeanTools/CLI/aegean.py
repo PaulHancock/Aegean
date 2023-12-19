@@ -1,8 +1,7 @@
 #! /usr/bin/env python
 
 import argparse
-import logging
-import logging.config
+# import logging.config
 import multiprocessing
 import os
 import sys
@@ -11,9 +10,11 @@ import astropy
 import lmfit
 import numpy as np
 import scipy
+
 from AegeanTools import __citation__, __date__, __version__
 from AegeanTools.catalogs import (check_table_formats, save_catalog,
                                   show_formats)
+from AegeanTools.logging import logger, logging
 from AegeanTools.source_finder import get_aux_files
 from AegeanTools.wcs_helpers import Beam
 

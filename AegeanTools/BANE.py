@@ -6,7 +6,6 @@ The function filter_image should be imported from elsewhere and run as is.
 """
 
 import copy
-import logging
 import multiprocessing
 import os
 import sys
@@ -17,6 +16,8 @@ from time import gmtime, strftime
 import numpy as np
 from astropy.io import fits
 from scipy.interpolate import RegularGridInterpolator
+
+from AegeanTools.logging import logger, logging
 
 from .fits_tools import compress
 

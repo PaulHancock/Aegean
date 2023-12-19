@@ -1,9 +1,9 @@
 #! /usr/bin/env python
 
 import argparse
-import logging
 
 from AegeanTools.AeRes import make_residual
+from AegeanTools.logging import logger, logging
 
 __author__ = 'Paul Hancock'
 __version__ = 'v0.2.7'

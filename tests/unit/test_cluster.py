@@ -2,14 +2,15 @@
 """
 Test cluster.py
 """
-import logging
 import math
 from copy import deepcopy
 
 import numpy as np
-from AegeanTools import catalogs, cluster, wcs_helpers
-from AegeanTools.models import SimpleSource
 from astropy.io import fits
+
+from AegeanTools import catalogs, cluster, wcs_helpers
+from AegeanTools.logging import logger, logging
+from AegeanTools.models import SimpleSource
 
 __author__ = 'Paul Hancock'
 

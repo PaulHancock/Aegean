@@ -7,12 +7,11 @@ Aegean Residual (AeRes) has the following capability:
 """
 
 
-import logging
-
 import numpy as np
 from astropy.io import fits
 
 from AegeanTools import catalogs, fitting, wcs_helpers
+from AegeanTools.logging import logger, logging
 
 __author__ = "Paul Hancock"
 
@@ -238,7 +237,7 @@ def make_residual(fitsfile, catalog, rfile, mfile=None,
 
     hdulist[0].data = residual
     hdulist.writeto(rfile, overwrite=True)
-    logging.info("wrote residual to {0}".format(rfile))
+    logger.info("wrote residual to {0}".format(rfile))
     if mfile is not None:
         hdulist[0].data = model
         hdulist.writeto(mfile, overwrite=True)

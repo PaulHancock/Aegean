@@ -2,7 +2,6 @@
 """
 Module for reading at writing catalogs
 """
-import logging
 import os
 import re
 import sqlite3
@@ -13,6 +12,8 @@ from astropy.io import ascii, fits
 from astropy.io.votable import from_table, parse_single_table
 from astropy.io.votable import writeto as writetoVO
 from astropy.table.table import Table
+
+from AegeanTools.logging import logger, logging
 
 from .models import ComponentSource, classify_catalog
 
