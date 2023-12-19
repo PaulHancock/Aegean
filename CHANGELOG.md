@@ -1,3 +1,8 @@
+### Dec 19 2023
+General
+- Added AegeanTools.logger module
+- All AegeanTools modules and scripts now use this logger
+
 ### Nov 29 2022
 
 Aegean
