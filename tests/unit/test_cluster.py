@@ -2,20 +2,16 @@
 """
 Test cluster.py
 """
-import logging
 import math
 from copy import deepcopy
 
 import numpy as np
-from AegeanTools import catalogs, cluster, wcs_helpers
-from AegeanTools.models import SimpleSource
 from astropy.io import fits
 
-__author__ = 'Paul Hancock'
+from AegeanTools import catalogs, cluster, wcs_helpers
+from AegeanTools.models import SimpleSource
 
-logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
-log = logging.getLogger("Aegean")
-log.setLevel(logging.INFO)
+__author__ = 'Paul Hancock'
 
 
 def test_norm_dist():

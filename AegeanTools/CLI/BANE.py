@@ -5,6 +5,7 @@ import argparse
 import os
 
 from AegeanTools import BANE, __citation__
+from AegeanTools.logging import logger, logging
 
 __author__ = 'Paul Hancock'
 
@@ -61,15 +62,13 @@ def main(argv=()):
         return 0
 
     # Get the BANE logger.
-    logging = BANE.logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
-    logging.basicConfig(level=logging_level,
-                        format="%(process)d:%(levelname)s %(message)s")
-    logging.info(
+    logger.setLevel(logging_level)
+    logger.info(
         "This is BANE {0}-({1})".format(BANE.__version__, BANE.__date__))
 
     if not os.path.exists(options.image):
-        logging.error("File not found: {0} ".format(options.image))
+        logger.error("File not found: {0} ".format(options.image))
         return 1
 
     if options.out_base is None:
@@ -79,9 +78,9 @@ def main(argv=()):
         bkgout = options.out_base + '_bkg.fits'
         rmsout = options.out_base + '_rms.fits'
         if os.path.exists(bkgout) and os.path.exists(rmsout):
-            logging.error("{0} and {1} exist and you said noclobber"
+            logger.error("{0} and {1} exist and you said noclobber"
                           "".format(bkgout, rmsout))
-            logging.error("Not running")
+            logger.error("Not running")
             return 1
 
     BANE.filter_image(im_name=options.image, out_base=options.out_base,

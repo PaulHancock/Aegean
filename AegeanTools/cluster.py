@@ -6,19 +6,18 @@ Includes:
 - DBSCAN clustering
 """
 
-import logging
 import math
 
 import numpy as np
 from sklearn.cluster import DBSCAN
+
+from AegeanTools.logging import logger
 
 from .angle_tools import bear, gcd
 from .catalogs import load_table, table_to_source_list
 from .wcs_helpers import Beam
 
 __author__ = "Paul Hancock"
-
-log = logging.getLogger('Aegean')
 
 cc2fwhm = (2 * math.sqrt(2 * math.log(2)))
 fwhm2cc = 1/cc2fwhm
@@ -160,9 +159,9 @@ def regroup_dbscan(srccat, eps=4):
         (in descending dec order).
 
     """
-    log.info("Regrouping islands within catalog")
+    logger.info("Regrouping islands within catalog")
 
-    log.debug("converting ra/dec -> x,y,z")
+    logger.debug("converting ra/dec -> x,y,z")
     # extract ra/dec
     ras = np.radians(np.array([s.ra for s in srccat]))
     decs = np.radians(np.array([s.dec for s in srccat]))
@@ -173,14 +172,14 @@ def regroup_dbscan(srccat, eps=4):
     y *= np.sin(ras)
     z = np.sin(decs)
 
-    log.debug("Constructing X array")
+    logger.debug("Constructing X array")
     X = np.hstack([x[:, None], y[:, None], z[:, None]])
 
-    log.debug("Clustering")
+    logger.debug("Clustering")
     # run clustering algorighm
     db = DBSCAN(eps=eps, min_samples=1).fit(X)
 
-    log.debug("Constructing groups")
+    logger.debug("Constructing groups")
     # count labels and regroup accordingly
     labels = db.labels_
     unique_labels = set(labels)
@@ -189,9 +188,9 @@ def regroup_dbscan(srccat, eps=4):
         group = list(map(srccat.__getitem__, np.where(labels == l)[0]))
         groups[i] = group
 
-    log.info("Found {0:d} clusters".format(len(unique_labels)))
+    logger.info("Found {0:d} clusters".format(len(unique_labels)))
 
-    log.debug("Labeling/sorting sources")
+    logger.debug("Labeling/sorting sources")
     islands = []
     # now that we have the groups, we relabel the sources to have
     # (island,component) in flux order note that the order of sources within an
@@ -327,15 +326,15 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
             _ = catalog[0].pa, catalog[0].peak_flux
 
         except AttributeError as e:
-            log.error("catalog is not understood.")
-            log.error("catalog: Should be a list of objects with the " +
+            logger.error("catalog is not understood.")
+            logger.error("catalog: Should be a list of objects with the " +
                       "following properties[units]:\n" +
                       "ra[deg],dec[deg], a[arcsec],b[arcsec],pa[deg]," +
                       " peak_flux[any]")
             raise e
 
-    log.info("Regrouping islands within catalog")
-    log.debug("Calculating distances")
+    logger.info("Regrouping islands within catalog")
+    logger.debug("Calculating distances")
 
     if far is None:
         far = 0.5  # 10*max(a.a/3600 for a in srccat)
@@ -398,7 +397,7 @@ def resize(catalog, ratio=None, psfhelper=None):
 
     # If ratio is provided we just the psf by this amount
     if ratio is not None:
-        log.info(
+        logger.info(
             "Using ratio of {0} to scale input source shapes".format(ratio))
 
         for i, src in enumerate(catalog):
@@ -412,7 +411,7 @@ def resize(catalog, ratio=None, psfhelper=None):
             )
             # source with funky a/b are also rejected
             if not np.all(np.isfinite((src.a, src.b))):
-                log.info(
+                logger.info(
                     ("Excluding source ({0.island},{0.source})" +
                      " due to bad psf ({0.a},{0.b},{0.pa})").format(src))
                 src_mask[i] = False
@@ -423,7 +422,7 @@ def resize(catalog, ratio=None, psfhelper=None):
         for i, src in enumerate(catalog):
             if (src.psf_a <= 0) or (src.psf_b <= 0):
                 src_mask[i] = False
-                log.info(
+                logger.info(
                     ("Excluding source ({0.island},{0.source})" +
                      "due to psf_a/b <=0").format(src)
                 )
@@ -441,7 +440,7 @@ def resize(catalog, ratio=None, psfhelper=None):
                 if imbeam is None:
                     unknown.append("image")
                 src_mask[i] = False
-                log.info(
+                logger.info(
                     ("Excluding source ({0.island},{0.source}) due to " +
                      "lack of psf knowledge in {1}").format(src,
                                                             ",".join(unknown))
@@ -468,7 +467,7 @@ def resize(catalog, ratio=None, psfhelper=None):
             else:
                 src.b = np.sqrt(src.b) * 3600  # arcsec
     else:
-        log.info("Not scaling input source sizes")
+        logger.info("Not scaling input source sizes")
     # return only the sources where resizing was possible
     out_cat = list(map(catalog.__getitem__, np.where(src_mask)[0]))
     return out_cat
@@ -497,9 +496,9 @@ def check_attributes_for_regroup(catalog):
             missing.append(att)
 
     if missing:
-        log.error("catalog is not understood.")
-        log.error(
+        logger.error("catalog is not understood.")
+        logger.error(
             "catalog: Should be a list of objects with the following properties[units]:")
-        log.error("ra[deg],dec[deg], a[arcsec],b[arcsec],pa[deg]")
+        logger.error("ra[deg],dec[deg], a[arcsec],b[arcsec],pa[deg]")
         return False
     return True

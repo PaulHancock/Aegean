@@ -6,7 +6,6 @@ The function filter_image should be imported from elsewhere and run as is.
 """
 
 import copy
-import logging
 import multiprocessing
 import os
 import sys
@@ -17,6 +16,8 @@ from time import gmtime, strftime
 import numpy as np
 from astropy.io import fits
 from scipy.interpolate import RegularGridInterpolator
+
+from AegeanTools.logging import logger
 
 from .fits_tools import compress
 
@@ -92,7 +93,7 @@ def sigmaclip(arr, lo, hi, reps=10):
         mean = np.mean(clipped)
         prev_valid = curr_valid
     else:
-        logging.debug(
+        logger.debug(
             "No stopping criteria was reached after {0} cycles".format(count))
 
     return mean, std
@@ -117,7 +118,7 @@ def _sf2(args):
         return sigma_filter(*args)
     except Exception as e:
         import traceback
-        logging.warn(e)
+        logger.warn(e)
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
@@ -157,7 +158,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
     """
 
     ymin, ymax = region
-    logging.debug('rows {0}-{1} starting at {2}'.format(ymin,
+    logger.debug('rows {0}-{1} starting at {2}'.format(ymin,
                   ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
     # cut out the region of interest plus 1/2 the box size
@@ -184,8 +185,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
                              data_row_min:data_row_max, 0:shape[1]]
             )
         else:
-            logging.error("Too many NAXIS for me {0}".format(NAXIS))
-            logging.error("fix your file to be more sane")
+            logger.error("Too many NAXIS for me {0}".format(NAXIS))
+            logger.error("fix your file to be more sane")
             raise Exception("Too many NAXIS")
 
     # Manually scale the data if BSCALE is not 1.0
@@ -198,8 +199,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
 
     # row_len = shape[1]
 
-    logging.debug('data size is {0}'.format(data.shape))
-    logging.debug('data format is {0}'.format(data.dtype))
+    logger.debug('data size is {0}'.format(data.shape))
+    logger.debug('data format is {0}'.format(data.dtype))
 
     def box(r, c):
         """
@@ -238,22 +239,22 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
     irms_shm = SharedMemory(name=f'irms_{memory_id}', create=False)
     irms = np.ndarray(shape, dtype=np.float64, buffer=irms_shm.buf)
 
-    logging.debug("Interpolating bkg to sharemem")
+    logger.debug("Interpolating bkg to sharemem")
     ifunc = RegularGridInterpolator((rows, cols), vals)
     interp_bkg = np.array(ifunc((gr, gc)), dtype=np.float64)
     ibkg[ymin:ymax, :] = interp_bkg
     del ifunc, interp_bkg
-    logging.debug(" ... done writing bkg")
+    logger.debug(" ... done writing bkg")
 
     # wait for all to complete
     i = barrier.wait()
     if i == 0:
         barrier.reset()
 
-    logging.debug("background subtraction")
+    logger.debug("background subtraction")
     data[0 + ymin - data_row_min: data.shape[0] -
          (data_row_max - ymax), :] -= ibkg[ymin:ymax, :]
-    logging.debug(".. done ")
+    logger.debug(".. done ")
 
     # reset/recycle the vals array
     vals[:] = 0
@@ -266,12 +267,12 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
             _, rms = sigmaclip(new, 3, 3)
             vals[i, j] = rms
 
-    logging.debug("Interpolating rms to sharemem")
+    logger.debug("Interpolating rms to sharemem")
     ifunc = RegularGridInterpolator((rows, cols), vals)
     interp_rms = np.array(ifunc((gr, gc)), dtype=np.float64)
     irms[ymin:ymax, :] = interp_rms
     del ifunc, interp_rms
-    logging.debug(" .. done writing rms")
+    logger.debug(" .. done writing rms")
 
     if domask:
         # wait for all to complete
@@ -279,14 +280,14 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
         if i == 0:
             barrier.reset()
 
-        logging.debug("applying mask")
+        logger.debug("applying mask")
         mask = ~np.isfinite(
             data[0 + ymin - data_row_min: data.shape[0] -
                  (data_row_max - ymax), :])
         ibkg[ymin:ymax, :][mask] = np.nan
         irms[ymin:ymax, :][mask] = np.nan
-        logging.debug("... done applying mask")
-    logging.debug('rows {0}-{1} finished at {2}'.format(ymin,
+        logger.debug("... done applying mask")
+    logger.debug('rows {0}-{1} finished at {2}'.format(ymin,
                   ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
     return
 
@@ -339,8 +340,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
 
     img_y, img_x = shape
 
-    logging.info("using {0} cores".format(cores))
-    logging.info("using {0} stripes".format(nslice))
+    logger.info("using {0} cores".format(cores))
+    logger.info("using {0} stripes".format(nslice))
 
     if nslice > 1:
         # box widths should be multiples of the step_size, and not zero
@@ -354,8 +355,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
         ymins = [0]
         ymaxs = [img_y]
 
-    logging.debug("ymins {0}".format(ymins))
-    logging.debug("ymaxs {0}".format(ymaxs))
+    logger.debug("ymins {0}".format(ymins))
+    logger.debug("ymaxs {0}".format(ymaxs))
 
     args = []
     for region in zip(ymins, ymaxs):
@@ -384,7 +385,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
             # process
             pool.map_async(_sf2, args, chunksize=1).get(timeout=10000000)
         except KeyboardInterrupt:
-            logging.error("Caught keyboard interrupt")
+            logger.error("Caught keyboard interrupt")
             pool.close()
             exit = True
         else:
@@ -465,7 +466,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
     if naxis > 2:
         naxis3 = header['NAXIS3']
         if cube_index >= naxis3:
-            logging.error(
+            logger.error(
                 "3rd dimension has len {0} but index {1} was passed".format(
                     naxis3, cube_index)
             )
@@ -481,19 +482,19 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
     if compressed:
         if not step_size[0] == step_size[1]:
             step_size = (min(step_size), min(step_size))
-            logging.info(
+            logger.info(
                 "Changing grid to be {0} so we can compress the output".format(
                     step_size)
             )
 
-    logging.info("using grid_size {0}, box_size {1}".format(
+    logger.info("using grid_size {0}, box_size {1}".format(
                  step_size, box_size))
-    logging.info("on data shape {0}".format(shape))
+    logger.info("on data shape {0}".format(shape))
     bkg, rms = filter_mc_sharemem(im_name,
                                   step_size=step_size, box_size=box_size,
                                   cores=cores, shape=shape, nslice=nslice,
                                   domask=mask, cube_index=cube_index)
-    logging.info("done")
+    logger.info("done")
 
     if out_base is not None:
         # add a comment to the fits header
@@ -552,19 +553,19 @@ def get_step_size(header):
             pix_scale = np.sqrt(abs(header['CD1_1']*header['CD2_2']))
             if 'CD1_2' in header and 'CD2_1' in header:
                 if header['CD1_2'] != 0 or header['CD2_1'] != 0:
-                    logging.warning(
+                    logger.warning(
                         "CD1_2 and/or CD2_1 are non-zero and " +
                         "I don't know what to do with them")
-                    logging.warning("Ingoring them")
+                    logger.warning("Ingoring them")
         else:
-            logging.warning(
+            logger.warning(
                 "Cannot determine pixel scale, assuming 4 pixels per beam")
             pix_scale = beam_size/4.
         # default to 4x the synthesized beam width
         step_size = int(np.ceil(4*beam_size/pix_scale))
     else:
-        logging.info("BMAJ and/or BMIN not in fits header.")
-        logging.info("Assuming 4 pix/beam, so we have step_size = 16 pixels")
+        logger.info("BMAJ and/or BMIN not in fits header.")
+        logger.info("Assuming 4 pix/beam, so we have step_size = 16 pixels")
         step_size = 16
     step_size = (step_size, step_size)
     return step_size
@@ -593,5 +594,5 @@ def write_fits(data, header, file_name):
     hdu.header = header
     hdulist = fits.HDUList([hdu])
     hdulist.writeto(file_name, overwrite=True)
-    logging.info("Wrote {0}".format(file_name))
+    logger.info("Wrote {0}".format(file_name))
     return

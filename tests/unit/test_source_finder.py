@@ -5,27 +5,23 @@ Test source_finder.py
 
 __author__ = 'Paul Hancock'
 
+import os
+from copy import deepcopy
+
+import numpy as np
 from astropy.io import fits
+
+from AegeanTools import flags, models
 from AegeanTools import source_finder as sf
-from AegeanTools.wcs_helpers import Beam, WCSHelper
-from AegeanTools import models, flags
+from AegeanTools.exceptions import AegeanError
+from AegeanTools.logging import logger, logging
 from AegeanTools.models import classify_catalog
 from AegeanTools.regions import Region
-from AegeanTools.exceptions import AegeanError
-from copy import deepcopy
-import numpy as np
-import logging
-import os
-
-logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
-log = logging.getLogger("Aegean")
-log.setLevel(logging.INFO)
-
+from AegeanTools.wcs_helpers import Beam, WCSHelper
 
 def test_psf_with_nans():
     """Test that a psf map with nans doesn't create a crash"""
-    log = logging.getLogger("Aegean")
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     filename = "tests/test_files/synthetic_test.fits"
     psf = "tests/test_files/synthetic_test_psf.fits"
     # create a test psf map with all major axis being nans
@@ -53,7 +49,7 @@ def test_misc():
     """Test some random things"""
     sf.IslandFittingData()
     sf.DummyLM()
-    sf.SourceFinder(ignored=None, log=log)
+    sf.SourceFinder(ignored=None)
 
 
 def test_helpers():
@@ -97,8 +93,7 @@ def test_helpers():
 
 def test__make_bkg_rms():
     """Ensure that SourceFinder._make_bkg_rms works properly"""
-    log = logging.getLogger("Aegean")
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     filename = 'tests/test_files/1904-66_SIN.fits'
     sfinder.load_globals(filename)
 
@@ -111,8 +106,7 @@ def test__make_bkg_rms():
 
 def test_load_globals():
     """Test load_globals"""
-    log = logging.getLogger("Aegean")
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     filename = 'tests/test_files/1904-66_SIN.fits'
     aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
     sfinder.load_globals(filename)
@@ -120,7 +114,7 @@ def test_load_globals():
         raise AssertionError()
 
     del sfinder
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     sfinder.load_globals(
         filename, bkgin=aux_files['bkg'], rms=1, mask=aux_files['mask'])
     # region isn't available due to healpy not being installed/required
@@ -128,7 +122,7 @@ def test_load_globals():
         raise AssertionError()
 
     del sfinder
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     sfinder.load_globals(
         filename, bkgin=aux_files['bkg'], bkg=0, mask=aux_files['mask'])
     # region isn't available due to healpy not being installed/required
@@ -136,7 +130,7 @@ def test_load_globals():
         raise AssertionError()
 
     del sfinder
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     sfinder.load_globals(
         filename, bkgin=aux_files['bkg'], rms=1, bkg=0, mask=aux_files['mask'])
     # region isn't available due to healpy not being installed/required
@@ -144,7 +138,7 @@ def test_load_globals():
         raise AssertionError()
 
     del sfinder
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     sfinder.load_globals(
         filename, rmsin=aux_files['rms'], do_curve=False, mask='derp')
     if sfinder.global_data.region is not None:
@@ -154,7 +148,7 @@ def test_load_globals():
         raise AssertionError()
 
     del sfinder
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
     from AegeanTools.regions import Region
     sfinder.load_globals(filename, rms=1, mask=Region())
@@ -164,8 +158,7 @@ def test_load_globals():
 
 def test_find_and_prior_sources():
     """Test find sources and prior sources"""
-    log = logging.getLogger("Aegean")
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     filename = 'tests/test_files/synthetic_test.fits'
     nsrc = 98
     nisl = 97
@@ -238,13 +231,12 @@ def test_find_and_prior_sources():
 
 def dont_test_find_and_prior_parallel():
     """Test find/piroirze with parallel operation"""
-    log = logging.getLogger("Aegean")
     cores = 1
 
     filename = 'tests/test_files/synthetic_test.fits'
     # vanilla source finding
-    log.info("basic fitting (no bkg/rms")
-    sfinder = sf.SourceFinder(log=log)
+    logger.info("basic fitting (no bkg/rms")
+    sfinder = sf.SourceFinder()
     found = sfinder.find_sources_in_image(filename, cores=cores,
                                           bkg=0, rms=0.5)
     if not (len(found) == 98):
@@ -253,9 +245,9 @@ def dont_test_find_and_prior_parallel():
     aux_files = sf.get_aux_files(filename)
 
     del sfinder
-    log.info("fitting with supplied bkg/rms and 2 cores")
+    logger.info("fitting with supplied bkg/rms and 2 cores")
     cores = 2
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     _ = sfinder.find_sources_in_image(filename, doislandflux=True,
                                       outfile=open('dlme', 'w'),
                                       nonegative=False,
@@ -264,15 +256,15 @@ def dont_test_find_and_prior_parallel():
                                       mask=aux_files['mask'],
                                       cores=cores)
 
-    log.info('now priorised fitting')
+    logger.info('now priorised fitting')
     _ = sfinder.priorized_fit_islands(filename, catalogue=found,
                                       doregroup=True, cores=cores,
                                       outfile=open('dlme', 'w'))
     os.remove('dlme')
 
     del sfinder
-    log.info('fitting negative sources')
-    sfinder = sf.SourceFinder(log=log)
+    logger.info('fitting negative sources')
+    sfinder = sf.SourceFinder()
     sfinder.find_sources_in_image('tests/test_files/1904-66_SIN_neg.fits',
                                   doislandflux=True, nonegative=False,
                                   cores=cores)
@@ -280,8 +272,7 @@ def dont_test_find_and_prior_parallel():
 
 def test_save_files():
     """Test that we can save files"""
-    log = logging.getLogger("Aegean")
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     filename = 'tests/test_files/small.fits'
     sfinder.save_background_files(image_filename=filename, outbase='dlme')
     for ext in ['bkg', 'rms', 'snr', 'crv']:
@@ -292,8 +283,7 @@ def test_save_files():
 
 def test_save_image():
     """Test save_image"""
-    log = logging.getLogger("Aegean")
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     filename = 'tests/test_files/small.fits'
     _ = sfinder.find_sources_in_image(
         filename, cores=1, max_summits=0, blank=True)
@@ -306,9 +296,7 @@ def test_save_image():
 
 def test_esimate_lmfit_parinfo():
     """Test estimate_lmfit_parinfo"""
-    log = logging.getLogger("Aegean")
-    # log.setLevel(logging.DEBUG)
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
 
     data = np.zeros(shape=(3, 3))
     rmsimg = np.ones(shape=(3, 3))
@@ -335,8 +323,7 @@ def test_esimate_lmfit_parinfo():
 
 def test_island_contours():
     """Test that island contours are correct"""
-    log = logging.getLogger("Aegean")
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     filename = 'tests/test_files/synthetic_test.fits'
 
     # vanilla source finding
@@ -379,7 +366,7 @@ def test_find_islands():
     im[0:3, :] = im[-1:, :] = np.nan
     im[:, 0] = im[:, -1] = np.nan
 
-    islands = sf.find_islands(im, bkg, rms, log=log)
+    islands = sf.find_islands(im, bkg, rms)
 
     if len(islands) != 1:
         raise AssertionError(
@@ -401,7 +388,7 @@ def test_find_islands():
 
     # add another island that is between the seed/flood thresholds
     im[7:9, 2:5] = 4.5
-    islands = sf.find_islands(im, bkg, rms, log=log)
+    islands = sf.find_islands(im, bkg, rms)
     if len(islands) != 1:
         raise AssertionError(
             "Incorrect number of islands found {0}, expecting 1".format(
@@ -413,9 +400,6 @@ def test_find_islands():
 
 def test_estimate_parinfo_image():
     """Test"""
-    log = logging.getLogger("Aegean")
-    # log.setLevel(logging.DEBUG)
-
     wcshelper = WCSHelper.from_file(
         filename='tests/test_files/1904-66_SIN.fits')
 
@@ -426,9 +410,9 @@ def test_estimate_parinfo_image():
     im[2:5, 2:5] = 6.
     im[3, 3] = 8.
 
-    islands = sf.find_islands(im, bkg, rms, log=log)
+    islands = sf.find_islands(im, bkg, rms)
     sources = sf.estimate_parinfo_image(
-        islands, im=im, rms=rms, wcshelper=wcshelper, log=log)
+        islands, im=im, rms=rms, wcshelper=wcshelper)
 
     if len(sources) != 1:
         raise AssertionError(
@@ -446,9 +430,9 @@ def test_estimate_parinfo_image():
 
     # test on a negative island
     im *= -1.
-    islands = sf.find_islands(im, bkg, rms, log=log)
+    islands = sf.find_islands(im, bkg, rms)
     sources = sf.estimate_parinfo_image(
-        islands, im=im, rms=rms, wcshelper=wcshelper, log=log)
+        islands, im=im, rms=rms, wcshelper=wcshelper)
 
     if len(sources) != 1:
         raise AssertionError(
@@ -469,9 +453,9 @@ def test_estimate_parinfo_image():
     im[2:4, 2:4] = 6.
     im[3, 3] = 8.
 
-    islands = sf.find_islands(im, bkg, rms, log=log)
+    islands = sf.find_islands(im, bkg, rms)
     sources = sf.estimate_parinfo_image(
-        islands, im=im, rms=rms, wcshelper=wcshelper, log=log)
+        islands, im=im, rms=rms, wcshelper=wcshelper)
     if len(sources) != 1:
         raise AssertionError(
             "Incorrect number of sources found {0}, expecting 1".format(
@@ -499,8 +483,7 @@ def test_regions_used_in_finding():
                      np.radians(-66),
                      np.radians(10))
 
-    log = logging.getLogger("Aegean")
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     sources = sfinder.find_sources_in_image(imfile,
                                             rmsin=aux_files['rms'],
                                             bkgin=aux_files['bkg'],
@@ -509,7 +492,7 @@ def test_regions_used_in_finding():
         raise AssertionError("Found sources outside of region specified.")
 
     del sfinder, sources
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     sources = sfinder.find_sources_in_image(imfile,
                                             rmsin=aux_files['rms'],
                                             bkgin=aux_files['bkg'],
@@ -531,8 +514,7 @@ def test_load_compressed_aux_files():
     noise = 'tests/test_files/1904-66_rms_compressed.fits'
     image = 'tests/test_files/1904-66_SIN.fits'
 
-    log = logging.getLogger("Aegean")
-    sfinder = sf.SourceFinder(log=log)
+    sfinder = sf.SourceFinder()
     try:
         sfinder.load_globals(image, bkgin=background, rmsin=noise)
     except AegeanError as ae:

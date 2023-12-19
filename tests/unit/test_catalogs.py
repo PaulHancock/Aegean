@@ -3,21 +3,17 @@
 Test catalogues.py
 """
 
-import logging
 import os
 
 import numpy as np
-from AegeanTools import catalogs as cat
-from AegeanTools.models import ComponentSource, IslandSource, SimpleSource
-from AegeanTools.msq2 import MarchingSquares
 from astropy import table
 from numpy.testing import assert_raises
 
-__author__ = 'Paul Hancock'
+from AegeanTools import catalogs as cat
+from AegeanTools.models import ComponentSource, IslandSource, SimpleSource
+from AegeanTools.msq2 import MarchingSquares
 
-logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
-log = logging.getLogger("Aegean")
-log.setLevel(logging.INFO)
+__author__ = 'Paul Hancock'
 
 
 def test_nulls():

@@ -6,7 +6,6 @@ TODO: Write an in/out reader for MOC formats described by
 http://arxiv.org/abs/1505.02937
 """
 
-import logging
 import os
 import re
 
@@ -16,6 +15,8 @@ import numpy as np
 from astropy.coordinates import Angle, SkyCoord
 from astropy.io import fits as pyfits
 from astropy.wcs import wcs as pywcs
+
+from AegeanTools.logging import logger
 
 from .catalogs import load_table, write_table
 from .regions import Region
@@ -189,7 +190,7 @@ def mask_file(regionfile, infile, outfile, negate=False):
         mask_plane(data, wcs, region, negate)
     im[0].data = data
     im.writeto(outfile, overwrite=True)
-    logging.info("Wrote {0}".format(outfile))
+    logger.info("Wrote {0}".format(outfile))
     return
 
 
@@ -262,9 +263,9 @@ def mask_catalog(regionfile, infile, outfile,
 
     :func:`AegeanTools.catalogs.load_table`
     """
-    logging.info("Loading region from {0}".format(regionfile))
+    logger.info("Loading region from {0}".format(regionfile))
     region = Region.load(regionfile)
-    logging.info("Loading catalog from {0}".format(infile))
+    logger.info("Loading catalog from {0}".format(infile))
     table = load_table(infile)
     masked_table = mask_table(
         region, table, negate=negate, racol=racol, deccol=deccol)
@@ -287,7 +288,7 @@ def mim2reg(mimfile, regfile):
     """
     region = Region.load(mimfile)
     region.write_reg(regfile)
-    logging.info("Converted {0} -> {1}".format(mimfile, regfile))
+    logger.info("Converted {0} -> {1}".format(mimfile, regfile))
     return
 
 
@@ -306,7 +307,7 @@ def mim2fits(mimfile, fitsfile):
     region = Region.load(mimfile)
     region.write_fits(
         fitsfile, moctool='MIMAS {0}-{1}'.format(__version__, __date__))
-    logging.info("Converted {0} -> {1}".format(mimfile, fitsfile))
+    logger.info("Converted {0} -> {1}".format(mimfile, fitsfile))
     return
 
 
@@ -346,7 +347,7 @@ def mask2mim(maskfile, mimfile, threshold=1.0, maxdepth=8):
     region.add_pixels(pix, depth=maxdepth)
     region._renorm()
     save_region(region, mimfile)
-    logging.info("Converted {0} -> {1}".format(maskfile, mimfile))
+    logger.info("Converted {0} -> {1}".format(maskfile, mimfile))
     return
 
 
@@ -461,7 +462,7 @@ def reg2mim(regfile, mimfile, maxdepth):
         Depth/resolution of the region file.
 
     """
-    logging.info("Reading regions from {0}".format(regfile))
+    logger.info("Reading regions from {0}".format(regfile))
     lines = (ln for ln in open(regfile, 'r') if not ln.startswith('#'))
     poly = []
     circles = []
@@ -471,11 +472,11 @@ def reg2mim(regfile, mimfile, maxdepth):
         elif line.startswith('circle'):
             circles.append(circle2circle(line))
         elif line.startswith('polygon'):
-            logging.warning(
+            logger.warning(
                 "Polygons break a lot, but I'll try this one anyway.")
             poly.append(poly2poly(line))
         else:
-            logging.warning("Not sure what to do with {0}".format(line[:-1]))
+            logger.warning("Not sure what to do with {0}".format(line[:-1]))
     container = Dummy(maxdepth=maxdepth)
     container.include_circles = circles
     container.include_polygons = poly
@@ -509,12 +510,12 @@ def combine_regions(container):
 
     # add/rem all the regions from files
     for r in container.add_region:
-        logging.info("adding region from {0}".format(r))
+        logger.info("adding region from {0}".format(r))
         r2 = Region.load(r[0])
         region.union(r2)
 
     for r in container.rem_region:
-        logging.info("removing region from {0}".format(r))
+        logger.info("removing region from {0}".format(r))
         r2 = Region.load(r[0])
         region.without(r2)
 
@@ -597,5 +598,5 @@ def save_region(region, filename):
         Output file name.
     """
     region.save(filename)
-    logging.info("Wrote {0}".format(filename))
+    logger.info("Wrote {0}".format(filename))
     return

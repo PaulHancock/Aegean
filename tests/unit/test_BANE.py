@@ -5,15 +5,11 @@ Test BANE.py
 import os
 
 import numpy as np
-from AegeanTools import BANE
 from astropy.io import fits
 
+from AegeanTools import BANE
+
 __author__ = 'Paul Hancock'
-
-import logging
-
-logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
-log = logging.getLogger("Aegean")
 
 
 def test_sigmaclip():
