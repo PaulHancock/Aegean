@@ -15,8 +15,6 @@ from .angle_tools import bear, gcd, translate
 
 __author__ = "Paul Hancock"
 
-log = logging.getLogger("Aegean")
-
 
 class WCSHelper(object):
     """
@@ -119,7 +117,7 @@ class WCSHelper(object):
             # small subset of the pixels are actually needed
             self._psf_map = fits.open(self.psf_file, memmap=True)[0].data
             if len(self._psf_map.shape) != 3:
-                log.critical(
+                logger.critical(
                     "PSF file needs to have 3 dimensions, found {0}".format(
                         len(self._psf_map.shape)
                     )
@@ -171,7 +169,7 @@ class WCSHelper(object):
             beam = beam
 
         if beam is None:
-            logging.critical("Cannot determine beam information")
+            logger.critical("Cannot determine beam information")
             raise AssertionError("Cannot determine beam information")
 
         _, pixscale = get_pixinfo(header)
@@ -455,7 +453,7 @@ class WCSHelper(object):
         # sense
         x, y = self.psf_sky2pix((ra, dec))
 
-        log.debug("sky2sky {0}, {1}, {2}, {3}".format(ra, dec, x, y))
+        logger.debug("sky2sky {0}, {1}, {2}, {3}".format(ra, dec, x, y))
 
         x = int(np.clip(x, 0, self.psf_map.shape[1] - 1))
         y = int(np.clip(y, 0, self.psf_map.shape[2] - 1))
@@ -649,13 +647,13 @@ def get_pixinfo(header):
         )
         pixscale = (header["CD1_1"], header["CD2_2"])
         if not (header["CD1_2"] == 0 and header["CD2_1"] == 0):
-            log.warning(
+            logger.warning(
                 "Pixels don't appear to be square -> pixscale is wrong")
     elif all(a in header for a in ["CD1_1", "CD2_2"]):
         pixarea = abs(header["CD1_1"] * header["CD2_2"])
         pixscale = (header["CD1_1"], header["CD2_2"])
     else:
-        log.critical(
+        logger.critical(
             "cannot determine pixel area" +
             "using zero EVEN THOUGH THIS IS WRONG!"
         )
@@ -684,19 +682,19 @@ def get_beam(header):
     """
 
     if "BPA" not in header:
-        log.warning("BPA not present in fits header, using 0")
+        logger.warning("BPA not present in fits header, using 0")
         bpa = 0
     else:
         bpa = header["BPA"]
 
     if "BMAJ" not in header:
-        log.warning("BMAJ not present in fits header.")
+        logger.warning("BMAJ not present in fits header.")
         bmaj = None
     else:
         bmaj = header["BMAJ"]
 
     if "BMIN" not in header:
-        log.warning("BMIN not present in fits header.")
+        logger.warning("BMIN not present in fits header.")
         bmin = None
     else:
         bmin = header["BMIN"]

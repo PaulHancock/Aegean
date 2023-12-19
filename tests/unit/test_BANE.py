@@ -8,12 +8,8 @@ import numpy as np
 from astropy.io import fits
 
 from AegeanTools import BANE
-from AegeanTools.logging import logger, logging
 
 __author__ = 'Paul Hancock'
-
-logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
-log = logging.getLogger("Aegean")
 
 
 def test_sigmaclip():

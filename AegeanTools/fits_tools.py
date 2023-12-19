@@ -7,7 +7,7 @@ import numpy as np
 from astropy.io import fits
 from scipy.interpolate import RegularGridInterpolator
 
-from AegeanTools.logging import logger, logging
+from AegeanTools.logging import logger
 
 from .exceptions import AegeanError
 
@@ -61,7 +61,7 @@ def compress(datafile, factor, outfile=None):
     :func:`AegeanTools.fits_interp.expand`
     """
     if not (factor > 0 and isinstance(factor, int)):
-        logging.error("factor must be a positive integer")
+        logger.error("factor must be a positive integer")
         return None
 
     hdulist = load_file_or_hdu(datafile)
@@ -93,14 +93,14 @@ def compress(datafile, factor, outfile=None):
     elif 'CD1_1' in header:
         header['CD1_1'] *= factor
     else:
-        logging.error("Error: Can't find CDELT1 or CD1_1")
+        logger.error("Error: Can't find CDELT1 or CD1_1")
         return None
     if 'CDELT2' in header:
         header['CDELT2'] *= factor
     elif "CD2_2" in header:
         header['CD2_2'] *= factor
     else:
-        logging.error("Error: Can't find CDELT2 or CD2_2")
+        logger.error("Error: Can't find CDELT2 or CD2_2")
         return None
     # Move the reference pixel so that the WCS is correct
     header['CRPIX1'] = (header['CRPIX1'] + factor - 1) / factor
@@ -119,7 +119,7 @@ def compress(datafile, factor, outfile=None):
     hdulist[0].header = header
     if outfile is not None:
         hdulist.writeto(outfile, overwrite=True)
-        logging.info("Wrote: {0}".format(outfile))
+        logger.info("Wrote: {0}".format(outfile))
     return hdulist
 
 
@@ -199,7 +199,7 @@ def expand(datafile, outfile=None):
     elif 'CD1_1' in header:
         header['CD1_1'] /= factor
     else:
-        logging.error("Error: Can't find CD1_1 or CDELT1")
+        logger.error("Error: Can't find CD1_1 or CDELT1")
         return None
 
     if 'CDELT2' in header:
@@ -207,7 +207,7 @@ def expand(datafile, outfile=None):
     elif "CD2_2" in header:
         header['CD2_2'] /= factor
     else:
-        logging.error("Error: Can't find CDELT2 or CD2_2")
+        logger.error("Error: Can't find CDELT2 or CD2_2")
         return None
 
     header['HISTORY'] = 'Expanded by factor {0}'.format(factor)
@@ -218,7 +218,7 @@ def expand(datafile, outfile=None):
     hdulist[0].header = header
     if outfile is not None:
         hdulist.writeto(outfile, overwrite=True)
-        logging.info("Wrote: {0}".format(outfile))
+        logger.info("Wrote: {0}".format(outfile))
     return hdulist
 
 
@@ -245,7 +245,7 @@ def write_fits(data, header, file_name):
     hdu.header = header
     hdulist = fits.HDUList([hdu])
     hdulist.writeto(file_name, overwrite=True)
-    logging.info("Wrote {0}".format(file_name))
+    logger.info("Wrote {0}".format(file_name))
     return
 
 

@@ -55,16 +55,14 @@ def main(argv=()):
 
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
-    log = logging.getLogger("Aegean")
-    logging.basicConfig(level=logging_level,
-                        format="%(process)d:%(levelname)s %(message)s")
-    log.info("This is regroup {0}-({1})".format(__version__, __date__))
-    log.debug("Run as:\n{0}".format(invocation_string))
+    logger.setLevel(logging_level)
+    logger.info("This is regroup {0}-({1})".format(__version__, __date__))
+    logger.debug("Run as:\n{0}".format(invocation_string))
 
     # check that a valid intput filename was entered
     filename = options.input
     if not os.path.exists(filename):
-        log.error("{0} not found".format(filename))
+        logger.error("{0} not found".format(filename))
         return 1
 
     input_table = load_table(options.input)
@@ -75,30 +73,30 @@ def main(argv=()):
     # Rescale before regrouping since the shape of a source
     # is used as part of the regrouping
     if (options.ratio is not None) and (options.psfheader is not None):
-        log.info("Both --ratio and --psfheader specified")
-        log.info("Ignoring --ratio")
+        logger.info("Both --ratio and --psfheader specified")
+        logger.info("Ignoring --ratio")
     if options.psfheader is not None:
         head = fits.getheader(options.psfheader)
         psfhelper = wcs_helpers.WCSHelper.from_header(head)
         sources = resize(sources, psfhelper=psfhelper)
-        log.debug("{0} sources resized".format(len(sources)))
+        logger.debug("{0} sources resized".format(len(sources)))
     elif options.ratio is not None:
         sources = resize(sources, ratio=options.ratio)
-        log.debug("{0} sources resized".format(len(sources)))
+        logger.debug("{0} sources resized".format(len(sources)))
     else:
-        log.debug("Not rescaling")
+        logger.debug("Not rescaling")
 
     if options.regroup:
         if not check_attributes_for_regroup(sources):
-            log.error("Cannot use catalog")
+            logger.error("Cannot use catalog")
             return 1
-        log.debug("Regrouping with eps={0}[arcmin]".format(options.eps))
+        logger.debug("Regrouping with eps={0}[arcmin]".format(options.eps))
         eps = np.sin(np.radians(options.eps/60))
         groups = regroup_dbscan(sources, eps=eps)
         sources = [source for group in groups for source in group]
-        log.debug("{0} sources regrouped".format(len(sources)))
+        logger.debug("{0} sources regrouped".format(len(sources)))
     else:
-        log.debug("Not regrouping")
+        logger.debug("Not regrouping")
 
     if options.tables:
         meta = {"PROGRAM": "regroup",
@@ -106,6 +104,6 @@ def main(argv=()):
                 "CATFILE": filename,
                 "RUN-AS": invocation_string}
         for t in options.tables.split(','):
-            log.debug("writing {0}".format(t))
+            logger.debug("writing {0}".format(t))
             save_catalog(t, sources, meta=meta)
     return 0

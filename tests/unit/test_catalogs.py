@@ -10,15 +10,10 @@ from astropy import table
 from numpy.testing import assert_raises
 
 from AegeanTools import catalogs as cat
-from AegeanTools.logging import logger, logging
 from AegeanTools.models import ComponentSource, IslandSource, SimpleSource
 from AegeanTools.msq2 import MarchingSquares
 
 __author__ = 'Paul Hancock'
-
-logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
-log = logging.getLogger("Aegean")
-log.setLevel(logging.INFO)
 
 
 def test_nulls():

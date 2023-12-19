@@ -9,14 +9,9 @@ import numpy as np
 from astropy.io import fits
 
 from AegeanTools import catalogs, cluster, wcs_helpers
-from AegeanTools.logging import logger, logging
 from AegeanTools.models import SimpleSource
 
 __author__ = 'Paul Hancock'
-
-logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
-log = logging.getLogger("Aegean")
-log.setLevel(logging.INFO)
 
 
 def test_norm_dist():

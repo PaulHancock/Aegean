@@ -1,7 +1,9 @@
 #! /usr/bin/env python
 
 import argparse
+
 from AegeanTools import MIMAS, __citation__
+from AegeanTools.logging import logger, logging
 
 
 def main(argv=()):
@@ -130,15 +132,13 @@ def main(argv=()):
         return 0
 
     # get the MIMAS logger
-    logging = MIMAS.logging
     logging_level = logging.DEBUG if results.debug else logging.INFO
-    logging.basicConfig(level=logging_level,
-                        format="%(process)d:%(levelname)s %(message)s")
-    logging.info(
+    logger.setLevel(level=logging_level)
+    logger.info(
         "This is MIMAS {0}-({1})".format(MIMAS.__version__, MIMAS.__date__))
 
     if len(results.fits_mask) > 0:
-        logging.info("The --fitsmask option is not yet implemented.")
+        logger.info("The --fitsmask option is not yet implemented.")
         return 1
 
     if len(results.mim2reg) > 0:

@@ -10,16 +10,13 @@ import lmfit
 import numpy as np
 from scipy.linalg import eigh, inv
 
-from AegeanTools.logging import logger, logging
+from AegeanTools.logging import logger
 
 from . import flags
 from .angle_tools import bear, gcd
 from .exceptions import AegeanNaNModelError
 
 __author__ = "Paul Hancock"
-
-# join the Aegean logger
-log = logging.getLogger('Aegean')
 
 # ERR_MASK is used to indicate that the err_x value can't be determined
 ERR_MASK = -1.0
@@ -768,7 +765,7 @@ def RB_bias(data, pars, ita=None, acf=None):
     bias : array
         The bias on each of the parameters
     """
-    log.info("data {0}".format(data.shape))
+    logger.info("data {0}".format(data.shape))
     nparams = np.sum([pars[k].vary for k in pars.keys() if k != 'components'])
     # masked pixels
     xm, ym = np.where(np.isfinite(data))
@@ -796,10 +793,10 @@ def RB_bias(data, pars, ita=None, acf=None):
         if acf is None:
             acf = nan_acf(N)
         ita = make_ita(N, acf=acf)
-        log.info('acf.shape {0}'.format(acf.shape))
-        log.info('acf[0] {0}'.format(acf[0]))
-        log.info('ita.shape {0}'.format(ita.shape))
-        log.info('ita[0] {0}'.format(ita[0]))
+        logger.info('acf.shape {0}'.format(acf.shape))
+        logger.info('acf[0] {0}'.format(acf[0]))
+        logger.info('ita.shape {0}'.format(ita.shape))
+        logger.info('ita[0] {0}'.format(ita[0]))
 
     # Included for completeness but not required
 
@@ -814,7 +811,7 @@ def RB_bias(data, pars, ita=None, acf=None):
     bias_1 = np.einsum('imn, mn', Cimn, Vij)
     bias_2 = np.einsum('ilkm, mlk', Eilkm, Uijk)
     bias = bias_1 + bias_2
-    log.info('bias {0}'.format(bias))
+    logger.info('bias {0}'.format(bias))
     return bias
 
 
@@ -898,7 +895,7 @@ def errors(source, model, wcshelper):
     source.err_peak_flux = err_amp
     pix_errs = [err_xo, err_yo, err_sx, err_sy, err_theta]
 
-    log.debug("Pix errs: {0}".format(pix_errs))
+    logger.debug("Pix errs: {0}".format(pix_errs))
 
     ref = wcshelper.pix2sky([xo, yo])
     # check to see if the reference position has a valid WCS coordinate

@@ -119,10 +119,8 @@ def make_catalogue():
 
 if __name__ == "__main__":
     # configure logging
-    logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
-    log = logging.getLogger("Aegean")
-    logging_level = logging.DEBUG  # if options.debug else logging.INFO
-    log.setLevel(logging_level)
+    logging_level = logging.DEBUG
+    logger.setLevel(logging_level)
 
     image, wcs = make_noise_image()
     header = wcs.to_header()
