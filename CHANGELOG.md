@@ -1,4 +1,10 @@
+### Jan 12 2024
+
+General
+- fix_beam.py updated to respect the deprecation of "clobber" keyword (and thus work with more recent versions of astropy)
+
 ### Dec 19 2023
+
 General
 - Added AegeanTools.logger module
 - All AegeanTools modules and scripts now use this logger
