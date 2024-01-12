@@ -11,6 +11,7 @@ from AegeanTools.wcs_helpers import Beam, WCSHelper
 from AegeanTools import models, flags
 from AegeanTools.models import classify_catalog
 from AegeanTools.regions import Region
+from AegeanTools.exceptions import AegeanError
 from copy import deepcopy
 import numpy as np
 import logging
@@ -518,6 +519,24 @@ def test_regions_used_in_finding():
         raise AssertionError(
             "Failed to find any islands within region specified.")
 
+    return
+
+
+def test_load_compressed_aux_files():
+    """
+    Test against issue #193: aegean failing to load bkg/rms files that were
+    created with BANE --compress
+    """
+    background = 'tests/test_files/1904-66_bkg_compressed.fits'
+    noise = 'tests/test_files/1904-66_rms_compressed.fits'
+    image = 'tests/test_files/1904-66_SIN.fits'
+
+    log = logging.getLogger("Aegean")
+    sfinder = sf.SourceFinder(log=log)
+    try:
+        sfinder.load_globals(image, bkgin=background, rmsin=noise)
+    except AegeanError as ae:
+        raise AssertionError(ae)
     return
 
 
