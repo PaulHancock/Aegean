@@ -2061,7 +2061,7 @@ class SourceFinder(object):
             # islands at the edge of a region of nans
             # result in no components
             if params is None or params["components"].value < 1:
-                return []
+                continue
 
             logger.debug("Rms is {0}".format(np.shape(rms)))
             logger.debug("Isle is {0}".format(np.shape(idata)))
@@ -2136,14 +2136,16 @@ class SourceFinder(object):
                 result, model, island_data, is_flag)
             guessed_sources.append(sources)
         
-        # choose the best sources
-        best_sources = guessed_sources[0]
-        best_measure = guessed_sources[0][0].residual_std
-        for g in guessed_sources:
-            if g[0].residual_std < best_measure:
-                best_sources = g
-                best_measure = g[0].residual_std
-        #best_sources = guessed_sources[0]
+        best_sources = []
+        if len(guessed_sources) > 0:
+            # choose the best sources
+            best_sources = guessed_sources[0]
+            best_measure = guessed_sources[0][0].residual_std
+            for g in guessed_sources:
+                if g[0].residual_std < best_measure:
+                    best_sources = g
+                    best_measure = g[0].residual_std
+    
         return best_sources
 
     def find_sources_in_image(
