@@ -2108,7 +2108,8 @@ class SourceFinder(object):
                 )
                 errs = np.nanmax(rms)
                 logger.debug("Initial params")
-                logger.debug(params)
+                logger.debug(params.pretty_repr(oneline=False))
+                #params.pretty_print(columns=['value','min','max', 'vary'])
                 result, _ = do_lmfit(idata, params, B=B)
                 if not result.errorbars:
                     is_flag |= flags.FITERR
@@ -2129,7 +2130,7 @@ class SourceFinder(object):
                     is_flag |= flags.FITERR
 
             logger.debug("Final params")
-            logger.debug(model)
+            logger.debug(model.pretty_repr(oneline=False))
 
             # convert the fitting results to a list of sources [and islands]
             sources = self.result_to_components(
