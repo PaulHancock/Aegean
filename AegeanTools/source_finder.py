@@ -2033,6 +2033,7 @@ class SourceFinder(object):
 
         logger.debug("=====")
         logger.debug("Island ({0})".format(isle_num))
+
         params = self.estimate_lmfit_parinfo(
             idata,
             rms,
@@ -2043,85 +2044,107 @@ class SourceFinder(object):
             offsets=[xmin, ymin],
             max_summits=max_summits,
         )
-        # params = estimate_parinfo_image()
-        # islands at the edge of a region of nans
-        # result in no components
-        if params is None or params["components"].value < 1:
-            return []
+        guessed_params = [params]
+        n_components = params["components"].value
+        if n_components > 1:
+            less_params = copy.deepcopy(params)
+            prefix = f"c{n_components-1}_"
+            # delete the last component
+            for k in list(less_params.keys()):
+                if prefix in k:
+                    del less_params[k]
+            less_params["components"].value = n_components-1
+            guessed_params.append(less_params)
+        guessed_sources = []
+        for params in reversed(guessed_params):
+            # params = estimate_parinfo_image()
+            # islands at the edge of a region of nans
+            # result in no components
+            if params is None or params["components"].value < 1:
+                return []
 
-        logger.debug("Rms is {0}".format(np.shape(rms)))
-        logger.debug("Isle is {0}".format(np.shape(idata)))
-        logger.debug(
-            " of which {0} are masked".format(sum(np.isnan(idata).ravel() * 1))
-        )
+            logger.debug("Rms is {0}".format(np.shape(rms)))
+            logger.debug("Isle is {0}".format(np.shape(idata)))
+            logger.debug(
+                " of which {0} are masked".format(sum(np.isnan(idata).ravel() * 1))
+            )
 
-        # Check that there is enough data to do the fit
-        mx, my = np.where(np.isfinite(idata))
-        non_blank_pix = len(mx)
-        free_vars = len([1 for a in params.keys() if params[a].vary])
-        if non_blank_pix < free_vars or free_vars == 0:
-            logger.debug(
-                "Island {0} doesn't have enough pixels to fit the given model"
-                .format(isle_num)
-            )
-            logger.debug(
-                "non_blank_pix {0}, free_vars {1}".format(
-                    non_blank_pix, free_vars)
-            )
-            result = DummyLM()
-            model = params
-            is_flag |= flags.NOTFIT
-        else:
-            # Model is the fitted parameters
-            fac = 1 / np.sqrt(2)
-            if self.global_data.docov:
-                C = Cmatrix(
-                    mx,
-                    my,
-                    pixbeam.a * FWHM2CC * fac,
-                    pixbeam.b * FWHM2CC * fac,
-                    pixbeam.pa,
+            # Check that there is enough data to do the fit
+            mx, my = np.where(np.isfinite(idata))
+            non_blank_pix = len(mx)
+            free_vars = len([1 for a in params.keys() if params[a].vary])
+            if non_blank_pix < free_vars or free_vars == 0:
+                logger.debug(
+                    "Island {0} doesn't have enough pixels to fit the given model"
+                    .format(isle_num)
                 )
-                B = Bmatrix(C)
+                logger.debug(
+                    "non_blank_pix {0}, free_vars {1}".format(
+                        non_blank_pix, free_vars)
+                )
+                result = DummyLM()
+                model = params
+                is_flag |= flags.NOTFIT
             else:
-                C = B = None
-            logger.debug(
-                "C({0},{1},{2},{3},{4})"
-                .format(len(mx), len(my),
-                        pixbeam.a * FWHM2CC,
-                        pixbeam.b * FWHM2CC,
-                        pixbeam.pa)
-            )
-            errs = np.nanmax(rms)
-            logger.debug("Initial params")
-            logger.debug(params)
-            result, _ = do_lmfit(idata, params, B=B)
-            if not result.errorbars:
-                is_flag |= flags.FITERR
-            # get the real (sky) parameter errors
-            model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
-
-            if self.global_data.dobias and self.global_data.docov:
-                x, y = np.indices(idata.shape)
-                acf = elliptical_gaussian(
-                    x, y, 1, 0, 0,
-                    pixbeam.a * FWHM2CC * fac,
-                    pixbeam.b * FWHM2CC * fac,
-                    pixbeam.pa,
+                # Model is the fitted parameters
+                fac = 1 / np.sqrt(2)
+                if self.global_data.docov:
+                    C = Cmatrix(
+                        mx,
+                        my,
+                        pixbeam.a * FWHM2CC * fac,
+                        pixbeam.b * FWHM2CC * fac,
+                        pixbeam.pa,
+                    )
+                    B = Bmatrix(C)
+                else:
+                    C = B = None
+                logger.debug(
+                    "C({0},{1},{2},{3},{4})"
+                    .format(len(mx), len(my),
+                            pixbeam.a * FWHM2CC,
+                            pixbeam.b * FWHM2CC,
+                            pixbeam.pa)
                 )
-                bias_correct(model, idata, acf=acf * errs ** 2)
+                errs = np.nanmax(rms)
+                logger.debug("Initial params")
+                logger.debug(params)
+                result, _ = do_lmfit(idata, params, B=B)
+                if not result.errorbars:
+                    is_flag |= flags.FITERR
+                # get the real (sky) parameter errors
+                model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
 
-            if not result.success:
-                is_flag |= flags.FITERR
+                if self.global_data.dobias and self.global_data.docov:
+                    x, y = np.indices(idata.shape)
+                    acf = elliptical_gaussian(
+                        x, y, 1, 0, 0,
+                        pixbeam.a * FWHM2CC * fac,
+                        pixbeam.b * FWHM2CC * fac,
+                        pixbeam.pa,
+                    )
+                    bias_correct(model, idata, acf=acf * errs ** 2)
 
-        logger.debug("Final params")
-        logger.debug(model)
+                if not result.success:
+                    is_flag |= flags.FITERR
 
-        # convert the fitting results to a list of sources [and islands]
-        sources = self.result_to_components(
-            result, model, island_data, is_flag)
+            logger.debug("Final params")
+            logger.debug(model)
 
-        return sources
+            # convert the fitting results to a list of sources [and islands]
+            sources = self.result_to_components(
+                result, model, island_data, is_flag)
+            guessed_sources.append(sources)
+        
+        # choose the best sources
+        best_sources = guessed_sources[0]
+        best_measure = guessed_sources[0][0].residual_std
+        for g in guessed_sources:
+            if g[0].residual_std < best_measure:
+                best_sources = g
+                best_measure = g[0].residual_std
+        #best_sources = guessed_sources[0]
+        return best_sources
 
     def find_sources_in_image(
         self,
