@@ -2047,7 +2047,9 @@ class SourceFinder(object):
             max_summits=max_summits,
         )
         guessed_params = [params]
-        n_components = params["components"].value
+        n_components = 0
+        if params is not None:
+            n_components = params["components"].value
         if n_components > 1:
             less_params = copy.deepcopy(params)
             prefix = f"c{n_components-1}_"
