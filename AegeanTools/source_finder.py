@@ -2047,6 +2047,8 @@ class SourceFinder(object):
             max_summits=max_summits,
         )
         guessed_params = [params]
+        
+        # create another guess which is just one less component
         n_components = 0
         if params is not None:
             n_components = params["components"].value
@@ -2059,6 +2061,7 @@ class SourceFinder(object):
                     del less_params[k]
             less_params["components"].value = n_components-1
             guessed_params.append(less_params)
+        
         guessed_sources = []
         for params in reversed(guessed_params):
             # params = estimate_parinfo_image()
