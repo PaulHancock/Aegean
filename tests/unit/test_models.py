@@ -45,11 +45,6 @@ def test_simple_source():
     if not (out == out): raise AssertionError()
 
 
-def test_global_fitting_data():
-    """Test that GlobalFittingData doesn't crash"""
-    models.GlobalFittingData()
-
-
 def test_island_fitting_data():
     """Test that IslandFittingData doesn't crash"""
     models.IslandFittingData()

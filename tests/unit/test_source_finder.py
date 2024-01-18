@@ -98,9 +98,9 @@ def test__make_bkg_rms():
     sfinder.load_globals(filename)
 
     # check that we don't make mistake #163 again.
-    if not np.all(sfinder.global_data.rmsimg[50:55, 50:55] > 0):
+    if not np.all(sfinder.rmsimg[50:55, 50:55] > 0):
         raise AssertionError("RMS map is not positive in the middle")
-    if not np.any(sfinder.global_data.bkgimg[50:55, 50:55] != 0):
+    if not np.any(sfinder.bkgimg[50:55, 50:55] != 0):
         raise AssertionError("BKG map is all zero in the middle")
 
 
@@ -110,7 +110,7 @@ def test_load_globals():
     filename = 'tests/test_files/1904-66_SIN.fits'
     aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
     sfinder.load_globals(filename)
-    if sfinder.global_data.img is None:
+    if sfinder.img is None:
         raise AssertionError()
 
     del sfinder
@@ -118,7 +118,7 @@ def test_load_globals():
     sfinder.load_globals(
         filename, bkgin=aux_files['bkg'], rms=1, mask=aux_files['mask'])
     # region isn't available due to healpy not being installed/required
-    if sfinder.global_data.region is None:
+    if sfinder.region is None:
         raise AssertionError()
 
     del sfinder
@@ -126,7 +126,7 @@ def test_load_globals():
     sfinder.load_globals(
         filename, bkgin=aux_files['bkg'], bkg=0, mask=aux_files['mask'])
     # region isn't available due to healpy not being installed/required
-    if sfinder.global_data.region is None:
+    if sfinder.region is None:
         raise AssertionError()
 
     del sfinder
@@ -134,16 +134,16 @@ def test_load_globals():
     sfinder.load_globals(
         filename, bkgin=aux_files['bkg'], rms=1, bkg=0, mask=aux_files['mask'])
     # region isn't available due to healpy not being installed/required
-    if sfinder.global_data.region is None:
+    if sfinder.region is None:
         raise AssertionError()
 
     del sfinder
     sfinder = sf.SourceFinder()
     sfinder.load_globals(
         filename, rmsin=aux_files['rms'], do_curve=False, mask='derp')
-    if sfinder.global_data.region is not None:
+    if sfinder.region is not None:
         raise AssertionError()
-    img = sfinder._load_aux_image(sfinder.global_data.img, filename)
+    img = sfinder._load_aux_image(sfinder.img, filename)
     if img is None:
         raise AssertionError()
 
@@ -152,7 +152,7 @@ def test_load_globals():
     aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
     from AegeanTools.regions import Region
     sfinder.load_globals(filename, rms=1, mask=Region())
-    if sfinder.global_data.region is None:
+    if sfinder.region is None:
         raise AssertionError()
 
 
