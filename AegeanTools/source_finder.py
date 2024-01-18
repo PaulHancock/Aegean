@@ -412,7 +412,6 @@ def estimate_parinfo_image(islands, im, rms, wcshelper,
                 logger.debug(" - flags {0}".format(flag))
                 logger.debug(" - fit?  {0}".format(not maxxed))
 
-            # TODO: figure out how incorporate the circular constraint on sx/sy
             prefix = "c{0}_".format(i)
             params.add(
                 prefix + "amp",
@@ -442,6 +441,9 @@ def estimate_parinfo_image(islands, im, rms, wcshelper,
                 psf_vary = not maxxed
             params.add(prefix + "sx", value=sx, min=sx_min,
                        max=sx_max, vary=psf_vary)
+            # if circular constraint:
+            #     params.add(prefix+"sy", vary=psf_vary, expr=prefix+"sx")
+            #     params.add(prefix+"theta", value=0, vary=False)
             params.add(prefix + "sy", value=sy, min=sy_min,
                        max=sy_max, vary=psf_vary)
             params.add(prefix + "theta", value=theta, vary=psf_vary)
