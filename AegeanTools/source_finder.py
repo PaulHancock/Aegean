@@ -526,7 +526,10 @@ class SourceFinder(object):
         self.wcshelper = None
         self.psfhelper = None
         self.blank = False
-        self.cube_index = None
+        self.docov = True
+        self.dobias = False
+        self.cube_index = 0
+        self.pixarea = None
 
         self.sources = []
 
@@ -1289,17 +1292,14 @@ class SourceFinder(object):
         # don't reload already loaded data
         if self.img is not None:
             return
-        # img = FitsImage(filename, hdu_index=hdu_index,
-        #                 beam=beam, cube_index=cube_index)
+        
         img, header = load_image_band(filename,
                                       hdu_index=hdu_index,
                                       cube_index=cube_index)
 
         debug = logger.isEnabledFor(logging.DEBUG)
 
-        if mask is None:
-            self.region = None
-        else:
+        if mask is not None:
             # allow users to supply and object instead of a filename
             if isinstance(mask, Region):
                 self.region = mask
@@ -1314,8 +1314,8 @@ class SourceFinder(object):
             header, beam, psf_file=psf
         )
         self.psfhelper = self.wcshelper
-
         self.beam = self.wcshelper.beam
+
         self.img = img
         self.header = header
         self.dtype = type(self.img[0][0])
@@ -1326,7 +1326,7 @@ class SourceFinder(object):
             self.img.shape, dtype=self.dtype
         )
         self.pixarea = wcs_helpers.get_pixinfo(header)[0]
-        self.dcurve = None
+        
         self.cube_index = cube_index
 
         if do_curve:
