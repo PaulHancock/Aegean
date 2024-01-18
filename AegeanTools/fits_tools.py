@@ -264,6 +264,10 @@ def load_image_band(filename,
     band : (int, int)
         (this band, total bands)
         Default (0,1)
+
+    returns
+    -------
+    data, header : :class:`numpy.ndarray`, :class:`astropy.io.fits.header.Header`
     """
     if band[1] <= 0:
         raise AegeanError(
