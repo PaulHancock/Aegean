@@ -28,7 +28,7 @@ def test_psf_with_nans():
     hdu = fits.open(psf)
     print(hdu[0].data.shape)
     hdu[0].data[0, :, :] = np.nan
-    hdu.writeto('dlme_psf.fits')
+    hdu.writeto('dlme_psf.fits', overwrite=True)
 
     try:
         _ = sfinder.find_sources_in_image(filename,
