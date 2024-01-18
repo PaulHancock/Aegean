@@ -168,14 +168,14 @@ def test_find_and_prior_sources():
     found = sfinder.find_sources_in_image(filename, cores=1, rms=0.5, bkg=0)
     if not (len(found) == nsrc):
         raise AssertionError(
-            "Found the wrong number of sources {0}".format(len(found)))
+            f"Vanilla source finding: wrong number of sources {len(found)}, expecting {nsrc}")
 
     # source finding but not fitting
     found = sfinder.find_sources_in_image(
         filename, cores=1, max_summits=0, rms=0.5, bkg=0)
     if not (len(found) == nsrc):
         raise AssertionError(
-            "Found the wrong number of sources {0}".format(len(found)))
+            f"Finding not fitting: wrong number of sources {len(found)}, expecting {nsrc}")
 
     # now with some options
     aux_files = sf.get_aux_files(filename)
@@ -188,7 +188,7 @@ def test_find_and_prior_sources():
                                            cores=1, docov=False)
     if not (len(found2) == ntot):
         raise AssertionError(
-            "Found the wrong number of sources {0}".format(len(found2)))
+            f"Fitting w aux files: wrong number of sources {len(found2)}, expecting {ntot}")
     isle1 = found2[1]
     if not (isle1.int_flux > 0):
         raise AssertionError()
@@ -210,7 +210,7 @@ def test_find_and_prior_sources():
                                               docov=False)
     if not (len(priorized) == nsrc):
         raise AssertionError(
-            "Found the wrong number of sources {0}".format(len(priorized)))
+            f"Multi cores: wrong number of sources {len(priorized)}, expecting {nsrc}")
 
     priorized = sfinder.priorized_fit_islands(filename, catalogue=found,
                                               doregroup=True, cores=1,
@@ -220,12 +220,12 @@ def test_find_and_prior_sources():
                                               stage=1)
     if not (len(priorized) == nsrc):
         raise AssertionError(
-            "Found the wrong number of sources {0}".format(len(priorized)))
+            f"Found the wrong number of sources {len(priorized)}, expecting {nsrc}")
     if not (len(sfinder.priorized_fit_islands(filename, catalogue=[])) == 0):
         raise AssertionError()
     # we should have written some output file
     if not (os.path.exists('dlme')):
-        raise AssertionError("Failed to creat outputfile")
+        raise AssertionError("Failed to create output file")
     os.remove('dlme')
 
 
