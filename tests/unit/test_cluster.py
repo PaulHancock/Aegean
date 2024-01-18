@@ -149,22 +149,22 @@ def test_resize_ratio():
     return
 
 
-def test_resize_psfhelper():
-    """Test that resize works with psfhelpers"""
+def test_resize_wcshelper():
+    """Test that resize works with wcshelpers"""
     # Load a table
     table = catalogs.load_table('tests/test_files/1904_comp.fits')
     srccat = catalogs.table_to_source_list(table)
-    # make psfhelper
+    # make wcshelper
     head = fits.getheader('tests/test_files/1904-66_SIN.fits')
-    psfhelper = wcs_helpers.WCSHelper.from_header(head)
+    wcshelper = wcs_helpers.WCSHelper.from_header(head)
 
     first = deepcopy(srccat[0])
-    out = cluster.resize(deepcopy(srccat), psfhelper=psfhelper)
+    out = cluster.resize(deepcopy(srccat), wcshelper=wcshelper)
     print(first.a, out[0].a)
 
     if not ((first.a - out[0].a < 1e-9) and
             (first.b - out[0].b < 1e-9)):
-        raise AssertionError("resize with psfhelper is not identity")
+        raise AssertionError("resize with wcshelper is not identity")
 
     return
 

@@ -77,8 +77,8 @@ def main(argv=()):
         logger.info("Ignoring --ratio")
     if options.psfheader is not None:
         head = fits.getheader(options.psfheader)
-        psfhelper = wcs_helpers.WCSHelper.from_header(head)
-        sources = resize(sources, psfhelper=psfhelper)
+        wcshelper = wcs_helpers.WCSHelper.from_header(head)
+        sources = resize(sources, wcshelper=wcshelper)
         logger.debug("{0} sources resized".format(len(sources)))
     elif options.ratio is not None:
         sources = resize(sources, ratio=options.ratio)

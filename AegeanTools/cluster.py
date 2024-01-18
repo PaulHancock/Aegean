@@ -364,7 +364,7 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
     return sources
 
 
-def resize(catalog, ratio=None, psfhelper=None):
+def resize(catalog, ratio=None, wcshelper=None):
     """
     Resize all the sources in a given catalogue. Either use a ratio to blindly
     scale all sources by the same amount, or use a psf map to deconvolve the
@@ -380,7 +380,7 @@ def resize(catalog, ratio=None, psfhelper=None):
     ratio : float, default=None
         Ratio for scaling the sources
 
-    psfhelper : :py:class:`AegeanTools.wcs_helpers.WCSHelper`, default=None
+    wcshelper : :py:class:`AegeanTools.wcs_helpers.WCSHelper`, default=None
         A wcs helper object that contains psf information for the target
         image/projection
 
@@ -418,7 +418,7 @@ def resize(catalog, ratio=None, psfhelper=None):
 
     # if we know the psf from the input catalogue (has_psf), or if it was
     # provided via a psf map then we use that psf.
-    elif psfhelper is not None or has_psf:
+    elif wcshelper is not None or has_psf:
         for i, src in enumerate(catalog):
             if (src.psf_a <= 0) or (src.psf_b <= 0):
                 src_mask[i] = False
@@ -430,8 +430,8 @@ def resize(catalog, ratio=None, psfhelper=None):
             if has_psf:
                 catbeam = Beam(src.psf_a / 3600, src.psf_b / 3600, src.psf_pa)
             else:
-                catbeam = Beam(*psfhelper.get_psf_sky2sky(src.ra, src.dec))
-            imbeam = psfhelper.get_skybeam(src.ra, src.dec)
+                catbeam = Beam(*wcshelper.get_psf_sky2sky(src.ra, src.dec))
+            imbeam = wcshelper.get_skybeam(src.ra, src.dec)
             # If either of the above are None then we skip this source.
             if catbeam is None or imbeam is None:
                 unknown = []

@@ -524,7 +524,6 @@ class SourceFinder(object):
         self.dtype = None
         self.region = None
         self.wcshelper = None
-        self.psfhelper = None
         self.blank = False
         self.docov = True
         self.dobias = False
@@ -837,7 +836,7 @@ class SourceFinder(object):
             if debug_on:
                 logger.debug("a_min {0}, a_max {1}".format(amp_min, amp_max))
 
-            a, b, pa = self.psfhelper.get_psf_pix2pix(
+            a, b, pa = self.wcshelper.get_psf_pix2pix(
                 yo + offsets[0], xo + offsets[1]
             )
             if not (np.all(np.isfinite((a, b, pa)))):
@@ -1079,7 +1078,7 @@ class SourceFinder(object):
             # calculate integrated flux
             source.int_flux = source.peak_flux * sx * sy * CC2FHWM ** 2 * np.pi
             # scale Jy/beam -> Jy using the area of the beam
-            source.int_flux /= self.psfhelper.get_beamarea_pix(
+            source.int_flux /= self.wcshelper.get_beamarea_pix(
                 source.ra, source.dec
             )
 
@@ -1088,7 +1087,7 @@ class SourceFinder(object):
 
             source.flags = src_flags
             # add psf info
-            local_beam = self.psfhelper.get_skybeam(
+            local_beam = self.wcshelper.get_skybeam(
                 source.ra, source.dec)
             if local_beam is not None:
                 source.psf_a = local_beam.a * 3600
@@ -1195,10 +1194,10 @@ class SourceFinder(object):
             )
 
             # integrated flux
-            beam_area_pix = self.psfhelper.get_beamarea_pix(
+            beam_area_pix = self.wcshelper.get_beamarea_pix(
                 source.ra, source.dec
             )
-            beam_area = self.psfhelper.get_beamarea_deg2(
+            beam_area = self.wcshelper.get_beamarea_deg2(
                 source.ra, source.dec)
             isize = source.pixels  # number of non zero pixels
             logger.debug("- pixels used {0}".format(isize))
@@ -1313,7 +1312,6 @@ class SourceFinder(object):
         self.wcshelper = WCSHelper.from_header(
             header, beam, psf_file=psf
         )
-        self.psfhelper = self.wcshelper
         self.beam = self.wcshelper.beam
 
         self.img = img
@@ -1680,7 +1678,7 @@ class SourceFinder(object):
             included_sources = []
             for src in isle:
                 pixbeam = Beam(
-                    *self.psfhelper.get_psf_sky2pix(src.ra, src.dec))
+                    *self.wcshelper.get_psf_sky2pix(src.ra, src.dec))
                 # find the right pixels from the ra/dec
                 source_x, source_y = self.wcshelper.sky2pix(
                     [src.ra, src.dec])
@@ -1902,7 +1900,7 @@ class SourceFinder(object):
                 # the location of the last source to have a valid psf
                 if pixbeam is None:
                     if src_valid_psf is not None:
-                        pixbeam = self.psfhelper.get_pixbeam(
+                        pixbeam = self.wcshelper.get_pixbeam(
                             src_valid_psf.ra, src_valid_psf.dec
                         )
                     else:
@@ -2000,7 +1998,7 @@ class SourceFinder(object):
         logger.debug("midra middex {0} {1}".format(midra, middec))
 
         try:
-            beam = self.psfhelper.get_psf_sky2pix(midra, middec)
+            beam = self.wcshelper.get_psf_sky2pix(midra, middec)
         except ValueError:
             # This island has no psf or is not 'on' the sky, ignore it
             logger.debug(
@@ -2063,7 +2061,7 @@ class SourceFinder(object):
         rms = rmsimg[xmin:xmax, ymin:ymax]
 
         is_flag = 0
-        a, b, pa = self.psfhelper.get_psf_pix2pix(
+        a, b, pa = self.wcshelper.get_psf_pix2pix(
             (xmin + xmax) / 2.0, (ymin + ymax) / 2.0
         )
         if not np.all(np.isfinite((a, b, pa))):
@@ -2339,7 +2337,7 @@ class SourceFinder(object):
             seed_clip=innerclip,
             flood_clip=outerclip,
             region=self.region,
-            wcs=self.psfhelper
+            wcs=self.wcshelper
         )
         logger.info("Found {0} islands".format(len(islands)))
         logger.info("Begin fitting")
@@ -2548,7 +2546,7 @@ class SourceFinder(object):
         # Do the resizing
         logger.info("{0} sources in catalog".format(len(input_sources)))
         sources = cluster.resize(
-            input_sources, ratio=ratio, psfhelper=self.psfhelper)
+            input_sources, ratio=ratio, wcshelper=self.wcshelper)
         logger.info("{0} sources accepted".format(len(sources)))
 
         if len(sources) < 1:
