@@ -1882,6 +1882,7 @@ class SourceFinder(object):
         blank=False,
         docov=True,
         cube_index=None,
+        progress=True
     ):
         """
         Run the Aegean source finder.
@@ -1945,6 +1946,9 @@ class SourceFinder(object):
 
         cube_index : int
           For image cubes, cube_index determines which slice is used.
+
+        progress : bool, Default=True
+            Show a progress bar when fitting island groups
 
         Returns
         -------
@@ -2026,7 +2030,7 @@ class SourceFinder(object):
 
         # now fit all the islands
         sources = []
-        with tqdm(total=isle_num, desc="Fitting Islands:") as pbar:
+        with tqdm(total=isle_num, desc="Fitting Islands:", disable= not progress) as pbar:
             for i in island_group:
                 try:
                     pbar.update(1)
@@ -2078,7 +2082,7 @@ class SourceFinder(object):
         regroup_eps=None,
         docov=True,
         cube_index=None,
-        progress=False,
+        progress=True,
     ):
         """
         Take an input catalog, and image, and optional background/noise images
