@@ -11,13 +11,12 @@ from copy import deepcopy
 import numpy as np
 from astropy.io import fits
 
-from AegeanTools import flags, models
+from AegeanTools import models
 from AegeanTools import source_finder as sf
 from AegeanTools.exceptions import AegeanError
-from AegeanTools.logging import logger, logging
+from AegeanTools.logging import logger
 from AegeanTools.models import classify_catalog
 from AegeanTools.regions import Region
-from AegeanTools.wcs_helpers import Beam, WCSHelper
 
 
 def test_psf_with_nans():

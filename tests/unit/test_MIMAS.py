@@ -8,7 +8,7 @@ from astropy.table import Table
 import numpy as np
 import os
 
-__author__ = 'Paul Hancock'
+__author__ = "Paul Hancock"
 
 
 def test_Dummy():
@@ -36,24 +36,24 @@ def test_mask_plane():
 
 
 def test_mask_file():
-    infile = 'tests/test_files/1904-66_SIN.fits'
-    outfile = 'test_masked.fits'
-    rfile = 'circle.mim'
+    infile = "tests/test_files/1904-66_SIN.fits"
+    outfile = "test_masked.fits"
+    rfile = "circle.mim"
     region = Region(maxdepth=8)
     region.add_circles(np.radians(285), np.radians(-65), 1.8)
 
     # check for failure in relevant conditions
     try:
-        MIMAS.mask_file('nofile', 'nofile', 'nofile')
+        MIMAS.mask_file("nofile", "nofile", "nofile")
     except AssertionError as e:
-        if not 'fits file' in e.args[0]:
-            raise AssertionError('Failed to catch file not found err (image)')
+        if "fits file" not in e.args[0]:
+            raise AssertionError("Failed to catch file not found err (image)")
 
     try:
-        MIMAS.mask_file('nofile', infile, 'nofile')
+        MIMAS.mask_file("nofile", infile, "nofile")
     except AssertionError as e:
-        if not 'region file' in e.args[0]:
-            raise AssertionError('Faile to catch file not found err (region)')
+        if "region file" not in e.args[0]:
+            raise AssertionError("Faile to catch file not found err (region)")
 
     # make a region file and test that a masked outfile can be made
     region.save(rfile)
@@ -80,7 +80,7 @@ def test_mask_table():
     region.add_circles(np.radians(285), np.radians(0), np.radians(2.1))
     ra = np.linspace(280, 290, 11)
     dec = np.zeros(11)
-    tab = Table(data=[ra, dec], names=('ra', 'dec'))
+    tab = Table(data=[ra, dec], names=("ra", "dec"))
     masked = MIMAS.mask_table(region, tab)
     if len(masked) != 6:
         print(len(masked))
@@ -93,9 +93,9 @@ def test_mask_table():
 
 
 def test_mask_catalog():
-    infile = 'tests/test_files/1904_comp.fits'
-    regionfile = 'tests/test_files/1904-66_SIN.mim'
-    outfile = 'dlme.fits'
+    infile = "tests/test_files/1904_comp.fits"
+    regionfile = "tests/test_files/1904-66_SIN.mim"
+    outfile = "dlme.fits"
 
     MIMAS.mask_catalog(regionfile, infile, outfile)
     if not os.path.exists(outfile):
@@ -111,8 +111,8 @@ def test_mask_catalog():
 
 
 def test_mim2reg():
-    rfile = 'circle.mim'
-    regfile = 'circle.reg'
+    rfile = "circle.mim"
+    regfile = "circle.reg"
     region = Region(maxdepth=4)
     region.add_circles(np.radians(285), np.radians(-65), 1.8)
     region.save(rfile)
@@ -126,8 +126,8 @@ def test_mim2reg():
 
 
 def test_mim2fits():
-    rfile = 'circle.mim'
-    fitsfile = 'circle.fits'
+    rfile = "circle.mim"
+    fitsfile = "circle.fits"
     region = Region(maxdepth=8)
     region.add_circles(np.radians(285), np.radians(-65), 1.8)
     region.save(rfile)
@@ -141,24 +141,18 @@ def test_mim2fits():
 
 
 def test_mask2mim():
-    maskfile = 'tests/test_files/mask.fits'
-    mimfile = 'out.mim'
+    maskfile = "tests/test_files/mask.fits"
+    mimfile = "out.mim"
     # test with threshold of 1.0
-    MIMAS.mask2mim(maskfile=maskfile,
-                   mimfile=mimfile)
+    MIMAS.mask2mim(maskfile=maskfile, mimfile=mimfile)
     if not os.path.exists(mimfile):
-        raise AssertionError(
-            "Failed to convert {0}->{1}".foramt(maskfile, mimfile))
+        raise AssertionError("Failed to convert {0}->{1}".foramt(maskfile, mimfile))
     os.remove(mimfile)
 
     # test with threshold of 2.0
-    MIMAS.mask2mim(maskfile=maskfile,
-                   mimfile=mimfile,
-                   threshold=2.0,
-                   maxdepth=9)
+    MIMAS.mask2mim(maskfile=maskfile, mimfile=mimfile, threshold=2.0, maxdepth=9)
     if not os.path.exists(mimfile):
-        raise AssertionError(
-            "Failed to convert {0}->{1}".foramt(maskfile, mimfile))
+        raise AssertionError("Failed to convert {0}->{1}".foramt(maskfile, mimfile))
     os.remove(mimfile)
 
     return
@@ -194,8 +188,8 @@ def test_poly2poly():
 
 
 def test_reg2mim():
-    reg = 'tests/test_files/ds9.reg'
-    outfile = 'dlme.mim'
+    reg = "tests/test_files/ds9.reg"
+    outfile = "dlme.mim"
     MIMAS.reg2mim(reg, outfile, maxdepth=4)
     if not os.path.exists(outfile):
         raise AssertionError("reg2mim failed")
@@ -204,17 +198,17 @@ def test_reg2mim():
 
 
 def test_combine_regions():
-    file1 = 'dlme1.mim'
-    file2 = 'dlme2.mim'
+    file1 = "dlme1.mim"
+    file2 = "dlme2.mim"
     r1 = Region(maxdepth=3)
     r1.add_circles(np.radians(285), np.radians(-65), 1.8)
     r1.save(file1)
     r1.save(file2)
 
-    class O(object):
+    class Ob(object):
         pass
 
-    c = O()
+    c = Ob()
     c.maxdepth = 3
     c.add_region = [[file1]]
     c.rem_region = [[file2]]
@@ -235,8 +229,8 @@ def test_combine_regions():
 
 
 def test_intersect_regions():
-    file1 = 'dlme1.mim'
-    file2 = 'dlme2.mim'
+    file1 = "dlme1.mim"
+    file2 = "dlme2.mim"
 
     try:
         MIMAS.intersect_regions([None])
@@ -259,7 +253,7 @@ def test_intersect_regions():
 
 
 def test_save_region():
-    rfile = 'circle.mim'
+    rfile = "circle.mim"
     region = Region(maxdepth=3)
     region.add_circles(np.radians(285), np.radians(-65), 1.8)
     MIMAS.save_region(region, rfile)
@@ -272,6 +266,6 @@ def test_save_region():
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
-        if f.startswith('test'):
+        if f.startswith("test"):
             print(f)
             globals()[f]()
