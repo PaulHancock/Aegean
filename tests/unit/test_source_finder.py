@@ -3,7 +3,7 @@
 Test source_finder.py
 """
 
-__author__ = 'Paul Hancock'
+__author__ = "Paul Hancock"
 
 import os
 from copy import deepcopy
@@ -19,6 +19,7 @@ from AegeanTools.models import classify_catalog
 from AegeanTools.regions import Region
 from AegeanTools.wcs_helpers import Beam, WCSHelper
 
+
 def test_psf_with_nans():
     """Test that a psf map with nans doesn't create a crash"""
     sfinder = sf.SourceFinder()
@@ -28,20 +29,20 @@ def test_psf_with_nans():
     hdu = fits.open(psf)
     print(hdu[0].data.shape)
     hdu[0].data[0, :, :] = np.nan
-    hdu.writeto('dlme_psf.fits', overwrite=True)
+    hdu.writeto("dlme_psf.fits", overwrite=True)
 
     try:
-        _ = sfinder.find_sources_in_image(filename,
-                                          cores=1, rms=0.5, bkg=0,
-                                          imgpsf='dlme_psf.fits')
+        _ = sfinder.find_sources_in_image(
+            filename, cores=1, rms=0.5, bkg=0, imgpsf="dlme_psf.fits"
+        )
     except AssertionError as e:
-        os.remove('dlme_psf.fits')
-        if 'major' in e.args[0]:
+        os.remove("dlme_psf.fits")
+        if "major" in e.args[0]:
             raise AssertionError("Broken on psf maps with nans")
         else:
             raise
     else:
-        os.remove('dlme_psf.fits')
+        os.remove("dlme_psf.fits")
     return
 
 
@@ -68,33 +69,33 @@ def test_helpers():
     if not (src.pa == src2.pa - 90):
         raise AssertionError()
     # pa limit
-    if not (sf.pa_limit(-180.) == 0.):
+    if not (sf.pa_limit(-180.0) == 0.0):
         raise AssertionError()
-    if not (sf.pa_limit(95.) == -85.):
+    if not (sf.pa_limit(95.0) == -85.0):
         raise AssertionError()
     # theta limit
-    if not (sf.theta_limit(0.) == 0.):
+    if not (sf.theta_limit(0.0) == 0.0):
         raise AssertionError()
-    if not (sf.theta_limit(np.pi) == 0.):
+    if not (sf.theta_limit(np.pi) == 0.0):
         raise AssertionError()
-    if not (sf.theta_limit(-3*np.pi/2) == np.pi/2):
+    if not (sf.theta_limit(-3 * np.pi / 2) == np.pi / 2):
         raise AssertionError()
     # get_aux
-    if not (np.all(a is None for a in sf.get_aux_files('_$_fkjfjl'))):
+    if not (np.all(a is None for a in sf.get_aux_files("_$_fkjfjl"))):
         raise AssertionError()
-    aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
-    if not (aux_files['rms'] == 'tests/test_files/1904-66_SIN_rms.fits'):
+    aux_files = sf.get_aux_files("tests/test_files/1904-66_SIN.fits")
+    if not (aux_files["rms"] == "tests/test_files/1904-66_SIN_rms.fits"):
         raise AssertionError()
-    if not (aux_files['bkg'] == 'tests/test_files/1904-66_SIN_bkg.fits'):
+    if not (aux_files["bkg"] == "tests/test_files/1904-66_SIN_bkg.fits"):
         raise AssertionError()
-    if not (aux_files['mask'] == 'tests/test_files/1904-66_SIN.mim'):
+    if not (aux_files["mask"] == "tests/test_files/1904-66_SIN.mim"):
         raise AssertionError()
 
 
 def test__make_bkg_rms():
     """Ensure that SourceFinder._make_bkg_rms works properly"""
     sfinder = sf.SourceFinder()
-    filename = 'tests/test_files/1904-66_SIN.fits'
+    filename = "tests/test_files/1904-66_SIN.fits"
     sfinder.load_globals(filename)
 
     # check that we don't make mistake #163 again.
@@ -107,8 +108,8 @@ def test__make_bkg_rms():
 def test_load_globals():
     """Test load_globals"""
     sfinder = sf.SourceFinder()
-    filename = 'tests/test_files/1904-66_SIN.fits'
-    aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
+    filename = "tests/test_files/1904-66_SIN.fits"
+    aux_files = sf.get_aux_files("tests/test_files/1904-66_SIN.fits")
     sfinder.load_globals(filename)
     if sfinder.img is None:
         raise AssertionError()
@@ -116,7 +117,8 @@ def test_load_globals():
     del sfinder
     sfinder = sf.SourceFinder()
     sfinder.load_globals(
-        filename, bkgin=aux_files['bkg'], rms=1, mask=aux_files['mask'])
+        filename, bkgin=aux_files["bkg"], rms=1, mask=aux_files["mask"]
+    )
     # region isn't available due to healpy not being installed/required
     if sfinder.region is None:
         raise AssertionError()
@@ -124,7 +126,8 @@ def test_load_globals():
     del sfinder
     sfinder = sf.SourceFinder()
     sfinder.load_globals(
-        filename, bkgin=aux_files['bkg'], bkg=0, mask=aux_files['mask'])
+        filename, bkgin=aux_files["bkg"], bkg=0, mask=aux_files["mask"]
+    )
     # region isn't available due to healpy not being installed/required
     if sfinder.region is None:
         raise AssertionError()
@@ -132,15 +135,15 @@ def test_load_globals():
     del sfinder
     sfinder = sf.SourceFinder()
     sfinder.load_globals(
-        filename, bkgin=aux_files['bkg'], rms=1, bkg=0, mask=aux_files['mask'])
+        filename, bkgin=aux_files["bkg"], rms=1, bkg=0, mask=aux_files["mask"]
+    )
     # region isn't available due to healpy not being installed/required
     if sfinder.region is None:
         raise AssertionError()
 
     del sfinder
     sfinder = sf.SourceFinder()
-    sfinder.load_globals(
-        filename, rmsin=aux_files['rms'], do_curve=False, mask='derp')
+    sfinder.load_globals(filename, rmsin=aux_files["rms"], do_curve=False, mask="derp")
     if sfinder.region is not None:
         raise AssertionError()
     img = sfinder._load_aux_image(sfinder.img, filename)
@@ -149,8 +152,9 @@ def test_load_globals():
 
     del sfinder
     sfinder = sf.SourceFinder()
-    aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
+    aux_files = sf.get_aux_files("tests/test_files/1904-66_SIN.fits")
     from AegeanTools.regions import Region
+
     sfinder.load_globals(filename, rms=1, mask=Region())
     if sfinder.region is None:
         raise AssertionError()
@@ -159,90 +163,107 @@ def test_load_globals():
 def test_find_and_prior_sources():
     """Test find sources and prior sources"""
     sfinder = sf.SourceFinder()
-    filename = 'tests/test_files/synthetic_test.fits'
+    filename = "tests/test_files/synthetic_test.fits"
     nsrc = 98
     nisl = 97
-    ntot = nsrc+nisl
+    ntot = nsrc + nisl
 
     # vanilla source finding
     found = sfinder.find_sources_in_image(filename, cores=1, rms=0.5, bkg=0)
     if not (len(found) == nsrc):
         raise AssertionError(
-            f"Vanilla source finding: wrong number of sources {len(found)}, expecting {nsrc}")
+            f"Vanilla source finding: wrong number of sources {len(found)}, expecting {nsrc}"
+        )
 
     # source finding but not fitting
     # the two source island is better described by one not-fit source than two
     found = sfinder.find_sources_in_image(
-        filename, cores=1, max_summits=0, rms=0.5, bkg=0)
-    if not (len(found) == (nsrc-1)):
+        filename, cores=1, max_summits=0, rms=0.5, bkg=0
+    )
+    if not (len(found) == (nsrc - 1)):
         raise AssertionError(
-            f"Finding not fitting: wrong number of sources {len(found)}, expecting {nsrc-1}")
+            f"Finding not fitting: wrong number of sources {len(found)}, expecting {nsrc-1}"
+        )
 
     # now with some options
     aux_files = sf.get_aux_files(filename)
-    found2 = sfinder.find_sources_in_image(filename, doislandflux=True,
-                                           outfile=open('dlme', 'w'),
-                                           nonegative=False,
-                                           rmsin=aux_files['rms'],
-                                           bkgin=aux_files['bkg'],
-                                           mask=aux_files['mask'],
-                                           cores=1, docov=False)
+    found2 = sfinder.find_sources_in_image(
+        filename,
+        doislandflux=True,
+        outfile=open("dlme", "w"),
+        nonegative=False,
+        rmsin=aux_files["rms"],
+        bkgin=aux_files["bkg"],
+        mask=aux_files["mask"],
+        cores=1,
+        docov=False,
+    )
     if not (len(found2) == ntot):
         raise AssertionError(
-            f"Fitting w aux files: wrong number of sources {len(found2)}, expecting {ntot}")
+            f"Fitting w aux files: wrong number of sources {len(found2)}, expecting {ntot}"
+        )
     isle1 = found2[1]
     if not (isle1.int_flux > 0):
         raise AssertionError()
     if not (isle1.max_angular_size > 0):
         raise AssertionError()
     # we should have written some output file
-    if not (os.path.exists('dlme')):
+    if not (os.path.exists("dlme")):
         raise AssertionError()
-    os.remove('dlme')
+    os.remove("dlme")
 
     # some more tests, now using multiple cores
     cores = 2
 
     # the two source island is better described by one not-fit source than two
-    priorized = sfinder.priorized_fit_islands(filename, catalogue=found,
-                                              doregroup=False,
-                                              ratio=1.2, cores=cores,
-                                              rmsin=aux_files['rms'],
-                                              bkgin=aux_files['bkg'],
-                                              docov=False)
-    if not (len(priorized) == (nsrc-1)):
+    priorized = sfinder.priorized_fit_islands(
+        filename,
+        catalogue=found,
+        doregroup=False,
+        ratio=1.2,
+        cores=cores,
+        rmsin=aux_files["rms"],
+        bkgin=aux_files["bkg"],
+        docov=False,
+    )
+    if not (len(priorized) == (nsrc - 1)):
         raise AssertionError(
-            f"Multi cores: wrong number of sources {len(priorized)}, expecting {nsrc-1}")
+            f"Multi cores: wrong number of sources {len(priorized)}, expecting {nsrc-1}"
+        )
 
-    priorized = sfinder.priorized_fit_islands(filename, catalogue=found,
-                                              doregroup=True, cores=1,
-                                              rmsin=aux_files['rms'],
-                                              bkgin=aux_files['bkg'],
-                                              outfile=open('dlme', 'w'),
-                                              stage=1)
-    if not (len(priorized) == (nsrc-1)):
+    priorized = sfinder.priorized_fit_islands(
+        filename,
+        catalogue=found,
+        doregroup=True,
+        cores=1,
+        rmsin=aux_files["rms"],
+        bkgin=aux_files["bkg"],
+        outfile=open("dlme", "w"),
+        stage=1,
+    )
+    if not (len(priorized) == (nsrc - 1)):
         raise AssertionError(
-            f"Found the wrong number of sources {len(priorized)}, expecting {nsrc-1}")
+            f"Found the wrong number of sources {len(priorized)}, expecting {nsrc-1}"
+        )
     if not (len(sfinder.priorized_fit_islands(filename, catalogue=[])) == 0):
         raise AssertionError()
     # we should have written some output file
-    if not (os.path.exists('dlme')):
+    if not (os.path.exists("dlme")):
         raise AssertionError("Failed to create output file")
-    os.remove('dlme')
+    os.remove("dlme")
 
 
 def dont_test_find_and_prior_parallel():
     """Test find/piroirze with parallel operation"""
     cores = 1
 
-    filename = 'tests/test_files/synthetic_test.fits'
+    filename = "tests/test_files/synthetic_test.fits"
     # vanilla source finding
     logger.info("basic fitting (no bkg/rms")
     sfinder = sf.SourceFinder()
-    found = sfinder.find_sources_in_image(filename, cores=cores,
-                                          bkg=0, rms=0.5)
+    found = sfinder.find_sources_in_image(filename, cores=cores, bkg=0, rms=0.5)
     if not (len(found) == 98):
-        raise AssertionError('found {0} sources'.format(len(found)))
+        raise AssertionError("found {0} sources".format(len(found)))
     # now with some options
     aux_files = sf.get_aux_files(filename)
 
@@ -250,34 +271,44 @@ def dont_test_find_and_prior_parallel():
     logger.info("fitting with supplied bkg/rms and 2 cores")
     cores = 2
     sfinder = sf.SourceFinder()
-    _ = sfinder.find_sources_in_image(filename, doislandflux=True,
-                                      outfile=open('dlme', 'w'),
-                                      nonegative=False,
-                                      rmsin=aux_files['rms'],
-                                      bkgin=aux_files['bkg'],
-                                      mask=aux_files['mask'],
-                                      cores=cores)
+    _ = sfinder.find_sources_in_image(
+        filename,
+        doislandflux=True,
+        outfile=open("dlme", "w"),
+        nonegative=False,
+        rmsin=aux_files["rms"],
+        bkgin=aux_files["bkg"],
+        mask=aux_files["mask"],
+        cores=cores,
+    )
 
-    logger.info('now priorised fitting')
-    _ = sfinder.priorized_fit_islands(filename, catalogue=found,
-                                      doregroup=True, cores=cores,
-                                      outfile=open('dlme', 'w'))
-    os.remove('dlme')
+    logger.info("now priorised fitting")
+    _ = sfinder.priorized_fit_islands(
+        filename,
+        catalogue=found,
+        doregroup=True,
+        cores=cores,
+        outfile=open("dlme", "w"),
+    )
+    os.remove("dlme")
 
     del sfinder
-    logger.info('fitting negative sources')
+    logger.info("fitting negative sources")
     sfinder = sf.SourceFinder()
-    sfinder.find_sources_in_image('tests/test_files/1904-66_SIN_neg.fits',
-                                  doislandflux=True, nonegative=False,
-                                  cores=cores)
+    sfinder.find_sources_in_image(
+        "tests/test_files/1904-66_SIN_neg.fits",
+        doislandflux=True,
+        nonegative=False,
+        cores=cores,
+    )
 
 
 def test_save_files():
     """Test that we can save files"""
     sfinder = sf.SourceFinder()
-    filename = 'tests/test_files/small.fits'
-    sfinder.save_background_files(image_filename=filename, outbase='dlme')
-    for ext in ['bkg', 'rms', 'snr', 'crv']:
+    filename = "tests/test_files/small.fits"
+    sfinder.save_background_files(image_filename=filename, outbase="dlme")
+    for ext in ["bkg", "rms", "snr", "crv"]:
         if not (os.path.exists("dlme_{0}.fits".format(ext))):
             raise AssertionError()
         os.remove("dlme_{0}.fits".format(ext))
@@ -286,10 +317,9 @@ def test_save_files():
 def test_save_image():
     """Test save_image"""
     sfinder = sf.SourceFinder()
-    filename = 'tests/test_files/small.fits'
-    _ = sfinder.find_sources_in_image(
-        filename, cores=1, max_summits=0, blank=True)
-    bfile = 'dlme_blanked.fits'
+    filename = "tests/test_files/small.fits"
+    _ = sfinder.find_sources_in_image(filename, cores=1, max_summits=0, blank=True)
+    bfile = "dlme_blanked.fits"
     sfinder.save_image(bfile)
     if not (os.path.exists(bfile)):
         raise AssertionError()
@@ -302,7 +332,6 @@ def test_esimate_lmfit_parinfo():
 
     data = np.zeros(shape=(3, 3))
     rmsimg = np.ones(shape=(3, 3))
-    beam = Beam(1, 1, 0)
 
     # should hit isnegative
     data[1, 1] = -6
@@ -311,14 +340,15 @@ def test_esimate_lmfit_parinfo():
     # should run error because curve is the wrong shape
     curve = np.zeros((3, 4))
     try:
-        sfinder.estimate_lmfit_parinfo(data=data, rmsimg=rmsimg,
-                                       curve=curve, beam=beam,
-                                       innerclip=5, outerclip=outerclip)
+        sfinder.estimate_lmfit_parinfo(
+            data=data, rmsimg=rmsimg, curve=curve, innerclip=5, outerclip=outerclip
+        )
     except AssertionError as e:
-        e.message = 'Passed'
+        e.message = "Passed"
     else:
         raise AssertionError(
-            "estimate_lmfit_parinfo should err when curve.shape != data.shape")
+            "estimate_lmfit_parinfo should err when curve.shape != data.shape"
+        )
 
     return
 
@@ -326,21 +356,48 @@ def test_esimate_lmfit_parinfo():
 def test_island_contours():
     """Test that island contours are correct"""
     sfinder = sf.SourceFinder()
-    filename = 'tests/test_files/synthetic_test.fits'
+    filename = "tests/test_files/synthetic_test.fits"
 
     # vanilla source finding
     found = sfinder.find_sources_in_image(
-        filename, cores=1, rms=0.5, bkg=0, doislandflux=True)
+        filename, cores=1, rms=0.5, bkg=0, doislandflux=True
+    )
 
     components, islands, simples = classify_catalog(found)
-    isle_0_contour = np.array([(41, 405), (41, 406), (41, 407), (42, 407),
-                               (42, 408), (42, 409), (43, 409), (43, 410),
-                               (44, 410), (45, 410), (46, 410), (47, 410),
-                               (47, 409), (48, 409), (48, 408), (49, 408),
-                               (49, 407), (49, 406), (49, 405), (48, 405),
-                               (48, 404), (48, 403), (47, 403), (46, 403),
-                               (45, 403), (44, 403), (43, 403), (43, 404),
-                               (42, 404), (42, 405)])
+    isle_0_contour = np.array(
+        [
+            (41, 405),
+            (41, 406),
+            (41, 407),
+            (42, 407),
+            (42, 408),
+            (42, 409),
+            (43, 409),
+            (43, 410),
+            (44, 410),
+            (45, 410),
+            (46, 410),
+            (47, 410),
+            (47, 409),
+            (48, 409),
+            (48, 408),
+            (49, 408),
+            (49, 407),
+            (49, 406),
+            (49, 405),
+            (48, 405),
+            (48, 404),
+            (48, 403),
+            (47, 403),
+            (46, 403),
+            (45, 403),
+            (44, 403),
+            (43, 403),
+            (43, 404),
+            (42, 404),
+            (42, 405),
+        ]
+    )
     if not np.all(np.array(islands[0].contour) == isle_0_contour):
         raise AssertionError("Island contour for island 0 is incorrect")
     return
@@ -372,20 +429,19 @@ def test_find_islands():
 
     if len(islands) != 1:
         raise AssertionError(
-            "Incorrect number of islands found {0}, expecting 1".format(
-                len(islands))
+            "Incorrect number of islands found {0}, expecting 1".format(len(islands))
         )
     if not isinstance(islands[0], models.PixelIsland):
         raise AssertionError(
-            "Islands[0] is not a PixelIsland but instead a {0}".format(
-                type(islands[0]))
+            "Islands[0] is not a PixelIsland but instead a {0}".format(type(islands[0]))
         )
 
     correct_box = [[3, 6], [4, 7]]
     if not np.all(islands[0].bounding_box == correct_box):
         raise AssertionError(
             "Bounding box incorrect, should be {0}, but is {1}".format(
-                correct_box, islands[0].bounding_box)
+                correct_box, islands[0].bounding_box
+            )
         )
 
     # add another island that is between the seed/flood thresholds
@@ -393,8 +449,7 @@ def test_find_islands():
     islands = sf.find_islands(im, bkg, rms)
     if len(islands) != 1:
         raise AssertionError(
-            "Incorrect number of islands found {0}, expecting 1".format(
-                len(islands))
+            "Incorrect number of islands found {0}, expecting 1".format(len(islands))
         )
 
     return
@@ -402,37 +457,30 @@ def test_find_islands():
 
 def test_regions_used_in_finding():
     """Ensure that a region is use appropriately in source finding"""
-    imfile = 'tests/test_files/1904-66_SIN.fits'
+    imfile = "tests/test_files/1904-66_SIN.fits"
     aux_files = sf.get_aux_files(imfile)
     # region outside of the test image
     reg1 = Region()
-    reg1.add_circles(np.radians(10),
-                     np.radians(20),
-                     np.radians(1))
+    reg1.add_circles(np.radians(10), np.radians(20), np.radians(1))
     # region that contains the test image
     reg2 = Region()
-    reg2.add_circles(np.radians(286),
-                     np.radians(-66),
-                     np.radians(10))
+    reg2.add_circles(np.radians(286), np.radians(-66), np.radians(10))
 
     sfinder = sf.SourceFinder()
-    sources = sfinder.find_sources_in_image(imfile,
-                                            rmsin=aux_files['rms'],
-                                            bkgin=aux_files['bkg'],
-                                            cores=1, mask=reg1)
+    sources = sfinder.find_sources_in_image(
+        imfile, rmsin=aux_files["rms"], bkgin=aux_files["bkg"], cores=1, mask=reg1
+    )
     if len(sources) > 0:
         raise AssertionError("Found sources outside of region specified.")
 
     del sfinder, sources
     sfinder = sf.SourceFinder()
-    sources = sfinder.find_sources_in_image(imfile,
-                                            rmsin=aux_files['rms'],
-                                            bkgin=aux_files['bkg'],
-                                            cores=1, mask=reg2)
+    sources = sfinder.find_sources_in_image(
+        imfile, rmsin=aux_files["rms"], bkgin=aux_files["bkg"], cores=1, mask=reg2
+    )
     if len(sources) == 0:
         print(len(sources))
-        raise AssertionError(
-            "Failed to find any islands within region specified.")
+        raise AssertionError("Failed to find any islands within region specified.")
 
     return
 
@@ -442,9 +490,9 @@ def test_load_compressed_aux_files():
     Test against issue #193: aegean failing to load bkg/rms files that were
     created with BANE --compress
     """
-    background = 'tests/test_files/1904-66_bkg_compressed.fits'
-    noise = 'tests/test_files/1904-66_rms_compressed.fits'
-    image = 'tests/test_files/1904-66_SIN.fits'
+    background = "tests/test_files/1904-66_bkg_compressed.fits"
+    noise = "tests/test_files/1904-66_rms_compressed.fits"
+    image = "tests/test_files/1904-66_SIN.fits"
 
     sfinder = sf.SourceFinder()
     try:
@@ -457,7 +505,7 @@ def test_load_compressed_aux_files():
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
-        if f.startswith('test'):
+        if f.startswith("test"):
             print(f)
             globals()[f]()
             print("... PASS")

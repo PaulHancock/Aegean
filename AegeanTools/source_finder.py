@@ -323,7 +323,6 @@ class SourceFinder(object):
         data,
         rmsimg,
         curve,
-        beam,
         innerclip,
         outerclip=None,
         offsets=(0, 0),
@@ -344,11 +343,8 @@ class SourceFinder(object):
         curve : 2d-array
           Image of curvature values [-1,0,+1]
 
-        beam : :class:`AegeanTools.fits_image.Beam`
-          The beam information for the image.
-
         innerclip, outerclip : float
-          Inerr and outer level for clipping (sigmas).
+          Inner and outer level for clipping (sigmas).
 
         offsets : (int, int)
           The (x,y) offset of data within it's parent image
@@ -360,7 +356,7 @@ class SourceFinder(object):
 
         Returns
         -------
-        model : lmfit.Parameters
+        model : :class:`lmfit.Parameters`
           The initial estimate of parameters for the components
           within this island.
         """
@@ -387,14 +383,13 @@ class SourceFinder(object):
         # For small islands we can't do a 6 param fit
         # Don't count the NaN values as part of the island
         non_nan_pix = len(data[np.where(np.isfinite(data))].ravel())
-        if 4 <= non_nan_pix <= 6:
-            logger.debug("FIXED2PSF")
-            is_flag |= flags.FIXED2PSF
-        elif non_nan_pix < 4:
+        if non_nan_pix < 4:
             logger.debug("FITERRSMALL!")
             is_flag |= flags.FITERRSMALL
-        else:
-            is_flag = 0
+        elif non_nan_pix <= 6:
+            logger.debug("FIXED2PSF")
+            is_flag |= flags.FIXED2PSF
+
         if debug_on:
             logger.debug(" - size {0}".format(len(data.ravel())))
 
@@ -1617,7 +1612,7 @@ class SourceFinder(object):
         logger.debug("midra middex {0} {1}".format(midra, middec))
 
         try:
-            beam = self.wcshelper.get_psf_sky2pix(midra, middec)
+            self.wcshelper.get_psf_sky2pix(midra, middec)
         except ValueError:
             # This island has no psf or is not 'on' the sky, ignore it
             logger.debug("Beam sky2pix failed. Island has invalid WCS/Beam - Skipping.")
@@ -1696,7 +1691,6 @@ class SourceFinder(object):
             idata,
             rms,
             icurve,
-            beam,
             innerclip,
             outerclip,
             offsets=[xmin, ymin],
