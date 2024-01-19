@@ -169,9 +169,6 @@ class SourceFinder(object):
     region : :class:`AegeanTools.regions.Region`
         The region that will be used to limit the source finding of Aegean.
 
-    pixarea : float
-        The area of a pixel at the phase center of the image
-
     blank : bool
         If true, then the input image will be blanked at the location of each
         of the measured islands.
@@ -201,7 +198,6 @@ class SourceFinder(object):
         self.docov = True
         self.dobias = False
         self.cube_index = 0
-        self.pixarea = None
 
         self.sources = []
 
@@ -996,7 +992,6 @@ class SourceFinder(object):
         self.rmsimg = np.zeros(
             self.img.shape, dtype=self.dtype
         )
-        self.pixarea = wcs_helpers.get_pixinfo(header)[0]
         
         self.cube_index = cube_index
 
