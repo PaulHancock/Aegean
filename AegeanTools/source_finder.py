@@ -1986,9 +1986,6 @@ class SourceFinder(object):
             cube_index=cube_index,
         )
 
-        rmsimg = self.rmsimg
-        data = self.img
-
         logger.info(
             "beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(
                 self.beam.a * 3600,
@@ -2003,9 +2000,9 @@ class SourceFinder(object):
         logger.info("floodclip={0}".format(outerclip))
 
         islands = find_islands(
-            im=data,
-            bkg=np.zeros_like(data),
-            rms=rmsimg,
+            im=self.img,
+            bkg=np.zeros_like(self.img),
+            rms=self.rmsimg,
             seed_clip=innerclip,
             flood_clip=outerclip,
             region=self.region,
@@ -2019,10 +2016,9 @@ class SourceFinder(object):
 
         for island in islands:
             [[xmin, xmax], [ymin, ymax]] = island.bounding_box
-            island_mask = island.mask
 
             i = copy.deepcopy(self.img[xmin:xmax, ymin:ymax])
-            i[island_mask] = np.nan
+            i[island.mask] = np.nan
 
             # ignore empty islands
             # This should now be impossible to trigger
