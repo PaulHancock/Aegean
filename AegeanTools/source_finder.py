@@ -1887,7 +1887,6 @@ class SourceFinder(object):
         blank=False,
         docov=True,
         cube_index=None,
-        progress=False,
     ):
         """
         Run the Aegean source finder.
@@ -1951,9 +1950,6 @@ class SourceFinder(object):
 
         cube_index : int
           For image cubes, cube_index determines which slice is used.
-
-        progress : bool
-          If true then show a progress bar when fitting island groups
 
         Returns
         -------
