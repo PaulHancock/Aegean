@@ -366,7 +366,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
     exit = False
     try:
         global memory_id
-        memory_id = str(uuid.uuid4())
+        memory_id = str(uuid.uuid4())[:24]  # Some python installs on OSX limit filenames to 32 chars
         nbytes = np.prod(shape) * np.float64(1).nbytes
         ibkg = SharedMemory(name=f'ibkg_{memory_id}', create=True, size=nbytes)
         irms = SharedMemory(name=f'irms_{memory_id}', create=True, size=nbytes)
