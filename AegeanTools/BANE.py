@@ -8,6 +8,7 @@ The function filter_image should be imported from elsewhere and run as is.
 import copy
 import multiprocessing
 import os
+import platform
 import sys
 import uuid
 from multiprocessing.shared_memory import SharedMemory
@@ -367,6 +368,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
     try:
         global memory_id
         memory_id = str(uuid.uuid4())
+        if 'Darwin' in platform.system():  # Some python installs on OSX limit filenames to 32 chars
+            memory_id = memory_id[:23]
         nbytes = np.prod(shape) * np.float64(1).nbytes
         ibkg = SharedMemory(name=f'ibkg_{memory_id}', create=True, size=nbytes)
         irms = SharedMemory(name=f'irms_{memory_id}', create=True, size=nbytes)

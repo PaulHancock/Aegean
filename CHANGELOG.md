@@ -1,3 +1,7 @@
+### Jan 23 2024
+BANE
+- Fix bugs #200/#203 which stopped BANE from working on some OSX installs
+
 ### Jan 12 2024
 
 General
