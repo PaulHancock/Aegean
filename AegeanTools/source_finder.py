@@ -1698,19 +1698,20 @@ class SourceFinder(object):
         )
         guessed_params = [params]
 
-        # create another guess which is just one less component
-        n_components = 0
-        if params is not None:
-            n_components = params["components"].value
-        if n_components > 1:
-            less_params = copy.deepcopy(params)
-            prefix = f"c{n_components-1}_"
-            # delete the last component
-            for k in list(less_params.keys()):
-                if prefix in k:
-                    del less_params[k]
-            less_params["components"].value = n_components - 1
-            guessed_params.append(less_params)
+        # POC here which allows for multiple guesses to  be made
+        # # create another guess which is just one less component
+        # n_components = 0
+        # if params is not None:
+        #     n_components = params["components"].value
+        # if n_components > 1:
+        #     less_params = copy.deepcopy(params)
+        #     prefix = f"c{n_components-1}_"
+        #     # delete the last component
+        #     for k in list(less_params.keys()):
+        #         if prefix in k:
+        #             del less_params[k]
+        #     less_params["components"].value = n_components - 1
+        #     guessed_params.append(less_params)
 
         guessed_sources = []
         for params in reversed(guessed_params):
