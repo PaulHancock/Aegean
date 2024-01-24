@@ -98,8 +98,8 @@ def bane_fft(
         Tuple[np.ndarray, np.ndarray]: Mean and RMS of the image
     """
     mean = fft_average(image, kernel, kern_sum)
-    rms = np.sqrt((image - mean) ** 2)
-    avg_rms = fft_average(rms, kernel, kern_sum)
+    rms = (image - mean) ** 2
+    avg_rms = np.sqrt(fft_average(rms, kernel, kern_sum))
     return mean, avg_rms
 
 
