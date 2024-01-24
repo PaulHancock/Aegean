@@ -1,7 +1,10 @@
-### Jan 12 2024
+### Jan 24 2024
 
 General
 - fix_beam.py updated to respect the deprecation of "clobber" keyword (and thus work with more recent versions of astropy)
+- refactored a lot of code to remove shims, confusing renaming of variables, and the passing of unused or not needed data.
+- Migrated build to use `pyproject.toml` instead of `setup.py`
+- Removed most files in `scripts/` as they are now created dynamically at install time.
 
 ### Dec 19 2023
 

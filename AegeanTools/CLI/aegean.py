@@ -46,7 +46,7 @@ def check_projection(filename, options, log=logger):
     return
 
 
-def main(argv=()):
+def main():
     """
     The Aegean source finding program.
     """
@@ -363,10 +363,10 @@ def main(argv=()):
         help="Show citation information.",
     )
 
-    options = parser.parse_args(args=argv)
+    options = parser.parse_args()
 
-    invocation_string = " ".join(argv)
-
+    invocation_string = " ".join(sys.argv)
+    print(sys.argv)
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logger.setLevel(logging_level)

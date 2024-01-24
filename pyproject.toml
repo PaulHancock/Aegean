@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "AegeanTools"
+description = "README.md"
+license = {file = "LICENSE"}
+authors = [{name="Paul Hancock", email="Mr.Paul.Hancock@gmail.com"}]
+dynamic = ["version"]
+requires-python=">=3.8"
+dependencies = [
+    "scipy>=0.16",
+    "tqdm>=4",
+    "numpy>=1.16",
+    "astropy>=2.0",
+    "healpy >=1.10",
+    "lmfit>=0.9.2",
+    "scikit-learn>=0.24.2",
+]
+classifiers=[
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Astronomy",
+    "License :: OSI Approved :: Academic Free License (AFL)",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+]
+keywords=["image processing", "radioastronomy"]
+
+[project.scripts]
+aegean = "AegeanTools.CLI.aegean:main"
+BANE = "AegeanTools.CLI.BANE:main"
+SR6 = "AegeanTools.CLI.SR6:main"
+AeRes = "AegeanTools.CLI.AeRes:main"
+MIMAS = "AegeanTools.CLI.MIMAS:main"
+AeReg = "AegeanTools.CLI.AeReg:main"
+
+[project.urls]
+Repository = "https://github.com/PaulHancock/Aegean"
+Documentation = "http://aegeantools.rtfd.io/"
+Issues = "https://github.com/PaulHancock/Aegean/issues"
+Changelog = "https://github.com/PaulHancock/Aegean/blob/main/CHANGELOG.md"
+
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["AegeanTools*"]
+
+[tool.setuptools.package-data]
+AegeanTools = ["MOC.fits"]

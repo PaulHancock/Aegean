@@ -10,7 +10,7 @@ from AegeanTools.logging import logger, logging
 __author__ = "Paul Hancock"
 
 
-def main(argv=()):
+def main():
     parser = argparse.ArgumentParser(prog="BANE", prefix_chars="-")
     parser.add_argument("image", nargs="?", default=None)
     group1 = parser.add_argument_group("Configuration Options")
@@ -95,7 +95,7 @@ def main(argv=()):
         debug=False,
     )
 
-    options = parser.parse_args(args=argv)
+    options = parser.parse_args()
 
     if options.cite:
         print(__citation__)

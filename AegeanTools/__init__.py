@@ -9,9 +9,9 @@ BANE and MIMAS. The wcs_helpers and angle_tools modules contain many useful
 classes and methods that would be useful more generally.
 
 """
-__author__ = 'Paul Hancock'
-__version__ = '2.3.0'
-__date__ = '2022-11-29'
+__author__ = "Paul Hancock"
+__version__ = "2.3.1"
+__date__ = "2024-01-24"
 __citation__ = r"""
 % If your work makes use of AegeanTools please cite the following papers as
 % appropriate:
