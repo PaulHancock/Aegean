@@ -2,76 +2,109 @@
 
 from AegeanTools.CLI import MIMAS
 import os
+import sys
 
-image_SIN = 'tests/test_files/1904-66_SIN.fits'
-catfile = 'tests/test_files/1904_comp.fits'
-mimfile = 'tests/test_files/1904-66_SIN.mim'
-regfile = 'tests/test_files/ds9.reg'
-maskfile = 'tests/test_files/mask.fits'
-tempfile = 'dlme'
+image_SIN = "tests/test_files/1904-66_SIN.fits"
+catfile = "tests/test_files/1904_comp.fits"
+mimfile = "tests/test_files/1904-66_SIN.mim"
+regfile = "tests/test_files/ds9.reg"
+maskfile = "tests/test_files/mask.fits"
+tempfile = "dlme"
 
 
 def test_help():
+    sys.argv = [""]
     MIMAS.main()
 
 
 def test_citation():
-    MIMAS.main(['--cite'])
+    sys.argv = ["", "--cite"]
+    MIMAS.main()
 
 
 def test_fitsmask():
-    MIMAS.main(['--fitsmask', '', '', ''])
+    sys.argv = ["", "--fitsmask", "", "", ""]
+    MIMAS.main()
 
 
 def test_mim2reg():
-    MIMAS.main(['--mim2reg', mimfile, tempfile])
-    os.remove(tempfile)
+    try:
+        sys.argv = ["", "--mim2reg", mimfile, tempfile]
+        MIMAS.main()
+    finally:
+        os.remove(tempfile)
 
 
 def test_reg2mim():
-    MIMAS.main(['--reg2mim', regfile, tempfile])
-    os.remove(tempfile)
+    try:
+        sys.argv = ["", "--reg2mim", regfile, tempfile]
+        MIMAS.main()
+    finally:
+        os.remove(tempfile)
 
 
 def test_mim2fits():
-    MIMAS.main(['--mim2fits', mimfile, tempfile])
-    os.remove(tempfile)
+    try:
+        sys.argv = ["", "--mim2fits", mimfile, tempfile]
+        MIMAS.main()
+    finally:
+        os.remove(tempfile)
 
 
 def test_area():
-    MIMAS.main(['--area', mimfile])
+    sys.argv = ["", "--area", mimfile]
+    MIMAS.main()
 
 
 def test_intersect():
-    MIMAS.main(['--intersect', mimfile])
-    MIMAS.main(['--intersect', mimfile, '--intersect', mimfile])
-    MIMAS.main(['--intersect', mimfile, '--intersect', mimfile, '-o', tempfile])
-    os.remove(tempfile)
+    try:
+        sys.argv = ["", "--intersect", mimfile]
+        MIMAS.main()
+
+        sys.argv = ["", "--intersect", mimfile, "--intersect", mimfile]
+        MIMAS.main()
+
+        sys.argv = ["", "--intersect", mimfile, "--intersect", mimfile, "-o", tempfile]
+        MIMAS.main()
+    finally:
+        os.remove(tempfile)
 
 
 def test_mask_image():
-    MIMAS.main(['--maskimage', mimfile, image_SIN, tempfile])
-    os.remove(tempfile)
+    try:
+        sys.argv = ["", "--maskimage", mimfile, image_SIN, tempfile]
+        MIMAS.main()
+    finally:
+        os.remove(tempfile)
 
 
 def test_mask_cat():
-    MIMAS.main(['--maskcat', mimfile, catfile, tempfile+'.csv'])
-    os.remove(tempfile+'.csv')
+    try:
+        sys.argv = ["", "--maskcat", mimfile, catfile, tempfile + ".csv"]
+        MIMAS.main()
+    finally:
+        os.remove(tempfile + ".csv")
 
 
 def test_mask2mim():
-    MIMAS.main(['--mask2mim', maskfile, tempfile])
-    os.remove(tempfile)
+    try:
+        sys.argv = ["", "--mask2mim", maskfile, tempfile]
+        MIMAS.main()
+    finally:
+        os.remove(tempfile)
 
 
 def test_make_region():
-    MIMAS.main(['+c', '290', '15', '1', '-g', '-depth', '3', '-o', tempfile])
-    os.remove(tempfile)
+    try:
+        sys.argv = ["", "+c", "290", "15", "1", "-g", "-depth", "3", "-o", tempfile]
+        MIMAS.main()
+    finally:
+        os.remove(tempfile)
 
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
-        if f.startswith('test'):
+        if f.startswith("test"):
             print(f)
             globals()[f]()
