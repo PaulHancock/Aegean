@@ -16,3 +16,4 @@ dist/
 wiki/
 doc/_build/
 .vscode
+env/*
