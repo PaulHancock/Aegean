@@ -9,13 +9,13 @@ catfile = "tests/test_files/1904_comp.fits"
 tempfile = "dlme"
 
 
-def no_test_help():
-    AeRes.main(["--help"])
+def test_help():
+    sys.argv = ["--help"]
+    AeRes.main()
 
 
 def test_nocat():
     try:
-        sys.argv = [""]
         AeRes.main()
 
         sys.argv = ["", "-c", catfile]
