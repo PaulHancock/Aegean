@@ -1,0 +1,4 @@
+include AegeanTools/data/MOC.fits
+include README.md
+include LICENSE
+include CHANGELOG.md
