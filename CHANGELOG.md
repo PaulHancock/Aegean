@@ -1,5 +1,8 @@
 ### Jan 24 2024
 
+BANE
+- Fix bugs #200/#203 which stopped BANE from working on some OSX installs
+
 General
 - fix_beam.py updated to respect the deprecation of "clobber" keyword (and thus work with more recent versions of astropy)
 - refactored a lot of code to remove shims, confusing renaming of variables, and the passing of unused or not needed data.
