@@ -425,63 +425,6 @@ class ComponentSource(SimpleSource):
             return self.source >= other.source
 
 
-class GlobalFittingData(object):
-    """
-    A class to hold the properties associated with an image. [ These were once
-    in the global scope of a monolithic script, hence the name]. (should be)
-    Read-only once created. Used by island fitting subprocesses.
-
-    Attributes
-    ----------
-    img : :class:`AegeanTools.fits_image.FitsImage`
-        Image that is being analysed, aka the input image.
-
-    dcurve : 2d-array
-        Image of +1,0,-1 representing the curvature of the input image.
-
-    rmsimg, bkgimg : 2d-array
-        The noise and background of the input image.
-
-    hdu_header : HDUHeader
-        FITS header for the input image.
-
-    beam : :class:`AegeanTools.wcs_helpers.Beam`
-        The synthesized beam of the input image.
-
-    dtype : {np.float32, np.float64}
-        The data type for the input image. Will be enforced upon writing.
-
-    region : :class:`AegeanTools.regions.Region`
-        The region that will be used to limit the source finding of Aegean.
-
-    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
-        A helper object for WCS operations, created from `hdu_header`.
-
-    blank : bool
-        If true, then the input image will be blanked at the location of each
-        of the measured islands.
-
-    cube_index : int
-        If the image is a cube, use this index into the 3rd axis.
-
-    """
-
-    def __init__(self):
-        self.img = None
-        self.dcurve = None
-        self.rmsimg = None
-        self.bkgimg = None
-        self.header = None
-        self.beam = None
-        self.dtype = None
-        self.region = None
-        self.wcshelper = None
-        self.psfhelper = None
-        self.blank = False
-        self.cube_index = None
-        return
-
-
 class PixelIsland(object):
     """
     An island of pixels within an image or cube
