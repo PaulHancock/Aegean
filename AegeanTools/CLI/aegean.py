@@ -366,7 +366,6 @@ def main():
     options = parser.parse_args()
 
     invocation_string = " ".join(sys.argv)
-    print(sys.argv)
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logger.setLevel(logging_level)
