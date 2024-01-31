@@ -249,7 +249,8 @@ def test_find_and_prior_sources():
         if not (os.path.exists("dlme")):
             raise AssertionError("Failed to create output file")
     finally:
-        os.remove("dlme")
+        if os.path.exists("dlme"):
+            os.remove("dlme")
 
 
 def dont_test_find_and_prior_parallel():
