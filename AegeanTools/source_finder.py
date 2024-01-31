@@ -209,6 +209,7 @@ class SourceFinder(object):
         self.docov = True
         self.dobias = False
         self.cube_index = 0
+        self.cube_fit = False
 
         self.sources = []
 
@@ -887,6 +888,7 @@ class SourceFinder(object):
         blank=False,
         docov=True,
         cube_index=None,
+        cube_fit=False,
     ):
         """
         Populate the global_data object by loading or calculating
@@ -942,8 +944,13 @@ class SourceFinder(object):
         if self.img is not None:
             return
 
+        self.cube_index = cube_index
+        self.cube_fit = cube_fit
         img, header = load_image_band(
-            filename, hdu_index=hdu_index, cube_index=cube_index
+            filename,
+            hdu_index=hdu_index,
+            cube_index=self.cube_index,
+            include_freq=self.cube_fit,
         )
 
         debug = logger.isEnabledFor(logging.DEBUG)
@@ -967,8 +974,6 @@ class SourceFinder(object):
         self.dtype = type(self.img[0][0])
         self.bkgimg = np.zeros(self.img.shape, dtype=self.dtype)
         self.rmsimg = np.zeros(self.img.shape, dtype=self.dtype)
-
-        self.cube_index = cube_index
 
         if do_curve:
             logger.info("Calculating curvature")

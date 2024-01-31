@@ -251,7 +251,9 @@ def write_fits(data, header, file_name):
     return
 
 
-def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0):
+def load_image_band(
+    filename, band=(0, 1), hdu_index=0, cube_index=0, include_freq=False
+):
     """
     Load a subset of an image from a given filename.
     The subset is controlled using the band, which is (this band, total bands)
@@ -263,6 +265,17 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0):
     band : (int, int)
         (this band, total bands)
         Default (0,1)
+
+    hdu_index : int
+        If the file has more than one HDU then use this hdu_index.
+
+    cube_index : int
+        If the file has more than 2 dimensions, then use this index along
+        the third axis to extract the image data.
+
+    include_freq : bool
+        If true, then load 3 axes instead of 2 (overrides 'cube_index')
+        Default false.
 
     returns
     -------
@@ -297,9 +310,12 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0):
         if NAXIS == 2:
             data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
         elif NAXIS == 3:
-            data = a[hdu_index].section[
-                cube_index, row_min:row_max, 0 : header["NAXIS1"]
-            ]
+            if include_freq:
+                data = a[hdu_index].section[:, row_min:row_max, 0 : header["NAXIS1"]]
+            else:
+                data = a[hdu_index].section[
+                    cube_index, row_min:row_max, 0 : header["NAXIS1"]
+                ]
         elif NAXIS == 4:
             data = a[hdu_index].section[
                 0, cube_index, row_min:row_max, 0 : header["NAXIS1"]
