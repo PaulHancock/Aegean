@@ -56,7 +56,14 @@ FWHM2CC = 1 / CC2FHWM
 
 
 def find_islands(
-    im, bkg, rms, seed_clip=5.0, flood_clip=4.0, region=None, wcs=None, log=logger
+    im,
+    bkg,
+    rms,
+    seed_clip=5.0,
+    flood_clip=4.0,
+    region=None,
+    wcs=None,
+    cube_fit=False,
 ):
     """
     This function designed to be run as a stand alone process
@@ -79,8 +86,9 @@ def find_islands(
       If a region is specified then this WCSHelper will be used to map sky->pix
       coordinates. Default = None.
 
-    log : `logging.Logger` or None
-      Deprecated
+    cube_fit : bool
+      Fit across ane image cube (3d).
+      Default False, ignores `cube_index`.
 
     Returns
     -------
@@ -104,50 +112,58 @@ def find_islands(
         logger.debug("There are no pixels above the clipping limit")
         return []
 
-    # segmentation via scipy
-    # structure includes diagonal pixels as single island
-    l, n = label(a, structure=np.ones((3, 3)))
-    f = find_objects(l)
-
-    logger.debug("{1} Found {0} islands total above flood limit".format(n, im.shape))
+    n_slices = 1
+    if cube_fit:
+        n_slices = im.shape[0]
 
     islands = []
-    for i in range(n):
-        xmin, xmax = f[i][0].start, f[i][0].stop
-        ymin, ymax = f[i][1].start, f[i][1].stop
-        # obey seed clip constraint
-        if np.any(snr[xmin:xmax, ymin:ymax] > seed_clip):
-            # obey region constraint
-            if region is not None:
-                y, x = np.where(snr[xmin:xmax, ymin:ymax] >= flood_clip)
-                yx = list(zip(y + ymin, x + xmin))
-                ra, dec = wcs.wcs.wcs_pix2world(yx, 1).transpose()
-                mask = region.sky_within(ra, dec, degin=True)
-                if not np.any(mask):
+    for plane in range(n_slices):
+        # segmentation via scipy
+        # structure includes diagonal pixels as single island
+        structure = np.ones((3, 3))
+
+        l, n = label(a[plane], structure=structure)
+        f = find_objects(l)
+
+        logger.debug("[{1}] Found {0} islands total above flood limit".format(n, plane))
+
+        for i in range(n):
+            xmin, xmax = f[i][0].start, f[i][0].stop
+            ymin, ymax = f[i][1].start, f[i][1].stop
+            # obey seed clip constraint
+            if np.any(snr[plane, xmin:xmax, ymin:ymax] > seed_clip):
+                # obey region constraint
+                if region is not None:
+                    y, x = np.where(snr[plane, xmin:xmax, ymin:ymax] >= flood_clip)
+                    yx = list(zip(y + ymin, x + xmin))
+                    ra, dec = wcs.wcs.wcs_pix2world(yx, 1).transpose()
+                    mask = region.sky_within(ra, dec, degin=True)
+                    if not np.any(mask):
+                        continue
+
+                # copy so that we don't blank the master data
+                data_box = copy.deepcopy(im[plane, xmin:xmax, ymin:ymax])
+
+                # make mask and blank out pixels with below the noise level or
+                # are pixels that are of another island in the FoV
+                island_mask = (snr[plane, xmin:xmax, ymin:ymax] < flood_clip) | (
+                    l[xmin:xmax, ymin:ymax] != i + 1
+                )
+                data_box[island_mask] = np.nan
+
+                # check if there are any pixels left unmasked
+                if not np.any(np.isfinite(data_box)):
+                    # logger.info("{1} Island {0} has no non-masked pixels"
+                    #               .format(i,data.shape))
                     continue
 
-            # copy so that we don't blank the master data
-            data_box = copy.deepcopy(im[xmin:xmax, ymin:ymax])
-
-            # make mask and blank out pixels with below the noise level or
-            # are pixels that are of another island in the FoV
-            island_mask = (snr[xmin:xmax, ymin:ymax] < flood_clip) | (
-                l[xmin:xmax, ymin:ymax] != i + 1
-            )
-            data_box[island_mask] = np.nan
-
-            # check if there are any pixels left unmasked
-            if not np.any(np.isfinite(data_box)):
-                # logger.info("{1} Island {0} has no non-masked pixels"
-                #               .format(i,data.shape))
-                continue
-
-            island = PixelIsland()
-            island.calc_bounding_box(
-                np.array(np.nan_to_num(data_box), dtype=bool), offsets=[xmin, ymin]
-            )
-            island.set_mask(island_mask)
-            islands.append(island)
+                island = PixelIsland(plane=plane)
+                island.calc_bounding_box(
+                    np.array(np.nan_to_num(data_box), dtype=bool),
+                    offsets=[xmin, ymin],
+                )
+                island.set_mask(island_mask)
+                islands.append(island)
 
     return islands
 
@@ -1842,6 +1858,7 @@ class SourceFinder(object):
         blank=False,
         docov=True,
         cube_index=None,
+        cube_fit=False,
         progress=True,
     ):
         """
@@ -1906,6 +1923,11 @@ class SourceFinder(object):
 
         cube_index : int
           For image cubes, cube_index determines which slice is used.
+          Default 0
+
+        cube_fit : bool
+          Fit across ane image cube (3d).
+          Default False, ignores `cube_index`.
 
         progress : bool, Default=True
             Show a progress bar when fitting island groups
@@ -1938,6 +1960,7 @@ class SourceFinder(object):
             blank=blank,
             docov=docov,
             cube_index=cube_index,
+            cube_fit=cube_fit,
         )
 
         logger.info(
@@ -1961,6 +1984,7 @@ class SourceFinder(object):
             flood_clip=outerclip,
             region=self.region,
             wcs=self.wcshelper,
+            cube_fit=self.cube_fit,
         )
         logger.info("Found {0} islands".format(len(islands)))
         logger.info("Begin fitting")
