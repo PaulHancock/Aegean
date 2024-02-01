@@ -1310,8 +1310,8 @@ class SourceFinder(object):
         """
         sources = []
 
-        data = self.img
-        rmsimg = self.rmsimg
+        # self.img
+        # self.rmsimg
 
         for inum, isle in enumerate(group, start=istart):
             logger.debug("-=-")
@@ -1322,7 +1322,7 @@ class SourceFinder(object):
             # set up the parameters for each of the sources within the island
             i = 0
             params = lmfit.Parameters()
-            shape = data.shape
+            shape = self.img.shape[1:]
             xmin, ymin = shape
             xmax = ymax = 0
 
@@ -1348,8 +1348,8 @@ class SourceFinder(object):
                 if (
                     not 0 <= x < shape[0]
                     or not 0 <= y < shape[1]
-                    or not np.isfinite(data[x, y])
-                    or not np.isfinite(rmsimg[x, y])
+                    or not np.isfinite(self.img[0, x, y])
+                    or not np.isfinite(self.rmsimg[0, x, y])
                     or pixbeam is None
                 ):
                     logger.debug(
@@ -1463,7 +1463,7 @@ class SourceFinder(object):
 
             # this .copy() will stop us from modifying the parent region when
             # we later apply our mask.
-            idata = data[int(xmin) : int(xmax), int(ymin) : int(ymax)].copy()
+            idata = self.img[0, int(xmin) : int(xmax), int(ymin) : int(ymax)].copy()
             # now convert these back to indices within the idata region
             # island_mask = np.array([(x-xmin, y-ymin) for x,y in island_mask])
 
@@ -1567,7 +1567,9 @@ class SourceFinder(object):
                     B = Bmatrix(C)
                 else:
                     C = B = None
-                errs = np.nanmax(rmsimg[int(xmin) : int(xmax), int(ymin) : int(ymax)])
+                errs = np.nanmax(
+                    self.rmsimg[0, int(xmin) : int(xmax), int(ymin) : int(ymax)]
+                )
                 result, _ = do_lmfit(idata, params, B=B)
                 model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
 
