@@ -563,6 +563,7 @@ def main():
             blank=options.blank,
             docov=options.docov,
             cube_index=options.slice,
+            cube_fit=options.cube_fit,
             progress=options.progress,
         )
         if options.blank:
