@@ -92,6 +92,14 @@ def main():
         "which will be processed by aegean",
     )
     group1.add_argument(
+        "--cube",
+        dest="cube_fit",
+        default=False,
+        action="store_true",
+        help="If the input data is a cube, then perform source finding in 3d. "
+        "[default: False] EXPERIMENTAL!",
+    )
+    group1.add_argument(
         "--progress",
         default=False,
         action="store_true",
@@ -511,6 +519,7 @@ def main():
             rms=options.rms,
             bkg=options.bkg,
             cube_index=options.slice,
+            cube_fit=options.cube_fit,
         )
         return 0
 
