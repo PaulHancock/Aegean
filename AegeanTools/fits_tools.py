@@ -308,7 +308,10 @@ def load_image_band(
     NAXIS = header["NAXIS"]
     with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
         if NAXIS == 2:
-            data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
+            if include_freq:
+                data = a[hdu_index].section[None, row_min:row_max, 0 : header["NAXIS1"]]
+            else:
+                data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
         elif NAXIS == 3:
             if include_freq:
                 data = a[hdu_index].section[:, row_min:row_max, 0 : header["NAXIS1"]]
@@ -317,9 +320,14 @@ def load_image_band(
                     cube_index, row_min:row_max, 0 : header["NAXIS1"]
                 ]
         elif NAXIS == 4:
-            data = a[hdu_index].section[
-                0, cube_index, row_min:row_max, 0 : header["NAXIS1"]
-            ]
+            if include_freq:
+                data = a[hdu_index].section[
+                    0, 0, cube_index, row_min:row_max, 0 : header["NAXIS1"]
+                ]
+            else:
+                data = a[hdu_index].section[
+                    None, 0, cube_index, row_min:row_max, 0 : header["NAXIS1"]
+                ]
         else:
             raise Exception(f"Too many NAXIS: {NAXIS}>4")
     if "BSCALE" in header:
