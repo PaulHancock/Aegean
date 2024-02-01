@@ -878,7 +878,6 @@ class SourceFinder(object):
         bkgin=None,
         rmsin=None,
         beam=None,
-        verb=False,
         rms=None,
         bkg=None,
         cores=1,
@@ -909,9 +908,6 @@ class SourceFinder(object):
           Beam object representing the synthsized beam.
           Will replace what is in the FITS header.
 
-        verb : bool
-          Verbose. Write extra lines to INFO level log.
-
         rms, bkg : float
           A float that represents a constant rms/bkg levels for the image.
           Default = None, which causes the rms/bkg to be loaded or calculated.
@@ -939,6 +935,10 @@ class SourceFinder(object):
         cube_index : int
           For an image cube, which slice to use.
 
+        cube_fit : bool
+          Fit across ane image cube (3d).
+          Default False, ignores `cube_index`.
+
         """
         # don't reload already loaded data
         if self.img is not None:
@@ -952,8 +952,6 @@ class SourceFinder(object):
             cube_index=self.cube_index,
             include_freq=self.cube_fit,
         )
-
-        debug = logger.isEnabledFor(logging.DEBUG)
 
         if mask is not None:
             # allow users to supply and object instead of a filename
@@ -971,27 +969,31 @@ class SourceFinder(object):
 
         self.img = img
         self.header = header
-        self.dtype = type(self.img[0][0])
+        self.dtype = self.img.dtype
         self.bkgimg = np.zeros(self.img.shape, dtype=self.dtype)
         self.rmsimg = np.zeros(self.img.shape, dtype=self.dtype)
 
         if do_curve:
             logger.info("Calculating curvature")
+            # curvature should only be in spatial coords, not across freq.
+            size = (3, 3)
+            if self.cube_fit:
+                size = (0, 3, 3)
             # calculate curvature but store it as -1,0,+1
             dcurve = np.zeros(self.img.shape, dtype=np.int8)
-            peaks = maximum_filter(self.img, size=3)
-            troughs = minimum_filter(self.img, size=3)
+            peaks = maximum_filter(self.img, size=size)
+            troughs = minimum_filter(self.img, size=size)
             pmask = np.where(self.img == peaks)
             tmask = np.where(self.img == troughs)
             dcurve[pmask] = -1
             dcurve[tmask] = 1
             self.dcurve = dcurve
+            logger.info("Curvature has shape {0}".format(dcurve.shape))
 
         # if either of rms or bkg images are not supplied
         # then calculate them both
         if not (rmsin and bkgin):
-            if verb:
-                logger.info("Calculating background and rms data")
+            logger.info("Calculating background and rms data")
             self._make_bkg_rms(
                 filename=filename,
                 forced_rms=rms,
@@ -1002,22 +1004,18 @@ class SourceFinder(object):
         # replace the calculated images with input versions,
         # if the user has supplied them.
         if bkgin:
-            if verb:
-                logger.info("Loading background data from file {0}".format(bkgin))
+            logger.info("Loading background data from file {0}".format(bkgin))
             self.bkgimg = self._load_aux_image(img, bkgin)
         if rmsin:
-            if verb:
-                logger.info("Loading rms data from file {0}".format(rmsin))
+            logger.info("Loading rms data from file {0}".format(rmsin))
             self.rmsimg = self._load_aux_image(img, rmsin)
 
         # subtract the background image from the data image and save
-        if verb and debug:
-            logger.debug("Data max is {0}".format(np.nanmax(img)))
-            logger.debug("Doing background subtraction")
-        img -= self.bkgimg
-        self.img = img
-        if verb and debug:
-            logger.debug("Data max is {0}".format(np.nanmax(img)))
+        logger.debug("Data max is {0}".format(np.nanmax(img)))
+        logger.debug("Doing background subtraction")
+        self.img -= self.bkgimg
+
+        logger.debug("Data max is {0}".format(np.nanmax(img)))
 
         self.blank = blank
         self.docov = docov
@@ -1043,6 +1041,7 @@ class SourceFinder(object):
         cores=1,
         outbase=None,
         cube_index=None,
+        cube_fit=False,
     ):
         """
         Generate and save the background and RMS maps as FITS files.
@@ -1077,6 +1076,10 @@ class SourceFinder(object):
 
         cube_index : int
           If images are 3d, use this index into the 3rd axis.
+
+        cube_fit : bool
+          Fit across ane image cube (3d).
+          Default False, ignores `cube_index`.
         """
 
         logger.info("Saving background / RMS maps")
@@ -1087,20 +1090,21 @@ class SourceFinder(object):
             bkgin=bkgin,
             rmsin=rmsin,
             beam=beam,
-            verb=True,
             rms=rms,
             bkg=bkg,
             cores=cores,
             do_curve=True,
             cube_index=cube_index,
+            cube_fit=cube_fit,
         )
-        img = self.img
-        bkgimg, rmsimg = self.bkgimg, self.rmsimg
-        curve = np.array(self.dcurve, dtype=bkgimg.dtype)
+        logger.debug(f"self.rmsimg.shape {self.rmsimg.shape}")
+        logger.debug(f"self.bkgimg.shape {self.bkgimg.shape}")
+
+        curve = np.array(self.dcurve, dtype=self.bkgimg.dtype)
         # mask these arrays have the same mask the same as the data
-        mask = np.where(np.isnan(img))
-        bkgimg[mask] = np.NaN
-        rmsimg[mask] = np.NaN
+        mask = np.where(np.isnan(self.img))
+        self.bkgimg[mask] = np.NaN
+        self.rmsimg[mask] = np.NaN
         curve[mask] = np.NaN
 
         # Generate the new FITS files by copying the existing HDU
@@ -1109,16 +1113,11 @@ class SourceFinder(object):
         header = self.header
         # Set the ORIGIN to indicate Aegean made this file
         header["ORIGIN"] = "Aegean {0}-({1})".format(__version__, __date__)
-        for c in [
-            "CRPIX3",
-            "CRPIX4",
-            "CDELT3",
-            "CDELT4",
-            "CRVAL3",
-            "CRVAL4",
-            "CTYPE3",
-            "CTYPE4",
-        ]:
+        # delete some axes that we aren't going to need
+        del_items = ["CRPIX4", "CDELT4", "CRVAL4", "CTYPE4"]
+        if not self.cube_fit:
+            del_items.extend(["CRPIX3", "CDELT3", "CRVAL3", "CTYPE3"])
+        for c in del_items:
             if c in header:
                 del header[c]
 
@@ -1129,16 +1128,16 @@ class SourceFinder(object):
         curve_out = outbase + "_crv.fits"
         snr_out = outbase + "_snr.fits"
 
-        write_fits(bkgimg, header, background_out)
+        write_fits(self.bkgimg, header, background_out)
         logger.info("Wrote {0}".format(background_out))
 
-        write_fits(rmsimg, header, noise_out)
+        write_fits(self.rmsimg, header, noise_out)
         logger.info("Wrote {0}".format(noise_out))
 
         write_fits(curve, header, curve_out)
         logger.info("Wrote {0}".format(curve_out))
 
-        write_fits(img / rmsimg, header, snr_out)
+        write_fits(self.img / self.rmsimg, header, snr_out)
         logger.info("Wrote {0}".format(snr_out))
         return
 
@@ -1155,16 +1154,10 @@ class SourceFinder(object):
         header = self.header
         header["ORIGIN"] = "Aegean {0}-({1})".format(__version__, __date__)
         # delete some axes that we aren't going to need
-        for c in [
-            "CRPIX3",
-            "CRPIX4",
-            "CDELT3",
-            "CDELT4",
-            "CRVAL3",
-            "CRVAL4",
-            "CTYPE3",
-            "CTYPE4",
-        ]:
+        del_items = ["CRPIX4", "CDELT4", "CRVAL4", "CTYPE4"]
+        if not self.cube_fit:
+            del_items.extend(["CRPIX3", "CDELT3", "CRVAL3", "CTYPE3"])
+        for c in del_items:
             if c in header:
                 del header[c]
         write_fits(self.img, header, outname)
@@ -1201,7 +1194,7 @@ class SourceFinder(object):
             logger.info("Forcing bkg = {0}".format(forced_bkg))
             self.bkgimg[:] = forced_bkg
 
-        # If we known both the rms and the bkg then there is nothing to compute
+        # If we know both the rms and the bkg then there is nothing to compute
         if (forced_rms is not None) and (forced_bkg is not None):
             return
 
@@ -1209,6 +1202,9 @@ class SourceFinder(object):
         step_size = get_step_size(self.header)
         box_size = (5 * step_size[0], 5 * step_size[1])
 
+        logger.debug("")
+        # TODO: iterate over each slice and make a new calcualtion when
+        # we are doing cube_fit
         bkg, rms = filter_image(
             im_name=filename,
             out_base=None,
@@ -1217,10 +1213,18 @@ class SourceFinder(object):
             cores=cores,
             cube_index=self.cube_index,
         )
+        # Copy the bkg/rms to all slices of our cube if cube_fit
+        # TODO: compute a new bkg/rms for each slice.
         if forced_rms is None:
-            self.rmsimg = rms
+            if self.cube_fit:
+                self.rmsimg[:] = rms[None, :, :]
+            else:
+                self.rmsimg = rms
         if forced_bkg is None:
-            self.bkgimg = bkg
+            if self.cube_fit:
+                self.bkgimg[:] = bkg[None, :, :]
+            else:
+                self.bkgimg = bkg
 
         return
 
@@ -1926,7 +1930,6 @@ class SourceFinder(object):
             bkgin=bkgin,
             rmsin=rmsin,
             beam=beam,
-            verb=True,
             rms=rms,
             bkg=bkg,
             cores=cores,
@@ -2127,7 +2130,6 @@ class SourceFinder(object):
             bkgin=bkgin,
             rmsin=rmsin,
             beam=beam,
-            verb=True,
             rms=rms,
             bkg=bkg,
             cores=cores,
