@@ -665,7 +665,11 @@ class SourceFinder(object):
         idata = island_data.i
         xmin, xmax, ymin, ymax = island_data.offsets
 
-        box = slice(int(xmin), int(xmax)), slice(int(ymin), int(ymax))
+        box = (
+            slice(island_data.plane, island_data.plane + 1),
+            slice(int(xmin), int(xmax)),
+            slice(int(ymin), int(ymax)),
+        )
         rms = self.rmsimg[box]
         bkg = self.bkgimg[box]
         residual = np.median(result.residual), np.std(result.residual)
@@ -711,10 +715,10 @@ class SourceFinder(object):
             # fluxes
             # the background is taken from background map
             # Clamp the pixel location to the edge of the background map
-            y = max(min(int(round(y_pix - ymin)), bkg.shape[1] - 1), 0)
-            x = max(min(int(round(x_pix - xmin)), bkg.shape[0] - 1), 0)
-            source.background = bkg[x, y]
-            source.local_rms = rms[x, y]
+            y = max(min(int(round(y_pix - ymin)), bkg.shape[2] - 1), 0)
+            x = max(min(int(round(x_pix - xmin)), bkg.shape[1] - 1), 0)
+            source.background = bkg[0, x, y]
+            source.local_rms = rms[0, x, y]
             source.peak_flux = amp
 
             # all params are in degrees
@@ -773,7 +777,7 @@ class SourceFinder(object):
             idx, idy = np.where(abs(idata) - outerclip * rms > 0)
             idx += xmin
             idy += ymin
-            self.img[[idx, idy]] = np.nan
+            self.img[[island_data.plane, idx, idy]] = np.nan
 
         # calculate the integrated island flux if required
         if island_data.doislandflux:
@@ -1650,11 +1654,11 @@ class SourceFinder(object):
         # We need a 1 pix buffer (if available)
         buffx = [
             xmin - max(xmin - 1, 0),
-            min(xmax + 1, self.img.shape[0]) - xmax,
+            min(xmax + 1, self.img.shape[1]) - xmax,
         ]
         buffy = [
             ymin - max(ymin - 1, 0),
-            min(ymax + 1, self.img.shape[1]) - ymax,
+            min(ymax + 1, self.img.shape[2]) - ymax,
         ]
         icurve = np.zeros(
             shape=(
@@ -1666,26 +1670,34 @@ class SourceFinder(object):
         # compute peaks and convert to +/-1
         peaks = maximum_filter(
             self.img[
-                xmin - buffx[0] : xmax + buffx[1], ymin - buffy[0] : ymax + buffy[0]
+                island_data.plane,
+                xmin - buffx[0] : xmax + buffx[1],
+                ymin - buffy[0] : ymax + buffy[0],
             ],
             size=3,
         )
         pmask = np.where(
             peaks
             == self.img[
-                xmin - buffx[0] : xmax + buffx[1], ymin - buffy[0] : ymax + buffy[0]
+                island_data.plane,
+                xmin - buffx[0] : xmax + buffx[1],
+                ymin - buffy[0] : ymax + buffy[0],
             ]
         )
         troughs = minimum_filter(
             self.img[
-                xmin - buffx[0] : xmax + buffx[1], ymin - buffy[0] : ymax + buffy[0]
+                island_data.plane,
+                xmin - buffx[0] : xmax + buffx[1],
+                ymin - buffy[0] : ymax + buffy[0],
             ],
             size=3,
         )
         tmask = np.where(
             troughs
             == self.img[
-                xmin - buffx[0] : xmax + buffx[1], ymin - buffy[0] : ymax + buffy[0]
+                island_data.plane,
+                xmin - buffx[0] : xmax + buffx[1],
+                ymin - buffy[0] : ymax + buffy[0],
             ]
         )
         icurve[pmask] = -1
@@ -1697,7 +1709,7 @@ class SourceFinder(object):
         ]
         del peaks, pmask, troughs, tmask
 
-        rms = rmsimg[xmin:xmax, ymin:ymax]
+        rms = rmsimg[island_data.plane, xmin:xmax, ymin:ymax]
 
         is_flag = 0
         a, b, pa = self.wcshelper.get_psf_pix2pix(
