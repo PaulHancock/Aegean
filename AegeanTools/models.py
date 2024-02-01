@@ -723,11 +723,12 @@ class PixelIsland(object):
         A mask that represents the island within the bounding box.
     """
 
-    def __init__(self):
-        self.dim = 3
-        self.bounding_box = np.zeros((self.dim, 2), dtype=int)
+    def __init__(self, dim=2, plane=0):
+        self.dim = dim
+        self.bounding_box = np.zeros((self.dim, 2), dtype=np.int32)
         self.mask = None
         self.partial = False
+        self.plane = plane
         return
 
     def set_mask(self, data):
@@ -757,7 +758,7 @@ class PixelIsland(object):
         data : np.ndarray
             Data array with dimension equal to self.dim
 
-        offsets : [xmin, ymin, fmin,...]
+        offsets : [xmin, ymin, ...]
             The offset between the image zero index and the zero index of data.
             len(offsets)==dim
         """
@@ -769,22 +770,15 @@ class PixelIsland(object):
             )
         # TODO: Figure out 3d boxes
         # set the bounding box one dimension at a time
-        ndplane = np.any(data, axis=0)
-        pmin, pmax = np.where(ndplane)[0][[0, -1]]
-        self.bounding_box[2][0] = offsets[2] + pmin
-        self.bounding_box[2][1] = offsets[2] + pmax + 1
-
-        ndrow = np.any(data, axis=1)
+        ndrow = np.any(data, axis=0)
         rmin, rmax = np.where(ndrow)[0][[0, -1]]
         self.bounding_box[1][0] = offsets[1] + rmin
         self.bounding_box[1][1] = offsets[1] + rmax + 1
-
         ndcol = np.any(data, axis=1)
         cmin, cmax = np.where(ndcol)[0][[0, -1]]
         self.bounding_box[0][0] = offsets[0] + cmin
         self.bounding_box[0][1] = offsets[0] + cmax + 1
-
-        self.set_mask(data[pmin : pmax + 1, rmin : rmax + 1, cmin : cmax + 1])
+        self.set_mask(data[rmin : rmax + 1, cmin : cmax + 1])
         return
 
 
