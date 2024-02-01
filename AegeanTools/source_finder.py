@@ -1995,7 +1995,7 @@ class SourceFinder(object):
         for island in islands:
             [[xmin, xmax], [ymin, ymax]] = island.bounding_box
 
-            i = copy.deepcopy(self.img[xmin:xmax, ymin:ymax])
+            i = copy.deepcopy(self.img[island.plane, xmin:xmax, ymin:ymax])
             i[island.mask] = np.nan
 
             # ignore empty islands
@@ -2006,7 +2006,9 @@ class SourceFinder(object):
             isle_num += 1
             scalars = (innerclip, outerclip, max_summits)
             offsets = (xmin, xmax, ymin, ymax)
-            island_data = IslandFittingData(isle_num, i, scalars, offsets, doislandflux)
+            island_data = IslandFittingData(
+                isle_num, i, scalars, offsets, doislandflux, island.plane
+            )
             island_group.append(island_data)
 
         # now fit all the islands

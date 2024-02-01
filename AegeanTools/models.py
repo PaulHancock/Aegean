@@ -805,16 +805,26 @@ class IslandFittingData(object):
 
     doislandflux : boolean
         If true then also measure properties of the island.
+
+    plane: int
+        The image plane index (freq axis) for this island.
     """
 
     def __init__(
-        self, isle_num=0, i=None, scalars=None, offsets=(0, 0, 1, 1), doislandflux=False
+        self,
+        isle_num=0,
+        i=None,
+        scalars=None,
+        offsets=(0, 0, 1, 1),
+        doislandflux=False,
+        plane=0,
     ):
         self.isle_num = isle_num
         self.i = i
         self.scalars = scalars
         self.offsets = offsets
         self.doislandflux = doislandflux
+        self.plane = plane
 
 
 class DummyLM(object):
