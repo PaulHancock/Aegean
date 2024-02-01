@@ -121,7 +121,8 @@ def find_islands(
         # segmentation via scipy
         # structure includes diagonal pixels as single island
         structure = np.ones((3, 3))
-
+        logger.debug(f"structure {structure}")
+        logger.debug(f"a.shape {a.shape}")
         l, n = label(a[plane], structure=structure)
         f = find_objects(l)
 
@@ -774,16 +775,24 @@ class SourceFinder(object):
 
         if self.blank:
             outerclip = island_data.scalars[1]
-            idx, idy = np.where(abs(idata) - outerclip * rms > 0)
+            logger.info(f"rms.shape {rms.shape}")
+            logger.info(f"idata.shape {idata.shape}")
+            idx, idy = np.where(
+                abs(idata) - outerclip * rms[island_data.plane, :, :] > 0
+            )
+            logger.info(f"idx {idx}")
+            logger.info(f"idy {idy}")
             idx += xmin
             idy += ymin
-            self.img[[island_data.plane, idx, idy]] = np.nan
+            self.img[island_data.plane, [idx, idy]] = np.nan
 
         # calculate the integrated island flux if required
         if island_data.doislandflux:
             _, outerclip, _ = island_data.scalars
             logger.debug("Integrated flux for island {0}".format(isle_num))
-            kappa_sigma = np.where(abs(idata) - outerclip * rms > 0, idata, np.NaN)
+            kappa_sigma = np.where(
+                abs(idata) - outerclip * rms[island_data.plane, :, :] > 0, idata, np.NaN
+            )
             logger.debug("- island shape is {0}".format(kappa_sigma.shape))
 
             source = IslandSource()
@@ -813,8 +822,8 @@ class SourceFinder(object):
             source.dec = radec[1]
             source.ra_str = dec2hms(source.ra)
             source.dec_str = dec2dms(source.dec)
-            source.background = bkg[positions[0][0], positions[1][0]]
-            source.local_rms = rms[positions[0][0], positions[1][0]]
+            source.background = bkg[island_data.plane, positions[0][0], positions[1][0]]
+            source.local_rms = rms[island_data.plane, positions[0][0], positions[1][0]]
             source.x_width, source.y_width = idata.shape
             source.pixels = int(sum(np.isfinite(kappa_sigma).ravel() * 1.0))
             source.extent = [xmin, xmax, ymin, ymax]
@@ -970,7 +979,7 @@ class SourceFinder(object):
             filename,
             hdu_index=hdu_index,
             cube_index=self.cube_index,
-            include_freq=self.cube_fit,
+            include_freq=True,  # self.cube_fit,
         )
 
         if mask is not None:
@@ -996,9 +1005,7 @@ class SourceFinder(object):
         if do_curve:
             logger.info("Calculating curvature")
             # curvature should only be in spatial coords, not across freq.
-            size = (3, 3)
-            if self.cube_fit:
-                size = (0, 3, 3)
+            size = (0, 3, 3)
             # calculate curvature but store it as -1,0,+1
             dcurve = np.zeros(self.img.shape, dtype=np.int8)
             peaks = maximum_filter(self.img, size=size)
@@ -1222,7 +1229,6 @@ class SourceFinder(object):
         step_size = get_step_size(self.header)
         box_size = (5 * step_size[0], 5 * step_size[1])
 
-        logger.debug("")
         # TODO: iterate over each slice and make a new calcualtion when
         # we are doing cube_fit
         bkg, rms = filter_image(
@@ -1236,15 +1242,9 @@ class SourceFinder(object):
         # Copy the bkg/rms to all slices of our cube if cube_fit
         # TODO: compute a new bkg/rms for each slice.
         if forced_rms is None:
-            if self.cube_fit:
-                self.rmsimg[:] = rms[None, :, :]
-            else:
-                self.rmsimg = rms
+            self.rmsimg[:] = rms[None, :, :]
         if forced_bkg is None:
-            if self.cube_fit:
-                self.bkgimg[:] = bkg[None, :, :]
-            else:
-                self.bkgimg = bkg
+            self.bkgimg[:] = bkg[None, :, :]
 
         return
 
@@ -1267,7 +1267,7 @@ class SourceFinder(object):
           The loaded image.
         """
 
-        auximg, _ = load_image_band(auxfile)
+        auximg, _ = load_image_band(auxfile, include_freq=True)
 
         if auximg.shape != image.shape:
             logger.error(
@@ -1619,10 +1619,6 @@ class SourceFinder(object):
           The sources that were fit.
         """
 
-        # global data
-        # dcurve = self.dcurve
-        rmsimg = self.rmsimg
-
         # island data
         isle_num = island_data.isle_num
         idata = island_data.i
@@ -1709,7 +1705,7 @@ class SourceFinder(object):
         ]
         del peaks, pmask, troughs, tmask
 
-        rms = rmsimg[island_data.plane, xmin:xmax, ymin:ymax]
+        rms = self.rmsimg[island_data.plane, xmin:xmax, ymin:ymax]
 
         is_flag = 0
         a, b, pa = self.wcshelper.get_psf_pix2pix(

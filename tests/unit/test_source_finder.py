@@ -98,9 +98,9 @@ def test__make_bkg_rms():
     sfinder.load_globals(filename)
 
     # check that we don't make mistake #163 again.
-    if not np.all(sfinder.rmsimg[50:55, 50:55] > 0):
+    if not np.all(sfinder.rmsimg[0, 50:55, 50:55] > 0):
         raise AssertionError("RMS map is not positive in the middle")
-    if not np.any(sfinder.bkgimg[50:55, 50:55] != 0):
+    if not np.any(sfinder.bkgimg[0, 50:55, 50:55] != 0):
         raise AssertionError("BKG map is all zero in the middle")
 
 
@@ -407,7 +407,7 @@ def test_island_contours():
 
 
 def test_find_islands():
-    im = np.ones((10, 12), dtype=np.float32)
+    im = np.ones((1, 10, 12), dtype=np.float32)
     bkg = np.zeros_like(im)
     rms = np.ones_like(im)
 
@@ -417,13 +417,13 @@ def test_find_islands():
         return AssertionError("Found islands where none existed")
 
     # now set just one island
-    im[3:6, 4:7] *= 10
+    im[0, 3:6, 4:7] *= 10
     # and have some pixels masked or below the clipping threshold
-    im[6, 5] = np.nan
-    im[4, 4] = 0
+    im[0, 6, 5] = np.nan
+    im[0, 4, 4] = 0
     # make the border nans
-    im[0:3, :] = im[-1:, :] = np.nan
-    im[:, 0] = im[:, -1] = np.nan
+    im[0, 0:3, :] = im[0, -1:, :] = np.nan
+    im[0, :, 0] = im[0, :, -1] = np.nan
 
     islands = sf.find_islands(im, bkg, rms)
 
@@ -445,7 +445,7 @@ def test_find_islands():
         )
 
     # add another island that is between the seed/flood thresholds
-    im[7:9, 2:5] = 4.5
+    im[0, 7:9, 2:5] = 4.5
     islands = sf.find_islands(im, bkg, rms)
     if len(islands) != 1:
         raise AssertionError(

@@ -302,16 +302,15 @@ def load_image_band(
     row_max = int(header["NAXIS2"] / band[1] * (band[0] + 1))
 
     if compressed:
-        return hdulist[0].data[row_min:row_max, :], header
+        return hdulist[0].data[None, row_min:row_max, :], header
 
     # Figure out how many axes are in the datafile
     NAXIS = header["NAXIS"]
     with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
         if NAXIS == 2:
+            data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
             if include_freq:
-                data = a[hdu_index].section[None, row_min:row_max, 0 : header["NAXIS1"]]
-            else:
-                data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
+                data = np.array(data[None, :, :])
         elif NAXIS == 3:
             if include_freq:
                 data = a[hdu_index].section[:, row_min:row_max, 0 : header["NAXIS1"]]
@@ -322,14 +321,15 @@ def load_image_band(
         elif NAXIS == 4:
             if include_freq:
                 data = a[hdu_index].section[
-                    0, 0, cube_index, row_min:row_max, 0 : header["NAXIS1"]
+                    0, 0, :, row_min:row_max, 0 : header["NAXIS1"]
                 ]
             else:
                 data = a[hdu_index].section[
-                    None, 0, cube_index, row_min:row_max, 0 : header["NAXIS1"]
+                    0, 0, cube_index, row_min:row_max, 0 : header["NAXIS1"]
                 ]
         else:
             raise Exception(f"Too many NAXIS: {NAXIS}>4")
+
     if "BSCALE" in header:
         data *= header["BSCALE"]
     # adjust the header to match the data shape
