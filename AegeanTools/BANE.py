@@ -371,7 +371,9 @@ def filter_mc_sharemem(
     try:
         global memory_id
         memory_id = str(uuid.uuid4())
-        if 'Darwin' in platform.system():  # Some python installs on OSX limit filenames to 32 chars
+        if (
+            "Darwin" in platform.system()
+        ):  # Some python installs on OSX limit filenames to 32 chars
             memory_id = memory_id[:23]
         nbytes = np.prod(shape) * np.float64(1).nbytes
         ibkg = SharedMemory(name=f"ibkg_{memory_id}", create=True, size=nbytes)
@@ -422,7 +424,6 @@ def filter_image(
     out_base,
     step_size=None,
     box_size=None,
-    twopass=False,  # Deprecated
     cores=None,
     mask=True,
     compressed=False,
@@ -447,10 +448,6 @@ def filter_image(
 
     box_size : (int,int)
         The size of the box in pixels
-
-    twopass : bool
-        Perform a second pass calculation to ensure that the noise is not
-        contaminated by the background. Default = False. DEPRECATED
 
     cores : int
         Number of CPU corse to use. Default = all available
