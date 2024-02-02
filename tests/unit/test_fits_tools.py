@@ -167,10 +167,40 @@ def test_load_image_band_multi_bands():
 
 
 def test_load_image_band_cube_index():
+    file_3d = "tests/test_files/1904-66_SIN_3d.fits"
+    for cube_index in [0, 1]:
+        data, header = fits_tools.load_image_band(file_3d, cube_index=cube_index)
+        if not isinstance(data, np.ndarray):
+            raise AssertionError(
+                "Loaded data is not an np.ndarray object, cube_index={0}".format(
+                    cube_index
+                )
+            )
+        if not isinstance(header, fits.Header):
+            raise AssertionError(
+                "header is not a fits.hdu.Header object, cube_index={0}".format(
+                    cube_index
+                )
+            )
+
     return
 
 
 def test_load_image_band_hdu_index():
+    multi_hdu = "tests/test_files/1904-66_SIN_multiHDU.fits"
+    for hdu_index in [0, 1]:
+        data, header = fits_tools.load_image_band(multi_hdu, hdu_index=hdu_index)
+        if not isinstance(data, np.ndarray):
+            raise AssertionError(
+                "Loaded data is not an np.ndarray object hdu_index={0}".format(
+                    hdu_index
+                )
+            )
+        if not isinstance(header, fits.Header):
+            raise AssertionError(
+                "header is not a fits.hdu.Header object hdu_index={0}".format(hdu_index)
+            )
+
     return
 
 
