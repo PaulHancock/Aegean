@@ -171,7 +171,6 @@ def find_islands(
 
 
 class SourceFinder:
-class SourceFinder:
     """
     The Aegean source finding algorithm
 
@@ -508,12 +507,7 @@ class SourceFinder:
                 )
             )
             if snr < innerclip:
-                logger.debug(
-                    "Summit has SNR {} < innerclip {}: skipping".format(
-                    "Summit has SNR {} < innerclip {}: skipping".format(
-                        snr, innerclip
-                    )
-                )
+                logger.debug("Summit has SNR {snr} < innerclip {innerclip}: skipping")
                 continue
 
             # allow amp to be 5% or (innerclip) sigma higher
@@ -595,12 +589,10 @@ class SourceFinder:
                 logger.debug(f" - yo {yo} {yo_min} {yo_max} ")
                 logger.debug(
                     " - sx {} {} {} | {} {}".format(
-                    " - sx {} {} {} | {} {}".format(
                         sx, sx_min, sx_max, sx_min * CC2FHWM, sx_max * CC2FHWM
                     )
                 )
                 logger.debug(
-                    " - sy {} {} {} | {} {}".format(
                     " - sy {} {} {} | {} {}".format(
                         sy, sy_min, sy_max, sy_min * CC2FHWM, sy_max * CC2FHWM
                     )
@@ -803,9 +795,7 @@ class SourceFinder:
             outerclip = island_data.scalars[1]
             logger.info(f"rms.shape {rms.shape}")
             logger.info(f"idata.shape {idata.shape}")
-            idx, idy = np.where(
-                abs(idata) - outerclip * rms[0, :, :] > 0
-            )
+            idx, idy = np.where(abs(idata) - outerclip * rms[0, :, :] > 0)
             logger.info(f"idx {idx}")
             logger.info(f"idy {idy}")
             idx += xmin
@@ -894,7 +884,6 @@ class SourceFinder:
                         ]
 
             logger.debug(
-                "- peak position {}, {} [{},{}]".format(
                 "- peak position {}, {} [{},{}]".format(
                     source.ra_str, source.dec_str, positions[0][0], positions[1][0]
                 )
@@ -1408,10 +1397,7 @@ class SourceFinder:
                     or pixbeam is None
                 ):
                     logger.debug(
-                        "Source ({},{}) not within usable region: skipping".format(
-                        "Source ({},{}) not within usable region: skipping".format(
-                            src.island, src.source
-                        )
+                        "Source ({src.island},{src.source}) not within usable region: skipping"
                     )
                     continue
                 else:
@@ -1427,12 +1413,10 @@ class SourceFinder:
 
                 logger.debug(
                     "Source shape [sky coords]  {:5.2f}x{:5.2f}@{:05.2f}".format(
-                    "Source shape [sky coords]  {:5.2f}x{:5.2f}@{:05.2f}".format(
                         src.a, src.b, src.pa
                     )
                 )
                 logger.debug(
-                    "Source shape [pixel coords] {:4.2f}x{:4.2f}@{:05.2f}".format(
                     "Source shape [pixel coords] {:4.2f}x{:4.2f}@{:05.2f}".format(
                         sx, sy, theta
                     )
@@ -1556,7 +1540,6 @@ class SourceFinder:
             logger.debug(f" max = {np.nanmax(idata)}")
             logger.debug(
                 " total {}, masked {}, not masked {}".format(
-                " total {}, masked {}, not masked {}".format(
                     total_pix, total_pix - non_nan_pix, non_nan_pix
                 )
             )
@@ -1604,7 +1587,6 @@ class SourceFinder:
             else:
                 if non_nan_pix < nfree:
                     logger.debug(
-                        "More free parameters {} than available pixels {}".format(
                         "More free parameters {} than available pixels {}".format(
                             nfree, non_nan_pix
                         )
@@ -1868,7 +1850,6 @@ class SourceFinder:
                     C = B = None
                 logger.debug(
                     "C({},{},{},{},{})".format(
-                    "C({},{},{},{},{})".format(
                         len(mx),
                         len(my),
                         pixbeam.a * FWHM2CC,
@@ -2050,7 +2031,6 @@ class SourceFinder:
         )
 
         logger.info(
-            "beam = {:5.2f}'' x {:5.2f}'' at {:5.2f}deg".format(
             "beam = {:5.2f}'' x {:5.2f}'' at {:5.2f}deg".format(
                 self.beam.a * 3600,
                 self.beam.b * 3600,
