@@ -778,7 +778,7 @@ class SourceFinder(object):
             logger.info(f"rms.shape {rms.shape}")
             logger.info(f"idata.shape {idata.shape}")
             idx, idy = np.where(
-                abs(idata) - outerclip * rms[island_data.plane, :, :] > 0
+                abs(idata) - outerclip * rms[0, :, :] > 0
             )
             logger.info(f"idx {idx}")
             logger.info(f"idy {idy}")
@@ -791,7 +791,7 @@ class SourceFinder(object):
             _, outerclip, _ = island_data.scalars
             logger.debug("Integrated flux for island {0}".format(isle_num))
             kappa_sigma = np.where(
-                abs(idata) - outerclip * rms[island_data.plane, :, :] > 0, idata, np.NaN
+                abs(idata) - outerclip * rms[0, :, :] > 0, idata, np.NaN
             )
             logger.debug("- island shape is {0}".format(kappa_sigma.shape))
 
@@ -822,8 +822,8 @@ class SourceFinder(object):
             source.dec = radec[1]
             source.ra_str = dec2hms(source.ra)
             source.dec_str = dec2dms(source.dec)
-            source.background = bkg[island_data.plane, positions[0][0], positions[1][0]]
-            source.local_rms = rms[island_data.plane, positions[0][0], positions[1][0]]
+            source.background = bkg[0, positions[0][0], positions[1][0]]
+            source.local_rms = rms[0, positions[0][0], positions[1][0]]
             source.x_width, source.y_width = idata.shape
             source.pixels = int(sum(np.isfinite(kappa_sigma).ravel() * 1.0))
             source.extent = [xmin, xmax, ymin, ymax]

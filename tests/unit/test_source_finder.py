@@ -502,6 +502,30 @@ def test_load_compressed_aux_files():
     return
 
 
+def test_sf_on_cube():
+    filename = "tests/test_files/synthetic_with_alpha.fits"
+    sfinder = sf.SourceFinder()
+    nsrc = 8
+    nisl = 8
+    ntot = nsrc + nisl
+
+    # vanilla source finding
+    found = sfinder.find_sources_in_image(filename, cores=1, cube_fit=True)
+    if not (len(found) == nsrc):
+        raise AssertionError(
+            f"Vanilla cube source finding: wrong number of sources {len(found)}, expecting {nsrc}"
+        )
+
+    # source finding with islands
+    found = sfinder.find_sources_in_image(
+        filename, cores=1, cube_fit=True, doislandflux=True
+    )
+    if not (len(found) == ntot):
+        raise AssertionError(
+            f"Vanilla cube source finding: wrong total sources {len(found)}, expecting {nsrc}"
+        )
+
+
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
