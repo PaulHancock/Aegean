@@ -205,7 +205,7 @@ def test_combine_regions():
     r1.save(file1)
     r1.save(file2)
 
-    class Ob(object):
+    class Ob:
         pass
 
     c = Ob()

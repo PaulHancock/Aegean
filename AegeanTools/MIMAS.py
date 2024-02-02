@@ -166,11 +166,11 @@ def mask_file(regionfile, infile, outfile, negate=False):
     """
     # Check that the input file is accessible and then open it
     if not os.path.exists(infile):
-        raise AssertionError("Cannot locate fits file {0}".format(infile))
+        raise AssertionError(f"Cannot locate fits file {infile}")
     im = pyfits.open(infile)
     if not os.path.exists(regionfile):
         raise AssertionError(
-            "Cannot locate region file {0}".format(regionfile))
+            f"Cannot locate region file {regionfile}")
     region = Region.load(regionfile)
     try:
         wcs = pywcs.WCS(im[0].header, naxis=2)
@@ -190,7 +190,7 @@ def mask_file(regionfile, infile, outfile, negate=False):
         mask_plane(data, wcs, region, negate)
     im[0].data = data
     im.writeto(outfile, overwrite=True)
-    logger.info("Wrote {0}".format(outfile))
+    logger.info(f"Wrote {outfile}")
     return
 
 
@@ -263,9 +263,9 @@ def mask_catalog(regionfile, infile, outfile,
 
     :func:`AegeanTools.catalogs.load_table`
     """
-    logger.info("Loading region from {0}".format(regionfile))
+    logger.info(f"Loading region from {regionfile}")
     region = Region.load(regionfile)
-    logger.info("Loading catalog from {0}".format(infile))
+    logger.info(f"Loading catalog from {infile}")
     table = load_table(infile)
     masked_table = mask_table(
         region, table, negate=negate, racol=racol, deccol=deccol)
@@ -288,7 +288,7 @@ def mim2reg(mimfile, regfile):
     """
     region = Region.load(mimfile)
     region.write_reg(regfile)
-    logger.info("Converted {0} -> {1}".format(mimfile, regfile))
+    logger.info(f"Converted {mimfile} -> {regfile}")
     return
 
 
@@ -306,8 +306,8 @@ def mim2fits(mimfile, fitsfile):
     """
     region = Region.load(mimfile)
     region.write_fits(
-        fitsfile, moctool='MIMAS {0}-{1}'.format(__version__, __date__))
-    logger.info("Converted {0} -> {1}".format(mimfile, fitsfile))
+        fitsfile, moctool=f'MIMAS {__version__}-{__date__}')
+    logger.info(f"Converted {mimfile} -> {fitsfile}")
     return
 
 
@@ -347,7 +347,7 @@ def mask2mim(maskfile, mimfile, threshold=1.0, maxdepth=8):
     region.add_pixels(pix, depth=maxdepth)
     region._renorm()
     save_region(region, mimfile)
-    logger.info("Converted {0} -> {1}".format(maskfile, mimfile))
+    logger.info(f"Converted {maskfile} -> {mimfile}")
     return
 
 
@@ -366,7 +366,7 @@ def box2poly(line):
     poly : [ra, dec, ...]
         The corners of the box in clockwise order from top left.
     """
-    words = re.split('[(\s,)]', line)
+    words = re.split(r'[(\s,)]', line)
     ra = words[1]
     dec = words[2]
     width = words[3]
@@ -400,7 +400,7 @@ def circle2circle(line):
     circle : [ra, dec, radius]
         The center and radius of the circle.
     """
-    words = re.split('[(,\s)]', line)
+    words = re.split(r'[(,\s)]', line)
     ra = words[1]
     dec = words[2]
     radius = words[3][:-1]  # strip the "
@@ -430,7 +430,7 @@ def poly2poly(line):
     poly : [ra, dec, ...]
         The coordinates of the polygon.
     """
-    words = re.split('[(\s,)]', line)
+    words = re.split(r'[(\s,)]', line)
     ras = np.array(words[1::2])
     decs = np.array(words[2::2])
     coords = []
@@ -462,8 +462,8 @@ def reg2mim(regfile, mimfile, maxdepth):
         Depth/resolution of the region file.
 
     """
-    logger.info("Reading regions from {0}".format(regfile))
-    lines = (ln for ln in open(regfile, 'r') if not ln.startswith('#'))
+    logger.info(f"Reading regions from {regfile}")
+    lines = (ln for ln in open(regfile) if not ln.startswith('#'))
     poly = []
     circles = []
     for line in lines:
@@ -476,7 +476,7 @@ def reg2mim(regfile, mimfile, maxdepth):
                 "Polygons break a lot, but I'll try this one anyway.")
             poly.append(poly2poly(line))
         else:
-            logger.warning("Not sure what to do with {0}".format(line[:-1]))
+            logger.warning(f"Not sure what to do with {line[:-1]}")
     container = Dummy(maxdepth=maxdepth)
     container.include_circles = circles
     container.include_polygons = poly
@@ -510,12 +510,12 @@ def combine_regions(container):
 
     # add/rem all the regions from files
     for r in container.add_region:
-        logger.info("adding region from {0}".format(r))
+        logger.info(f"adding region from {r}")
         r2 = Region.load(r[0])
         region.union(r2)
 
     for r in container.rem_region:
-        logger.info("removing region from {0}".format(r))
+        logger.info(f"removing region from {r}")
         r2 = Region.load(r[0])
         region.without(r2)
 
@@ -598,5 +598,5 @@ def save_region(region, filename):
         Output file name.
     """
     region.save(filename)
-    logger.info("Wrote {0}".format(filename))
+    logger.info(f"Wrote {filename}")
     return

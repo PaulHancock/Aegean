@@ -94,7 +94,7 @@ def sigmaclip(arr, lo, hi, reps=10):
         mean = np.mean(clipped)
         prev_valid = curr_valid
     else:
-        logger.debug("No stopping criteria was reached after {0} cycles".format(count))
+        logger.debug(f"No stopping criteria was reached after {count} cycles")
 
     return mean, std
 
@@ -159,7 +159,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
 
     ymin, ymax = region
     logger.debug(
-        "rows {0}-{1} starting at {2}".format(
+        "rows {}-{} starting at {}".format(
             ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())
         )
     )
@@ -186,7 +186,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
                 a[0].section[0, cube_index, data_row_min:data_row_max, 0 : shape[1]]
             )
         else:
-            logger.error("Too many NAXIS for me {0}".format(NAXIS))
+            logger.error(f"Too many NAXIS for me {NAXIS}")
             logger.error("fix your file to be more sane")
             raise Exception("Too many NAXIS")
 
@@ -200,8 +200,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
 
     # row_len = shape[1]
 
-    logger.debug("data size is {0}".format(data.shape))
-    logger.debug("data format is {0}".format(data.dtype))
+    logger.debug(f"data size is {data.shape}")
+    logger.debug(f"data format is {data.dtype}")
 
     def box(r, c):
         """
@@ -290,7 +290,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
         irms[ymin:ymax, :][mask] = np.nan
         logger.debug("... done applying mask")
     logger.debug(
-        "rows {0}-{1} finished at {2}".format(
+        "rows {}-{} finished at {}".format(
             ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())
         )
     )
@@ -345,8 +345,8 @@ def filter_mc_sharemem(
 
     img_y, img_x = shape
 
-    logger.info("using {0} cores".format(cores))
-    logger.info("using {0} stripes".format(nslice))
+    logger.info(f"using {cores} cores")
+    logger.info(f"using {nslice} stripes")
 
     if nslice > 1:
         # box widths should be multiples of the step_size, and not zero
@@ -360,8 +360,8 @@ def filter_mc_sharemem(
         ymins = [0]
         ymaxs = [img_y]
 
-    logger.debug("ymins {0}".format(ymins))
-    logger.debug("ymaxs {0}".format(ymaxs))
+    logger.debug(f"ymins {ymins}")
+    logger.debug(f"ymaxs {ymaxs}")
 
     args = []
     for region in zip(ymins, ymaxs):
@@ -484,7 +484,7 @@ def filter_image(
         naxis3 = header["NAXIS3"]
         if cube_index >= naxis3:
             logger.error(
-                "3rd dimension has len {0} but index {1} was passed".format(
+                "3rd dimension has len {} but index {} was passed".format(
                     naxis3, cube_index
                 )
             )
@@ -501,13 +501,13 @@ def filter_image(
         if not step_size[0] == step_size[1]:
             step_size = (min(step_size), min(step_size))
             logger.info(
-                "Changing grid to be {0} so we can compress the output".format(
+                "Changing grid to be {} so we can compress the output".format(
                     step_size
                 )
             )
 
-    logger.info("using grid_size {0}, box_size {1}".format(step_size, box_size))
-    logger.info("on data shape {0}".format(shape))
+    logger.info(f"using grid_size {step_size}, box_size {box_size}")
+    logger.info(f"on data shape {shape}")
     bkg, rms = filter_mc_sharemem(
         im_name,
         step_size=step_size,
@@ -522,7 +522,7 @@ def filter_image(
 
     if out_base is not None:
         # add a comment to the fits header
-        header["HISTORY"] = "BANE {0}-({1})".format(__version__, __date__)
+        header["HISTORY"] = f"BANE {__version__}-({__date__})"
 
         bkg_out = "_".join([os.path.expanduser(out_base), "bkg.fits"])
         rms_out = "_".join([os.path.expanduser(out_base), "rms.fits"])
@@ -618,5 +618,5 @@ def write_fits(data, header, file_name):
     hdu.header = header
     hdulist = fits.HDUList([hdu])
     hdulist.writeto(file_name, overwrite=True)
-    logger.info("Wrote {0}".format(file_name))
+    logger.info(f"Wrote {file_name}")
     return

@@ -96,7 +96,7 @@ def test_slice():
         for index in [0, 1, 2]:
             BANE.filter_image(fname, out_base=None, nslice=1, cube_index=0)
     except Exception as e:
-        raise AssertionError("Error on cube_index {0}:\n{1}".format(index, e))
+        raise AssertionError(f"Error on cube_index {index}:\n{e}")
 
     # die niecely when using an invalid cube_index
     try:
@@ -123,10 +123,10 @@ def test_quantitative():
     os.remove(rms)
     os.remove(bkg)
     if not np.allclose(r1, r2, atol=0.01, equal_nan=True):
-        raise AssertionError("rms is wrong {0}".format(np.nanmax(np.abs(r1 - r2))))
+        raise AssertionError(f"rms is wrong {np.nanmax(np.abs(r1 - r2))}")
 
     if not np.allclose(b1, b2, atol=0.01, equal_nan=True):
-        raise AssertionError("bkg is wrong {0}".format(np.nanmax(np.abs(b1 - b2))))
+        raise AssertionError(f"bkg is wrong {np.nanmax(np.abs(b1 - b2))}")
 
     return
 

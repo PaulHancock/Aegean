@@ -16,7 +16,7 @@ from .angle_tools import bear, gcd, translate
 __author__ = "Paul Hancock"
 
 
-class WCSHelper(object):
+class WCSHelper:
     """
     A wrapper around astropy.wcs that provides extra functionality, and hides
     the c/fortran indexing troubles.
@@ -119,11 +119,11 @@ class WCSHelper(object):
             self._psf_map = fits.open(self.psf_file, memmap=True)[0].data
             if len(self._psf_map.shape) != 3:
                 logger.critical(
-                    "PSF file needs to have 3 dimensions, found {0}".format(
+                    "PSF file needs to have 3 dimensions, found {}".format(
                         len(self._psf_map.shape)
                     )
                 )
-                raise Exception("Invalid PSF file {0}".format(self.psf_file))
+                raise Exception(f"Invalid PSF file {self.psf_file}")
         return self._psf_map
 
     @property
@@ -449,7 +449,7 @@ class WCSHelper(object):
         # sense
         x, y = self.psf_sky2pix((ra, dec))
 
-        logger.debug("sky2sky {0}, {1}, {2}, {3}".format(ra, dec, x, y))
+        logger.debug(f"sky2sky {ra}, {dec}, {x}, {y}")
 
         x = int(np.clip(x, 0, self.psf_map.shape[1] - 1))
         y = int(np.clip(y, 0, self.psf_map.shape[2] - 1))
@@ -590,7 +590,7 @@ class WCSHelper(object):
         return sep
 
 
-class Beam(object):
+class Beam:
     """
     Small class to hold the properties of the beam. Properties are a,b,pa. No
     assumptions are made as to the units, but both a and b have to be >0.
@@ -606,7 +606,7 @@ class Beam(object):
         self.pa = pa
 
     def __str__(self):
-        return "a={0} b={1} pa={2}".format(self.a, self.b, self.pa)
+        return f"a={self.a} b={self.b} pa={self.pa}"
 
 
 def get_pixinfo(header):

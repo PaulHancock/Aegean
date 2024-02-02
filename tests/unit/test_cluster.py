@@ -117,14 +117,14 @@ def test_regroup():
     a = cluster.regroup("tests/test_files/1904_comp.fits", eps=1 / 3600.0)
     if not len(a) == 51:
         raise AssertionError(
-            "Regroup with eps=1/3600. gave {0} groups instead of 51".format(len(a))
+            f"Regroup with eps=1/3600. gave {len(a)} groups instead of 51"
         )
 
     # this should give 1 group
     a = cluster.regroup("tests/test_files/1904_comp.fits", eps=10, far=1000)
     if not len(a) == 1:
         raise AssertionError(
-            "Regroup with eps=10, far=1000. gave {0} groups instead of 51".format(
+            "Regroup with eps=10, far=1000. gave {} groups instead of 51".format(
                 len(a)
             )
         )
@@ -136,7 +136,7 @@ def test_regroup_dbscan():
     a = cluster.regroup_dbscan(srccat, eps=1 / 3600.0)
     if not len(a) == 51:
         raise AssertionError(
-            "Regroup_dbscan with eps=1/3600. gave {0} groups instead of 51".format(
+            "Regroup_dbscan with eps=1/3600. gave {} groups instead of 51".format(
                 len(a)
             )
         )

@@ -12,7 +12,7 @@ import numpy as np
 __author__ = "Paul Hancock"
 
 
-class SimpleSource(object):
+class SimpleSource:
     """
     The base source class for an elliptical Gaussian.
 
@@ -255,7 +255,7 @@ class IslandSource(SimpleSource):
         self.pix_mask = []
 
     def __str__(self):
-        return "({0:d})".format(self.island)
+        return f"({self.island:d})"
 
     def __eq__(self, other):
         if hasattr(other, "island"):
@@ -429,7 +429,7 @@ class ComponentSource(SimpleSource):
         return self.formatter.format(self)
 
     def __repr__(self):
-        return "({0:d},{1:d})".format(self.island, self.source)
+        return f"({self.island:d},{self.source:d})"
 
     def __eq__(self, other):
         if self.island != other.island:
@@ -706,7 +706,7 @@ class ComponentWithAlpha(ComponentSource):
         return gauss
 
 
-class PixelIsland(object):
+class PixelIsland:
     """
     An island of pixels within an image or cube
 
@@ -764,7 +764,7 @@ class PixelIsland(object):
         """
         if len(offsets) != self.dim:
             raise AssertionError(
-                "{0} offsets were passed but {1} are required".format(
+                "{} offsets were passed but {} are required".format(
                     len(offsets), self.dim
                 )
             )
@@ -782,7 +782,7 @@ class PixelIsland(object):
         return
 
 
-class IslandFittingData(object):
+class IslandFittingData:
     """
     All the data required to fit a single island. Instances are pickled and
     passed to the fitting subprocesses
@@ -827,7 +827,7 @@ class IslandFittingData(object):
         self.plane = plane
 
 
-class DummyLM(object):
+class DummyLM:
     """
     A dummy copy of the lmfit results, for use when no fitting was done.
 

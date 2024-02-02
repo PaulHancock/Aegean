@@ -16,7 +16,7 @@ from astropy.io import fits
 __author__ = "Paul Hancock"
 
 
-class Region(object):
+class Region:
     """
     A Region object represents a footprint on the sky. This is done in a way
     similar to a MOC. The region is stored as a list of healpix pixels,
@@ -38,7 +38,7 @@ class Region(object):
 
     def __init__(self, maxdepth=11):
         self.maxdepth = maxdepth
-        self.pixeldict = dict((i, set()) for i in range(1, maxdepth + 1))
+        self.pixeldict = {i: set() for i in range(1, maxdepth + 1)}
         self.demoted = set()
         return
 
@@ -194,7 +194,7 @@ class Region(object):
             pd = self.pixeldict
             for d in range(1, self.maxdepth):
                 for p in pd[d]:
-                    pd[d + 1].update(set((4 * p, 4 * p + 1, 4 * p + 2, 4 * p + 3)))
+                    pd[d + 1].update({4 * p, 4 * p + 1, 4 * p + 2, 4 * p + 3})
                 pd[d] = set()  # clear the pixels from this level
             self.demoted = pd[d + 1]
         return
@@ -212,7 +212,7 @@ class Region(object):
             plist = self.pixeldict[d].copy()
             for p in plist:
                 if p % 4 == 0:
-                    nset = set((p, p + 1, p + 2, p + 3))
+                    nset = {p, p + 1, p + 2, p + 3}
                     if p + 1 in plist and p + 2 in plist and p + 3 in plist:
                         # remove the four pixels from this level
                         self.pixeldict[d].difference_update(nset)

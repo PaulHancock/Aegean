@@ -18,7 +18,7 @@ def test_ra2dec():
     for ra in ['14:21:45.003', '-12 04 22', '-00 01 12.003']:
         ans = at.ra2dec(ra)
         desired = Angle(ra, unit=u.hourangle).hour * 15
-        assert_approx_equal(ans, desired, "{0} != {1}".format(ans, desired))
+        assert_approx_equal(ans, desired, f"{ans} != {desired}")
 
 
 def test_dec2dec():
@@ -28,7 +28,7 @@ def test_dec2dec():
         ans = at.dec2dec(dec)
         desired = Angle(dec, unit=u.degree).degree
         assert_approx_equal(
-            ans, desired, err_msg="{0} != {1}".format(ans, desired))
+            ans, desired, err_msg=f"{ans} != {desired}")
 
 
 def test_dec2dms():
@@ -39,7 +39,7 @@ def test_dec2dms():
                       (np.inf, "XX:XX:XX.XX")]:
         ans = at.dec2dms(dec)
         if not ans == dstr:
-            raise AssertionError("{0} != {1}".format(ans, dstr))
+            raise AssertionError(f"{ans} != {dstr}")
 
 
 def test_dec2hms():
@@ -51,7 +51,7 @@ def test_dec2hms():
                       (np.inf, "XX:XX:XX.XX")]:
         ans = at.dec2hms(dec)
         if not ans == dstr:
-            raise AssertionError("{0} != {1}".format(ans, dstr))
+            raise AssertionError(f"{ans} != {dstr}")
 
 
 def test_gcd():
@@ -66,7 +66,7 @@ def test_gcd():
                                        ]:
         ans = at.gcd(ra1, dec1, ra2, dec2)
         assert_almost_equal(
-            ans, dist, err_msg="{0:5.2f},{1:5.2f} <-> {2:5.2f},{3:5.2f} == {4:g} != {5:g}".format(ra1, dec1, ra2, dec2, dist, ans))
+            ans, dist, err_msg=f"{ra1:5.2f},{dec1:5.2f} <-> {ra2:5.2f},{dec2:5.2f} == {dist:g} != {ans:g}")
 
 
 def test_bear():
@@ -78,7 +78,7 @@ def test_bear():
                                        ]:
         ans = at.bear(ra1, dec1, ra2, dec2)
         assert_almost_equal(
-            ans, bear, err_msg="{0:5.2f},{1:5.2f} <-> {2:5.2f},{3:5.2f} == {4:g} != {5:g}".format(ra1, dec1, ra2, dec2, bear, ans))
+            ans, bear, err_msg=f"{ra1:5.2f},{dec1:5.2f} <-> {ra2:5.2f},{dec2:5.2f} == {bear:g} != {ans:g}")
 
 
 def test_translate():
@@ -92,7 +92,7 @@ def test_translate():
                                                  ]:
         ans = at.translate(ra1, dec1, r, theta)
         assert_almost_equal(
-            ans, (ra2, dec2), err_msg="{0:5.2f},{1:5.2f} -> {2:g},{3:g} -> {4:5.2f},{5:5.2f} != {6:g},{7:g}".format(ra1, dec1, r, theta, ra2, dec2, *ans))
+            ans, (ra2, dec2), err_msg="{:5.2f},{:5.2f} -> {:g},{:g} -> {:5.2f},{:5.2f} != {:g},{:g}".format(ra1, dec1, r, theta, ra2, dec2, *ans))
 
 
 def test_dist_rhumb():
@@ -121,7 +121,7 @@ def test_translate_rhumb():
                                                  ]:
         ans = at.translate_rhumb(ra1, dec1, r, theta)
         assert_almost_equal(
-            ans, (ra2, dec2), err_msg="{0:5.2f},{1:5.2f} -> {2:g},{3:g} -> {4:5.2f},{5:5.2f} != {6:g},{7:g}".format(ra1, dec1, r, theta, ra2, dec2, *ans))
+            ans, (ra2, dec2), err_msg="{:5.2f},{:5.2f} -> {:g},{:g} -> {:5.2f},{:5.2f} != {:g},{:g}".format(ra1, dec1, r, theta, ra2, dec2, *ans))
 
 
 if __name__ == "__main__":

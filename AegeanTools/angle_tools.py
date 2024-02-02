@@ -84,7 +84,7 @@ def dec2dms(x):
     d = int(math.floor(x))
     m = int(math.floor((x - d) * 60))
     s = float(((x - d) * 60 - m) * 60)
-    return "{0}{1:02d}:{2:02d}:{3:05.2f}".format(sign, d, m, s)
+    return f"{sign}{d:02d}:{m:02d}:{s:05.2f}"
 
 
 def dec2hms(x):
@@ -112,7 +112,7 @@ def dec2hms(x):
     x = (x - h) * 60
     m = int(x)
     s = (x - m) * 60
-    return "{0:02d}:{1:02d}:{2:05.2f}".format(h, m, s)
+    return f"{h:02d}:{m:02d}:{s:05.2f}"
 
 
 # The following functions are explained at

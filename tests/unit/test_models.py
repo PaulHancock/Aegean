@@ -20,7 +20,7 @@ def test_simple_source():
     if not (isinstance(ss.ra, np.float64)):
         raise AssertionError()
     # convert to string without failing
-    a = "{0}".format(ss)
+    a = f"{ss}"
     if not (
         a == " 12.0000000   0.0000000  0.000000  0.000000  0.00  0.00    0.0 0000000"
     ):

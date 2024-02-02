@@ -44,7 +44,7 @@ def check_table_formats(files):
         ext = ext[1:].lower()
         if ext not in formats:
             cont = False
-            logger.warning("Format not supported for {0} ({1})".format(t, ext))
+            logger.warning(f"Format not supported for {t} ({ext})")
     if not cont:
         logger.error("Invalid table format specified.")
     return cont
@@ -75,7 +75,7 @@ def show_formats():
     supported = get_table_formats()
     print("Extension |     Description       | Supported?")
     for k in sorted(fmts.keys()):
-        print("{0:10s} {1:24s} {2}".format(k, fmts[k], k in supported))
+        print(f"{k:10s} {fmts[k]:24s} {k in supported}")
     return
 
 
@@ -120,7 +120,7 @@ def update_meta_data(meta=None):
         meta["DATE"] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
     if "PROGRAM" not in meta:
         meta["PROGRAM"] = "AegeanTools.catalogs"
-        meta["PROGVER"] = "{0}-({1})".format(__version__, __date__)
+        meta["PROGVER"] = f"{__version__}-({__date__})"
     return meta
 
 
@@ -176,7 +176,7 @@ def save_catalog(filename, catalog, meta=None, prefix=None):
             prefix=prefix,
         )
     else:
-        logger.warning("extension not recognised {0}".format(extension))
+        logger.warning(f"extension not recognised {extension}")
         logger.warning("You get tab format")
         write_catalog(filename, catalog, fmt="tab", prefix=prefix)
     return
@@ -202,12 +202,12 @@ def load_catalog(filename):
     fmt = os.path.splitext(filename)[-1][1:].lower()  # extension sans '.'
 
     if fmt in ["csv", "tab", "tex"] and fmt in supported:
-        logger.info("Reading file {0}".format(filename))
+        logger.info(f"Reading file {filename}")
         t = ascii.read(filename)
         catalog = list(zip(t.columns["ra"], t.columns["dec"]))
 
     elif fmt in ["vo", "vot", "xml"] and fmt in supported:
-        logger.info("Reading file {0}".format(filename))
+        logger.info(f"Reading file {filename}")
         t = parse_single_table(filename)
         catalog = list(zip(t.array["ra"].tolist(), t.array["dec"].tolist()))
 
@@ -215,7 +215,7 @@ def load_catalog(filename):
         logger.info("Assuming ascii format, reading first two columns")
         lines = [
             a.strip().split()
-            for a in open(filename, "r").readlines()
+            for a in open(filename).readlines()
             if not a.startswith("#")
         ]
         try:
@@ -223,7 +223,7 @@ def load_catalog(filename):
         except ValueError as e:
             logger.warning(e)
             logger.error("Expecting two columns of floats but failed to parse")
-            logger.error("Catalog file {0} not loaded".format(filename))
+            logger.error(f"Catalog file {filename} not loaded")
             raise Exception("Could not determine file format")
 
     return catalog
@@ -250,14 +250,14 @@ def load_table(filename):
     fmt = os.path.splitext(filename)[-1][1:].lower()  # extension sans '.'
 
     if fmt in ["csv", "tab", "tex"] and fmt in supported:
-        logger.info("Reading file {0}".format(filename))
+        logger.info(f"Reading file {filename}")
         t = ascii.read(filename)
     elif fmt in ["vo", "vot", "xml", "fits", "hdf5"] and fmt in supported:
-        logger.info("Reading file {0}".format(filename))
+        logger.info(f"Reading file {filename}")
         t = Table.read(filename)
     else:
         logger.error("Table format not recognized or supported")
-        logger.error("{0} [{1}]".format(filename, fmt))
+        logger.error(f"{filename} [{fmt}]")
         raise Exception("Table format not recognized or supported")
     return t
 
@@ -282,14 +282,14 @@ def write_table(table, filename):
         if os.path.exists(filename):
             os.remove(filename)
         table.write(filename)
-        logger.info("Wrote {0}".format(filename))
+        logger.info(f"Wrote {filename}")
     except Exception as e:
         if "Format could not be identified" not in e.message:
             raise e
         else:
             # extension sans '.'
             fmt = os.path.splitext(filename)[-1][1:].lower()
-            raise Exception("Cannot auto-determine format for {0}".format(fmt))
+            raise Exception(f"Cannot auto-determine format for {fmt}")
     return
 
 
@@ -426,15 +426,15 @@ def write_catalog(filename, catalog, fmt=None, meta=None, prefix=None):
     if len(components) > 0:
         new_name = "{1}{0}{2}".format("_comp", *os.path.splitext(filename))
         writer(new_name, components, fmt)
-        logger.info("wrote {0}".format(new_name))
+        logger.info(f"wrote {new_name}")
     if len(islands) > 0:
         new_name = "{1}{0}{2}".format("_isle", *os.path.splitext(filename))
         writer(new_name, islands, fmt)
-        logger.info("wrote {0}".format(new_name))
+        logger.info(f"wrote {new_name}")
     if len(simples) > 0:
         new_name = "{1}{0}{2}".format("_simp", *os.path.splitext(filename))
         writer(new_name, simples, fmt)
-        logger.info("wrote {0}".format(new_name))
+        logger.info(f"wrote {new_name}")
     return
 
 
@@ -471,9 +471,9 @@ def writeFITSTable(filename, table):
         elif isinstance(val, (float, np.float64, np.float32)):
             types = "E"
         elif isinstance(val, str):
-            types = "{0}A".format(len(val))
+            types = f"{len(val)}A"
         else:
-            logger.warning("Column {0} is of unknown type {1}".format(val, type(val)))
+            logger.warning(f"Column {val} is of unknown type {type(val)}")
             logger.warning("Using 5A")
             types = "5A"
         return types
@@ -484,7 +484,7 @@ def writeFITSTable(filename, table):
         if name.startswith("err_"):
             fmt = "E"
         elif name == "uuid":
-            fmt = "{0}A".format(max(len(val) for val in table[name]))
+            fmt = f"{max(len(val) for val in table[name])}A"
         else:
             fmt = FITSTableType(table[name][0])
         cols.append(fits.Column(name=name, format=fmt, array=table[name]))
@@ -521,14 +521,14 @@ def writeIslandContours(filename, catalog, fmt="reg"):
     :func:`AegeanTools.catalogs.writeIslandBoxes`
     """
     if fmt != "reg":
-        logger.warning("Format {0} not yet supported".format(fmt))
+        logger.warning(f"Format {fmt} not yet supported")
         logger.warning("not writing anything")
         return
 
     out = open(filename, "w")
     print("#Aegean island contours", file=out)
     print(
-        "#AegeanTools.catalogs version {0}-({1})".format(__version__, __date__),
+        f"#AegeanTools.catalogs version {__version__}-({__date__})",
         file=out,
     )
     line_fmt = "image;line({0},{1},{2},{3})"
@@ -596,12 +596,12 @@ def writeIslandBoxes(filename, catalog, fmt):
     :func:`AegeanTools.catalogs.writeIslandContours`
     """
     if fmt not in ["reg", "ann"]:
-        logger.warning("Format not supported for island boxes{0}".format(fmt))
+        logger.warning(f"Format not supported for island boxes{fmt}")
         return  # fmt not supported
 
     out = open(filename, "w")
     print("#Aegean Islands", file=out)
-    print("#Aegean version {0}-({1})".format(__version__, __date__), file=out)
+    print(f"#Aegean version {__version__}-({__date__})", file=out)
 
     if fmt == "reg":
         print("IMAGE", file=out)
@@ -656,7 +656,7 @@ def writeAnn(filename, catalog, fmt):
     AegeanTools.catalogs.writeIslandContours
     """
     if fmt not in ["reg", "ann"]:
-        logger.warning("Format not supported for island boxes{0}".format(fmt))
+        logger.warning(f"Format not supported for island boxes{fmt}")
         return  # fmt not supported
 
     components, islands, simples = classify_catalog(catalog)
@@ -684,9 +684,9 @@ def writeAnn(filename, catalog, fmt):
 
         names = [a.__repr__() for a in cat]
         if fmt == "ann":
-            new_file = re.sub(".ann$", "_{0}.ann".format(suffix), filename)
+            new_file = re.sub(".ann$", f"_{suffix}.ann", filename)
             out = open(new_file, "w")
-            print("#Aegean version {0}-({1})".format(__version__, __date__), file=out)
+            print(f"#Aegean version {__version__}-({__date__})", file=out)
             print("PA SKY", file=out)
             print("FONT hershey12", file=out)
             print("COORD W", file=out)
@@ -694,9 +694,9 @@ def writeAnn(filename, catalog, fmt):
                 "ELLIPSE W {0} {1} {2} {3} {4:+07.3f} #{5}" + "\nTEXT W {0} {1} {5}"
             )
         else:  # reg
-            new_file = re.sub(".reg$", "_{0}.reg".format(suffix), filename)
+            new_file = re.sub(".reg$", f"_{suffix}.reg", filename)
             out = open(new_file, "w")
-            print("#Aegean version {0}-({1})".format(__version__, __date__), file=out)
+            print(f"#Aegean version {__version__}-({__date__})", file=out)
             print("fk5", file=out)
             formatter = (
                 "ellipse {0} {1} {2:.9f}d {3:.9f}d {4:+07.3f}d " + '# text="{5}"'
@@ -710,7 +710,7 @@ def writeAnn(filename, catalog, fmt):
                 print("#", end=" ", file=out)
             print(formatter.format(ra, dec, bmaj, bmin, pa, name), file=out)
         out.close()
-        logger.info("wrote {0}".format(new_file))
+        logger.info(f"wrote {new_file}")
     if len(islands) > 0:
         if fmt == "reg":
             new_file = re.sub(".reg$", "_isle.reg", filename)
@@ -719,11 +719,11 @@ def writeAnn(filename, catalog, fmt):
             return
         else:
             logger.warning(
-                "format {0} not supported for island annotations".format(fmt)
+                f"format {fmt} not supported for island annotations"
             )
             return
         writeIslandContours(new_file, islands, fmt)
-        logger.info("wrote {0}".format(new_file))
+        logger.info(f"wrote {new_file}")
 
     return
 
@@ -786,13 +786,13 @@ def writeDB(filename, catalog, meta=None):
             elif isinstance(val, str):
                 types.append("VARCHAR")
             else:
-                logger.warning("Column {0} is of unknown type {1}".format(n, type(n)))
+                logger.warning(f"Column {n} is of unknown type {type(n)}")
                 logger.warning("Using VARCHAR")
                 types.append("VARCHAR")
         return types
 
     if os.path.exists(filename):
-        logger.warning("overwriting {0}".format(filename))
+        logger.warning(f"overwriting {filename}")
         os.remove(filename)
     conn = sqlite3.connect(filename)
     db = conn.cursor()
@@ -802,15 +802,15 @@ def writeDB(filename, catalog, meta=None):
             continue  # don't write empty tables
         col_names = t[0].names
         col_types = sqlTypes(t[0], col_names)
-        stmnt = ",".join(["{0} {1}".format(a, b) for a, b in zip(col_names, col_types)])
-        db.execute("CREATE TABLE {0} ({1})".format(tn, stmnt))
-        stmnt = "INSERT INTO {0} ({1}) VALUES ({2})".format(
+        stmnt = ",".join([f"{a} {b}" for a, b in zip(col_names, col_types)])
+        db.execute(f"CREATE TABLE {tn} ({stmnt})")
+        stmnt = "INSERT INTO {} ({}) VALUES ({})".format(
             tn, ",".join(col_names), ",".join(["?" for i in col_names])
         )
         # expend the iterators that are created by python 3+
         data = list(map(nulls, list(r.as_list() for r in t)))
         db.executemany(stmnt, data)
-        logger.info("Created table {0}".format(tn))
+        logger.info(f"Created table {tn}")
     # metadata add some meta data
     db.execute("CREATE TABLE meta (key VARCHAR, val VARCHAR)")
     for k in meta:
@@ -820,5 +820,5 @@ def writeDB(filename, catalog, meta=None):
         db.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
     )
     conn.close()
-    logger.info("Wrote file {0}".format(filename))
+    logger.info(f"Wrote file {filename}")
     return

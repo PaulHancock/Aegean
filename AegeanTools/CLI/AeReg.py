@@ -80,13 +80,13 @@ def main():
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logger.setLevel(logging_level)
-    logger.info("This is regroup {0}-({1})".format(__version__, __date__))
-    logger.debug("Run as:\n{0}".format(invocation_string))
+    logger.info(f"This is regroup {__version__}-({__date__})")
+    logger.debug(f"Run as:\n{invocation_string}")
 
     # check that a valid intput filename was entered
     filename = options.input
     if not os.path.exists(filename):
-        logger.error("{0} not found".format(filename))
+        logger.error(f"{filename} not found")
         return 1
 
     input_table = load_table(options.input)
@@ -103,10 +103,10 @@ def main():
         head = fits.getheader(options.psfheader)
         wcshelper = wcs_helpers.WCSHelper.from_header(head)
         sources = resize(sources, wcshelper=wcshelper)
-        logger.debug("{0} sources resized".format(len(sources)))
+        logger.debug(f"{len(sources)} sources resized")
     elif options.ratio is not None:
         sources = resize(sources, ratio=options.ratio)
-        logger.debug("{0} sources resized".format(len(sources)))
+        logger.debug(f"{len(sources)} sources resized")
     else:
         logger.debug("Not rescaling")
 
@@ -114,22 +114,22 @@ def main():
         if not check_attributes_for_regroup(sources):
             logger.error("Cannot use catalog")
             return 1
-        logger.debug("Regrouping with eps={0}[arcmin]".format(options.eps))
+        logger.debug(f"Regrouping with eps={options.eps}[arcmin]")
         eps = np.sin(np.radians(options.eps / 60))
         groups = regroup_dbscan(sources, eps=eps)
         sources = [source for group in groups for source in group]
-        logger.debug("{0} sources regrouped".format(len(sources)))
+        logger.debug(f"{len(sources)} sources regrouped")
     else:
         logger.debug("Not regrouping")
 
     if options.tables:
         meta = {
             "PROGRAM": "regroup",
-            "PROGVER": "{0}-({1})".format(__version__, __date__),
+            "PROGVER": f"{__version__}-({__date__})",
             "CATFILE": filename,
             "RUN-AS": invocation_string,
         }
         for t in options.tables.split(","):
-            logger.debug("writing {0}".format(t))
+            logger.debug(f"writing {t}")
             save_catalog(t, sources, meta=meta)
     return 0

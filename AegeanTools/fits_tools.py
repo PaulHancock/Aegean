@@ -112,14 +112,14 @@ def compress(datafile, factor, outfile=None):
     header["BN_NPX2"] = (header["NAXIS2"], "original NAXIS2 value")
     header["BN_RPX1"] = (lcx, "Residual on axis 1")
     header["BN_RPX2"] = (lcy, "Residual on axis 2")
-    header["HISTORY"] = "Compressed by a factor of {0}".format(factor)
+    header["HISTORY"] = f"Compressed by a factor of {factor}"
 
     # save the changes
     hdulist[0].data = np.array(new_data, dtype=np.float32)
     hdulist[0].header = header
     if outfile is not None:
         hdulist.writeto(outfile, overwrite=True)
-        logger.info("Wrote: {0}".format(outfile))
+        logger.info(f"Wrote: {outfile}")
     return hdulist
 
 
@@ -212,7 +212,7 @@ def expand(datafile, outfile=None):
         logger.error("Error: Can't find CDELT2 or CD2_2")
         return None
 
-    header["HISTORY"] = "Expanded by factor {0}".format(factor)
+    header["HISTORY"] = f"Expanded by factor {factor}"
 
     # don't need these any more so delete them.
     del header["BN_CFAC"], header["BN_NPX1"], header["BN_NPX2"]
@@ -220,7 +220,7 @@ def expand(datafile, outfile=None):
     hdulist[0].header = header
     if outfile is not None:
         hdulist.writeto(outfile, overwrite=True)
-        logger.info("Wrote: {0}".format(outfile))
+        logger.info(f"Wrote: {outfile}")
     return hdulist
 
 
@@ -247,7 +247,7 @@ def write_fits(data, header, file_name):
     hdu.header = header
     hdulist = fits.HDUList([hdu])
     hdulist.writeto(file_name, overwrite=True)
-    logger.info("Wrote {0}".format(file_name))
+    logger.info(f"Wrote {file_name}")
     return
 
 
@@ -282,13 +282,13 @@ def load_image_band(
     data, header : :class:`numpy.ndarray`, :class:`astropy.io.fits.header.Header`
     """
     if band[1] <= 0:
-        raise AegeanError("band[1] number {0} not valid".format(band[1]))
+        raise AegeanError(f"band[1] number {band[1]} not valid")
     elif band[0] >= band[1]:
         raise AegeanError(
-            "band number {0} too large for total bands = {1}".format(band[0], band[1])
+            f"band number {band[0]} too large for total bands = {band[1]}"
         )
     elif band[0] < 0:
-        raise AegeanError("band[0] number {0} not valid".format(band[0]))
+        raise AegeanError(f"band[0] number {band[0]} not valid")
 
     header = fits.getheader(filename, ext=hdu_index)
 

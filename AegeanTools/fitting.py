@@ -110,7 +110,7 @@ def jacobian(pars, x, y):
     matrix = []
 
     for i in range(pars["components"].value):
-        prefix = "c{0}_".format(i)
+        prefix = f"c{i}_"
         amp = pars[prefix + "amp"].value
         xo = pars[prefix + "xo"].value
         yo = pars[prefix + "yo"].value
@@ -193,7 +193,7 @@ def emp_jacobian(pars, x, y):
     matrix = []
     model = ntwodgaussian_lmfit(pars)(x, y)
     for i in range(pars["components"].value):
-        prefix = "c{0}_".format(i)
+        prefix = f"c{i}_"
         for p in ["amp", "xo", "yo", "sx", "sy", "theta"]:
             if pars[prefix + p].vary:
                 pars[prefix + p].value += eps
@@ -290,7 +290,7 @@ def hessian(pars, x, y):
     npvar = 0
 
     for i in range(pars["components"].value):
-        prefix = "c{0}_".format(i)
+        prefix = f"c{i}_"
         amp = pars[prefix + "amp"].value
         xo = pars[prefix + "xo"].value
         yo = pars[prefix + "yo"].value
@@ -604,7 +604,7 @@ def emp_hessian(pars, x, y):
     matrix = []
     for i in range(pars["components"].value):
         model = emp_jacobian(pars, x, y)
-        prefix = "c{0}_".format(i)
+        prefix = f"c{i}_"
         for p in ["amp", "xo", "yo", "sx", "sy", "theta"]:
             if pars[prefix + p].vary:
                 pars[prefix + p].value += eps
@@ -711,7 +711,7 @@ def RB_bias(data, pars, ita=None, acf=None):
     bias : array
         The bias on each of the parameters
     """
-    logger.info("data {0}".format(data.shape))
+    logger.info(f"data {data.shape}")
     nparams = np.sum([pars[k].vary for k in pars.keys() if k != "components"])
     # masked pixels
     xm, ym = np.where(np.isfinite(data))
@@ -740,10 +740,10 @@ def RB_bias(data, pars, ita=None, acf=None):
         if acf is None:
             acf = nan_acf(N)
         ita = make_ita(N, acf=acf)
-        logger.info("acf.shape {0}".format(acf.shape))
-        logger.info("acf[0] {0}".format(acf[0]))
-        logger.info("ita.shape {0}".format(ita.shape))
-        logger.info("ita[0] {0}".format(ita[0]))
+        logger.info(f"acf.shape {acf.shape}")
+        logger.info(f"acf[0] {acf[0]}")
+        logger.info(f"ita.shape {ita.shape}")
+        logger.info(f"ita[0] {ita[0]}")
 
     # Included for completeness but not required
 
@@ -758,7 +758,7 @@ def RB_bias(data, pars, ita=None, acf=None):
     bias_1 = np.einsum("imn, mn", Cimn, Vij)
     bias_2 = np.einsum("ilkm, mlk", Eilkm, Uijk)
     bias = bias_1 + bias_2
-    logger.info("bias {0}".format(bias))
+    logger.info(f"bias {bias}")
     return bias
 
 
@@ -830,7 +830,7 @@ def errors(source, model, wcshelper):
         ) = source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
         return source
     # copy the errors from the model
-    prefix = "c{0}_".format(source.source)
+    prefix = f"c{source.source}_"
     err_amp = model[prefix + "amp"].stderr
     xo, yo = model[prefix + "xo"].value, model[prefix + "yo"].value
     err_xo = model[prefix + "xo"].stderr
@@ -846,7 +846,7 @@ def errors(source, model, wcshelper):
     source.err_peak_flux = err_amp
     pix_errs = [err_xo, err_yo, err_sx, err_sy, err_theta]
 
-    logger.debug("Pix errs: {0}".format(pix_errs))
+    logger.debug(f"Pix errs: {pix_errs}")
 
     ref = wcshelper.pix2sky([xo, yo])
     # check to see if the reference position has a valid WCS coordinate
@@ -974,7 +974,7 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
         ) = source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
         return source
     # copy the errors/values from the model
-    prefix = "c{0}_".format(source.source)
+    prefix = f"c{source.source}_"
     err_amp = model[prefix + "amp"].stderr
     xo, yo = model[prefix + "xo"].value, model[prefix + "yo"].value
     err_xo = model[prefix + "xo"].stderr
@@ -1150,7 +1150,7 @@ def ntwodgaussian_lmfit(params):
         """
         result = None
         for i in range(params["components"].value):
-            prefix = "c{0}_".format(i)
+            prefix = f"c{i}_"
             # I hope this doesn't kill our run time
             amp = np.nan_to_num(params[prefix + "amp"].value)
             xo = params[prefix + "xo"].value
@@ -1302,7 +1302,7 @@ def covar_errors(params, data, errs, B, C=None):
             onesigma = [-2] * len(mask[0])
 
     for i in range(params["components"].value):
-        prefix = "c{0}_".format(i)
+        prefix = f"c{i}_"
         j = 0
         for p in ["amp", "xo", "yo", "sx", "sy", "theta"]:
             if params[prefix + p].vary:
