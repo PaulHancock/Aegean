@@ -105,7 +105,7 @@ def main():
 
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logger.setLevel(logging_level)
-    logger.info("This is AeRes {0}-({1})".format(__version__, __date__))
+    logger.info(f"This is AeRes {__version__}-({__date__})")
 
     if options.catalog is None:
         logger.error("input catalog is required")
@@ -124,12 +124,12 @@ def main():
         options.frac = None
 
     logger.info(
-        "Using {0} and {1} to make {2}".format(
+        "Using {} and {} to make {}".format(
             options.fitsfile, options.catalog, options.rfile
         )
     )
     if options.mfile is not None:
-        logger.info(" and writing model to {0}".format(options.mfile))
+        logger.info(f" and writing model to {options.mfile}")
 
     colmap = {
         "ra_col": options.ra_col,

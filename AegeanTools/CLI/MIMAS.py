@@ -237,7 +237,7 @@ def main():
     group4.add_argument(
         "--version",
         action="version",
-        version="%(prog)s " + MIMAS.__version__ + "-({0})".format(MIMAS.__date__),
+        version="%(prog)s " + MIMAS.__version__ + f"-({MIMAS.__date__})",
     )
     group4.add_argument(
         "--cite",
@@ -261,7 +261,7 @@ def main():
     # get the MIMAS logger
     logging_level = logging.DEBUG if results.debug else logging.INFO
     logger.setLevel(level=logging_level)
-    logger.info("This is MIMAS {0}-({1})".format(MIMAS.__version__, MIMAS.__date__))
+    logger.info(f"This is MIMAS {MIMAS.__version__}-({MIMAS.__date__})")
 
     if len(results.fits_mask) > 0:
         logger.info("The --fitsmask option is not yet implemented.")
@@ -285,7 +285,7 @@ def main():
     if results.area is not None:
         region = MIMAS.Region.load(results.area)
         print(
-            "{0} represents an area of {1} deg^2".format(
+            "{} represents an area of {} deg^2".format(
                 results.area, region.get_area()
             )
         )

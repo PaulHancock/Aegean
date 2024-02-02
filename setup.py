@@ -13,7 +13,7 @@ from setuptools import setup
 def get_version():
     """Get the version number of AegeanTools"""
     version = ""
-    with open("AegeanTools/__init__.py", "r") as f:
+    with open("AegeanTools/__init__.py") as f:
         while True:
             l = f.readline()
             if l.startswith("__version__"):

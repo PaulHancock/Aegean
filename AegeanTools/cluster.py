@@ -200,7 +200,7 @@ def regroup_dbscan(srccat, eps=4):
         group = list(map(srccat.__getitem__, np.where(labels == l)[0]))
         groups[i] = group
 
-    logger.info("Found {0:d} clusters".format(len(unique_labels)))
+    logger.info(f"Found {len(unique_labels):d} clusters")
 
     logger.debug("Labeling/sorting sources")
     islands = []
@@ -408,7 +408,7 @@ def resize(catalog, ratio=None, wcshelper=None):
 
     # If ratio is provided we just the psf by this amount
     if ratio is not None:
-        logger.info("Using ratio of {0} to scale input source shapes".format(ratio))
+        logger.info(f"Using ratio of {ratio} to scale input source shapes")
 
         for i, src in enumerate(catalog):
             # the new source size is the previous size, convolved with the

@@ -40,7 +40,7 @@ def check_projection(filename, options, log=logger):
         if options.imgpsf is None:
             projection = header["CTYPE1"].split("-")[-1]
             logger.warning(
-                "For projection {0} you should consider supplying a psf via"
+                "For projection {} you should consider supplying a psf via"
                 " --psf".format(projection)
             )
     return
@@ -377,9 +377,9 @@ def main():
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logger.setLevel(logging_level)
-    logger.info("This is Aegean {0}-({1})".format(__version__, __date__))
+    logger.info(f"This is Aegean {__version__}-({__date__})")
 
-    logger.debug("Run as:\n{0}".format(invocation_string))
+    logger.debug(f"Run as:\n{invocation_string}")
 
     # options that don't require image inputs
     if options.cite:
@@ -398,16 +398,16 @@ def main():
 
     if options.file_versions:
         logger.info(
-            "AegeanTools {0} from {1}".format(
+            "AegeanTools {} from {}".format(
                 AegeanTools.__version__, AegeanTools.__file__
             )
         )
-        logger.info("Numpy {0} from {1} ".format(np.__version__, np.__file__))
-        logger.info("Scipy {0} from {1}".format(scipy.__version__, scipy.__file__))
+        logger.info(f"Numpy {np.__version__} from {np.__file__} ")
+        logger.info(f"Scipy {scipy.__version__} from {scipy.__file__}")
         logger.info(
-            "AstroPy {0} from {1}".format(astropy.__version__, astropy.__file__)
+            f"AstroPy {astropy.__version__} from {astropy.__file__}"
         )
-        logger.info("LMFit {0} from {1}".format(lmfit.__version__, lmfit.__file__))
+        logger.info(f"LMFit {lmfit.__version__} from {lmfit.__file__}")
         return 0
 
     # print help if the user enters no options or filename
@@ -418,7 +418,7 @@ def main():
     # check that a valid filename was entered
     filename = options.image
     if not os.path.exists(filename):
-        logger.error("{0} not found".format(filename))
+        logger.error(f"{filename} not found")
         return 1
 
     # check to see if the user has supplied --telescope/--psf when required
@@ -451,12 +451,12 @@ def main():
     # check/set cores to use
     if options.cores is None:
         options.cores = multiprocessing.cpu_count()
-        logger.info("Found {0} cores".format(options.cores))
-    logger.info("Using {0} cores".format(options.cores))
+        logger.info(f"Found {options.cores} cores")
+    logger.info(f"Using {options.cores} cores")
 
     hdu_index = options.hdu_index
     if hdu_index > 0:
-        logger.info("Using hdu index {0}".format(hdu_index))
+        logger.info(f"Using hdu index {hdu_index}")
 
     # create a beam object from user input
     if options.beam is not None:
@@ -464,7 +464,7 @@ def main():
         options.beam = Beam(beam[0], beam[1], beam[2])
         logger.info("Using user supplied beam parameters")
         logger.info(
-            "Beam is {0} deg x {1} deg with pa {2}".format(
+            "Beam is {} deg x {} deg with pa {}".format(
                 options.beam.a, options.beam.b, options.beam.pa
             )
         )
@@ -475,34 +475,34 @@ def main():
         files = get_aux_files(filename)
         if files["bkg"] and not options.backgroundimg:
             options.backgroundimg = files["bkg"]
-            logger.info("Found background {0}".format(options.backgroundimg))
+            logger.info(f"Found background {options.backgroundimg}")
         if files["rms"] and not options.noiseimg:
             options.noiseimg = files["rms"]
-            logger.info("Found noise {0}".format(options.noiseimg))
+            logger.info(f"Found noise {options.noiseimg}")
         if files["mask"] and not options.region:
             options.region = files["mask"]
-            logger.info("Found region {0}".format(options.region))
+            logger.info(f"Found region {options.region}")
         if files["psf"] and not options.imgpsf:
             options.imgpsf = files["psf"]
-            logger.info("Found psf {0}".format(options.imgpsf))
+            logger.info(f"Found psf {options.imgpsf}")
 
     # check that the aux input files exist
     if options.backgroundimg and not os.path.exists(options.backgroundimg):
-        logger.error("{0} not found".format(options.backgroundimg))
+        logger.error(f"{options.backgroundimg} not found")
         return 1
     if options.noiseimg and not os.path.exists(options.noiseimg):
-        logger.error("{0} not found".format(options.noiseimg))
+        logger.error(f"{options.noiseimg} not found")
         return 1
     if options.imgpsf and not os.path.exists(options.imgpsf):
-        logger.error("{0} not found".format(options.imgpsf))
+        logger.error(f"{options.imgpsf} not found")
         return 1
     if options.catpsf and not os.path.exists(options.catpsf):
-        logger.error("{0} not found".format(options.catpsf))
+        logger.error(f"{options.catpsf} not found")
         return 1
 
     if options.region is not None:
         if not os.path.exists(options.region):
-            logger.error("Region file {0} not found".format(options.region))
+            logger.error(f"Region file {options.region} not found")
             return 1
 
     # Generate and save the background FITS files with the Aegean default
@@ -583,11 +583,11 @@ def main():
             logger.error("Must specify input catalog when " "--priorized is selected")
             return 1
         if not os.path.exists(options.input):
-            logger.error("{0} not found".format(options.input))
+            logger.error(f"{options.input} not found")
             return 1
         logger.info("Priorized fitting of sources in input catalog.")
 
-        logger.info("Stage = {0}".format(options.priorized))
+        logger.info(f"Stage = {options.priorized}")
         if options.doislandflux:
             logger.warning(
                 "--island requested but not yet supported for " "priorized fitting"
@@ -617,11 +617,11 @@ def main():
 
     sources = sf.sources
 
-    logger.info("found {0} sources total".format(len(sources)))
+    logger.info(f"found {len(sources)} sources total")
     if len(sources) > 0 and options.tables:
         meta = {
             "PROGRAM": "Aegean",
-            "PROGVER": "{0}-({1})".format(__version__, __date__),
+            "PROGVER": f"{__version__}-({__date__})",
             "FITSFILE": filename,
             "RUN-AS": invocation_string,
         }

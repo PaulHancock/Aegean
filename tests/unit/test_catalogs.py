@@ -186,7 +186,7 @@ def test_write_fits_table_variable_uuid_lengths():
     for i in range(10):
         c = ComponentSource()
         c.ra_str = c.dec_str = "hello!"
-        c.uuid = "source-{0:d}".format(2**i)
+        c.uuid = f"source-{2**i:d}"
         catalog.append(c)
     cat.save_catalog("a.fits", catalog, meta={"Purpose": "Testing"})
     if not os.path.exists("a_comp.fits"):
@@ -195,8 +195,8 @@ def test_write_fits_table_variable_uuid_lengths():
     rcat = cat.load_table("a_comp.fits")
     for src1, src2 in zip(rcat, catalog):
         if len(src1["uuid"]) != len(src2.uuid):
-            print("len mismatch for source {0}".format(src1))
-            print("uuid should be len={0}".format(len(src2.uuid)))
+            print(f"len mismatch for source {src1}")
+            print(f"uuid should be len={len(src2.uuid)}")
             raise AssertionError("UUID col is of wrong length")
     os.remove("a_comp.fits")
     return

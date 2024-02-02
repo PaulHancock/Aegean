@@ -112,7 +112,7 @@ def test_write_fits():
     outname = "tests/temp/dlme.fits"
     fits_tools.write_fits(data, header, outname)
     if not os.path.exists(outname):
-        raise AssertionError("Failed to write data to file {0}".format(outname))
+        raise AssertionError(f"Failed to write data to file {outname}")
     os.remove(outname)
 
 
@@ -172,13 +172,13 @@ def test_load_image_band_cube_index():
         data, header = fits_tools.load_image_band(file_3d, cube_index=cube_index)
         if not isinstance(data, np.ndarray):
             raise AssertionError(
-                "Loaded data is not an np.ndarray object, cube_index={0}".format(
+                "Loaded data is not an np.ndarray object, cube_index={}".format(
                     cube_index
                 )
             )
         if not isinstance(header, fits.Header):
             raise AssertionError(
-                "header is not a fits.hdu.Header object, cube_index={0}".format(
+                "header is not a fits.hdu.Header object, cube_index={}".format(
                     cube_index
                 )
             )
@@ -192,13 +192,13 @@ def test_load_image_band_hdu_index():
         data, header = fits_tools.load_image_band(multi_hdu, hdu_index=hdu_index)
         if not isinstance(data, np.ndarray):
             raise AssertionError(
-                "Loaded data is not an np.ndarray object hdu_index={0}".format(
+                "Loaded data is not an np.ndarray object hdu_index={}".format(
                     hdu_index
                 )
             )
         if not isinstance(header, fits.Header):
             raise AssertionError(
-                "header is not a fits.hdu.Header object hdu_index={0}".format(hdu_index)
+                f"header is not a fits.hdu.Header object hdu_index={hdu_index}"
             )
 
     return
@@ -216,20 +216,20 @@ def test_load_image_band_include_freq():
         )
     if data.shape != (30, 30):
         raise AssertionError(
-            "Data has wrong shape {0} instead of (30,30)".format(data.shape)
+            f"Data has wrong shape {data.shape} instead of (30,30)"
         )
     # Load multi-freq image as a cube
     data, _ = fits_tools.load_image_band(multi_freq, include_freq=True)
     if data.shape != (8, 30, 30):
         raise AssertionError(
-            "Data has wrong shape {0} instead of (8,30,30)".format(data.shape)
+            f"Data has wrong shape {data.shape} instead of (8,30,30)"
         )
 
     # load single-freq image as a cube
     data, _ = fits_tools.load_image_band(single_freq, include_freq=True)
     if data.shape != (1, 192, 192):
         raise AssertionError(
-            "Data has wrong shape {0} instead of (1,30,30)".format(data.shape)
+            f"Data has wrong shape {data.shape} instead of (1,30,30)"
         )
 
     return

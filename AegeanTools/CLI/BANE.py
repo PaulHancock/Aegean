@@ -108,10 +108,10 @@ def main():
     # Get the BANE logger.
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logger.setLevel(logging_level)
-    logger.info("This is BANE {0}-({1})".format(BANE.__version__, BANE.__date__))
+    logger.info(f"This is BANE {BANE.__version__}-({BANE.__date__})")
 
     if not os.path.exists(options.image):
-        logger.error("File not found: {0} ".format(options.image))
+        logger.error(f"File not found: {options.image} ")
         return 1
 
     if options.out_base is None:
@@ -122,7 +122,7 @@ def main():
         rmsout = options.out_base + "_rms.fits"
         if os.path.exists(bkgout) and os.path.exists(rmsout):
             logger.error(
-                "{0} and {1} exist and you said noclobber" "".format(bkgout, rmsout)
+                "{} and {} exist and you said noclobber" "".format(bkgout, rmsout)
             )
             logger.error("Not running")
             return 1

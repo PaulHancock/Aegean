@@ -263,7 +263,7 @@ def dont_test_find_and_prior_parallel():
     sfinder = sf.SourceFinder()
     found = sfinder.find_sources_in_image(filename, cores=cores, bkg=0, rms=0.5)
     if not (len(found) == 98):
-        raise AssertionError("found {0} sources".format(len(found)))
+        raise AssertionError(f"found {len(found)} sources")
     # now with some options
     aux_files = sf.get_aux_files(filename)
 
@@ -309,9 +309,9 @@ def test_save_files():
     filename = "tests/test_files/small.fits"
     sfinder.save_background_files(image_filename=filename, outbase="dlme")
     for ext in ["bkg", "rms", "snr", "crv"]:
-        if not (os.path.exists("dlme_{0}.fits".format(ext))):
+        if not (os.path.exists(f"dlme_{ext}.fits")):
             raise AssertionError()
-        os.remove("dlme_{0}.fits".format(ext))
+        os.remove(f"dlme_{ext}.fits")
 
 
 def test_save_image():
@@ -429,17 +429,17 @@ def test_find_islands():
 
     if len(islands) != 1:
         raise AssertionError(
-            "Incorrect number of islands found {0}, expecting 1".format(len(islands))
+            f"Incorrect number of islands found {len(islands)}, expecting 1"
         )
     if not isinstance(islands[0], models.PixelIsland):
         raise AssertionError(
-            "Islands[0] is not a PixelIsland but instead a {0}".format(type(islands[0]))
+            f"Islands[0] is not a PixelIsland but instead a {type(islands[0])}"
         )
 
     correct_box = [[3, 6], [4, 7]]
     if not np.all(islands[0].bounding_box == correct_box):
         raise AssertionError(
-            "Bounding box incorrect, should be {0}, but is {1}".format(
+            "Bounding box incorrect, should be {}, but is {}".format(
                 correct_box, islands[0].bounding_box
             )
         )
@@ -449,7 +449,7 @@ def test_find_islands():
     islands = sf.find_islands(im, bkg, rms)
     if len(islands) != 1:
         raise AssertionError(
-            "Incorrect number of islands found {0}, expecting 1".format(len(islands))
+            f"Incorrect number of islands found {len(islands)}, expecting 1"
         )
 
     return
