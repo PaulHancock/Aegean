@@ -204,6 +204,37 @@ def test_load_image_band_hdu_index():
     return
 
 
+def test_load_image_band_include_freq():
+    multi_freq = "tests/test_files/synthetic_with_alpha.fits"
+    single_freq = "tests/test_files/1904-66_SIN.fits"
+
+    # Load multi-freq image as a single plane
+    data, _ = fits_tools.load_image_band(multi_freq, include_freq=False)
+    if not isinstance(data, np.ndarray):
+        raise AssertionError(
+            "Loaded data is not an np.ndarray object, include_freq=False"
+        )
+    if data.shape != (30, 30):
+        raise AssertionError(
+            "Data has wrong shape {0} instead of (30,30)".format(data.shape)
+        )
+    # Load multi-freq image as a cube
+    data, _ = fits_tools.load_image_band(multi_freq, include_freq=True)
+    if data.shape != (8, 30, 30):
+        raise AssertionError(
+            "Data has wrong shape {0} instead of (8,30,30)".format(data.shape)
+        )
+
+    # load single-freq image as a cube
+    data, _ = fits_tools.load_image_band(single_freq, include_freq=True)
+    if data.shape != (1, 192, 192):
+        raise AssertionError(
+            "Data has wrong shape {0} instead of (1,30,30)".format(data.shape)
+        )
+
+    return
+
+
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
