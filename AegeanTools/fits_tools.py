@@ -336,3 +336,28 @@ def load_image_band(
     header["NAXIS2"] = row_max - row_min
     header["CRPIX2"] -= row_min
     return data, header
+
+
+def stack_image(image, weights=None):
+    """
+    Perform image stacking on a cube, optionally with weights.
+
+    Parameters
+    ----------
+    image : :class:`numpy.ndarray`
+        The image cube for stacking along axis 0.
+
+    weights : :class:`numpy.ndarray`
+        A weights map for each pixel. None = no weighting
+        Default: None.
+
+    Returns
+    -------
+    stacked : :class:`numpy.ndarray`
+        The stacked image with one fewer dimension.
+    """
+    if weights is None:
+        stacked = np.sum(image, axis=0) / image.shape[0]
+    else:
+        stacked = np.sum(image * weights, axis=0) / np.sum(weights, axis=0)
+    return stacked
