@@ -613,6 +613,7 @@ def main():
             cube_index=options.slice,
             progress=options.progress,
             regroup_eps=options.regroup_eps,
+            cube_fit=options.cube_fit,
         )
 
     sources = sf.sources
