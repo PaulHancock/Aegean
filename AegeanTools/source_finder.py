@@ -179,7 +179,10 @@ class SourceFinder:
         The image, noise, and background maps.
 
     cube_index : int
-          For an image cube, which slice is being used.
+        For an image cube, which slice is being used.
+    
+    cube_fit : bool
+        If true, then fit across an entire cube instead of just one slice.
 
     dcurve : :class:`numpy.ndarray`
         Image of +1,0,-1 representing the curvature of `img`.
@@ -189,7 +192,7 @@ class SourceFinder:
     wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
 
     beam : :class:`AegeanTools.wcs_helpers.Beam`
-          Beam object representing the synthesized beam.
+        Beam object representing the synthesized beam.
 
     dtype : {float, float32, float64}
         The (original) data type for `img`. Will be enforced upon writing.
@@ -207,27 +210,29 @@ class SourceFinder:
     dobais: bool
         Not yet implemented. Default = False
 
+    globals_loaded : bool
+        True once self.load_globals has been called
+
     sources : [ComponentSource|IslandSource|SimpleSource]
-      List of sources that have been found/measured.
+        List of sources that have been found/measured.
     """
 
     def __init__(self, **kwargs):
-        # self.global_data = GlobalFittingData()
         self.img = None
         self.dcurve = None
         self.rmsimg = None
         self.bkgimg = None
+        self.cube_index = 0
+        self.cube_fit = False
         self.header = None
+        self.wcshelper = None
         self.beam = None
         self.dtype = None
         self.region = None
-        self.wcshelper = None
         self.blank = False
         self.docov = True
         self.dobias = False
-        self.cube_index = 0
-        self.cube_fit = False
-
+        self.globals_loaded = False
         self.sources = []
 
         # # allow the passing of parameters while being lazy programmer
@@ -955,8 +960,7 @@ class SourceFinder:
           Default False, ignores `cube_index`.
 
         """
-        # don't reload already loaded data
-        if self.img is not None:
+        if self.globals_loaded:
             return
 
         self.cube_index = cube_index
@@ -1040,6 +1044,8 @@ class SourceFinder:
         if "lon" in self.header["CTYPE1"].lower():
             logger.info("Galactic coordinates detected and noted")
             SimpleSource.galactic = True
+
+        self.globals_loaded = True
         return
 
     def save_background_files(
@@ -1567,8 +1573,10 @@ class SourceFinder:
             offsets = (xmin, xmax, ymin, ymax)
             # TODO allow for island fluxes in the refitting.
             island_data = IslandFittingData(
-                inum, i=idata,
-                scalars=(4, 4, None), offsets=offsets,
+                inum,
+                i=idata,
+                scalars=(4, 4, None),
+                offsets=offsets,
                 doislandflux=False,
                 plane=plane,
             )
