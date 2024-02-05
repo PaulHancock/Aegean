@@ -211,6 +211,7 @@ class IslandSource(SimpleSource):
         "dec_str",
         "ra",
         "dec",
+        "spec",
         "peak_flux",
         "int_flux",
         "err_int_flux",
@@ -235,6 +236,7 @@ class IslandSource(SimpleSource):
         self.dec_str = ""  # str
         # ra = None # degrees
         # dec = None # degrees
+        self.spec = np.nan  # Spectral dimension
         # peak_flux = None # Jy/beam
         self.int_flux = np.nan  # Jy
         self.err_int_flux = np.nan  # Jy
@@ -348,9 +350,9 @@ class ComponentSource(SimpleSource):
 
     # header for the output
     header = (
-        "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err    flags\n"
-        + "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   ZWNCPES\n"
-        + "#============================================================================================================================================================================================"
+        "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err       Spec       Peak      err     S_int     err        a    err    b    err     pa   err    flags\n"
+      + "#         Jy/beam   Jy/beam                               deg        deg         deg        deg                Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   ZWNCPES\n"
+      + "#============================================================================================================================================================================================"
     )
 
     # formatting strings for making nice output
@@ -358,7 +360,8 @@ class ComponentSource(SimpleSource):
         "({0.island:04d},{0.source:02d}) {0.background: 8.6f} "
         + "{0.local_rms: 8.6f} {0.ra_str:12s} {0.dec_str:12s} "
         + "{0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} "
-        + "{0.err_dec: 9.7f} {0.peak_flux: 8.6f} "
+        + "{0.err_dec: 9.7f} {0.spec: 9.7f} "
+        + "{0.peak_flux: 8.6f} "
         + "{0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} "
         + "{0.err_int_flux: 8.6f} {0.a:5.2f} {0.err_a:5.2f} "
         + "{0.b:5.2f} {0.err_b:5.2f} {0.pa:6.1f} {0.err_pa:5.1f}   "
@@ -375,6 +378,7 @@ class ComponentSource(SimpleSource):
         "err_ra",
         "dec",
         "err_dec",
+        "spec",
         "peak_flux",
         "err_peak_flux",
         "int_flux",
@@ -408,6 +412,7 @@ class ComponentSource(SimpleSource):
         self.err_dec = np.nan
         # peak_flux = None # Jy/beam
         # err_peak_flux = None # Jy/beam
+        self.spec = np.nan  # Spectral dimension
         self.int_flux = np.nan  # Jy
         self.err_int_flux = np.nan  # Jy
         # self.a = 0.0 # major axis (arcsecs)

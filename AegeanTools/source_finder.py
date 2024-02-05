@@ -670,6 +670,7 @@ class SourceFinder:
             source = ComponentSource()
             source.island = isle_num
             source.source = j
+            source.spec = island_data.plane
             logger.debug(f" component {j}")
             prefix = f"c{j}_"
             xo = model[prefix + "xo"].value
@@ -2192,6 +2193,19 @@ class SourceFinder:
         else:
             groups = list(island_itergen(input_sources))
 
+        logger.debug(f"Initial islands {len(groups)}")
+        # for cube fitting we duplicate the catalogue across the spectral
+        # dimension
+        if self.cube_fit:
+            new_groups = []
+            for i in range(self.img.shape[0]):
+                for g in groups:
+                    new_group = copy.deepcopy(g)
+                    for src in new_group:
+                        src.spec = i
+                    new_groups.extend(new_group)
+            groups = new_groups
+        logger.debug(f"Total (cube) islands {len(groups)}")
         logger.info("Begin fitting")
 
         island_groups = []  # will be a list of groups of islands
