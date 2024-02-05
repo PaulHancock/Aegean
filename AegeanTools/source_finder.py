@@ -670,7 +670,7 @@ class SourceFinder:
             source = ComponentSource()
             source.island = isle_num
             source.source = j
-            source.spec = island_data.plane
+            source.spec = self.wcshelper.plane2spec(island_data.plane)
             logger.debug(f" component {j}")
             prefix = f"c{j}_"
             xo = model[prefix + "xo"].value
