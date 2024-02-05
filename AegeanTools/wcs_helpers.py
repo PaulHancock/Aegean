@@ -131,10 +131,10 @@ class WCSHelper:
         if self._psf_wcs is None:
             header = fits.getheader(self.psf_file)
             try:
-                wcs = WCS(header, naxis=2)
+                wcs = WCS(header)
             except:
-                wcs = WCS(str(header), naxis=2)
-            self._psf_wcs = wcs
+                wcs = WCS(str(header))
+            self._psf_wcs = wcs.spatial
         return self._psf_wcs
 
     @classmethod
@@ -160,9 +160,9 @@ class WCSHelper:
             A helper object.
         """
         try:
-            wcs = WCS(header, naxis=2)
+            wcs = WCS(header)
         except:  # TODO: figure out what error is being thrown
-            wcs = WCS(str(header), naxis=2)
+            wcs = WCS(str(header))
 
         if beam is None:
             beam = get_beam(header)
@@ -202,6 +202,42 @@ class WCSHelper:
         header = fits.getheader(filename)
         return cls.from_header(header, beam, psf_file=psf_file)
 
+    def plane2spec(self, plane):
+        """
+        Compute the spectral value of the image plane index.
+
+        Parameters
+        ----------
+        plane : int
+            The image plane index.
+
+        Returns
+        -------
+        spec : float
+            The spectral coordinate. Units depend on WCS.
+
+        """
+        return float(self.wcs.spectral.all_pix2world(plane, 0)[0])
+
+    def spec2plane(self, spec):
+        """
+        Compute the image plane index for a given spectral value.
+
+        Parameters
+        ----------
+        spec : float
+            The spectral coordinate in units defined by the WCS.
+
+        Returns
+        -------
+        plane : int
+            The image plane index rounded to the nearest int.
+
+        """
+        idx = float(self.wcs.spectral.all_world2pix(spec, 0)[0])
+        idx = round(idx)
+        return idx
+
     def pix2sky(self, pixel):
         """
         Convert pixel coordinates into sky coordinates.
@@ -220,7 +256,9 @@ class WCSHelper:
         """
         x, y = pixel
         # wcs and python have opposite ideas of x/y
-        return self.wcs.all_pix2world([[y, x]], 1, ra_dec_order=self.ra_dec_order)[0]
+        return self.wcs.celestial.all_pix2world(
+                    [[y, x]], 1, ra_dec_order=self.ra_dec_order
+               )[0]
 
     def sky2pix(self, pos):
         """
@@ -238,7 +276,7 @@ class WCSHelper:
             The (x,y) pixel coordinates
 
         """
-        pixel = self.wcs.all_world2pix([pos], 1, ra_dec_order=self.ra_dec_order)
+        pixel = self.wcs.celestial.all_world2pix([pos], 1, ra_dec_order=self.ra_dec_order)
         # wcs and python have opposite ideas of x/y
         return [pixel[0][1], pixel[0][0]]
 
