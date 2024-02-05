@@ -134,7 +134,7 @@ class WCSHelper:
                 wcs = WCS(header)
             except:
                 wcs = WCS(str(header))
-            self._psf_wcs = wcs.spatial
+            self._psf_wcs = wcs.celestial
         return self._psf_wcs
 
     @classmethod
@@ -238,7 +238,7 @@ class WCSHelper:
 
         """
         idx = 0
-        if (not np.isfinite(spec)) and self.wcs.has_spectral:
+        if np.isfinite(spec) and self.wcs.has_spectral:
             idx = float(self.wcs.spectral.all_world2pix(spec, 0)[0])
             idx = round(idx)
         return idx

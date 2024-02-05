@@ -267,6 +267,55 @@ def test_fix_aips_header():
     _ = fix_aips_header(header)
 
 
+def test_plane2spec():
+    wcs = WCSHelper.from_file("tests/test_files/synthetic_with_alpha.fits")
+
+    spec = wcs.plane2spec(0)
+    if not np.allclose(spec, 1.7e8):
+        raise AssertionError(f"plane2spec returned {spec} instead of {1.7e8}")
+
+    wcs = WCSHelper.from_file("tests/test_files/1904-66_SIN.fits")
+    spec = wcs.plane2spec(0)
+    if np.isfinite(spec):
+        raise AssertionError("plane2spec returned non-nan spec")
+
+    return
+
+
+def test_spec2plane():
+    wcs = WCSHelper.from_file("tests/test_files/synthetic_with_alpha.fits")
+
+    plane = wcs.spec2plane(1.7e8)
+    if not np.allclose(plane, 0):
+        raise AssertionError(f"spec2plane returned {plane} instead of {0}")
+
+    plane = wcs.spec2plane(np.nan)
+    if plane != 0:
+        raise AssertionError(f"spec2plane returned {plane} instead of {0}")
+
+    wcs = WCSHelper.from_file("tests/test_files/1904-66_SIN.fits")
+    plane = wcs.spec2plane(0)
+    if plane != 0:
+        raise AssertionError(f"spec2plane returned {plane} instead of {0}")
+    return
+
+
+def test_beam():
+    try:
+        Beam(1, 0, 0)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("Beam(1,0,0) should fail")
+    
+    try:
+        Beam(0, 1, 0)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("Beam(0,1,0) should fail")
+    
+
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
