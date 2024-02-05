@@ -217,7 +217,10 @@ class WCSHelper:
             The spectral coordinate. Units depend on WCS.
 
         """
-        return float(self.wcs.spectral.all_pix2world(plane, 0)[0])
+        spec = np.nan
+        if self.wcs.has_spectral:
+            spec = float(self.wcs.spectral.all_pix2world(plane, 0)[0])
+        return spec
 
     def spec2plane(self, spec):
         """
@@ -234,8 +237,10 @@ class WCSHelper:
             The image plane index rounded to the nearest int.
 
         """
-        idx = float(self.wcs.spectral.all_world2pix(spec, 0)[0])
-        idx = round(idx)
+        idx = 0
+        if (not np.isfinite(spec)) and self.wcs.has_spectral:
+            idx = float(self.wcs.spectral.all_world2pix(spec, 0)[0])
+            idx = round(idx)
         return idx
 
     def pix2sky(self, pixel):
