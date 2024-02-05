@@ -1303,6 +1303,7 @@ class SourceFinder:
             shape = self.img.shape[1:]
             xmin, ymin = shape
             xmax = ymax = 0
+            plane = self.wcshelper.spec2plane(isle[0].spec)
 
             # island_mask = []
             src_valid_psf = None
@@ -1324,8 +1325,8 @@ class SourceFinder:
                 if (
                     not 0 <= x < shape[0]
                     or not 0 <= y < shape[1]
-                    or not np.isfinite(self.img[0, x, y])
-                    or not np.isfinite(self.rmsimg[0, x, y])
+                    or not np.isfinite(self.img[plane, x, y])
+                    or not np.isfinite(self.rmsimg[plane, x, y])
                     or pixbeam is None
                 ):
                     logger.debug(
@@ -1437,7 +1438,7 @@ class SourceFinder:
 
             # this .copy() will stop us from modifying the parent region when
             # we later apply our mask.
-            idata = self.img[0, int(xmin) : int(xmax), int(ymin) : int(ymax)].copy()
+            idata = self.img[plane, int(xmin) : int(xmax), int(ymin) : int(ymax)].copy()
             # now convert these back to indices within the idata region
             # island_mask = np.array([(x-xmin, y-ymin) for x,y in island_mask])
 
@@ -1551,7 +1552,10 @@ class SourceFinder:
             offsets = (xmin, xmax, ymin, ymax)
             # TODO allow for island fluxes in the refitting.
             island_data = IslandFittingData(
-                inum, i=idata, offsets=offsets, doislandflux=False, scalars=(4, 4, None)
+                inum, i=idata,
+                scalars=(4, 4, None), offsets=offsets,
+                doislandflux=False,
+                plane=plane,
             )
             new_src = self.result_to_components(result, model, island_data, src.flags)
 
@@ -2193,19 +2197,19 @@ class SourceFinder:
         else:
             groups = list(island_itergen(input_sources))
 
-        logger.debug(f"Initial islands {len(groups)}")
-        # for cube fitting we duplicate the catalogue across the spectral
-        # dimension
-        if self.cube_fit:
-            new_groups = []
-            for i in range(self.img.shape[0]):
-                for g in groups:
-                    new_group = copy.deepcopy(g)
-                    for src in new_group:
-                        src.spec = i
-                    new_groups.extend(new_group)
-            groups = new_groups
-        logger.debug(f"Total (cube) islands {len(groups)}")
+        # logger.debug(f"Initial islands {len(groups)}")
+        # # for cube fitting we duplicate the catalogue across the spectral
+        # # dimension
+        # if self.cube_fit:
+        #     new_groups = []
+        #     for i in range(self.img.shape[0]):
+        #         for g in groups:
+        #             new_group = copy.deepcopy(g)
+        #             for src in new_group:
+        #                 src.spec = self.wcshelper.plane2spec(i)
+        #             new_groups.extend(new_group)
+        #     groups = new_groups
+        # logger.debug(f"Total (cube) islands {len(groups)}")
         logger.info("Begin fitting")
 
         island_groups = []  # will be a list of groups of islands
