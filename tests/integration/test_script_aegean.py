@@ -9,6 +9,7 @@ image_AIT = "tests/test_files/1904-66_AIT.fits"
 image_alpha = "tests/test_files/synthetic_with_alpha.fits"
 tempfile = "dlme"
 
+
 def safe_rm(filename):
     try:
         os.remove(filename)
@@ -128,7 +129,6 @@ def test_cube():
         safe_rm(tempfile + "_comp.fits")
         safe_rm(tempfile + "_prior_comp.fits")
 
-    
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
