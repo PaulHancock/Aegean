@@ -526,6 +526,83 @@ def test_sf_on_cube():
         )
 
 
+def test_priorize_on_cube():
+    filename = "tests/test_files/synthetic_with_alpha.fits"
+    sfinder = sf.SourceFinder()
+
+    found = sfinder.find_sources_in_image(filename, cores=1, cube_fit=True)
+
+    # source finding with islands
+    sfinder = sf.SourceFinder()
+    priorized = sfinder.priorized_fit_islands(
+        filename, cores=1, cube_fit=True,
+        catalogue=found,
+    )
+    if not (len(priorized) == len(found)):
+        raise AssertionError(
+            "Cube priorized source finding: wrong total sources "
+            f"{len(priorized)}, expecting {len(found)}"
+        )
+
+
+def test_priorize_cube_from_slice_cat():
+    filename = "tests/test_files/synthetic_with_alpha.fits"
+    sfinder = sf.SourceFinder()
+
+    found = sfinder.find_sources_in_image(filename, cores=1, cube_index=0)
+
+    # source finding with islands
+    sfinder = sf.SourceFinder()
+    priorized = sfinder.priorized_fit_islands(
+        filename, cores=1, cube_fit=True,
+        catalogue=found,
+    )
+    if not (len(priorized) == 8):
+        raise AssertionError(
+            "Cube priorized source finding: wrong total sources "
+            f"{len(priorized)}, expecting {8}"
+        )
+
+
+def test_priorize_slice_from_cube_cat():
+    filename = "tests/test_files/synthetic_with_alpha.fits"
+    sfinder = sf.SourceFinder()
+
+    found = sfinder.find_sources_in_image(filename, cores=1, cube_fit=True)
+
+    # source finding with islands
+    sfinder = sf.SourceFinder()
+    priorized = sfinder.priorized_fit_islands(
+        filename, cores=1, cube_index=0,
+        catalogue=found,
+    )
+    if not (len(priorized) == 1):
+        raise AssertionError(
+            "Slice priorized source finding: wrong total sources "
+            f"{len(priorized)}, expecting 1"
+        )
+
+
+def test_priorize_cube_from_cube_cat():
+    filename = "tests/test_files/synthetic_with_alpha.fits"
+    sfinder = sf.SourceFinder()
+
+    found = sfinder.find_sources_in_image(filename, cores=1, cube_fit=True)
+    found = found[:4]
+
+    # source finding with islands
+    sfinder = sf.SourceFinder()
+    priorized = sfinder.priorized_fit_islands(
+        filename, cores=1, cube_fit=True,
+        catalogue=found,
+    )
+    if not (len(priorized) == 8):
+        raise AssertionError(
+            "Slice priorized source finding: wrong total sources "
+            f"{len(priorized)}, expecting 8"
+        )
+
+
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():

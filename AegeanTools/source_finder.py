@@ -180,7 +180,7 @@ class SourceFinder:
 
     cube_index : int
         For an image cube, which slice is being used.
-    
+
     cube_fit : bool
         If true, then fit across an entire cube instead of just one slice.
 
@@ -2206,6 +2206,22 @@ class SourceFinder:
             logger.debug("No sources accepted for priorized fitting")
             return []
 
+        # count the number of spec entries
+        all_spec = [src.spec for src in sources]
+        n_spec = 1
+        # be aware that sometimes the spec is np.nan
+        if np.all(np.isfinite(all_spec)):
+            all_spec = list(sorted(set(all_spec)))
+            n_spec = len(all_spec)
+
+        if n_spec > 1:
+            # if our catalogue has more than one spec, then ignore all but one
+            sources = [src for src in sources if src.spec == all_spec[0]]
+            logger.info(
+                f"Catalog has {n_spec} spec entries, "
+                f"keeping only the {len(sources)} "
+                f"that have spec= {sources[0].spec:5.2g}."
+            )
         # compute eps if it's not defined
         if regroup_eps is None:
             # s.a is in arcsec but we assume regroup_eps is in arcmin
@@ -2220,19 +2236,18 @@ class SourceFinder:
         else:
             groups = list(island_itergen(input_sources))
 
-        # logger.debug(f"Initial islands {len(groups)}")
-        # # for cube fitting we duplicate the catalogue across the spectral
-        # # dimension
-        # if self.cube_fit:
-        #     new_groups = []
-        #     for i in range(self.img.shape[0]):
-        #         for g in groups:
-        #             new_group = copy.deepcopy(g)
-        #             for src in new_group:
-        #                 src.spec = self.wcshelper.plane2spec(i)
-        #             new_groups.extend(new_group)
-        #     groups = new_groups
-        # logger.debug(f"Total (cube) islands {len(groups)}")
+        if self.cube_fit:
+            logger.debug(f"n_spec = {n_spec}")
+            new_groups = []
+            for i in range(self.img.shape[0]):
+                for g in groups:
+                    new_group = copy.deepcopy(g)
+                    for src in new_group:
+                        src.spec = self.wcshelper.plane2spec(i)
+                    new_groups.append(new_group)
+            logger.debug(f"Now using {len(groups)} -> {len(new_groups)} groups")
+            groups = new_groups
+
         logger.info("Begin fitting")
 
         island_groups = []  # will be a list of groups of islands
