@@ -172,11 +172,11 @@ def regroup_dbscan(srccat, eps=4):
 
     """
     logger.info("Regrouping islands within catalog")
-
     logger.debug("converting ra/dec -> x,y,z")
     # extract ra/dec
     ras = np.radians(np.array([s.ra for s in srccat]))
     decs = np.radians(np.array([s.dec for s in srccat]))
+    spec = np.array([s.spec for s in srccat])
 
     # convert to cartesian coords
     y = np.cos(decs)
@@ -185,7 +185,10 @@ def regroup_dbscan(srccat, eps=4):
     z = np.sin(decs)
 
     logger.debug("Constructing X array")
-    X = np.hstack([x[:, None], y[:, None], z[:, None]])
+    if not np.all(np.isnan(spec)):
+        X = np.hstack([x[:, None], y[:, None], z[:, None], spec[:, None]])
+    else:
+        X = np.hstack([x[:, None], y[:, None], z[:, None]])
 
     logger.debug("Clustering")
     # run clustering algorighm
