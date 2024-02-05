@@ -1215,22 +1215,37 @@ class SourceFinder:
         step_size = get_step_size(self.header)
         box_size = (5 * step_size[0], 5 * step_size[1])
 
-        # TODO: iterate over each slice and make a new calcualtion when
-        # we are doing cube_fit
-        bkg, rms = filter_image(
-            im_name=filename,
-            out_base=None,
-            step_size=step_size,
-            box_size=box_size,
-            cores=cores,
-            cube_index=self.cube_index,
-        )
-        # Copy the bkg/rms to all slices of our cube if cube_fit
-        # TODO: compute a new bkg/rms for each slice.
-        if forced_rms is None:
-            self.rmsimg[:] = rms[None, :, :]
-        if forced_bkg is None:
-            self.bkgimg[:] = bkg[None, :, :]
+        if self.cube_fit:
+            bkg = np.zeros_like(self.img)
+            rms = np.zeros_like(self.img)
+            for i in range(self.img.shape[0]):
+                bkg[i], rms[i] = filter_image(
+                    im_name=filename,
+                    out_base=None,
+                    step_size=step_size,
+                    box_size=box_size,
+                    cores=cores,
+                    cube_index=i,
+                )
+                if forced_rms is None:
+                    self.rmsimg[i] = rms[i]
+                if forced_bkg is None:
+                    self.bkgimg[i] = bkg[i]
+
+        else:
+            bkg, rms = filter_image(
+                im_name=filename,
+                out_base=None,
+                step_size=step_size,
+                box_size=box_size,
+                cores=cores,
+                cube_index=self.cube_index,
+            )
+
+            if forced_rms is None:
+                self.rmsimg[:] = rms[None, :, :]
+            if forced_bkg is None:
+                self.bkgimg[:] = bkg[None, :, :]
 
         return
 
