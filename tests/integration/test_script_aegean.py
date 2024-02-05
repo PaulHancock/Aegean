@@ -6,7 +6,15 @@ import sys
 
 image_SIN = "tests/test_files/1904-66_SIN.fits"
 image_AIT = "tests/test_files/1904-66_AIT.fits"
+image_alpha = "tests/test_files/synthetic_with_alpha.fits"
 tempfile = "dlme"
+
+def safe_rm(filename):
+    try:
+        os.remove(filename)
+    except OSError:
+        pass
+    return
 
 
 def test_help():
@@ -94,16 +102,33 @@ def test_priorized():
     sys.argv = [
         "",
         image_SIN,
-        "--priorized",
-        "1",
-        "--input",
-        tempfile + "_comp.fits",
-        "--out",
-        "stdout",
+        "--priorized", "1",
+        "--input", tempfile + "_comp.fits",
+        "--out", "stdout",
         "--island",
     ]
     aegean.main()
 
+
+def test_cube():
+    try:
+        sys.argv = ["", image_alpha, "--cube", "--table", tempfile + ".fits"]
+        aegean.main()
+
+        sys.argv = [
+            "",
+            image_alpha,
+            "--cube",
+            "--priorized", "1",
+            "--input", tempfile + "_comp.fits",
+            "--table", tempfile + "_prior.fits",
+        ]
+        aegean.main()
+    finally:
+        safe_rm(tempfile + "_comp.fits")
+        safe_rm(tempfile + "_prior_comp.fits")
+
+    
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
