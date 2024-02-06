@@ -24,11 +24,14 @@ def get_version():
 
 reqs = ['scipy>=0.16',
         'tqdm>=4',
-        'numpy>=1.16',
+        'numpy>=1.22,<2',
         'astropy>=2.0',
         'healpy >=1.10',
         'lmfit>=0.9.2',
-        'scikit-learn>=0.24.2']
+        'scikit-learn>=0.24.2',
+        'rocket-fft>=0.2.3',
+        'numba>=0.58'
+        ]
 
 data_dir = 'AegeanTools/data'
 
