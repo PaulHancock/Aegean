@@ -1278,6 +1278,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     data = np.array(data)
     mask = np.where(np.isfinite(data))
 
+    @jit(nopython=True)
     def residual(params, **kwargs):
         """
         The residual function required by lmfit
