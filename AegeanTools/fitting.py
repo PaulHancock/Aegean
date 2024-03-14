@@ -13,7 +13,7 @@ from AegeanTools.logging import logger
 from . import flags
 from .angle_tools import bear, gcd
 from .exceptions import AegeanNaNModelError
-from numba import jit, prange
+from numba import jit, prange, object_, njit
 
 __author__ = "Paul Hancock"
 
@@ -22,7 +22,7 @@ ERR_MASK = -1.0
 
 
 # Modelling and fitting functions
-@jit(nopython=True)
+@njit
 def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     """
     Generate a model 2d Gaussian with the given parameters.
@@ -1186,7 +1186,7 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
 
     return source
 
-
+@njit
 def ntwodgaussian_lmfit(params):
     """
     Convert an lmfit.Parameters object into a function which calculates the
@@ -1203,7 +1203,7 @@ def ntwodgaussian_lmfit(params):
     model : func
         A function f(x,y) that will compute the model.
     """
-
+    @njit
     def rfunc(x, y):
         """
         Compute the model given by params, at pixel coordinates x,y
@@ -1278,7 +1278,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     data = np.array(data)
     mask = np.where(np.isfinite(data))
 
-    @jit(nopython=True)
+    @njit
     def residual(params, x, y, B=None, errs=None):
         """
         The residual function required by lmfit
