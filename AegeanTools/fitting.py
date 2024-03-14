@@ -13,7 +13,7 @@ from AegeanTools.logging import logger
 from . import flags
 from .angle_tools import bear, gcd
 from .exceptions import AegeanNaNModelError
-from numba import jit, prange, object_, njit
+from numba import njit, prange
 
 __author__ = "Paul Hancock"
 
