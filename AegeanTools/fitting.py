@@ -14,6 +14,7 @@ from . import flags
 from .angle_tools import bear, gcd
 from .exceptions import AegeanNaNModelError
 from numba import jit, prange
+
 __author__ = "Paul Hancock"
 
 # ERR_MASK is used to indicate that the err_x value can't be determined
@@ -21,7 +22,7 @@ ERR_MASK = -1.0
 
 
 # Modelling and fitting functions
-@jit(nopython=True, parallel=True)
+@jit(nopython=True)
 def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     """
     Generate a model 2d Gaussian with the given parameters.
