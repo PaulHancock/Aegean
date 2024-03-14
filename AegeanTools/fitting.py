@@ -1279,7 +1279,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     mask = np.where(np.isfinite(data))
 
     @jit(nopython=True)
-    def residual(params, **kwargs):
+    def residual(params, x, y, B=None, errs=None):
         """
         The residual function required by lmfit
 
@@ -1294,7 +1294,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
             Model - Data
         """
         f = ntwodgaussian_lmfit(params)  # A function describing the model
-        model = f(*mask)  # The actual model
+        model = f(x ,y)  # The actual model
 
         if np.any(~np.isfinite(model)):
             raise AegeanNaNModelError(
