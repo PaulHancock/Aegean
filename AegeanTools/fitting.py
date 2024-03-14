@@ -13,7 +13,7 @@ from AegeanTools.logging import logger
 from . import flags
 from .angle_tools import bear, gcd
 from .exceptions import AegeanNaNModelError
-from numba import njit, prange
+from numba import jit, njit, prange
 
 __author__ = "Paul Hancock"
 
@@ -1186,7 +1186,7 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
 
     return source
 
-@njit
+# @njit # TODO explore how we can make Numba work with this
 def ntwodgaussian_lmfit(params):
     """
     Convert an lmfit.Parameters object into a function which calculates the
@@ -1203,7 +1203,7 @@ def ntwodgaussian_lmfit(params):
     model : func
         A function f(x,y) that will compute the model.
     """
-    @njit
+    # @njit #TODO explore how we can make Numba work with this
     def rfunc(x, y):
         """
         Compute the model given by params, at pixel coordinates x,y
@@ -1236,7 +1236,7 @@ def ntwodgaussian_lmfit(params):
 
     return rfunc
 
-
+#@njit #TODO explore how we can make Numba work with this
 def do_lmfit(data, params, B=None, errs=None, dojac=True):
     """
     Fit the model to the data
@@ -1278,7 +1278,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     data = np.array(data)
     mask = np.where(np.isfinite(data))
 
-    @njit
+    # @njit #TODO explore how we can make Numba work with this
     def residual(params, x, y, B=None, errs=None):
         """
         The residual function required by lmfit
