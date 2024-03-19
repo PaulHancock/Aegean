@@ -10,7 +10,9 @@ BANE: Background and Noise Estimation
 __author__ = ["Alec Thomson", "Tim Galvin"]
 __version__ = "0.0.0"
 
+from concurrent.futures import ThreadPoolExecutor
 import multiprocessing as mp
+from multiprocessing.pool import ThreadPool
 import os
 from pathlib import Path
 from time import time
@@ -240,6 +242,56 @@ def chunk_image(image_shape: Tuple[int, int], box_size: int) -> np.ndarray:
 
     return chunks
 
+@nb.njit(
+    nb.float32(
+        nb.float32[:],
+    ),
+    cache=True,
+)
+def median_jit(data: np.ndarray) -> float:
+    """Median of an array
+
+    Args:
+        data (np.ndarray): Data to find the median of
+
+    Returns:
+        float: Median of the data
+    """
+    return np.median(data)
+
+@nb.njit(
+    nb.float32(
+        nb.float32[:],
+    ),
+    cache=True,
+)
+def std_jit(data: np.ndarray) -> float:
+    """Standard deviation of an array
+
+    Args:
+        data (np.ndarray): Data to find the standard deviation of
+
+    Returns:
+        float: Standard deviation of the data
+    """
+    return np.std(data)
+
+@nb.njit(
+    nb.float32(
+        nb.float32[:],
+    ),
+    cache=True,
+)
+def mad_jit(data: np.ndarray) -> float:
+    """Median absolute deviation of an array
+
+    Args:
+        data (np.ndarray): Data to find the median absolute deviation of
+
+    Returns:
+        float: Median absolute deviation of the data
+    """
+    return np.median(np.abs(data - np.median(data)))
 
 @nb.njit(
     nb.float32(
@@ -282,17 +334,21 @@ def estimate_rms(
         bin_perc /= 100.0
 
     if mode == "std":
-        clipping_func = lambda data: np.std(data)
+        clipping_func = lambda data: np.nanstd(data)
+        # clipping_func = std_jit
+
 
     elif mode == "mad":
-        clipping_func = lambda data: np.median(np.abs(data - np.median(data)))
+        clipping_func = lambda data: np.nanmedian(np.abs(data - np.nanmedian(data)))
+        # clipping_func = mad_jit
+
 
     else:
         raise ValueError(
             f"{mode} not supported as a clipping mode, available modes are `std` and `mad`. "
         )
 
-    cen_func = lambda data: np.median(data)
+    cen_func = lambda data: np.nanmedian(data)
 
     for i in range(clip_rounds):
         data = data[np.abs(data - cen_func(data)) < outlier_thres * clipping_func(data)]
@@ -416,13 +472,15 @@ def robust_bane(
 
     # Run the FFT
     mean, avg_rms = bane_fft(image_ds, kernel, kern_sum)
-
+    # Catch small values
+    mean = np.nan_to_num(mean, nan=0.0)
+    avg_rms = np.nan_to_num(avg_rms, nan=0.0)
     # Upsample the mean and RMS to the original image size
     # Trying a shift first to see if it helps with the edge effects
     # mean_shift = ndimage.shift(mean, box_size*step_size)
     # avg_rms_shift = ndimage.shift(avg_rms, box_size*step_size)
-    mean_us = ndimage.zoom(mean, zoom, order=3, grid_mode=True)
-    avg_rms_us = ndimage.zoom(avg_rms, zoom, order=3, grid_mode=True)
+    mean_us = ndimage.zoom(mean, zoom, order=3, grid_mode=True, mode = "grid-constant")
+    avg_rms_us = ndimage.zoom(avg_rms, zoom, order=3, grid_mode=True, mode = "grid-constant")
 
     # Reapply mask
     mean_us[nan_mask] = np.nan
@@ -453,6 +511,7 @@ def init_outputs(
     for suffix in ("rms", "bkg"):
         out_file = Path(fits_file.as_posix().replace(".fits", f"_{suffix}.fits"))
         if out_file.exists():
+            logging.warning(f"Removing existing {out_file}")
             os.remove(out_file)
 
         header.tofile(out_file)
@@ -467,7 +526,6 @@ def init_outputs(
 
         logging.info(f"Created {out_file}")
         out_files.append(out_file)
-
     return out_files
 
 
@@ -560,7 +618,7 @@ def bane_3d(
     # Run BANE
     ncores = mp.cpu_count() if not ncores else ncores
     logging.info(f"Running BANE with {ncores} cores")
-    with mp.Pool(ncores) as pool:
+    with ThreadPool(ncores) as pool:
         pool.starmap(
             bane_3d_loop,
             [
@@ -635,7 +693,9 @@ def main(
     ncores: Optional[int] = None,
     kernel_str: str = "gauss",
     estimator_str: str = "mad_std",
+    all_in_mem: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
+    logging.info("Starting BANE (tools will be compiled...)")
     # Init output files
     out_files = init_outputs(fits_file, ext=ext)
     # Check for frequency axis and Stokes axis
@@ -643,6 +703,10 @@ def main(
     with fits.open(fits_file, memmap=True, mode="denywrite") as hdul:
         data = hdul[ext].data
         header = hdul[ext].header
+    
+    if all_in_mem:
+        logging.warning("Loading entire image into memory!")
+        data = np.array(data, dtype=np.float32)
 
     is_stokes_cube = len(data.shape) > 3 and data.shape[-1] > 1
     is_cube = len(data.shape) == 3
@@ -758,6 +822,11 @@ def cli():
         help="RMS estimator to use",
     )
     parser.add_argument(
+        "--all-in-mem",
+        action="store_true",
+        help="Load entire image into memory",
+    )
+    parser.add_argument(
         "-v",
         "--version",
         action="version",
@@ -778,6 +847,7 @@ def cli():
         ncores=args.ncores,
         kernel_str=args.kernel,
         estimator_str=args.estimator,
+        all_in_mem=args.all_in_mem,
     )
 
     return 0
