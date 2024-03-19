@@ -30,7 +30,8 @@ reqs = ['scipy>=0.16',
         'lmfit>=0.9.2',
         'scikit-learn>=0.24.2',
         'rocket-fft>=0.2.3',
-        'numba>=0.58'
+        'numba>=0.58',
+        'radio-beam'
         ]
 
 data_dir = 'AegeanTools/data'
