@@ -46,17 +46,29 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     data : numeric or array-like
         Gaussian function evaluated at the x,y locations.
     """
-    result = np.zeros_like(x)
-    for i in prange(x.shape[0]):
-        if theta % 90 == 0:
-            sint, cost = 0.0, 1.0
-        else:
-            sint, cost = math.sin(np.radians(theta)), math.cos(np.radians(theta))
-        xxo = x[i] - xo
-        yyo = y[i] - yo
-        exp = ((xxo * cost + yyo * sint) ** 2 / sx ** 2 + (xxo * sint - yyo * cost) ** 2 / sy ** 2) / -2
-        result[i] = amp * math.exp(exp)
-    return result
+    # try:
+    #     sint, cost = math.sin(np.radians(theta)), math.cos(np.radians(theta))
+    # except ValueError as e:
+    #     if "math domain error" in e.args:
+    #         sint, cost = np.nan, np.nan
+    # TODO This needs to be optimised further
+    if not np.isfinite(math.sin(np.radians(theta))):
+        sint = np.nan
+    else:
+        sint = math.sin(np.radians(theta))
+    
+    if not np.isfinite(math.cos(np.radians(theta))):
+        cost = np.nan
+    else:
+        cost = math.cos(np.radians(theta))
+    xxo = x - xo
+    yyo = y - yo
+    exp = (xxo * cost + yyo * sint) ** 2 / sx**2 + (
+        xxo * sint - yyo * cost
+    ) ** 2 / sy**2
+    exp *= -1.0 / 2
+    return amp * np.exp(exp)
+
 
 
 def elliptical_gaussian_with_alpha(
