@@ -54,13 +54,11 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     # TODO This needs to be optimised further
     if not np.isfinite(theta):
         sint = np.nan
-    else:
-        sint = math.sin(np.radians(theta))
-    
-    if not np.isfinite(theta):
         cost = np.nan
     else:
+        sint = math.sin(np.radians(theta))
         cost = math.cos(np.radians(theta))
+    
     xxo = x - xo
     yyo = y - yo
     exp = (xxo * cost + yyo * sint) ** 2 / sx**2 + (
