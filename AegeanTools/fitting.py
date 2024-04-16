@@ -13,7 +13,7 @@ from AegeanTools.logging import logger
 from . import flags
 from .angle_tools import bear, gcd
 from .exceptions import AegeanNaNModelError
-from numba import jit, njit, prange
+from numba import njit
 
 __author__ = "Paul Hancock"
 
@@ -46,12 +46,6 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     data : numeric or array-like
         Gaussian function evaluated at the x,y locations.
     """
-    # try:
-    #     sint, cost = math.sin(np.radians(theta)), math.cos(np.radians(theta))
-    # except ValueError as e:
-    #     if "math domain error" in e.args:
-    #         sint, cost = np.nan, np.nan
-    # TODO This needs to be optimised further
     if not np.isfinite(theta):
         sint = np.nan
         cost = np.nan
@@ -1196,7 +1190,6 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
 
     return source
 
-# @njit # TODO explore how we can make Numba work with this
 def ntwodgaussian_lmfit(params):
     """
     Convert an lmfit.Parameters object into a function which calculates the
@@ -1213,7 +1206,6 @@ def ntwodgaussian_lmfit(params):
     model : func
         A function f(x,y) that will compute the model.
     """
-    # @njit #TODO explore how we can make Numba work with this
     def rfunc(x, y):
         """
         Compute the model given by params, at pixel coordinates x,y
@@ -1246,7 +1238,6 @@ def ntwodgaussian_lmfit(params):
 
     return rfunc
 
-#@njit #TODO explore how we can make Numba work with this
 def do_lmfit(data, params, B=None, errs=None, dojac=True):
     """
     Fit the model to the data
@@ -1288,7 +1279,6 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     data = np.array(data)
     mask = np.where(np.isfinite(data))
 
-    # @njit #TODO explore how we can make Numba work with this
     def residual(params, x, y, B=None, errs=None):
         """
         The residual function required by lmfit
@@ -1304,7 +1294,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
             Model - Data
         """
         f = ntwodgaussian_lmfit(params)  # A function describing the model
-        model = f(x ,y)  # The actual model
+        model = f(*mask)  # The actual model
 
         if np.any(~np.isfinite(model)):
             raise AegeanNaNModelError(
