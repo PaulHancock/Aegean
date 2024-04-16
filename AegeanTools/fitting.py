@@ -52,12 +52,12 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     #     if "math domain error" in e.args:
     #         sint, cost = np.nan, np.nan
     # TODO This needs to be optimised further
-    if not np.isfinite(math.sin(np.radians(theta))):
+    if not np.isfinite(theta):
         sint = np.nan
     else:
         sint = math.sin(np.radians(theta))
     
-    if not np.isfinite(math.cos(np.radians(theta))):
+    if not np.isfinite(theta):
         cost = np.nan
     else:
         cost = math.cos(np.radians(theta))
