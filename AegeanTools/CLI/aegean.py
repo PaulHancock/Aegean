@@ -17,13 +17,7 @@ from AegeanTools.catalogs import check_table_formats, save_catalog, show_formats
 from AegeanTools.logging import logger, logging
 from AegeanTools.source_finder import get_aux_files
 from AegeanTools.wcs_helpers import Beam
-
-try:
-    import mpi4py
-    from mpi4py import MPI
-    MPI_AVAIL = True
-except ImportError:
-    MPI_AVAIL = False
+from AegeanTools.mpi import MPI_AVAIL, MPI
 
 
 header = """#Aegean version {0}
@@ -626,9 +620,8 @@ def main():
         }
         for t in options.tables.split(","):
             if MPI_AVAIL:
-                if MPI.COMM_WORLD.Get_size() > 1:
-                    base, ext = os.path.splitext(t)
-                    base += f"_{MPI.COMM_WORLD.Get_rank():02d}"
-                    t = base + ext
+                base, ext = os.path.splitext(t)
+                base += f"_{MPI.COMM_WORLD.Get_rank():02d}"
+                t = base + ext
             save_catalog(t, sources, prefix=options.column_prefix, meta=meta)
     return 0
