@@ -626,7 +626,7 @@ def main():
             save_catalog(t, sources, prefix=options.column_prefix, meta=meta)
 
     if MPI_AVAIL:
-        MPI.Comm.Barrier()
+        MPI.COMM_WORLD.Barrier()
         # collect and rejoin the catalogues
 
     return 0
