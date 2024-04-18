@@ -627,6 +627,7 @@ def main():
 
     if MPI_AVAIL:
         MPI.COMM_WORLD.Barrier()
+        print(f"{MPI.COMM_WORLD.Get_rank()} running on {MPI.COMM_WORLD.Get_name()}")
         # collect and rejoin the catalogues
 
     return 0
