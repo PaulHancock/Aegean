@@ -1,3 +1,8 @@
+### Apr 16 2024
+
+General
+- Enable njit for elliptical_gaussian function
+
 ### Jan 24 2024
 
 BANE
