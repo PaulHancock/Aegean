@@ -4,7 +4,7 @@ def test_import_mpi():
     try:
         from AegeanTools.mpi import MPI_AVAIL, MPI
     except Exception:
-        raise AssertionError("Error importing AegeaTools.mpi")
+        raise AssertionError("Error importing AegeanTools.mpi")
     
 
     try:
