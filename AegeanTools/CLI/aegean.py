@@ -624,4 +624,9 @@ def main():
                 base += f"_{MPI.COMM_WORLD.Get_rank():02d}"
                 t = base + ext
             save_catalog(t, sources, prefix=options.column_prefix, meta=meta)
+
+    if MPI_AVAIL:
+        MPI.Comm.Barrier()
+        # collect and rejoin the catalogues
+
     return 0
