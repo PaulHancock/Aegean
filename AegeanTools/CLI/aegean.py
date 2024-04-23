@@ -8,12 +8,13 @@ import os
 import sys
 
 import astropy
+from astropy.table import vstack
 import lmfit
 import numpy as np
 import scipy
 
 from AegeanTools import __citation__, __date__, __version__
-from AegeanTools.catalogs import check_table_formats, save_catalog, show_formats
+from AegeanTools.catalogs import check_table_formats, save_catalog, show_formats, load_table, write_table
 from AegeanTools.logging import logger, logging
 from AegeanTools.source_finder import get_aux_files
 from AegeanTools.wcs_helpers import Beam
@@ -618,16 +619,36 @@ def main():
             "FITSFILE": filename,
             "RUN-AS": invocation_string,
         }
+
+        # collect catalogues and clean up
+        if MPI_AVAIL:
+            catalog_list = []
         for t in options.tables.split(","):
+            final_file_name = t
             if MPI_AVAIL:
                 base, ext = os.path.splitext(t)
                 base += f"_{MPI.COMM_WORLD.Get_rank():02d}"
                 t = base + ext
             save_catalog(t, sources, prefix=options.column_prefix, meta=meta)
 
-    if MPI_AVAIL:
-        MPI.COMM_WORLD.Barrier()
-        print(f"{MPI.COMM_WORLD.Get_rank()} running on {MPI.Get_processor_name()}")
-        # collect and rejoin the catalogues
+        if MPI_AVAIL:
+            MPI.COMM_WORLD.Barrier()
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                for t in options.tables.split(","):
+                    flist = []
+                    base, ext = os.path.splitext(t)
+                    final_file_name = base + "_comp" + ext
+                    for n in range(0, MPI.COMM_WORLD.Get_size()):
+                        base, ext = os.path.splitext(t)
+                        base += f"_{n:02d}_comp" + ext
+                        flist.append(base)
+                    final_table = load_table(flist[0])
+                    for f in flist[1:]:
+                        table = load_table(f)
+                        final_table = vstack([final_table, table])
+                        os.remove(f)
+            
+                    write_table(final_table, final_file_name)
+                    logger.info(f"Wrote table name: {final_file_name}")
 
     return 0
