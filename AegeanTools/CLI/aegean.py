@@ -24,6 +24,31 @@ from AegeanTools.mpi import MPI_AVAIL, MPI
 header = """#Aegean version {0}
 # on dataset: {1}"""
 
+def addSuffix(file, suffix):
+    """
+    A function to add a specified suffix before the extension.
+
+    parameters
+    ----------
+    file: str
+        The current name of the file
+    
+    suffix: str or int
+        The desired suffix to be inserted before the extension
+    """
+    if isinstance(suffix, int):
+        base, ext = os.path.splitext(file)
+        base += f"_{suffix:02d}"
+        fname = base + ext
+    elif isinstance(suffix, str):
+        base, ext = os.path.splitext(file)
+        base += f"_{suffix}"
+        fname = base + ext
+    else:
+        return f"This file type is not support: {suffix}"
+
+    return fname
+    ...
 
 def check_projection(filename, options, log=logger):
     """
@@ -626,9 +651,7 @@ def main():
         for t in options.tables.split(","):
             final_file_name = t
             if MPI_AVAIL:
-                base, ext = os.path.splitext(t)
-                base += f"_{MPI.COMM_WORLD.Get_rank():02d}"
-                t = base + ext
+                t = addSuffix(t,MPI.COMM_WORLD.Get_rank())
             save_catalog(t, sources, prefix=options.column_prefix, meta=meta)
 
         if MPI_AVAIL:
@@ -636,11 +659,9 @@ def main():
             if MPI.COMM_WORLD.Get_rank() == 0:
                 for t in options.tables.split(","):
                     flist = []
-                    base, ext = os.path.splitext(t)
-                    final_file_name = base + "_comp" + ext
+                    final_file_name = addSuffix(t,"_comp")
                     for n in range(0, MPI.COMM_WORLD.Get_size()):
-                        base, ext = os.path.splitext(t)
-                        base += f"_{n:02d}_comp" + ext
+                        base = addSuffix(t,n)
                         flist.append(base)
                     final_table = load_table(flist[0])
                     for f in flist[1:]:
