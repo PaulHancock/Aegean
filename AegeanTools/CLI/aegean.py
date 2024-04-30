@@ -42,7 +42,7 @@ def addSuffix(file, suffix):
         fname = base + ext
     elif isinstance(suffix, str):
         if suffix[0] == "_":
-            str = str[1:]
+            suffix = str[1:]
         base, ext = os.path.splitext(file)
         base += f"_{suffix}"
         fname = base + ext
@@ -648,6 +648,7 @@ def main():
 
         # collect catalogues and clean up
         if MPI_AVAIL:
+            logger.info("MPI is available")
             catalog_list = []
         for t in options.tables.split(","):
             final_file_name = t

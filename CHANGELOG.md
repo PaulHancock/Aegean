@@ -3,6 +3,7 @@
 General
 - Created a addSuffix function in aegean.py to add a suffix to a filename
 
+- Added mpi4py to the dependencies
 ### Apr 16 2024
 
 General
