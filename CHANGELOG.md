@@ -1,3 +1,8 @@
+### Apr 30 2024
+
+General
+- Created a addSuffix function in aegean.py to add a suffix to a filename
+
 ### Apr 16 2024
 
 General

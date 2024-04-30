@@ -41,6 +41,8 @@ def addSuffix(file, suffix):
         base += f"_{suffix:02d}"
         fname = base + ext
     elif isinstance(suffix, str):
+        if suffix[0] == "_":
+            str = str[1:]
         base, ext = os.path.splitext(file)
         base += f"_{suffix}"
         fname = base + ext
@@ -658,9 +660,10 @@ def main():
             if MPI.COMM_WORLD.Get_rank() == 0:
                 for t in options.tables.split(","):
                     flist = []
-                    final_file_name = addSuffix(t,"_comp")
+                    final_file_name = addSuffix(t,"comp")
                     for n in range(0, MPI.COMM_WORLD.Get_size()):
                         base = addSuffix(t,n)
+                        base = addSuffix(base, "comp")
                         flist.append(base)
                     final_table = load_table(flist[0])
                     for f in flist[1:]:
