@@ -10,3 +10,9 @@ class AegeanNaNModelError(AegeanError):
     be NaNs in the data. It is a little
     misleading.
     """
+
+class AegeanSuffixError(AegeanError):
+    """
+    [Fill it in later]
+    """
+    pass

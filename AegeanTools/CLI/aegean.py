@@ -19,7 +19,7 @@ from AegeanTools.logging import logger, logging
 from AegeanTools.source_finder import get_aux_files
 from AegeanTools.wcs_helpers import Beam
 from AegeanTools.mpi import MPI_AVAIL, MPI
-
+from AegeanTools.exceptions import AegeanSuffixError
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -45,10 +45,9 @@ def addSuffix(file, suffix):
         base += f"_{suffix}"
         fname = base + ext
     else:
-        return f"This file type is not support: {suffix}"
+        raise AegeanSuffixError(f"This suffix type is not support: {suffix}") 
 
     return fname
-    ...
 
 def check_projection(filename, options, log=logger):
     """
