@@ -42,7 +42,7 @@ def addSuffix(file, suffix):
         fname = base + ext
     elif isinstance(suffix, str):
         if suffix[0] == "_":
-            suffix = str[1:]
+            suffix = suffix[1:]
         base, ext = os.path.splitext(file)
         base += f"_{suffix}"
         fname = base + ext
