@@ -48,5 +48,9 @@ class TestAddSuffix(unittest.TestCase):
         with self.assertRaises(AegeanSuffixError):
             addSuffix("sample.txt", ["invalid"])
 
-if __name__ == '__main__':
-    unittest.main()
+if __name__ == "__main__":
+    # introspect and run all the functions starting with 'test'
+    for f in dir():
+        if f.startswith("test"):
+            print(f)
+            globals()[f]()
