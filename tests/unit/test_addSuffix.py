@@ -1,37 +1,10 @@
 #! /usr/bin/env python
 
 import unittest
-import os
 from AegeanTools.exceptions import AegeanSuffixError
-
+from AegeanTools.CLI.aegean import addSuffix
 __author__ = "Ahmed Abdelmuniem Abdalla Mohammed"
 
-def addSuffix(file, suffix):
-    """
-    A function to add a specified suffix before the extension.
-
-    parameters
-    ----------
-    file: str
-        The current name of the file
-    
-    suffix: str or int
-        The desired suffix to be inserted before the extension
-    """
-    if isinstance(suffix, int):
-        base, ext = os.path.splitext(file)
-        base += f"_{suffix:02d}"
-        fname = base + ext
-    elif isinstance(suffix, str):
-        if suffix[0] == "_":
-            suffix = suffix[1:]
-        base, ext = os.path.splitext(file)
-        base += f"_{suffix}"
-        fname = base + ext
-    else:
-        raise AegeanSuffixError(f"This suffix type is not support: {suffix}") 
-
-    return fname
 
 class TestAddSuffix(unittest.TestCase):
 
