@@ -2028,7 +2028,6 @@ class SourceFinder(object):
                             continue
                         sources.append(src)
 
-        # TODO: make this work for multiple MPI ranks
         # Write the output to the output file
         if outfile:
             print(
