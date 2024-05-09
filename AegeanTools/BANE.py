@@ -5,8 +5,7 @@ This module contains all of the BANE specific code
 The function filter_image should be imported from elsewhere and run as is.
 """
 
-import warnings
-from typing import Tuple
+from typing import Tuple, Union, TypeAlias, Dict, Any
 
 import copy
 import logging
@@ -21,11 +20,23 @@ import numpy as np
 from astropy.io import fits
 from scipy.interpolate import RegularGridInterpolator
 
-from .fits_tools import compress
+from .fits_tools import compress 
+from .sigma import (
+    FittedSigmaClip, fit_bkg_rms_estimate, sigmaclip, fitted_sigma_clip, SigmaClip, FitBkgRmsEstimate
+)
 
 __author__ = 'Paul Hancock'
 __version__ = 'v1.10.0'
 __date__ = '2022-08-17'
+
+BANE_MODE_MAPPINGS = dict(
+    sigmaclip=SigmaClip,
+    fitrmsbkgestimate=FitBkgRmsEstimate,
+    fittedsigmaclip=FittedSigmaClip
+)
+AVAILABLE_MODES = tuple(BANE_MODE_MAPPINGS.keys())
+AVAILABLE_TYPES = tuple(BANE_MODE_MAPPINGS.values())
+ClippingModes: TypeAlias = Union[SigmaClip, FitBkgRmsEstimate, FittedSigmaClip]
 
 # global barrier for multiprocessing
 barrier = None
@@ -38,132 +49,6 @@ def init(b, mem):
     global barrier, memory_id
     barrier = b
     memory_id = mem
-
-
-def median_clip(data):
-    return np.median(np.abs(data - np.median(data)))
-
-def rms_estimate(
-    data: np.ndarray,
-    mode: str = "mad",
-    clip_rounds: int = 2,
-    bin_perc: float = 0.25,
-    outlier_thres: float = 3.0,
-    nan_check: bool = True,
-) -> Tuple[float,float]:
-    
-    if bin_perc > 1.0:
-        bin_perc /= 100.0
-
-    if mode == "std":
-        clipping_func = np.std
-
-    elif mode == "mad":
-        clipping_func = median_clip
-
-    else:
-        raise ValueError(
-            f"{mode} not supported as a clipping mode, available modes are `std` and `mad`. "
-        )
-
-    if nan_check:
-        data = data[np.isfinite(data)]
-
-    cen_func = np.median
-
-    for i in range(clip_rounds):
-        bkg = cen_func(data)
-        data = data[np.abs(data - bkg) < outlier_thres * clipping_func(data)]
-
-    # Attempts to ensure a sane number of bins to fit against
-    mask_counts = 0
-    loop = 1
-    while mask_counts < 5 and loop < 5:
-        counts, binedges = np.histogram(data, bins=50 * loop)
-        binc = (binedges[:-1] + binedges[1:]) / 2
-
-        mask = counts >= bin_perc * np.max(counts)
-        mask_counts = np.sum(mask)
-        loop += 1
-
-    p = np.polyfit(binc[mask], np.log10(counts[mask] / np.max(counts)), 2)
-    a, b, c = p
-
-    x1 = (-b + np.sqrt(b ** 2 - 4.0 * a * (c - np.log10(0.5)))) / (2.0 * a)
-    x2 = (-b - np.sqrt(b ** 2 - 4.0 * a * (c - np.log10(0.5)))) / (2.0 * a)
-    fwhm = np.abs(x1 - x2)
-    noise = fwhm / 2.355
-
-    return bkg, noise
-
-def sigmaclip(arr, lo, hi, reps=10):
-    """
-    Perform sigma clipping on an array, ignoring non finite values.
-
-    During each iteration return an array whose elements c obey:
-    mean -std*lo < c < mean + std*hi
-
-    where mean/std are the mean std of the input array.
-
-    Parameters
-    ----------
-    arr : iterable
-        An iterable array of numeric types.
-    lo : float
-        The negative clipping level.
-    hi : float
-        The positive clipping level.
-    reps : int
-        The number of iterations to perform. Default = 3.
-
-    Returns
-    -------
-    mean : float
-        The mean of the array, possibly nan
-    std : float
-        The std of the array, possibly nan
-
-    Notes
-    -----
-    Scipy v0.16 now contains a comparable method that will ignore nan/inf
-    values.
-    """
-    clipped = np.array(arr)[np.isfinite(arr)]
-
-    # with np.errstate(all='ignore'):
-        
-    #     bkg, rms = rms_estimate(data=clipped)
-
-    # # if np.isnan(rms):
-    # #     print(rms)
-    # #     print(clipped)
-
-    # return bkg, rms
-
-    if len(clipped) < 1:
-        return np.nan, np.nan
-
-    std = np.std(clipped)
-    mean = np.mean(clipped)
-    prev_valid = len(clipped)
-    for count in range(int(reps)):
-        mask = (clipped > mean-std*lo) & (clipped < mean+std*hi)
-        clipped = clipped[mask]
-
-        curr_valid = len(clipped)
-        if curr_valid < 1:
-            break
-        # No change in statistics if no change is noted
-        if prev_valid == curr_valid:
-            break
-        std = np.std(clipped)
-        mean = np.mean(clipped)
-        prev_valid = curr_valid
-    else:
-        logging.debug(
-            "No stopping criteria was reached after {0} cycles".format(count))
-
-    return mean, std
 
 
 def _sf2(args):
@@ -189,8 +74,60 @@ def _sf2(args):
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
+def box(r, c, data_shape, box_size):
+    """
+    calculate the boundaries of the box centered at r,c
+    with size = box_size
+    """
+    r_min = max(0, r - box_size[0] // 2)
+    r_max = min(data_shape[0] - 1, r + box_size[0] // 2)
+    c_min = max(0, c - box_size[1] // 2)
+    c_max = min(data_shape[1] - 1, c + box_size[1] // 2)
+    
+    return r_min, r_max, c_min, c_max
+
+
+def adaptive_box_estimate(data, row, column, box_size, mode: ClippingModes):
+    
+    r_min, r_max, c_min, c_max = box(
+        row, column, data_shape=data.shape, box_size=box_size
+    )
+    new = data[r_min:r_max, c_min:c_max]
+    new = new.flatten()
+    
+    if isinstance(mode, SigmaClip):
+        bkg, rms = sigmaclip(new, lo=mode.low, hi=mode.high)
+    elif isinstance(mode, FitBkgRmsEstimate):
+        bkg, rms = fit_bkg_rms_estimate(
+            data=new, clip_rounds=mode.clip_rounds, bin_perc=mode.bin_perc, outlier_thres=mode.outlier_thres
+        )
+    elif isinstance(mode, FittedSigmaClip):
+        bkg, rms = fitted_sigma_clip(data=new, sigma=mode.sigma)
+    else:
+        raise TypeError(f"Unrecognised type, {mode=}")
+    
+    return float(bkg), float(rms)
+        
+        # while attempt < 10 and np.isnan(rms):
+        #     r_min, r_max, c_min, c_max = box(row, col)
+        #     r_min -= enlarge 
+        #     r_max += enlarge 
+        #     c_min -=enlarge 
+        #     c_max += enlarge
+            
+        #     new = data[r_min:r_max, c_min:c_max]
+        #     new = np.ravel(new)
+        #     _, rms = sigmaclip(new, 3, 3)
+            
+        #     attempt += 1
+        #     enlarge = 50 * attempt
+            
+        #     if np.isnan(rms):
+        #         logging.info(f"Enlarging the box {enlarge}")
+        
+
 def sigma_filter(filename, region, step_size, box_size, shape, domask,
-                 cube_index):
+                 cube_index, mode):
     """
     Calculate the background and rms for a sub region of an image. The results
     are written to shared memory - irms and ibkg.
@@ -269,17 +206,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
     logging.debug('data size is {0}'.format(data.shape))
     logging.debug('data format is {0}'.format(data.dtype))
 
-    def box(r, c):
-        """
-        calculate the boundaries of the box centered at r,c
-        with size = box_size
-        """
-        r_min = max(0, r - box_size[0] // 2)
-        r_max = min(data.shape[0] - 1, r + box_size[0] // 2)
-        c_min = max(0, c - box_size[1] // 2)
-        c_max = min(data.shape[1] - 1, c + box_size[1] // 2)
-        return r_min, r_max, c_min, c_max
-
+    
     # set up a grid of rows/cols at which we will compute the bkg/rms
     rows = list(range(ymin-data_row_min, ymax-data_row_min, step_size[0]))
     rows.append(ymax-data_row_min)
@@ -288,14 +215,16 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
 
     # store the computed bkg/rms in this smaller array
     vals = np.zeros(shape=(len(rows), len(cols)))
-
+    
     for i, row in enumerate(rows):
         for j, col in enumerate(cols):
-            r_min, r_max, c_min, c_max = box(row, col)
-            new = data[r_min:r_max, c_min:c_max]
-            new = np.ravel(new)
-            bkg, _ = sigmaclip(new, 3, 3)
-            vals[i, j] = bkg
+            
+            bkg, rms = adaptive_box_estimate(
+                data=data, row=row, column=col, box_size=box_size, mode=mode
+            )
+            
+            if np.isfinite(bkg):
+                vals[i, j] = bkg
 
     # indices of all the pixels within our region
     gr, gc = np.mgrid[ymin-data_row_min:ymax-data_row_min, 0:shape[1]]
@@ -328,33 +257,14 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
 
     for i, row in enumerate(rows):
         for j, col in enumerate(cols):
-            attempt = 0
-            enlarge = 0
             rms = np.nan
+
+            bkg, rms = adaptive_box_estimate(
+                data=data, row=row, column=col, box_size=box_size, mode=mode
+            )
             
-            r_min, r_max, c_min, c_max = box(row, col)
-            new = data[r_min:r_max, c_min:c_max]
-            new = np.ravel(new)
-            _, rms = sigmaclip(new, 3, 3)
-            
-            # while attempt < 10 and np.isnan(rms):
-            #     r_min, r_max, c_min, c_max = box(row, col)
-            #     r_min -= enlarge 
-            #     r_max += enlarge 
-            #     c_min -=enlarge 
-            #     c_max += enlarge
-                
-            #     new = data[r_min:r_max, c_min:c_max]
-            #     new = np.ravel(new)
-            #     _, rms = sigmaclip(new, 3, 3)
-                
-            #     attempt += 1
-            #     enlarge = 50 * attempt
-                
-            #     if np.isnan(rms):
-            #         logging.info(f"Enlarging the box {enlarge}")
-                
-            vals[i, j] = rms
+            if np.isfinite(rms):
+                vals[i, j] = rms
 
     logging.debug("Interpolating rms to sharemem")
     ifunc = RegularGridInterpolator((rows, cols), vals)
@@ -383,7 +293,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
 
 def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
                        nslice=None, domask=True,
-                       cube_index=0):
+                       cube_index=0, mode: str='sigmaclip', mode_kwargs: Dict[str, Any]=None):
     """
     Calculate the background and noise images corresponding to the input file.
     The calculation is done via a box-car approach and uses multiple cores and
@@ -421,6 +331,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
     bkg, rms : numpy.ndarray
         The interpolated background and noise images.
     """
+    mode_kwargs = mode_kwargs if mode_kwargs else {}
 
     if cores is None:
         cores = multiprocessing.cpu_count()
@@ -446,11 +357,30 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
 
     logging.debug("ymins {0}".format(ymins))
     logging.debug("ymaxs {0}".format(ymaxs))
+    
+    
+    if mode.lower() not in AVAILABLE_MODES:
+        raise ValueError(f"Mode not recognised. Received {mode=}, available modes {AVAILABLE_MODES}")
+
+    logging.info(f"Using bane {mode=}")
+    mode: ClippingModes = BANE_MODE_MAPPINGS[mode.lower()](**mode_kwargs)
+
+    # if mode.lower() == 'sigmaclip':
+    #     logging.info(f"Using original estimate mode, {mode=}")
+    #     mode: ClippingModes = SigmaClip(**mode_kwargs)
+    # elif mode.lower() == 'fitrmsbkgestimate':
+    #     logging.info(f"Using fitting mode, {mode=}")
+    #     mode: ClippingModes = FitBkgRmsEstimate(**mode_kwargs)
+    # elif mode.lower() == 'fittedsigmaclip':
+    #     logging.info(f"Using fitted sigma clip, {mode=}")
+    #     mode: ClippingModes = FittedSigmaClip(**mode_kwargs)
+    # else:
+
 
     args = []
     for region in zip(ymins, ymaxs):
         args.append((filename, region, step_size, box_size,
-                    shape, domask, cube_index))
+                    shape, domask, cube_index, mode))
 
     exit = False
     try:
@@ -477,6 +407,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
             logging.error("Caught keyboard interrupt")
             pool.close()
             exit = True
+        except Exception as e:
+            logging.error(e)
         else:
             pool.close()
             pool.join()
@@ -500,7 +432,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
 def filter_image(im_name, out_base, step_size=None, box_size=None,
                  twopass=False,  # Deprecated
                  cores=None, mask=True, compressed=False, nslice=None,
-                 cube_index=None):
+                 cube_index=None, mode='sigmaclip'):
     """
     Create a background and noise image from an input image. Resulting images
     are written to `outbase_bkg.fits` and `outbase_rms.fits`
@@ -585,7 +517,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
     bkg, rms = filter_mc_sharemem(im_name,
                                   step_size=step_size, box_size=box_size,
                                   cores=cores, shape=shape, nslice=nslice,
-                                  domask=mask, cube_index=cube_index)
+                                  domask=mask, cube_index=cube_index, mode=mode)
     logging.info("done")
 
     if out_base is not None:
