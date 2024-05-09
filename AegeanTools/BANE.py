@@ -5,6 +5,9 @@ This module contains all of the BANE specific code
 The function filter_image should be imported from elsewhere and run as is.
 """
 
+import warnings
+from typing import Tuple
+
 import copy
 import logging
 import multiprocessing
@@ -28,7 +31,6 @@ __date__ = '2022-08-17'
 barrier = None
 memory_id = None
 
-
 def init(b, mem):
     """
     Set the global barrier and memory_id
@@ -37,6 +39,62 @@ def init(b, mem):
     barrier = b
     memory_id = mem
 
+
+def median_clip(data):
+    return np.median(np.abs(data - np.median(data)))
+
+def rms_estimate(
+    data: np.ndarray,
+    mode: str = "mad",
+    clip_rounds: int = 2,
+    bin_perc: float = 0.25,
+    outlier_thres: float = 3.0,
+    nan_check: bool = True,
+) -> Tuple[float,float]:
+    
+    if bin_perc > 1.0:
+        bin_perc /= 100.0
+
+    if mode == "std":
+        clipping_func = np.std
+
+    elif mode == "mad":
+        clipping_func = median_clip
+
+    else:
+        raise ValueError(
+            f"{mode} not supported as a clipping mode, available modes are `std` and `mad`. "
+        )
+
+    if nan_check:
+        data = data[np.isfinite(data)]
+
+    cen_func = np.median
+
+    for i in range(clip_rounds):
+        bkg = cen_func(data)
+        data = data[np.abs(data - bkg) < outlier_thres * clipping_func(data)]
+
+    # Attempts to ensure a sane number of bins to fit against
+    mask_counts = 0
+    loop = 1
+    while mask_counts < 5 and loop < 5:
+        counts, binedges = np.histogram(data, bins=50 * loop)
+        binc = (binedges[:-1] + binedges[1:]) / 2
+
+        mask = counts >= bin_perc * np.max(counts)
+        mask_counts = np.sum(mask)
+        loop += 1
+
+    p = np.polyfit(binc[mask], np.log10(counts[mask] / np.max(counts)), 2)
+    a, b, c = p
+
+    x1 = (-b + np.sqrt(b ** 2 - 4.0 * a * (c - np.log10(0.5)))) / (2.0 * a)
+    x2 = (-b - np.sqrt(b ** 2 - 4.0 * a * (c - np.log10(0.5)))) / (2.0 * a)
+    fwhm = np.abs(x1 - x2)
+    noise = fwhm / 2.355
+
+    return bkg, noise
 
 def sigmaclip(arr, lo, hi, reps=10):
     """
@@ -71,6 +129,16 @@ def sigmaclip(arr, lo, hi, reps=10):
     values.
     """
     clipped = np.array(arr)[np.isfinite(arr)]
+
+    # with np.errstate(all='ignore'):
+        
+    #     bkg, rms = rms_estimate(data=clipped)
+
+    # # if np.isnan(rms):
+    # #     print(rms)
+    # #     print(clipped)
+
+    # return bkg, rms
 
     if len(clipped) < 1:
         return np.nan, np.nan
@@ -260,10 +328,32 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
 
     for i, row in enumerate(rows):
         for j, col in enumerate(cols):
+            attempt = 0
+            enlarge = 0
+            rms = np.nan
+            
             r_min, r_max, c_min, c_max = box(row, col)
             new = data[r_min:r_max, c_min:c_max]
             new = np.ravel(new)
             _, rms = sigmaclip(new, 3, 3)
+            
+            # while attempt < 10 and np.isnan(rms):
+            #     r_min, r_max, c_min, c_max = box(row, col)
+            #     r_min -= enlarge 
+            #     r_max += enlarge 
+            #     c_min -=enlarge 
+            #     c_max += enlarge
+                
+            #     new = data[r_min:r_max, c_min:c_max]
+            #     new = np.ravel(new)
+            #     _, rms = sigmaclip(new, 3, 3)
+                
+            #     attempt += 1
+            #     enlarge = 50 * attempt
+                
+            #     if np.isnan(rms):
+            #         logging.info(f"Enlarging the box {enlarge}")
+                
             vals[i, j] = rms
 
     logging.debug("Interpolating rms to sharemem")
@@ -365,7 +455,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
     exit = False
     try:
         global memory_id
-        memory_id = str(uuid.uuid4())
+        memory_id = str(uuid.uuid4())[:15]
         nbytes = np.prod(shape) * np.float64(1).nbytes
         ibkg = SharedMemory(name=f'ibkg_{memory_id}', create=True, size=nbytes)
         irms = SharedMemory(name=f'irms_{memory_id}', create=True, size=nbytes)
@@ -393,7 +483,10 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
             bkg = np.ndarray(shape, buffer=ibkg.buf,
                              dtype=np.float64).astype(np.float32)
             rms = np.ndarray(shape, buffer=irms.buf,
-                             dtype=np.float64).astype(np.float32)
+                           dtype=np.float64).astype(np.float32)
+    
+    except Exception as e:
+        print(e)
     finally:
         ibkg.close()
         ibkg.unlink()
