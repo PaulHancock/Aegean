@@ -106,6 +106,9 @@ def adaptive_box_estimate(data, row, column, box_size, mode: ClippingModes):
     else:
         raise TypeError(f"Unrecognised type, {mode=}")
     
+    if not np.isfinite(bkg) and not np.isfinite(rms):
+        raise ValueError("Nasty nan")
+    
     return float(bkg), float(rms)
         
         # while attempt < 10 and np.isnan(rms):

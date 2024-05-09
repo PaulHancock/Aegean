@@ -1,25 +1,35 @@
 """Tooling around the rms and background estimation"""
 
 from re import L
-from typing import Tuple, NamedTuple
+from typing import Tuple, NamedTuple, Optional
 import logging 
 
 import numpy as np
-from scipy.stats import norm, normaltest
-from astropy.stats import mad_std, sigma_clip
+from scipy.stats import norm
+from astropy.stats import sigma_clip
 
 class FittedSigmaClip(NamedTuple):
     """Arguments for the fitted_sigma_clip"""
     sigma: int = 3 
     """Threshhold before clipped"""
 
-def fitted_mean(data: np.ndarray) -> float:
+def fitted_mean(data: np.ndarray, axis: Optional[int] =None) -> float:
+    if axis is not None:
+        # This is to make astropy sigma clip happy
+        raise NotImplementedError("Unexpected axis keyword. ")
+    
     mean, _ = norm.fit(data)
+    
     return mean
 
 
-def fitted_std(data: np.ndarray) -> float:
+def fitted_std(data: np.ndarray, axis: Optional[int]=None) -> float:
+    if axis is not None:
+        # This is to make astropy sigma clip happy
+        raise NotImplementedError("Unexpected axis keyword. ")
+    
     _, std = norm.fit(data)
+    
     return std
 
 def fitted_sigma_clip(data: np.ndarray, sigma: int=3) -> Tuple[float,float]:
@@ -29,12 +39,13 @@ def fitted_sigma_clip(data: np.ndarray, sigma: int=3) -> Tuple[float,float]:
     clipped_plane = sigma_clip(
         data.flatten(), 
         sigma=3, 
-        cenfunc=fitted_mean, 
+        cenfunc=np.median, 
         stdfunc=fitted_std, 
         maxiters=None
     )
     bkg, rms = norm.fit(clipped_plane.compressed())
 
+    return float(bkg), float(rms)
 
 class FitBkgRmsEstimate(NamedTuple):
     """Options for the fitting approach method"""
