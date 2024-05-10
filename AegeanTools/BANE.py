@@ -121,7 +121,6 @@ def adaptive_box_estimate(
     
     
     original_box = box_size
-    original_pixels = np.prod(original_box)
     loop = 0
     while True:
         test_box_size = tuple([b+loop*100 for b in original_box])
