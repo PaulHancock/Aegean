@@ -91,6 +91,33 @@ def box(r, c, data_shape, box_size):
 def adaptive_box_estimate(
     data: np.ndarray, row: int, column: int, box_size, mode: ClippingModes, max_loop: int = 5
 ) -> Tuple[float,float]:
+    """Estimate the background and RMS level within a data extract. Multiple
+    clipping and noise estimation modes are supported. 
+    
+    The adaptive behavour is only activated should the pixel statistics become
+    compromised. At the moment, this only is considered true if fewer than 80percent
+    of the pixels remain after clipping. 
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data that will be the source of the box extraction
+    row : int
+        Row to center extracted region at
+    column : int
+        Column to center extracted region at
+    box_size : Tuple[int,int]
+        Base size of the box to extract
+    mode : ClippingModes
+        Instance of a clipping and noise estiamtion mode to use. Should return a BANEResult and ahve a .perform method. 
+    max_loop : int, optional
+        Maximum number of adjustable boxes to use. Will increase in steps of 100 pixels. If 0 adative mode is disabled, by default 5
+
+    Returns
+    -------
+    Tuple[float,float]
+        Backgrounf and noise estimation
+    """
     
     
     original_box = box_size

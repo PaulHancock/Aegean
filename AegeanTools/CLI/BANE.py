@@ -105,5 +105,5 @@ def main(argv=()):
                       nslice=options.stripes,
                       cube_index=options.cube_index,
                       mode=options.mode,
-                      adapative_box=opts.adaptive_box)
+                      adaptive_box=options.adaptive_box)
     return 0
