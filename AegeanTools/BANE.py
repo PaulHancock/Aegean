@@ -19,6 +19,7 @@ from time import gmtime, strftime
 import numpy as np
 from astropy.io import fits
 from scipy.interpolate import RegularGridInterpolator
+from scipy.stats import normaltest
 
 from .fits_tools import compress 
 from .sigma import (
@@ -87,46 +88,34 @@ def box(r, c, data_shape, box_size):
     return r_min, r_max, c_min, c_max
 
 
-def adaptive_box_estimate(data, row, column, box_size, mode: ClippingModes):
+def adaptive_box_estimate(
+    data: np.ndarray, row: int, column: int, box_size, mode: ClippingModes
+) -> Tuple[float,float]:
     
-    r_min, r_max, c_min, c_max = box(
-        row, column, data_shape=data.shape, box_size=box_size
-    )
-    new = data[r_min:r_max, c_min:c_max]
-    new = new.flatten()
     
-    if isinstance(mode, SigmaClip):
-        bkg, rms = sigmaclip(new, lo=mode.low, hi=mode.high)
-    elif isinstance(mode, FitBkgRmsEstimate):
-        bkg, rms = fit_bkg_rms_estimate(
-            data=new, clip_rounds=mode.clip_rounds, bin_perc=mode.bin_perc, outlier_thres=mode.outlier_thres
+    original_box = box_size
+    original_pixels = np.prod(original_box)
+    loop = 0
+    while True:
+        test_box_size = tuple([b+loop*100 for b in original_box])
+        r_min, r_max, c_min, c_max = box(
+            row, column, data_shape=data.shape, box_size=test_box_size
         )
-    elif isinstance(mode, FittedSigmaClip):
-        bkg, rms = fitted_sigma_clip(data=new, sigma=mode.sigma)
-    else:
-        raise TypeError(f"Unrecognised type, {mode=}")
+        new = data[r_min:r_max, c_min:c_max]
+        new = new.flatten()
+        
+        result = mode.perform(data=new)
     
-    if not np.isfinite(bkg) and not np.isfinite(rms):
-        raise ValueError("Nasty nan")
+        if result.valid_pixels > 0.8 * original_pixels or loop > 5:
+            break
+        
+        loop += 1
+        
+    
+    rms = result.rms
+    bkg = result.bkg 
     
     return float(bkg), float(rms)
-        
-        # while attempt < 10 and np.isnan(rms):
-        #     r_min, r_max, c_min, c_max = box(row, col)
-        #     r_min -= enlarge 
-        #     r_max += enlarge 
-        #     c_min -=enlarge 
-        #     c_max += enlarge
-            
-        #     new = data[r_min:r_max, c_min:c_max]
-        #     new = np.ravel(new)
-        #     _, rms = sigmaclip(new, 3, 3)
-            
-        #     attempt += 1
-        #     enlarge = 50 * attempt
-            
-        #     if np.isnan(rms):
-        #         logging.info(f"Enlarging the box {enlarge}")
         
 
 def sigma_filter(filename, region, step_size, box_size, shape, domask,

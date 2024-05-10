@@ -8,11 +8,23 @@ import numpy as np
 from scipy.stats import norm
 from astropy.stats import sigma_clip
 
+class BANEResult(NamedTuple):
+    """Container for function results"""
+    rms: float
+    """RMS constrained"""
+    bkg: float 
+    """BKG constrained"""
+    valid_pixels: int 
+    """Number of pixels constrained against"""
+
 class FittedSigmaClip(NamedTuple):
     """Arguments for the fitted_sigma_clip"""
     sigma: int = 3 
     """Threshhold before clipped"""
-
+    
+    def perform(self, data: np.ndarray) -> BANEResult:
+        return fitted_sigma_clip(data=data, sigma=self.sigma)
+        
 def fitted_mean(data: np.ndarray, axis: Optional[int] =None) -> float:
     if axis is not None:
         # This is to make astropy sigma clip happy
@@ -32,20 +44,22 @@ def fitted_std(data: np.ndarray, axis: Optional[int]=None) -> float:
     
     return std
 
-def fitted_sigma_clip(data: np.ndarray, sigma: int=3) -> Tuple[float,float]:
+def fitted_sigma_clip(data: np.ndarray, sigma: int=3) -> BANEResult:
     
     data = data[np.isfinite(data)]
     
     clipped_plane = sigma_clip(
         data.flatten(), 
-        sigma=3, 
-        cenfunc=np.median, 
+        sigma=sigma, 
+        cenfunc=fitted_mean, 
         stdfunc=fitted_std, 
         maxiters=None
     )
     bkg, rms = norm.fit(clipped_plane.compressed())
 
-    return float(bkg), float(rms)
+    result = BANEResult(rms=float(rms), bkg=float(bkg), valid_pixels=len(clipped_plane.compressed()))
+
+    return result
 
 class FitBkgRmsEstimate(NamedTuple):
     """Options for the fitting approach method"""
@@ -56,6 +70,9 @@ class FitBkgRmsEstimate(NamedTuple):
     outlier_thres: float = 3.0
     """Threshold that a data point should be at to be considered an outlier"""
 
+    def perform(self, data: np.ndarray) -> BANEResult:
+        return fit_bkg_rms_estimate(data=data, clip_rounds=self.clip_rounds, bin_perc=self.bin_perc, outlier_thres=self.outlier_thres)
+
 def mad(data, bkg=None):
     bkg = bkg if bkg else np.median(data)
     return np.median(np.abs(data - bkg))
@@ -65,7 +82,7 @@ def fit_bkg_rms_estimate(
     clip_rounds: int = 2,
     bin_perc: float = 0.25,
     outlier_thres: float = 3.0,
-) -> Tuple[float,float]:
+) -> BANEResult:
     
     data = data[np.isfinite(data)]
 
@@ -74,7 +91,7 @@ def fit_bkg_rms_estimate(
     bkg = cen_func(data)
 
     for i in range(clip_rounds):
-        data = data[np.abs(data - bkg) < outlier_thres * mad(data, bkg=bkg)]
+        data = data[np.abs(data - bkg) < outlier_thres * 1.4826 * mad(data, bkg=bkg)]
         bkg = cen_func(data)
 
     # Attempts to ensure a sane number of bins to fit against
@@ -99,7 +116,9 @@ def fit_bkg_rms_estimate(
     fwhm = np.abs(x1 - x2)
     noise = fwhm / 2.355
 
-    return float(bkg), noise
+    result = BANEResult(rms=float(noise), bkg=float(bkg), valid_pixels=len(data))
+
+    return result
 
 
 
@@ -110,7 +129,10 @@ class SigmaClip(NamedTuple):
     high: float = 3.0
     """High sigma clip threshhold"""
 
-def sigmaclip(arr, lo, hi, reps=10):
+    def perform(self, data: np.ndarray) -> BANEResult:
+        return sigmaclip(arr=data, lo=self.low, hi=self.high)
+
+def sigmaclip(arr, lo, hi, reps=10) -> BANEResult:
     """
     Perform sigma clipping on an array, ignoring non finite values.
 
@@ -167,4 +189,6 @@ def sigmaclip(arr, lo, hi, reps=10):
         logging.debug(
             "No stopping criteria was reached after {0} cycles".format(count))
 
-    return mean, std
+    result = BANEResult(rms=float(std), bkg=float(mean), valid_pixels=len(clipped))
+
+    return result
