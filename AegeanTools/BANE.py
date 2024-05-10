@@ -133,10 +133,13 @@ def adaptive_box_estimate(
         
         result = mode.perform(data=new)
     
-        if result.valid_pixels > 0.8 * original_pixels or loop > max_loop:
+        if loop >= max_loop:
+            break
+        if all(np.isfinite(result))  and result.valid_pixels > 0.9 * len(new):
             break
         
         loop += 1
+        print(f"increasing, {loop=} {row=} {column=}")
         
     
     rms = result.rms
@@ -402,6 +405,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
     mode: ClippingModes = BANE_MODE_MAPPINGS[mode.lower()](**mode_kwargs)
 
     adaptive_loop = 5 if adaptive_box else 0
+    logging.info(f"Adaptive box resize loops: {adaptive_loop}")
 
     args = []
     for region in zip(ymins, ymaxs):
