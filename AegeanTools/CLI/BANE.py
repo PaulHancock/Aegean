@@ -57,6 +57,12 @@ def main(argv=()):
         default='sigmaclip', 
         help=f"Which bkg and rms estimation mode to use. Available are: {BANE.AVAILABLE_MODES}"
     )
+    group1.add_argument(
+        "--adaptive-box",
+        default=False,
+        action='store_true',
+        help="Allow the box-car to be resized should insufficent statistics be detected. "
+    )
 
     options = parser.parse_args(args=argv)
 
@@ -98,5 +104,6 @@ def main(argv=()):
                       mask=options.mask, compressed=options.compress,
                       nslice=options.stripes,
                       cube_index=options.cube_index,
-                      mode=options.mode)
+                      mode=options.mode,
+                      adapative_box=opts.adaptive_box)
     return 0

@@ -5,7 +5,7 @@ This module contains all of the BANE specific code
 The function filter_image should be imported from elsewhere and run as is.
 """
 
-from typing import Tuple, Union, TypeAlias, Dict, Any
+from typing import Tuple, Union, TypeAlias, Dict, Any, Optional
 
 import copy
 import logging
@@ -89,7 +89,7 @@ def box(r, c, data_shape, box_size):
 
 
 def adaptive_box_estimate(
-    data: np.ndarray, row: int, column: int, box_size, mode: ClippingModes
+    data: np.ndarray, row: int, column: int, box_size, mode: ClippingModes, max_loop: int = 5
 ) -> Tuple[float,float]:
     
     
@@ -106,7 +106,7 @@ def adaptive_box_estimate(
         
         result = mode.perform(data=new)
     
-        if result.valid_pixels > 0.8 * original_pixels or loop > 5:
+        if result.valid_pixels > 0.8 * original_pixels or loop > max_loop:
             break
         
         loop += 1
@@ -119,7 +119,7 @@ def adaptive_box_estimate(
         
 
 def sigma_filter(filename, region, step_size, box_size, shape, domask,
-                 cube_index, mode):
+                 cube_index, mode, adaptive_loop=0):
     """
     Calculate the background and rms for a sub region of an image. The results
     are written to shared memory - irms and ibkg.
@@ -147,6 +147,13 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
 
     cube_index : int
         The index into the 3rd dimension (if present)
+
+    mode  : ClippingModes
+        Which of the clipping modes to use. 
+        
+    adaptive_loop  : int
+        The maximum number of resizes allowed should a box be resized. If 0 this is turned off.
+        Default = 0
 
     Returns
     -------
@@ -212,7 +219,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
         for j, col in enumerate(cols):
             
             bkg, rms = adaptive_box_estimate(
-                data=data, row=row, column=col, box_size=box_size, mode=mode
+                data=data, row=row, column=col, box_size=box_size, mode=mode, max_loop=adaptive_loop
             )
             
             if np.isfinite(bkg):
@@ -252,7 +259,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
             rms = np.nan
 
             bkg, rms = adaptive_box_estimate(
-                data=data, row=row, column=col, box_size=box_size, mode=mode
+                data=data, row=row, column=col, box_size=box_size, mode=mode, max_loop=adaptive_loop
             )
             
             if np.isfinite(rms):
@@ -285,7 +292,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
 
 def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
                        nslice=None, domask=True,
-                       cube_index=0, mode: str='sigmaclip', mode_kwargs: Dict[str, Any]=None):
+                       cube_index=0, mode: str='sigmaclip', mode_kwargs: Optional[Dict[str, Any]]=None,
+                       adaptive_box: bool=False):
     """
     Calculate the background and noise images corresponding to the input file.
     The calculation is done via a box-car approach and uses multiple cores and
@@ -317,6 +325,15 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
 
     cube_index : int
         For 3d data use this index into the third dimension. Default = 0
+
+    mode  : str
+        Which background and rms estimation mode to use. 
+        Default = 'sigmaclip', which is the original BANE mode. 
+        
+    adaptive_box  : bool
+         Resize the box-car should a position be deemed to have unreliable
+         statistics. Default = False. 
+
 
     Returns
     -------
@@ -357,22 +374,12 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
     logging.info(f"Using bane {mode=}")
     mode: ClippingModes = BANE_MODE_MAPPINGS[mode.lower()](**mode_kwargs)
 
-    # if mode.lower() == 'sigmaclip':
-    #     logging.info(f"Using original estimate mode, {mode=}")
-    #     mode: ClippingModes = SigmaClip(**mode_kwargs)
-    # elif mode.lower() == 'fitrmsbkgestimate':
-    #     logging.info(f"Using fitting mode, {mode=}")
-    #     mode: ClippingModes = FitBkgRmsEstimate(**mode_kwargs)
-    # elif mode.lower() == 'fittedsigmaclip':
-    #     logging.info(f"Using fitted sigma clip, {mode=}")
-    #     mode: ClippingModes = FittedSigmaClip(**mode_kwargs)
-    # else:
-
+    adaptive_loop = 5 if adaptive_box else 0
 
     args = []
     for region in zip(ymins, ymaxs):
         args.append((filename, region, step_size, box_size,
-                    shape, domask, cube_index, mode))
+                    shape, domask, cube_index, mode, adaptive_loop))
 
     exit = False
     try:
@@ -424,7 +431,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
 def filter_image(im_name, out_base, step_size=None, box_size=None,
                  twopass=False,  # Deprecated
                  cores=None, mask=True, compressed=False, nslice=None,
-                 cube_index=None, mode='sigmaclip'):
+                 cube_index=None, mode='sigmaclip', adaptive_box: bool=False):
     """
     Create a background and noise image from an input image. Resulting images
     are written to `outbase_bkg.fits` and `outbase_rms.fits`
@@ -466,6 +473,14 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
     cube_index : int
         If the input data is 3d, then use this index for the 3rd dimension.
         Default = None, use the first index.
+
+    mode  : str
+        Which background and rms estimation mode to use. 
+        Default = 'sigmaclip', which is the original BANE mode. 
+        
+    adaptive_box  : bool
+         Resize the box-car should a position be deemed to have unreliable
+         statistics. Default = False. 
 
     Returns
     -------
@@ -509,7 +524,8 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
     bkg, rms = filter_mc_sharemem(im_name,
                                   step_size=step_size, box_size=box_size,
                                   cores=cores, shape=shape, nslice=nslice,
-                                  domask=mask, cube_index=cube_index, mode=mode)
+                                  domask=mask, cube_index=cube_index, mode=mode,
+                                  adaptive_box=adaptive_box)
     logging.info("done")
 
     if out_base is not None:
