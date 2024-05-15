@@ -23,7 +23,7 @@ from scipy.stats import normaltest
 
 from .fits_tools import compress 
 from .sigma import (
-    FittedSigmaClip, fit_bkg_rms_estimate, sigmaclip, fitted_sigma_clip, SigmaClip, FitBkgRmsEstimate
+    FitGaussianCDF, FittedSigmaClip, SigmaClip, FitBkgRmsEstimate, FitGaussianCDF
 )
 
 __author__ = 'Paul Hancock'
@@ -33,11 +33,12 @@ __date__ = '2022-08-17'
 BANE_MODE_MAPPINGS = dict(
     sigmaclip=SigmaClip,
     fitrmsbkgestimate=FitBkgRmsEstimate,
-    fittedsigmaclip=FittedSigmaClip
+    fittedsigmaclip=FittedSigmaClip,
+    fitgaussiancdf=FitGaussianCDF
 )
 AVAILABLE_MODES = tuple(BANE_MODE_MAPPINGS.keys())
 AVAILABLE_TYPES = tuple(BANE_MODE_MAPPINGS.values())
-ClippingModes: TypeAlias = Union[SigmaClip, FitBkgRmsEstimate, FittedSigmaClip]
+ClippingModes: TypeAlias = Union[SigmaClip, FitBkgRmsEstimate, FittedSigmaClip, FitGaussianCDF]
 
 # global barrier for multiprocessing
 barrier = None
@@ -143,6 +144,8 @@ def adaptive_box_estimate(
     
     rms = result.rms
     bkg = result.bkg 
+    
+    # print(f"{row} {column}")
     
     return float(bkg), float(rms)
         

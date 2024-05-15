@@ -1,11 +1,13 @@
 """Tooling around the rms and background estimation"""
 
 from re import L
-from typing import Tuple, NamedTuple, Optional
+from typing import Tuple, NamedTuple, Optional, Callable
 import logging 
 
 import numpy as np
 from scipy.stats import norm
+from scipy.special import erf
+from scipy.optimize import minimize
 from astropy.stats import sigma_clip
 
 class BANEResult(NamedTuple):
@@ -16,6 +18,96 @@ class BANEResult(NamedTuple):
     """BKG constrained"""
     valid_pixels: int 
     """Number of pixels constrained against"""
+
+
+class FitGaussianCDF(NamedTuple):
+    """Options for the fitting approach method"""
+    linex_args: Tuple[float,float] = (0.1, 1.0)
+    
+    def perform(self, data: np.ndarray) -> BANEResult:
+        return fit_gaussian_cdf(data=data, linex_args=self.linex_args)
+
+
+def softmax(x: np.ndarray, offset: float=0) -> np.ndarray:
+    """Activation function"""
+    return np.log(1+np.exp(x + offset))
+
+def gaussian_cdf(x: np.ndarray, mu: float, sig: float) -> np.ndarray:
+    """Calculate teh cumulative distribution given a mu and sig across x-values"""
+    top = x - mu
+    bottom = 1.412 * sig
+    
+    return 0.5 * (1. + erf(top / bottom))
+
+
+def linear_squared(x: np.ndarray, a: float, b: float) -> np.ndarray:
+    """Non-linear loss function. Residuals below zero are scaled via the 
+    linear gradient `a`. The squared-residual of residual values above 
+    zero are scaled by factor `b`.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Residuals to scale via this linear-squared function
+    a : float
+        Gradient to apply to `x` values below zero
+    b : float
+        Scale to apply to the squared `x` values when `x` is above zero
+
+    Returns
+    -------
+    np.ndarray
+        Cost of each residual. This vector should be summed and treated as the loss when optimizing
+    """
+    
+    mask = x < 0
+    
+    return (a * -x + 1) * mask + (b * (1. + x))** 2. * ~mask
+
+    x = x.copy()
+
+    x[mask]  = a * -x[mask] + 1
+    x[~mask] = b * (1+x[~mask])**2
+    
+    return x
+
+def make_fitness(
+    x: np.ndarray, y: np.ndarray, a: float, b: float
+) -> Callable:
+    """Creates the cost function on the (x,y) values that will be used throughout minimisation. """
+    
+    def loss_function(args):
+        mu, sig, scalar = args
+
+        s = np.sum(
+            linear_squared(
+                gaussian_cdf(x, mu, sig) * softmax(scalar) - y, 
+                a, 
+                b, 
+            )
+        )
+        
+        return s
+    return loss_function
+
+def fit_gaussian_cdf(data: np.ndarray, linex_args: Tuple[float,float] = (0.1, 1.0)) -> BANEResult:
+
+    data = data[np.isfinite(data)].flatten()
+
+    sort_data = np.sort(data)
+    cdf_data = np.arange(start=0, stop=1, step=1./len(sort_data))
+
+    func = make_fitness(sort_data, cdf_data, *linex_args)
+    
+    res = minimize(
+        func, (0, 0.0001, 0.8),
+        # tol=1e-7,
+        method='Nelder-Mead'
+    )
+
+    bane_result = BANEResult(rms=res.x[1], bkg=res.x[0], valid_pixels=int(res.x[2] * len(data)))
+
+    return bane_result
 
 class FittedSigmaClip(NamedTuple):
     """Arguments for the fitted_sigma_clip"""
