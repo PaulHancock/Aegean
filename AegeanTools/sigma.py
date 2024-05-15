@@ -28,9 +28,9 @@ class FitGaussianCDF(NamedTuple):
         return fit_gaussian_cdf(data=data, linex_args=self.linex_args)
 
 
-def softmax(x: np.ndarray, offset: float=0) -> np.ndarray:
+def softmax(x: np.ndarray) -> np.ndarray:
     """Activation function"""
-    return np.log(1+np.exp(x + offset))
+    return np.log(1+np.exp(x))
 
 def gaussian_cdf(x: np.ndarray, mu: float, sig: float) -> np.ndarray:
     """Calculate teh cumulative distribution given a mu and sig across x-values"""
@@ -63,13 +63,6 @@ def linear_squared(x: np.ndarray, a: float, b: float) -> np.ndarray:
     mask = x < 0
     
     return (a * -x + 1) * mask + (b * (1. + x))** 2. * ~mask
-
-    x = x.copy()
-
-    x[mask]  = a * -x[mask] + 1
-    x[~mask] = b * (1+x[~mask])**2
-    
-    return x
 
 def make_fitness(
     x: np.ndarray, y: np.ndarray, a: float, b: float

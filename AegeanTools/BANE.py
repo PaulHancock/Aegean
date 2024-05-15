@@ -145,7 +145,7 @@ def adaptive_box_estimate(
     rms = result.rms
     bkg = result.bkg 
     
-    # print(f"{row} {column}")
+    print(f"{row} {column}")
     
     return float(bkg), float(rms)
         
