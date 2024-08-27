@@ -12,7 +12,7 @@ requires-python=">=3.8"
 dependencies = [
     "scipy>=0.16",
     "tqdm>=4",
-    "numpy>=1.16",
+    "numpy>=1.16, <2.0",
     "astropy>=2.0",
     "healpy >=1.10",
     "lmfit>=0.9.2",
