@@ -251,7 +251,8 @@ def write_fits(data, header, file_name):
     return
 
 
-def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0):
+def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=False): # TODO rename the function
+    # TODO Checks if it is a cube, update the doc string and write a unit test.
     """
     Load a subset of an image from a given filename.
     The subset is controlled using the band, which is (this band, total bands)
@@ -298,11 +299,11 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0):
             data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
         elif NAXIS == 3:
             data = a[hdu_index].section[
-                cube_index, row_min:row_max, 0 : header["NAXIS1"]
+                cube_index, row_min:row_max, 0 : header["NAXIS1"] # Renamed cube_index to frequency index
             ]
         elif NAXIS == 4:
             data = a[hdu_index].section[
-                0, cube_index, row_min:row_max, 0 : header["NAXIS1"]
+                0, cube_index, row_min:row_max, 0 : header["NAXIS1"] # Renamed cube_index to frequency index
             ]
         else:
             raise Exception(f"Too many NAXIS: {NAXIS}>4")
