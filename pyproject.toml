@@ -19,8 +19,8 @@ dependencies = [
     "scikit-learn>=0.24.2",
     "numba>=0.58",
 ]
-[project.optional-dependencies]
-mpi=["mpi4py>=3.1.6"]
+# [project.optional-dependencies]
+# mpi=["mpi4py>=3.1.6"]
 
 classifiers=[
     "Development Status :: 5 - Production/Stable",
