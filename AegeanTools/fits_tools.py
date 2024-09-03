@@ -251,8 +251,7 @@ def write_fits(data, header, file_name):
     return
 
 
-def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=False): # TODO rename the function
-    # TODO Checks if it is a cube, update the doc string and write a unit test.
+def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=False):
     """
     Load a subset of an image from a given filename.
     The subset is controlled using the band, which is (this band, total bands)
@@ -265,6 +264,9 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=Fa
         (this band, total bands)
         Default (0,1)
 
+    as_cube : boolean
+        This is a flag that determines whether the data to be processed is a cube 
+        or a frequency slice
     returns
     -------
     data, header : :class:`numpy.ndarray`, :class:`astropy.io.fits.header.Header`
@@ -296,14 +298,22 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=Fa
     NAXIS = header["NAXIS"]
     with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
         if NAXIS == 2:
-            data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
+            if not as_cube:
+                data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
+            else:
+                raise AegeanError("Data passed as a cube but only 2 axes were provided")
         elif NAXIS == 3:
+            if not as_cube:
+                data = a[hdu_index].section[
+                cube_index, row_min:row_max, 0 : header["NAXIS1"] #? Why is there a 0 at the end of the columns?
+                ]
+            else:
+                data = a[hdu_index].section[
+                cube_index: , row_min:row_max, 0 : header["NAXIS1"] #! Check the comma
+                ]
+        elif NAXIS == 4: #? Why not move this into the exception below?
             data = a[hdu_index].section[
-                cube_index, row_min:row_max, 0 : header["NAXIS1"] # Renamed cube_index to frequency index
-            ]
-        elif NAXIS == 4:
-            data = a[hdu_index].section[
-                0, cube_index, row_min:row_max, 0 : header["NAXIS1"] # Renamed cube_index to frequency index
+                0, cube_index: , row_min:row_max, 0 : header["NAXIS1"]
             ]
         else:
             raise Exception(f"Too many NAXIS: {NAXIS}>4")

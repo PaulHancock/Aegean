@@ -13,6 +13,6 @@ class AegeanNaNModelError(AegeanError):
 
 class AegeanSuffixError(AegeanError):
     """
-    [Fill it in later]
+    This is a child class of AegeanError that is raised when an incorrect suffix is provided
     """
     pass
