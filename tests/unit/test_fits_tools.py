@@ -204,7 +204,7 @@ def test_load_image_band_2d_as_cube_false():
     try:
         data, header = fits_tools.load_image_band("tests/test_files/1904-66_AIT.fits", as_cube = False)
     except Exception as e:
-        raise e #? Why not use assert?
+        raise e
     if not isinstance(data, np.ndarray):
         raise AssertionError("Loaded data is not an np.ndarray object")
     if not isinstance(header, fits.Header):
