@@ -251,7 +251,7 @@ class IslandSource(SimpleSource):
         return self.__gt__(other) or self.__eq__(other)
 
 
-class ComponentSource(SimpleSource):
+class ComponentSource(SimpleSource): #! <- This is the entry point
     """
     A Gaussian component, aka a source, that was measured by Aegean.
 

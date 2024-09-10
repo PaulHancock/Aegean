@@ -889,6 +889,7 @@ class SourceFinder(object):
         blank=False,
         docov=True,
         cube_index=None,
+        as_cube = False, #! Added this flag
     ):
         """
         Populate the global_data object by loading or calculating
@@ -938,74 +939,88 @@ class SourceFinder(object):
 
         cube_index : int
           For an image cube, which slice to use.
-
+        
+        as_cube : bool #! Added this docstring
+          If the data is to be processed as a cube or not.
         """
         # don't reload already loaded data
         if self.img is not None:
             return
 
         img, header = load_image_band(
-            filename, hdu_index=hdu_index, cube_index=cube_index
+            filename, hdu_index=hdu_index, cube_index=cube_index, as_cube = as_cube
         )
 
         debug = logger.isEnabledFor(logging.DEBUG)
 
-        if mask is not None:
-            # allow users to supply and object instead of a filename
-            if isinstance(mask, Region):
-                self.region = mask
-            elif os.path.exists(mask):
-                logger.info("Loading mask from {0}".format(mask))
-                self.region = Region.load(mask)
-            else:
-                logger.error("File {0} not found for loading".format(mask))
-                self.region = None
+        if not as_cube:
+            self.img = img
+            self.header = header
+            self.dtype = type(self.img[0][0])
+            self.bkgimg = np.zeros(self.img.shape, dtype=self.dtype)
+            self.rmsimg = np.zeros(self.img.shape, dtype=self.dtype)
 
-        self.wcshelper = WCSHelper.from_header(header, beam, psf_file=psf)
-        self.beam = self.wcshelper.beam
+            self.cube_index = cube_index
 
-        self.img = img
-        self.header = header
-        self.dtype = type(self.img[0][0])
-        self.bkgimg = np.zeros(self.img.shape, dtype=self.dtype)
-        self.rmsimg = np.zeros(self.img.shape, dtype=self.dtype)
+            #! moved inside the if statement ->
+            self.wcshelper = WCSHelper.from_header(header, beam, psf_file=psf)
+            self.beam = self.wcshelper.beam
 
-        self.cube_index = cube_index
+            if mask is not None: #! moved into the if statement
+            # allow users to supply an object instead of a filename
+                if isinstance(mask, Region):
+                    self.region = mask
+                elif os.path.exists(mask):
+                    logger.info("Loading mask from {0}".format(mask))
+                    self.region = Region.load(mask)
+                else:
+                    logger.error("File {0} not found for loading".format(mask))
+                    self.region = None
 
-        if do_curve:
-            logger.info("Calculating curvature")
-            # calculate curvature but store it as -1,0,+1
-            dcurve = np.zeros(self.img.shape, dtype=np.int8)
-            peaks = maximum_filter(self.img, size=3)
-            troughs = minimum_filter(self.img, size=3)
-            pmask = np.where(self.img == peaks)
-            tmask = np.where(self.img == troughs)
-            dcurve[pmask] = -1
-            dcurve[tmask] = 1
-            self.dcurve = dcurve
+            if do_curve:
+                logger.info("Calculating curvature")
+                # calculate curvature but store it as -1,0,+1
+                dcurve = np.zeros(self.img.shape, dtype=np.int8)
+                peaks = maximum_filter(self.img, size=3)
+                troughs = minimum_filter(self.img, size=3)
+                pmask = np.where(self.img == peaks)
+                tmask = np.where(self.img == troughs)
+                dcurve[pmask] = -1
+                dcurve[tmask] = 1
+                self.dcurve = dcurve
 
-        # if either of rms or bkg images are not supplied
-        # then calculate them both
-        if not (rmsin and bkgin):
-            if verb:
-                logger.info("Calculating background and rms data")
-            self._make_bkg_rms(
-                filename=filename,
-                forced_rms=rms,
-                forced_bkg=bkg,
-                cores=cores,
-            )
+                # if either of rms or bkg images are not supplied
+                # then calculate them both
+                if not (rmsin and bkgin):
+                    # TODO If as cube is True, raise an error
+                    #! Moved it inside an if statement instead
+                    if verb:
+                        logger.info("Calculating background and rms data")
+                    self._make_bkg_rms(
+                        filename=filename,
+                        forced_rms=rms,
+                        forced_bkg=bkg,
+                        cores=cores,
+                    )
+
+        else:
+            self.img = img
+            self.header = header
+            self.dtype = type(self.img[0][0])
+
+            self.wcshelper = WCSHelper.from_header(header, beam)
+            self.beam = self.wcshelper.beam
 
         # replace the calculated images with input versions,
         # if the user has supplied them.
         if bkgin:
             if verb:
                 logger.info("Loading background data from file {0}".format(bkgin))
-            self.bkgimg = self._load_aux_image(img, bkgin)
+            self.bkgimg = self._load_aux_image(img, bkgin, as_cube=as_cube)
         if rmsin:
             if verb:
                 logger.info("Loading rms data from file {0}".format(rmsin))
-            self.rmsimg = self._load_aux_image(img, rmsin)
+            self.rmsimg = self._load_aux_image(img, rmsin, as_cube=as_cube)
 
         # subtract the background image from the data image and save
         if verb and debug:
@@ -1221,7 +1236,7 @@ class SourceFinder(object):
 
         return
 
-    def _load_aux_image(self, image, auxfile):
+    def _load_aux_image(self, image, auxfile, as_cube=False):
         """
         Load a fits file (bkg/rms/curve) and make sure that
         it is the same shape as the main image.
@@ -1240,7 +1255,7 @@ class SourceFinder(object):
           The loaded image.
         """
 
-        auximg, _ = load_image_band(auxfile)
+        auximg, _ = load_image_band(auxfile, as_cube=as_cube)
 
         if auximg.shape != image.shape:
             logger.error(

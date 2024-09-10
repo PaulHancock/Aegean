@@ -264,6 +264,9 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0):
         (this band, total bands)
         Default (0,1)
 
+    as_cube : boolean
+        This is a flag that determines whether the data to be processed is a cube 
+        or a frequency slice
     returns
     -------
     data, header : :class:`numpy.ndarray`, :class:`astropy.io.fits.header.Header`
@@ -297,12 +300,17 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0):
         if NAXIS == 2:
             data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
         elif NAXIS == 3:
+            if not as_cube:
+                data = a[hdu_index].section[
+                cube_index, row_min:row_max, 0 : header["NAXIS1"] #? Why is there a 0 at the end of the columns?
+                ]
+            else:
+                data = a[hdu_index].section[
+                cube_index: , row_min:row_max, 0 : header["NAXIS1"] #! Check the comma
+                ]
+        elif NAXIS == 4: #? Why not move this into the exception below?
             data = a[hdu_index].section[
-                cube_index, row_min:row_max, 0 : header["NAXIS1"]
-            ]
-        elif NAXIS == 4:
-            data = a[hdu_index].section[
-                0, cube_index, row_min:row_max, 0 : header["NAXIS1"]
+                0, cube_index: , row_min:row_max, 0 : header["NAXIS1"]
             ]
         else:
             raise Exception(f"Too many NAXIS: {NAXIS}>4")
