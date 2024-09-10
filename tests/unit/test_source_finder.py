@@ -173,8 +173,6 @@ def test_load_globals_cube():
     else:
         raise AssertionError()
 
-# TODO np.allclose(sfinder.img, 0)
-
 def test_find_and_prior_sources():
     """Test find sources and prior sources"""
     try:

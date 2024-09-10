@@ -251,7 +251,7 @@ def write_fits(data, header, file_name):
     return
 
 
-def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0):
+def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=False):
     """
     Load a subset of an image from a given filename.
     The subset is controlled using the band, which is (this band, total bands)

@@ -889,7 +889,7 @@ class SourceFinder(object):
         blank=False,
         docov=True,
         cube_index=None,
-        as_cube = False, #! Added this flag
+        as_cube = False,
     ):
         """
         Populate the global_data object by loading or calculating
@@ -940,7 +940,7 @@ class SourceFinder(object):
         cube_index : int
           For an image cube, which slice to use.
         
-        as_cube : bool #! Added this docstring
+        as_cube : bool
           If the data is to be processed as a cube or not.
         """
         # don't reload already loaded data
@@ -962,11 +962,10 @@ class SourceFinder(object):
 
             self.cube_index = cube_index
 
-            #! moved inside the if statement ->
             self.wcshelper = WCSHelper.from_header(header, beam, psf_file=psf)
             self.beam = self.wcshelper.beam
 
-            if mask is not None: #! moved into the if statement
+            if mask is not None:
             # allow users to supply an object instead of a filename
                 if isinstance(mask, Region):
                     self.region = mask
@@ -992,8 +991,6 @@ class SourceFinder(object):
                 # if either of rms or bkg images are not supplied
                 # then calculate them both
                 if not (rmsin and bkgin):
-                    # TODO If as cube is True, raise an error
-                    #! Moved it inside an if statement instead
                     if verb:
                         logger.info("Calculating background and rms data")
                     self._make_bkg_rms(
