@@ -12,12 +12,16 @@ requires-python=">=3.8"
 dependencies = [
     "scipy>=0.16",
     "tqdm>=4",
-    "numpy>=1.16",
+    "numpy>=1.16, <2.0",
     "astropy>=2.0",
     "healpy >=1.10",
     "lmfit>=0.9.2",
     "scikit-learn>=0.24.2",
+    "numba>=0.58",
 ]
+# [project.optional-dependencies]
+# mpi=["mpi4py>=3.1.6"]
+
 classifiers=[
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",

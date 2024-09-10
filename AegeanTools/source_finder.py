@@ -45,6 +45,8 @@ from .msq2 import MarchingSquares
 from .regions import Region
 from .wcs_helpers import Beam, WCSHelper
 
+from .mpi import MPI_AVAIL, MPI
+
 __author__ = "Paul Hancock"
 
 header = """#Aegean version {0}
@@ -1979,12 +1981,22 @@ class SourceFinder(object):
 
         # now fit all the islands
         sources = []
-        with tqdm(
-            total=isle_num, desc="Fitting Islands:", disable=not progress
-        ) as pbar:
-            for i in island_group:
+        if MPI_AVAIL:
+
+            size = MPI.COMM_WORLD.Get_size()
+            rank = MPI.COMM_WORLD.Get_rank()
+
+            block_size = len(island_group) // size
+
+            start = block_size*rank
+            end = block_size*(rank+1)
+
+            # highest rank will deal with the remainder (which is < size)
+            if rank == size:
+                end=None
+
+            for i in island_group[start:end]:
                 try:
-                    pbar.update(1)
                     srcs = self._fit_island(i)
                 except AegeanNaNModelError:
                     continue
@@ -1996,6 +2008,25 @@ class SourceFinder(object):
                     ):
                         continue
                     sources.append(src)
+        
+        else:
+            with tqdm(
+                total=isle_num, desc="Fitting Islands:", disable=not progress
+            ) as pbar:
+                for i in island_group:
+                    try:
+                        pbar.update(1)
+                        srcs = self._fit_island(i)
+                    except AegeanNaNModelError:
+                        continue
+                    # update bar as each individual island is fit
+                    for src in srcs:
+                        # ignore sources that we have been told to ignore
+                        if (src.peak_flux > 0 and nopositive) or (
+                            src.peak_flux < 0 and nonegative
+                        ):
+                            continue
+                        sources.append(src)
 
         # Write the output to the output file
         if outfile:

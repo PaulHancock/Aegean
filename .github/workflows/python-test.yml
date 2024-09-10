@@ -5,9 +5,9 @@ name: Python test
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main,3-D, load_cube ]
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main, dev, 3-D ]
 
 jobs:
   build:

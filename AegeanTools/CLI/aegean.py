@@ -8,19 +8,48 @@ import os
 import sys
 
 import astropy
+from astropy.table import vstack
 import lmfit
 import numpy as np
 import scipy
 
 from AegeanTools import __citation__, __date__, __version__
-from AegeanTools.catalogs import check_table_formats, save_catalog, show_formats
+from AegeanTools.catalogs import check_table_formats, save_catalog, show_formats, load_table, write_table
 from AegeanTools.logging import logger, logging
 from AegeanTools.source_finder import get_aux_files
 from AegeanTools.wcs_helpers import Beam
+from AegeanTools.mpi import MPI_AVAIL, MPI
+from AegeanTools.exceptions import AegeanSuffixError
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
 
+def addSuffix(file, suffix):
+    """
+    A function to add a specified suffix before the extension.
+
+    parameters
+    ----------
+    file: str
+        The current name of the file
+    
+    suffix: str or int
+        The desired suffix to be inserted before the extension
+    """
+    if isinstance(suffix, int):
+        base, ext = os.path.splitext(file)
+        base += f"_{suffix:02d}"
+        fname = base + ext
+    elif isinstance(suffix, str):
+        if suffix[0] == "_":
+            suffix = suffix[1:]
+        base, ext = os.path.splitext(file)
+        base += f"_{suffix}"
+        fname = base + ext
+    else:
+        raise AegeanSuffixError(f"This suffix type is not support: {suffix}") 
+
+    return fname
 
 def check_projection(filename, options, log=logger):
     """
@@ -616,6 +645,34 @@ def main():
             "FITSFILE": filename,
             "RUN-AS": invocation_string,
         }
+
+        # collect catalogues and clean up
+        if MPI_AVAIL:
+            logger.info("MPI is available")
+            catalog_list = []
         for t in options.tables.split(","):
+            final_file_name = t
+            if MPI_AVAIL:
+                t = addSuffix(t,MPI.COMM_WORLD.Get_rank())
             save_catalog(t, sources, prefix=options.column_prefix, meta=meta)
+
+        if MPI_AVAIL:
+            MPI.COMM_WORLD.Barrier()
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                for t in options.tables.split(","):
+                    flist = []
+                    final_file_name = addSuffix(t,"comp")
+                    for n in range(0, MPI.COMM_WORLD.Get_size()):
+                        base = addSuffix(t,n)
+                        base = addSuffix(base, "comp")
+                        flist.append(base)
+                    final_table = load_table(flist[0])
+                    for f in flist[1:]:
+                        table = load_table(f)
+                        final_table = vstack([final_table, table])
+                        os.remove(f)
+            
+                    write_table(final_table, final_file_name)
+                    logger.info(f"Wrote table name: {final_file_name}")
+
     return 0

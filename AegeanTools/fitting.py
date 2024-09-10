@@ -5,16 +5,15 @@ Provide fitting routines and helper functions to Aegean
 
 import copy
 import math
-
 import lmfit
 import numpy as np
+
 from scipy.linalg import eigh, inv
-
 from AegeanTools.logging import logger
-
 from . import flags
 from .angle_tools import bear, gcd
 from .exceptions import AegeanNaNModelError
+from numba import njit
 
 __author__ = "Paul Hancock"
 
@@ -23,6 +22,7 @@ ERR_MASK = -1.0
 
 
 # Modelling and fitting functions
+@njit
 def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     """
     Generate a model 2d Gaussian with the given parameters.
@@ -46,11 +46,13 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     data : numeric or array-like
         Gaussian function evaluated at the x,y locations.
     """
-    try:
-        sint, cost = math.sin(np.radians(theta)), math.cos(np.radians(theta))
-    except ValueError as e:
-        if "math domain error" in e.args:
-            sint, cost = np.nan, np.nan
+    if not np.isfinite(theta):
+        sint = np.nan
+        cost = np.nan
+    else:
+        sint = math.sin(np.radians(theta))
+        cost = math.cos(np.radians(theta))
+    
     xxo = x - xo
     yyo = y - yo
     exp = (xxo * cost + yyo * sint) ** 2 / sx**2 + (
@@ -58,6 +60,7 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     ) ** 2 / sy**2
     exp *= -1.0 / 2
     return amp * np.exp(exp)
+
 
 
 def elliptical_gaussian_with_alpha(
@@ -1187,7 +1190,6 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
 
     return source
 
-
 def ntwodgaussian_lmfit(params):
     """
     Convert an lmfit.Parameters object into a function which calculates the
@@ -1204,7 +1206,6 @@ def ntwodgaussian_lmfit(params):
     model : func
         A function f(x,y) that will compute the model.
     """
-
     def rfunc(x, y):
         """
         Compute the model given by params, at pixel coordinates x,y
@@ -1236,7 +1237,6 @@ def ntwodgaussian_lmfit(params):
         return result
 
     return rfunc
-
 
 def do_lmfit(data, params, B=None, errs=None, dojac=True):
     """
@@ -1279,7 +1279,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     data = np.array(data)
     mask = np.where(np.isfinite(data))
 
-    def residual(params, **kwargs):
+    def residual(params, x, y, B=None, errs=None):
         """
         The residual function required by lmfit
 
