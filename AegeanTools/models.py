@@ -310,8 +310,8 @@ class ComponentSource(SimpleSource): #! <- This is the entry point
     """
     # header for the output
     header = "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err    flags\n" + \
-             "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   ZWNCPES\n" + \
-             "#============================================================================================================================================================================================"
+            "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   ZWNCPES\n" + \
+            "#============================================================================================================================================================================================"
 
     # formatting strings for making nice output
     formatter = "({0.island:04d},{0.source:02d}) {0.background: 8.6f} " + \
@@ -323,11 +323,11 @@ class ComponentSource(SimpleSource): #! <- This is the entry point
                 "{0.b:5.2f} {0.err_b:5.2f} {0.pa:6.1f} {0.err_pa:5.1f}   " + \
                 "{0.flags:07b}"
     names = ['island', 'source', 'background', 'local_rms',
-             'ra_str', 'dec_str', 'ra', 'err_ra', 'dec', 'err_dec',
-             'peak_flux', 'err_peak_flux', 'int_flux', 'err_int_flux',
-             'a', 'err_a', 'b', 'err_b', 'pa', 'err_pa',
-             'flags', 'residual_mean', 'residual_std',
-             'uuid', 'psf_a', 'psf_b', 'psf_pa']
+            'ra_str', 'dec_str', 'ra', 'err_ra', 'dec', 'err_dec',
+            'peak_flux', 'err_peak_flux', 'int_flux', 'err_int_flux',
+            'a', 'err_a', 'b', 'err_b', 'pa', 'err_pa',
+            'flags', 'residual_mean', 'residual_std',
+            'uuid', 'psf_a', 'psf_b', 'psf_pa']
 
     def __init__(self):
         SimpleSource.__init__(self)
@@ -423,6 +423,12 @@ class ComponentSource(SimpleSource): #! <- This is the entry point
             return True
         if self.island == other.island:
             return self.source >= other.source
+
+class ComponentSource3D(ComponentSource):
+    def __init__(self):
+        super().__init__()  # Call the parent class constructor
+        self.alpha = 0  # Add the alpha attribute
+        self.nu0 = 0 # Add the nu0 attribute
 
 
 class PixelIsland(object):
