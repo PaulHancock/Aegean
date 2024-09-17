@@ -321,13 +321,16 @@ class ComponentSource(SimpleSource): #! <- This is the entry point
                 "{0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} " + \
                 "{0.err_int_flux: 8.6f} {0.a:5.2f} {0.err_a:5.2f} " + \
                 "{0.b:5.2f} {0.err_b:5.2f} {0.pa:6.1f} {0.err_pa:5.1f}   " + \
-                "{0.flags:07b}"
+                "{0.flags:07b}" #TODO: Update these in the new class, try to inherit it and add to it, alpha is either positive or negative single digit
+                                #TODO : 2 decimal places e.g. 1.04 +- would be good if they have + infront of them
+                                #TODO: formatter is +4.2f for the alpha
+                                #TODO: For nu0 unsure if megahertz or gighertz, for now assume megahertz between 100Mhz and a few 10s of GHz, within 0.5 Mhz resolution
     names = ['island', 'source', 'background', 'local_rms',
             'ra_str', 'dec_str', 'ra', 'err_ra', 'dec', 'err_dec',
             'peak_flux', 'err_peak_flux', 'int_flux', 'err_int_flux',
             'a', 'err_a', 'b', 'err_b', 'pa', 'err_pa',
             'flags', 'residual_mean', 'residual_std',
-            'uuid', 'psf_a', 'psf_b', 'psf_pa']
+            'uuid', 'psf_a', 'psf_b', 'psf_pa'] #TODO: Ditto for this, add alpha and nu0 to the names
 
     def __init__(self):
         SimpleSource.__init__(self)
