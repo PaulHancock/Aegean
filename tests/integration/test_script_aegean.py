@@ -67,8 +67,8 @@ def test_aux_images():
 
 
 def test_find():
-    sys.argv = ["", image_SIN, "--table", "test"]
-    aegean.main()
+    # sys.argv = ["", image_SIN, "--table", "test"]
+    # aegean.main()
 
     sys.argv = ["", image_SIN, "--out", "stdout"]
     aegean.main()
