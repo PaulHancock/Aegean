@@ -241,6 +241,51 @@ class WCSHelper(object):
         pixel = self.wcs.all_world2pix([pos], 1, ra_dec_order=self.ra_dec_order)
         # wcs and python have opposite ideas of x/y
         return [pixel[0][1], pixel[0][0]]
+    
+    def pix2freq(self, pos_z, filename):
+        """
+        Convert z coordinates into frequency.
+
+        Parameters
+        ----------
+        pos_z : float
+            The z axis pixel coordinates.
+
+        filename:
+            The fits file to get the header from
+        
+        Returns
+        -------
+        frequency : float
+            The frequency in MHz
+
+        """
+        header = fits.getheader(filename)
+
+        
+        return (header["CDELT3"]/1_000_000)*pos_z + (header["CRVAL3"]/1_000_000)
+    
+    def freq2pix(self, freq, filename):
+        """
+        Convert frequency into pixel coordinates.
+
+        Parameters
+        ----------
+        freq : float
+            The frequency in MHz.
+
+        filename:
+            The fits file to get the header from
+        
+        Returns
+        -------
+        pixel : (float, float)
+            The (x,y) pixel coordinates
+
+        """
+        header = fits.getheader(filename)
+        
+        return (freq - (header["CRVAL3"]/1_000_000))/(header["CDELT3"]/1_000_000)
 
     def psf_sky2pix(self, pos):
         """
