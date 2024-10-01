@@ -165,6 +165,7 @@ def test_load_image_band_multi_bands():
         raise AssertionError("adjacent bands don't match up at edges")
     return
 
+
 def test_load_image_band_data_header_check():
     """Load an image to test if it is of type np.ndarray object 
     and that the header is a fits.hdu.Header object"""
@@ -194,6 +195,7 @@ def test_load_image_band_cube_as_cube_false():
         data, header = fits_tools.load_image_band("tests/test_files/synthetic_with_alpha.fits", as_cube = False)
     except Exception as e:
         raise e
+        
     if len(data.shape) < 2:
         raise AssertionError("Loaded data is not 2-Dimensional") 
     return
@@ -205,7 +207,7 @@ def test_load_image_band_2d_as_cube_true():
     except AegeanError as e:
         return
     else:
-        raise AssertionError("Expected AegeanError but no error was raised")
+        raise AssertionError("Data passed as a cube but only 2 axes were provided")
     
 
 def test_load_image_band_2d_as_cube_false():

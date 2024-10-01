@@ -157,7 +157,21 @@ def test_load_globals():
     sfinder.load_globals(filename, rms=1, mask=Region())
     if sfinder.region is None:
         raise AssertionError()
-
+    
+def test_load_globals_cube():
+    """Test load_globals"""
+    sfinder = sf.SourceFinder()
+    filename = "tests/test_files/synthetic_with_alpha.fits"
+    # aux_files = sf.get_aux_files("tests/test_files/synthetic_with_alpha.fits")
+    bkg = filename
+    rms = filename
+    sfinder.load_globals(filename, bkgin=bkg, rmsin= rms, as_cube=True)
+    if sfinder.img is None:
+        raise AssertionError()
+    if np.allclose(sfinder.img, 0):
+        print("True")
+    else:
+        raise AssertionError()
 
 def test_find_and_prior_sources():
     """Test find sources and prior sources"""

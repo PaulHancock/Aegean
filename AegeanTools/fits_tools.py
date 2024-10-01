@@ -306,6 +306,7 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=Fa
         elif NAXIS == 3:
             if not as_cube:
                 data = a[hdu_index].section[
+                  
                 cube_index, row_min:row_max, 0 : header["NAXIS1"]
                 ]
             else:

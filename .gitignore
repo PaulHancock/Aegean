@@ -17,4 +17,4 @@ wiki/
 doc/_build/
 .vscode
 env/*
-.DS_store
+.DS_Store
