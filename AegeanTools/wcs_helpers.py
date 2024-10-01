@@ -63,7 +63,7 @@ class WCSHelper(object):
         The WCS object for the psf map
     """
 
-    def __init__(self, wcs, beam, pixscale, refpix, psf_file=None):
+    def __init__(self, wcs, beam, pixscale, refpix, psf_file=None, freq_wcs=(None, None, None)):
         """
         Parameters
         ----------
@@ -83,6 +83,7 @@ class WCSHelper(object):
             Filename for a psf map
         """
         self.wcs = wcs
+        self.CDELT3, self.CRVAL3, self.CRPIX3 = freq_wcs
         self.beam = (
             # the beam as per the fits header (at the reference coordiante)
             beam
@@ -175,7 +176,11 @@ class WCSHelper(object):
 
         _, pixscale = get_pixinfo(header)
         refpix = (header["CRPIX1"], header["CRPIX2"])
-        return cls(wcs, beam, pixscale, refpix, psf_file=psf_file)
+        if "CRVAL3" in header:
+            freq_wcs = (header["CDELT3"], header["CRVAL3"], header["CRPIX3"])
+        else:
+            freq_wcs = (None, None, None)
+        return cls(wcs, beam, pixscale, refpix, psf_file=psf_file, freq_wcs=freq_wcs)
 
     @classmethod
     def from_file(cls, filename, beam=None, psf_file=None):
@@ -242,7 +247,7 @@ class WCSHelper(object):
         # wcs and python have opposite ideas of x/y
         return [pixel[0][1], pixel[0][0]]
     
-    def pix2freq(self, pos_z, filename):
+    def pix2freq(self, pos_z):
         """
         Convert z coordinates into frequency.
 
@@ -250,9 +255,6 @@ class WCSHelper(object):
         ----------
         pos_z : float
             The z axis pixel coordinates.
-
-        filename:
-            The fits file to get the header from
         
         Returns
         -------
@@ -260,12 +262,10 @@ class WCSHelper(object):
             The frequency in MHz
 
         """
-        header = fits.getheader(filename)
-
         
-        return (header["CDELT3"]/1_000_000)*pos_z + (header["CRVAL3"]/1_000_000)
+        return (self.CDELT3/1_000_000)*(pos_z-self.CRPIX3) + (self.CRVAL3/1_000_000)
     
-    def freq2pix(self, freq, filename):
+    def freq2pix(self, freq):
         """
         Convert frequency into pixel coordinates.
 
@@ -273,9 +273,6 @@ class WCSHelper(object):
         ----------
         freq : float
             The frequency in MHz.
-
-        filename:
-            The fits file to get the header from
         
         Returns
         -------
@@ -283,9 +280,8 @@ class WCSHelper(object):
             The (x,y) pixel coordinates
 
         """
-        header = fits.getheader(filename)
         
-        return (freq - (header["CRVAL3"]/1_000_000))/(header["CDELT3"]/1_000_000)
+        return (freq - (self.CRVAL3/1_000_000))/(self.CDELT3/1_000_000) + self.CRPIX3
 
     def psf_sky2pix(self, pos):
         """
