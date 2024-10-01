@@ -247,7 +247,7 @@ class WCSHelper(object):
         # wcs and python have opposite ideas of x/y
         return [pixel[0][1], pixel[0][0]]
     
-    def pix2freq(self, pos_z):
+    def pix2freq(self, pos_z): #! Write a test case for this, afterwards create a pull request
         """
         Convert z coordinates into frequency.
 
@@ -265,7 +265,7 @@ class WCSHelper(object):
         
         return (self.CDELT3/1_000_000)*(pos_z-self.CRPIX3) + (self.CRVAL3/1_000_000)
     
-    def freq2pix(self, freq):
+    def freq2pix(self, freq): #! Write a test case for this
         """
         Convert frequency into pixel coordinates.
 
