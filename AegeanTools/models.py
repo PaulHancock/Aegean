@@ -428,8 +428,79 @@ class ComponentSource(SimpleSource): #! <- This is the entry point
             return self.source >= other.source
 
 class ComponentSource3D(ComponentSource):
+    """
+    A 3-D Gaussian component, aka a source, that was measured by Aegean, 
+    with additional attributes for spectral index and frequency.
+
+    Inherits from the ComponentSource Class.
+
+    Attributes
+    ----------
+    alpha : float
+        Spectral index of the source, showing how flux varies with frequency.
+        Typically a small positive or negative value.
+
+    nu0 : float
+        The reference frequency (in MHz) at which the source was measured.
+        
+    Other attributes are inherited from ParentClass:
+    
+    island : int
+        The island which this component is part of.
+
+    source : int
+        The source number within the island.
+
+    background, local_rms : float
+        Background and local noise level in the image at the location
+        of this source.
+
+    ra, err_ra, dec, err_dec : float
+        Sky location of the source including uncertainties. Decimal degrees.
+
+    ra_str, dec_str : str
+        Sky location in HH:MM:SS.SS +DD:MM:SS.SS format.
+
+    galactic : bool
+        If true then ra,dec are interpreted as glat,glon instead.
+        Default = False.
+        This is a class attribute, not an instance attribute.
+
+    peak_flux, err_peak_flux : float
+        The peak flux and associated uncertainty.
+
+    int_flux, err_int_flux : float
+        Integrated flux and associated uncertainty.
+
+    a, err_a, b, err_b, pa, err_pa: float
+        Shape parameters for this source and associated uncertainties.
+        a/b are in arcsec, pa is in degrees East of North.
+
+    residual_mean, residual_std : float
+        The mean and standard deviation of the model-data for this island
+        of pixels.
+
+    psf_a, psf_b, psf_pa : float
+        The shape parameters for the point spread function
+        (degrees).
+
+    flags : int
+        Flags. See :mod:`AegeanTools.flags`.
+
+    uuid : str
+        Unique ID for this source. This is random and not dependent on the
+        source properties.
+
+    See Also
+    --------
+    :mod:`AegeanTools.flags`
+
+    """
+
     def __init__(self):
         super().__init__()  # Call the parent class constructor
+        formatter = ComponentSource.formatter + " {0.alpha: 4.2f} {0.nu0: 4.2f}"  # Add the alpha and nu0 attributes to the formatter
+        names = ComponentSource.names + ['alpha', 'nu0']  # Add the alpha and nu0 attributes to the names
         self.alpha = 0  # Add the alpha attribute
         self.nu0 = 0 # Add the nu0 attribute
 
