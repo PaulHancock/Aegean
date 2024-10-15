@@ -10,8 +10,6 @@ from AegeanTools.wcs_helpers import (
     fix_aips_header,
     get_beam,
     get_pixinfo,
-    pix2freq,
-    freq2pix
 )
 from astropy.io import fits
 from numpy.testing import assert_almost_equal
@@ -269,10 +267,16 @@ def test_fix_aips_header():
     _ = fix_aips_header(header)
 
 def test_pix2freq():
-    freq = pix2freq(8, "synthetic_with_alpha.fits")
+    wcs = WCSHelper.from_file("tests/test_files/synthetic_with_alpha.fits")
+    freq = wcs.pix2freq(8)
     if freq != 223.76000000000005:
         raise AssertionError(f"The expected value is 223.76000000000005. However, {freq} was returned.")
 
+def test_freq2pix():
+    wcs = WCSHelper.from_file("tests/test_files/synthetic_with_alpha.fits")
+    z = wcs.freq2pix(223.76000000000005)
+    if z != 7.999999999999999:
+        raise AssertionError(f"The expected value is 7.999999999999999. However, {z} was returned.")
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
