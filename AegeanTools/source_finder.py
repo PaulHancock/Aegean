@@ -990,15 +990,15 @@ class SourceFinder(object):
 
                 # if either of rms or bkg images are not supplied
                 # then calculate them both
-                if not (rmsin and bkgin):
-                    if verb:
-                        logger.info("Calculating background and rms data")
-                    self._make_bkg_rms(
-                        filename=filename,
-                        forced_rms=rms,
-                        forced_bkg=bkg,
-                        cores=cores,
-                    )
+            if not (rmsin and bkgin):
+                if verb:
+                    logger.info("Calculating background and rms data")
+                self._make_bkg_rms(
+                    filename=filename,
+                    forced_rms=rms,
+                    forced_bkg=bkg,
+                    cores=cores,
+                )
 
         else:
             self.img = img
