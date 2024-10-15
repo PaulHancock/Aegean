@@ -111,7 +111,7 @@ def find_islands(
     l, n = label(a, structure=np.ones((3, 3)))
     f = find_objects(l)
 
-    logger.debug("{1} Found {0} islands total above flood limit".format(n, im.shape))
+    logger.debug(f"{n} Found {im.shape} islands total above flood limit")
 
     islands = []
     for i in range(n):
@@ -988,17 +988,17 @@ class SourceFinder(object):
                 dcurve[tmask] = 1
                 self.dcurve = dcurve
 
-            # if either of rms or bkg images are not supplied
-            # then calculate them both
-            if not (rmsin and bkgin):
-                if verb:
-                    logger.info("Calculating background and rms data")
-                self._make_bkg_rms(
-                    filename=filename,
-                    forced_rms=rms,
-                    forced_bkg=bkg,
-                    cores=cores,
-                )
+                # if either of rms or bkg images are not supplied
+                # then calculate them both
+                if not (rmsin and bkgin):
+                    if verb:
+                        logger.info("Calculating background and rms data")
+                    self._make_bkg_rms(
+                        filename=filename,
+                        forced_rms=rms,
+                        forced_bkg=bkg,
+                        cores=cores,
+                    )
 
         else:
             self.img = img
@@ -1301,7 +1301,7 @@ class SourceFinder(object):
         for inum, isle in enumerate(group, start=istart):
             logger.debug("-=-")
             logger.debug(
-                "input island = {0}, {1} components".format(isle[0].island, len(isle))
+                f"input island = {isle[0].island}, {len(isle)} components"
             )
 
             # set up the parameters for each of the sources within the island
@@ -1318,7 +1318,7 @@ class SourceFinder(object):
             included_sources = []
             for src in isle:
                 pixbeam = Beam(*self.wcshelper.get_psf_sky2pix(src.ra, src.dec))
-                # find the right pixels from the ra/dec
+                # find the right pixels from the ra/dec 
                 source_x, source_y = self.wcshelper.sky2pix([src.ra, src.dec])
                 source_x -= 1
                 source_y -= 1
@@ -1380,7 +1380,7 @@ class SourceFinder(object):
                 s_lims = [0.8 * min(sx, pixbeam.b * FWHM2CC), max(sy, sx) * 1.25]
 
                 # Set up the parameters for the fit, including constraints
-                prefix = "c{0}_".format(i)
+                prefix = f"c{i}_"
                 params.add(prefix + "amp", value=src.peak_flux, vary=True)
                 # for now the xo/yo are locations within the main image,
                 # we correct this later
@@ -1413,6 +1413,9 @@ class SourceFinder(object):
                     vary=stage >= 3,
                 )
                 params.add(prefix + "theta", value=theta, vary=stage >= 3)
+                params.add(prefix + "alpha", value=-1, vary=True) #! Think about the limits of alpha (somewhere between -5 <= alpha <= 5)
+                params.add(prefix + "nu0", value=self.wcshelper.pix2freq(0), vary=False)
+                #TODO: Write the pix2freq function
                 params.add(prefix + "flags", value=0, vary=False)
                 # this source is being refit so add it to the list
                 included_sources.append(src)
@@ -1449,6 +1452,7 @@ class SourceFinder(object):
             # this .copy() will stop us from modifying the parent region when
             # we later apply our mask.
             idata = data[int(xmin) : int(xmax), int(ymin) : int(ymax)].copy()
+            # idata = data[zmin:zmax ,int(xmin) : int(xmax), int(ymin) : int(ymax)].copy()
             # now convert these back to indices within the idata region
             # island_mask = np.array([(x-xmin, y-ymin) for x,y in island_mask])
 
@@ -1848,6 +1852,7 @@ class SourceFinder(object):
         docov=True,
         cube_index=None,
         progress=True,
+        threeD=False,
     ):
         """
         Run the Aegean source finder.
@@ -1929,6 +1934,7 @@ class SourceFinder(object):
         else:
             cores = multiprocessing.cpu_count()
 
+        
         self.load_globals(
             filename,
             hdu_index=hdu_index,
@@ -1944,8 +1950,8 @@ class SourceFinder(object):
             blank=blank,
             docov=docov,
             cube_index=cube_index,
+            as_cube = threeD,
         )
-
         logger.info(
             "beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(
                 self.beam.a * 3600,
@@ -1956,8 +1962,8 @@ class SourceFinder(object):
         # stop people from doing silly things.
         if outerclip > innerclip:
             outerclip = innerclip
-        logger.info("seedclip={0}".format(innerclip))
-        logger.info("floodclip={0}".format(outerclip))
+        logger.info(f"seedclip={innerclip}") 
+        logger.info(f"floodclip={outerclip}") 
 
         islands = find_islands(
             im=self.img,
@@ -1965,10 +1971,10 @@ class SourceFinder(object):
             rms=self.rmsimg,
             seed_clip=innerclip,
             flood_clip=outerclip,
-            region=self.region,
+            region=self.region, 
             wcs=self.wcshelper,
         )
-        logger.info("Found {0} islands".format(len(islands)))
+        logger.info(f"Found {len(islands)} islands")
         logger.info("Begin fitting")
 
         island_group = []
@@ -1983,7 +1989,7 @@ class SourceFinder(object):
             # ignore empty islands
             # This should now be impossible to trigger
             if not np.any(np.isfinite(i)):
-                logger.warning("Empty island detected, this should be imposisble.")
+                logger.warning("Empty island detected, this should be impossible.")
                 continue
             isle_num += 1
             scalars = (innerclip, outerclip, max_summits)
@@ -2054,7 +2060,8 @@ class SourceFinder(object):
         logger.info("Fit {0} sources".format(len(sources)))
         return sources
 
-    def priorized_fit_islands(
+    def priorized_fit_islands( 
+            
         self,
         filename,
         catalogue,
@@ -2190,7 +2197,7 @@ class SourceFinder(object):
         ok = True
         for param in ["ra", "dec", "peak_flux", "a", "b", "pa"]:
             if np.isnan(getattr(input_sources[0], param)):
-                logger.info("Source 0, is missing param '{0}'".format(param))
+                logger.info(f"Source 0, is missing param '{param}'")
                 ok = False
         if not ok:
             logger.error("Missing parameters! Not fitting.")
@@ -2199,9 +2206,9 @@ class SourceFinder(object):
         del ok
 
         # Do the resizing
-        logger.info("{0} sources in catalog".format(len(input_sources)))
+        logger.info(f"{len(input_sources)} sources in catalog")
         sources = cluster.resize(input_sources, ratio=ratio, wcshelper=self.wcshelper)
-        logger.info("{0} sources accepted".format(len(sources)))
+        logger.info(f"{len(sources)} sources accepted")
 
         if len(sources) < 1:
             logger.debug("No sources accepted for priorized fitting")
