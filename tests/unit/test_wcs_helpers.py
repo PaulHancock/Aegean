@@ -10,6 +10,8 @@ from AegeanTools.wcs_helpers import (
     fix_aips_header,
     get_beam,
     get_pixinfo,
+    pix2freq,
+    freq2pix
 )
 from astropy.io import fits
 from numpy.testing import assert_almost_equal
@@ -265,6 +267,11 @@ def test_fix_aips_header():
     # test with some aips history
     header["HISTORY"] = "AIPS   CLEAN BMAJ=  1.2500E-02 BMIN=  1.2500E-02 BPA=   0.00"
     _ = fix_aips_header(header)
+
+def test_pix2freq():
+    freq = pix2freq(8, "synthetic_with_alpha.fits")
+    if freq != 223.76000000000005:
+        raise AssertionError(f"The expected value is 223.76000000000005. However, {freq} was returned.")
 
 
 if __name__ == "__main__":
