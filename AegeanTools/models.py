@@ -496,11 +496,11 @@ class ComponentSource3D(ComponentSource):
     :mod:`AegeanTools.flags`
 
     """
+    formatter = ComponentSource.formatter + " {0.alpha: 4.2f} {0.nu0: 4.2f}"  # Add the alpha and nu0 attributes to the formatter
+    names = ComponentSource.names + ['alpha', 'nu0']  # Add the alpha and nu0 attributes to the names
 
     def __init__(self):
         super().__init__()  # Call the parent class constructor
-        formatter = ComponentSource.formatter + " {0.alpha: 4.2f} {0.nu0: 4.2f}"  # Add the alpha and nu0 attributes to the formatter
-        names = ComponentSource.names + ['alpha', 'nu0']  # Add the alpha and nu0 attributes to the names
         self.alpha = 0  # Add the alpha attribute
         self.nu0 = 0 # Add the nu0 attribute
 
