@@ -143,7 +143,7 @@ def main():
         default=None,
         help="Assume a single image background of bkg." " [default: None]",
     )
-    group1.add_argument( #! found a group1 in group2
+    group1.add_argument(
         "--cores",
         dest="cores",
         type=int,
