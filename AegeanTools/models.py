@@ -496,6 +496,7 @@ class ComponentSource3D(ComponentSource):
     :mod:`AegeanTools.flags`
 
     """
+
     header = "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err    flags     alpha   nu0\n" + \
             "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   ZWNCPES       ''      Mhz\n" + \
             "#============================================================================================================================================================================================================="
