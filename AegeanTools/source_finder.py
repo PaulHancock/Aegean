@@ -27,6 +27,7 @@ from .fitting import (
     bias_correct,
     covar_errors,
     do_lmfit,
+    do_lmfit_3D,
     elliptical_gaussian,
     errors,
     ntwodgaussian_lmfit,
