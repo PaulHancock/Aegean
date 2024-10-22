@@ -185,6 +185,13 @@ def main():
         "region, and psf files using the input filename "
         "as a hint. [default: don't do this]",
     )
+    group2.add_argument(
+        "--3d",
+        dest="threeD",
+        action="store_true",
+        default=False,
+        help="Treat the input image as a 3D cube. "
+    )
 
     # Output
     group3 = parser.add_argument_group("Output Options")
@@ -408,11 +415,11 @@ def main():
         print(__citation__)
         return 0
 
-    import AegeanTools
-    from AegeanTools.source_finder import SourceFinder
+    import AegeanTools #! This import is not at the top
+    from AegeanTools.source_finder import SourceFinder #! This import is not at the top
 
     # source finding object
-    sf = SourceFinder()
+    sf = SourceFinder() #! <--- This is the source finder object
 
     if options.table_formats:
         show_formats()
@@ -585,6 +592,7 @@ def main():
             docov=options.docov,
             cube_index=options.slice,
             progress=options.progress,
+            threeD=options.threeD,
         )
         if options.blank:
             outname = basename + "_blank.fits"
