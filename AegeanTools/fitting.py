@@ -1238,7 +1238,7 @@ def ntwodgaussian_lmfit(params):
 
     return rfunc
 
-def do_lmfit(data, params, B=None, errs=None, dojac=True):
+def do_lmfit(data, params, B=None, errs=None, dojac=False):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
