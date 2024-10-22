@@ -1374,7 +1374,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
         result.residual = result.residual.dot(inv(B))
     return result, params
 
-def do_lmfit_3D(data, params, B=None, errs=None, dojac=True): #TODO: Go through B matrix
+def do_lmfit_3D(data, params, B=None, errs=None, dojac=False): #TODO: Go through B matrix
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
