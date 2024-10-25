@@ -351,6 +351,7 @@ def write_catalog(filename, catalog, fmt=None, meta=None, prefix=None):
     catalog : list
         A list of source objects. Sources must be of type
         :class:`AegeanTools.models.ComponentSource`,
+        :class:`AegeanTools.models.ComponentSource3D`,
         :class:`AegeanTools.models.SimpleSource`, or
         :class:`AegeanTools.models.IslandSource`.
 

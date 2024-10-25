@@ -592,7 +592,6 @@ def main():
             docov=options.docov,
             cube_index=options.slice,
             progress=options.progress,
-            threeD=options.threeD,
         )
         if options.blank:
             outname = basename + "_blank.fits"
@@ -620,28 +619,53 @@ def main():
             logger.warning(
                 "--island requested but not yet supported for " "priorized fitting"
             )
-        sf.priorized_fit_islands(
+        if options.threeD:
+            sf.priorized_fit_islands_3D(
             filename,
             catalogue=options.input,
-            hdu_index=options.hdu_index,
-            rms=options.rms,
-            bkg=options.bkg,
+            # hdu_index=options.hdu_index,
+            # rms=options.rms,
+            # bkg=options.bkg,
             outfile=options.outfile,
             bkgin=options.backgroundimg,
             rmsin=options.noiseimg,
-            beam=options.beam,
-            imgpsf=options.imgpsf,
-            catpsf=options.catpsf,
+            # beam=options.beam,
+            # imgpsf=options.imgpsf,
+            # catpsf=options.catpsf,
             stage=options.priorized,
             ratio=options.ratio,
             outerclip=options.outerclip,
             cores=options.cores,
             doregroup=options.regroup,
             docov=options.docov,
-            cube_index=options.slice,
+            # cube_index=options.slice,
             progress=options.progress,
             regroup_eps=options.regroup_eps,
-        )
+            )
+            
+        else:
+            sf.priorized_fit_islands(
+                filename,
+                catalogue=options.input,
+                hdu_index=options.hdu_index,
+                rms=options.rms,
+                bkg=options.bkg,
+                outfile=options.outfile,
+                bkgin=options.backgroundimg,
+                rmsin=options.noiseimg,
+                beam=options.beam,
+                imgpsf=options.imgpsf,
+                catpsf=options.catpsf,
+                stage=options.priorized,
+                ratio=options.ratio,
+                outerclip=options.outerclip,
+                cores=options.cores,
+                doregroup=options.regroup,
+                docov=options.docov,
+                cube_index=options.slice,
+                progress=options.progress,
+                regroup_eps=options.regroup_eps,
+            )
 
     sources = sf.sources
 

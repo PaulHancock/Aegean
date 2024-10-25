@@ -647,23 +647,33 @@ class SourceFinder(object):
         sources : list
           A list of components, and islands if requested.
         """
-
+        threeD = len(self.img.shape) == 3
         # island data
         isle_num = island_data.isle_num
         idata = island_data.i
         xmin, xmax, ymin, ymax = island_data.offsets
 
-        box = slice(int(xmin), int(xmax)), slice(int(ymin), int(ymax))
-        rms = self.rmsimg[box]
-        bkg = self.bkgimg[box]
+        if threeD:
+            box = slice(0, -1), slice(int(xmin), int(xmax)), slice(int(ymin), int(ymax))
+            logger.debug(f"THIS IS THE 3-D BOX: {box}")
+
+            rms = np.mean(self.rmsimg[box], axis=0)
+            bkg = np.mean(self.bkgimg[box], axis=0)
+
+        else:
+            box = slice(int(xmin), int(xmax)), slice(int(ymin), int(ymax))
+            logger.debug(f"THIS IS THE 2-D BOX: {box}")
+
+            rms = self.rmsimg[box]
+            bkg = self.bkgimg[box]
+
         residual = np.median(result.residual), np.std(result.residual)
         is_flag = isflags
-
         sources = []
         j = 0
         for j in range(model["components"].value):
             src_flags = is_flag
-            source = ComponentSource()
+            source = ComponentSource3D() if threeD else ComponentSource()
             source.island = isle_num
             source.source = j
             logger.debug(" component {0}".format(j))
@@ -675,6 +685,9 @@ class SourceFinder(object):
             theta = model[prefix + "theta"].value
             amp = model[prefix + "amp"].value
             src_flags |= model[prefix + "flags"].value
+            if threeD:
+                source.alpha = model[prefix + "alpha"].value
+                source.nu0 = model[prefix + "nu0"].value
 
             # these are goodness of fit statistics for the entire island.
             source.residual_mean = residual[0]
@@ -1628,7 +1641,7 @@ class SourceFinder(object):
             i = 0
             params = lmfit.Parameters()
             shape = data.shape
-            xmin, ymin = shape
+            _, xmin, ymin = shape
             xmax = ymax = 0
 
             # island_mask = []
@@ -1652,10 +1665,10 @@ class SourceFinder(object):
                 # reject sources that are outside the image bounds,
                 # or which have nan data/rms values
                 if (
-                    not 0 <= x < shape[0]
-                    or not 0 <= y < shape[1]
-                    or not np.isfinite(data[x, y])
-                    or not np.isfinite(rmsimg[x, y])
+                    not 0 <= x < shape[1]
+                    or not 0 <= y < shape[2]
+                    or not np.isfinite(data[0, x, y])
+                    or not np.isfinite(rmsimg[0, x, y])
                     or pixbeam is None
                 ):
                     logger.debug(
@@ -1689,8 +1702,8 @@ class SourceFinder(object):
                 # adjust the size of the island to include this source
                 xmin = min(xmin, max(0, x - xwidth / 2))
                 ymin = min(ymin, max(0, y - ywidth / 2))
-                xmax = max(xmax, min(shape[0], x + xwidth / 2 + 1))
-                ymax = max(ymax, min(shape[1], y + ywidth / 2 + 1))
+                xmax = max(xmax, min(shape[1], x + xwidth / 2 + 1))
+                ymax = max(ymax, min(shape[2], y + ywidth / 2 + 1))
 
                 s_lims = [0.8 * min(sx, pixbeam.b * FWHM2CC), max(sy, sx) * 1.25]
 
@@ -1735,7 +1748,7 @@ class SourceFinder(object):
                     )
                 params.add(prefix + "theta", value=theta, vary=stage >= 3)
                 params.add(prefix + "flags", value=0, vary=False)
-                params.add(prefix + "nu0", value=WCSHelper.pix2freq(0), vary=False)
+                params.add(prefix + "nu0", value=self.wcshelper.pix2freq(0), vary=False)
                                                                     # TODO: Rename to nu0
                 # this source is being refit so add it to the list
                 included_sources.append(src)
@@ -1771,29 +1784,30 @@ class SourceFinder(object):
 
             # this .copy() will stop us from modifying the parent region when
             # we later apply our mask.
-            idata = data[int(xmin) : int(xmax), int(ymin) : int(ymax)].copy()
+            idata = data[:,int(xmin) : int(xmax), int(ymin) : int(ymax)].copy()
             # now convert these back to indices within the idata region
             # island_mask = np.array([(x-xmin, y-ymin) for x,y in island_mask])
 
-            allx, ally = np.indices(idata.shape)
+            allz ,allx, ally = np.indices(idata.shape)
             # mask to include pixels that are withn the FWHM
             # of the sources being fit
             mask_params = copy.deepcopy(params)
             for i in range(mask_params["components"].value):
                 prefix = f"c{i}_"
                 mask_params[prefix + "amp"].value = 1
-            mask_model = ntwodgaussian_lmfit(mask_params) 
-            mask = np.where(mask_model(allx.ravel(), ally.ravel()) <= 0.1)
-            mask = allx.ravel()[mask], ally.ravel()[mask]
+            mask_model = nthreedgaussian_lmfit(mask_params) 
+            mask = np.where(mask_model(allz.ravel(), allx.ravel(), ally.ravel()) <= 0.1)
+            mask = allz.ravel()[mask], allx.ravel()[mask], ally.ravel()[mask]
             del mask_params
 
             idata[mask] = np.nan
 
-            mx, my = np.where(np.isfinite(idata))
+            _,mx, my = np.where(np.isfinite(idata))
             non_nan_pix = len(mx)
             total_pix = len(allx.ravel())
             logger.debug("island extracted:")
             logger.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin, xmax, ymin, ymax))
+            logger.debug(f"This is the idata: {idata}")
             logger.debug(" max = {0}".format(np.nanmax(idata)))
             logger.debug(
                 " total {0}, masked {1}, not masked {2}".format(
@@ -1813,10 +1827,10 @@ class SourceFinder(object):
                 )  # central pixel coords
                 logger.debug(f" comp {i}")
                 logger.debug(f"  x0, y0 {cx} {cy}")
-                xmx = int(round(np.clip(cx + 2, 0, idata.shape[0])))
-                xmn = int(round(np.clip(cx - 1, 0, idata.shape[0])))
-                ymx = int(round(np.clip(cy + 2, 0, idata.shape[1])))
-                ymn = int(round(np.clip(cy - 1, 0, idata.shape[1])))
+                xmx = int(round(np.clip(cx + 2, 0, idata.shape[1])))
+                xmn = int(round(np.clip(cx - 1, 0, idata.shape[1])))
+                ymx = int(round(np.clip(cy + 2, 0, idata.shape[2])))
+                ymn = int(round(np.clip(cy - 1, 0, idata.shape[2])))
                 square = idata[xmn:xmx, ymn:ymx]
                 # if there are no not-nan pixels in this region
                 # then don't vary any parameters
@@ -1873,8 +1887,11 @@ class SourceFinder(object):
                     B = Bmatrix(C)
                 else:
                     C = B = None
-                errs = np.nanmax(rmsimg[int(xmin) : int(xmax), int(ymin) : int(ymax)])
-                result, _ = do_lmfit_3D(idata, params, B=B)
+                errs = np.nanmax(rmsimg[ : , int(xmin) : int(xmax), int(ymin) : int(ymax)])
+                mask = np.where(np.isfinite(idata))
+                freq_mapping = np.array([self.wcshelper.pix2freq(f) for f in range(idata.shape[0])])
+                logger.debug(f"Freq mapping: {freq_mapping}")
+                result, _ = do_lmfit_3D(idata, params, B=B, freq_mapping=freq_mapping)
                 model = covar_errors(result.params, idata, errs=errs, B=B, C=C) #! Check the covar_errors function
 
             # convert the results to a source object
@@ -2702,7 +2719,7 @@ class SourceFinder(object):
             #beam=beam,
             verb=True,
             #rms=rms,
-            #bkg=bkg,
+            bkg=bkgin,
             cores=cores,
             do_curve=False,
             #psf=imgpsf,
@@ -2730,7 +2747,7 @@ class SourceFinder(object):
 
         # reject sources with missing params
         ok = True
-        for param in ["ra", "dec", "peak_flux", "a", "b", "pa", "freq", "alpha"]: #! Added freq and alpha
+        for param in ["ra", "dec", "peak_flux", "a", "b", "pa", "alpha", "nu0"]: #! Added freq and alpha
             if np.isnan(getattr(input_sources[0], param)):
                 logger.info("Source 0, is missing param '{0}'".format(param))
                 ok = False

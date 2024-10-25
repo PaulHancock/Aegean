@@ -661,7 +661,7 @@ def classify_catalog(catalog):
     islands = []
     simples = []
     for source in catalog:
-        if isinstance(source, ComponentSource):
+        if isinstance(source, ComponentSource) or isinstance(source, ComponentSource3D): # TODO This needs to be split up down the line
             components.append(source)
         elif isinstance(source, IslandSource):
             islands.append(source)

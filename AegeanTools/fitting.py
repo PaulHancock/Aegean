@@ -1254,7 +1254,7 @@ def nthreedgaussian_lmfit(params):
     model : func
         A function f(x,y) that will compute the model.
     """
-    def rfunc(x, y, v): #TODO: Update the Doc string
+    def rfunc(v, x, y): #TODO: Update the Doc string
                         #! v is not a pixel coordinate it should be actual frequency i.e. pix2freq
         """
         Compute the model given by params, at pixel coordinates x,y
@@ -1270,6 +1270,7 @@ def nthreedgaussian_lmfit(params):
             Model
         """
         result = None
+
         for i in range(params["components"].value):
             prefix = f"c{i}_"
             # I hope this doesn't kill our run time
@@ -1289,7 +1290,7 @@ def nthreedgaussian_lmfit(params):
 
     return rfunc
 
-def do_lmfit(data, params, B=None, errs=None, dojac=True):
+def do_lmfit(data, params, B=None, errs=None, dojac=False):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
@@ -1374,7 +1375,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
         result.residual = result.residual.dot(inv(B))
     return result, params
 
-def do_lmfit_3D(data, params, B=None, errs=None, dojac=False): #TODO: Go through B matrix
+def do_lmfit_3D(data, params, freq_mapping=None, B=None, errs=None, dojac=False, ): #TODO: Go through B matrix
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.NaN
@@ -1414,7 +1415,7 @@ def do_lmfit_3D(data, params, B=None, errs=None, dojac=False): #TODO: Go through
     params = copy.deepcopy(params)
     data = np.array(data)
     mask = np.where(np.isfinite(data))
-
+    fmask = freq_mapping[mask[0]]
     def residual(params, x, y, B=None, errs=None):
         """
         The residual function required by lmfit
@@ -1430,9 +1431,10 @@ def do_lmfit_3D(data, params, B=None, errs=None, dojac=False): #TODO: Go through
             Model - Data
         """
         f = nthreedgaussian_lmfit(params)  # A function describing the model
-        model = f(*mask)  # The actual model
+        model = f(fmask, mask[1], mask[2])  # The actual model
 
         if np.any(~np.isfinite(model)):
+            logger.debug(f"The parameters are  {params}")
             raise AegeanNaNModelError(
                 "lmfit optimisation has return NaN in the parameter set. "
             )
