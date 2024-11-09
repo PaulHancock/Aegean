@@ -1452,7 +1452,7 @@ def do_lmfit_3D(data, params, freq_mapping=None, B=None, errs=None, dojac=False,
     #         Dfun=lmfit_jacobian,
     #    )
     result = lmfit.minimize(
-        residual, params, kws={"x": mask[0], "y": mask[1], "B": B, "errs": errs} #?We might also need to supply nu
+        residual, params, kws={"x": mask[0], "y": mask[1], "B": B, "errs": errs}
     )
 
     # Remake the residual so that it is once again (model - data)
