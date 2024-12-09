@@ -14,6 +14,7 @@ from . import flags
 from .angle_tools import bear, gcd
 from .exceptions import AegeanNaNModelError
 
+# don't freak out if numba isn't installed
 try:
     from numba import njit
 except ImportError:
