@@ -1,3 +1,17 @@
+### Dec 09 2024
+
+General
+- numba and mpi4py are now optional dependencies which, if installed, will make things faster
+- use `pip install AegeanTools[fast]` to also install number or `pip install AegeanTools[faster]` for both numba and mpi4py
+
+Aegean
+- Fitting is now faster thanks to numba
+
+BANE
+- Background estimation is faster thanks to numba
+- Resolve issue [#212](https://github.com/PaulHancock/Aegean/issues/212)
+- Fix bug [#213](https://github.com/PaulHancock/Aegean/issues/213) by setting default values for cores/stripes
+
 ### Jan 24 2024
 
 BANE

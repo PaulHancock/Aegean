@@ -16,7 +16,7 @@ dependencies = [
     "astropy>=2.0",
     "healpy >=1.10",
     "lmfit>=0.9.2",
-    "scikit-learn>=0.24.2",
+    "scikit-learn>=0.24.2"
 ]
 classifiers=[
     "Development Status :: 5 - Production/Stable",
@@ -43,6 +43,9 @@ Documentation = "http://aegeantools.rtfd.io/"
 Issues = "https://github.com/PaulHancock/Aegean/issues"
 Changelog = "https://github.com/PaulHancock/Aegean/blob/main/CHANGELOG.md"
 
+[project.optional-dependencies]
+fast = ['numba>=0.58']
+faster = ["AegeanTools[fast]","mpi4py"]
 
 [tool.setuptools]
 include-package-data = true

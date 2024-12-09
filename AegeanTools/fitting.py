@@ -5,17 +5,24 @@ Provide fitting routines and helper functions to Aegean
 
 import copy
 import math
-
 import lmfit
 import numpy as np
+
 from scipy.linalg import eigh, inv
-
 from AegeanTools.logging import logger
-
 from . import flags
 from .angle_tools import bear, gcd
 from .exceptions import AegeanNaNModelError
 from .models import ComponentSource, ComponentWithAlpha
+
+# don't freak out if numba isn't installed
+try:
+    from numba import njit
+except ImportError:
+
+    def njit(f):
+        return f
+
 
 __author__ = "Paul Hancock"
 
@@ -24,8 +31,44 @@ ERR_MASK = -1.0
 
 
 # Modelling and fitting functions
+@njit
 def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
-    return ComponentSource.eval(x, y, amp, xo, yo, sx, sy, theta)
+    """
+    Generate a model 2d Gaussian with the given parameters.
+    Evaluate this model at the given locations x,y.
+
+    Parameters
+    ----------
+    x, y : numeric or array-like
+        locations at which to evaluate the gaussian
+    amp : float
+        Peak value.
+    xo, yo : float
+        Center of the gaussian.
+    sx, sy : float
+        major/minor axes in sigmas
+    theta : float
+        position angle (degrees) CCW from x-axis
+
+    Returns
+    -------
+    data : numeric or array-like
+        Gaussian function evaluated at the x,y locations.
+    """
+    if not np.isfinite(theta):
+        sint = np.nan
+        cost = np.nan
+    else:
+        sint = math.sin(np.radians(theta))
+        cost = math.cos(np.radians(theta))
+
+    xxo = x - xo
+    yyo = y - yo
+    exp = (xxo * cost + yyo * sint) ** 2 / sx**2 + (
+        xxo * sint - yyo * cost
+    ) ** 2 / sy**2
+    exp *= -1.0 / 2
+    return amp * np.exp(exp)
 
 
 def elliptical_gaussian_with_alpha(x, y, v, amp, xo, yo, vo, sx, sy, theta, alpha):
@@ -155,12 +198,7 @@ def jacobian(pars, x, y):
 
         if pars[prefix + "theta"].vary:
             dmdtheta = (
-                model
-                * (sy**2 - sx**2)
-                * (xsin - ycos)
-                * (xcos + ysin)
-                / sx**2
-                / sy**2
+                model * (sy**2 - sx**2) * (xsin - ycos) * (xcos + ysin) / sx**2 / sy**2
             )
             matrix.append(dmdtheta)
 
@@ -821,13 +859,9 @@ def errors(source, model, wcshelper):
 
     # if the source wasn't fit then all errors are -1
     if source.flags & (flags.NOTFIT | flags.FITERR):
-        source.err_peak_flux = (
-            source.err_a
-        ) = (
-            source.err_b
-        ) = (
-            source.err_pa
-        ) = source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = (
+            source.err_ra
+        ) = source.err_dec = source.err_int_flux = ERR_MASK
         return source
     # copy the errors from the model
     prefix = f"c{source.source}_"
@@ -965,13 +999,9 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
 
     # if the source wasn't fit then all errors are -1
     if source.flags & (flags.NOTFIT | flags.FITERR):
-        source.err_peak_flux = (
-            source.err_a
-        ) = (
-            source.err_b
-        ) = (
-            source.err_pa
-        ) = source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = (
+            source.err_ra
+        ) = source.err_dec = source.err_int_flux = ERR_MASK
         return source
     # copy the errors/values from the model
     prefix = f"c{source.source}_"
@@ -995,13 +1025,9 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
     # check for inf/nan errors -> these sources have poor fits.
     if not all(a is not None and np.isfinite(a) for a in pix_errs):
         source.flags |= flags.FITERR
-        source.err_peak_flux = (
-            source.err_a
-        ) = (
-            source.err_b
-        ) = (
-            source.err_pa
-        ) = source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = (
+            source.err_ra
+        ) = source.err_dec = source.err_int_flux = ERR_MASK
         return source
 
     # calculate the reference coordinate
@@ -1011,13 +1037,9 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
     # even if the ra/dec conversion works elsewhere
     if not all(np.isfinite(ref)):
         source.flags |= flags.WCSERR
-        source.err_peak_flux = (
-            source.err_a
-        ) = (
-            source.err_b
-        ) = (
-            source.err_pa
-        ) = source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = (
+            source.err_ra
+        ) = source.err_dec = source.err_int_flux = ERR_MASK
         return source
 
     # calculate position errors by transforming the error ellipse
@@ -1170,7 +1192,7 @@ def ntwodgaussian_lmfit(params):
 def do_lmfit(data, params, B=None, errs=None, dojac=True):
     """
     Fit the model to the data
-    data may contain 'flagged' or 'masked' data with the value of np.NaN
+    data may contain 'flagged' or 'masked' data with the value of np.nan
 
     Parameters
     ----------
@@ -1208,7 +1230,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     data = np.array(data)
     mask = np.where(np.isfinite(data))
 
-    def residual(params, **kwargs):
+    def residual(params, x, y, B=None, errs=None):
         """
         The residual function required by lmfit
 

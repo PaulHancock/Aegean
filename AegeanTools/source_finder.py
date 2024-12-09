@@ -1122,9 +1122,9 @@ class SourceFinder:
         curve = np.array(self.dcurve, dtype=self.bkgimg.dtype)
         # mask these arrays have the same mask the same as the data
         mask = np.where(np.isnan(self.img))
-        self.bkgimg[mask] = np.NaN
-        self.rmsimg[mask] = np.NaN
-        curve[mask] = np.NaN
+        self.bkgimg[mask] = np.nan
+        self.rmsimg[mask] = np.nan
+        curve[mask] = np.nan
 
         # Generate the new FITS files by copying the existing HDU
         # and assigning new data. This gives the new files the same

@@ -24,7 +24,7 @@ def test_sigmaclip():
         raise AssertionError()
 
     # test empty list
-    if not np.isnan(BANE.sigmaclip([], 0, 3)[0]):
+    if not np.isnan(BANE.sigmaclip(np.array([]), 0, 3)[0]):
         raise AssertionError()
 
 
