@@ -762,7 +762,7 @@ class SourceFinder(object):
         if island_data.doislandflux:
             _, outerclip, _ = island_data.scalars
             logger.debug("Integrated flux for island {0}".format(isle_num))
-            kappa_sigma = np.where(abs(idata) - outerclip * rms > 0, idata, np.NaN)
+            kappa_sigma = np.where(abs(idata) - outerclip * rms > 0, idata, np.nan)
             logger.debug("- island shape is {0}".format(kappa_sigma.shape))
 
             source = IslandSource()
@@ -1094,9 +1094,9 @@ class SourceFinder(object):
         curve = np.array(self.dcurve, dtype=bkgimg.dtype)
         # mask these arrays have the same mask the same as the data
         mask = np.where(np.isnan(img))
-        bkgimg[mask] = np.NaN
-        rmsimg[mask] = np.NaN
-        curve[mask] = np.NaN
+        bkgimg[mask] = np.nan
+        rmsimg[mask] = np.nan
+        curve[mask] = np.nan
 
         # Generate the new FITS files by copying the existing HDU
         # and assigning new data. This gives the new files the same

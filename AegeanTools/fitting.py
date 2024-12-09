@@ -1230,7 +1230,7 @@ def ntwodgaussian_lmfit(params):
 def do_lmfit(data, params, B=None, errs=None, dojac=True):
     """
     Fit the model to the data
-    data may contain 'flagged' or 'masked' data with the value of np.NaN
+    data may contain 'flagged' or 'masked' data with the value of np.nan
 
     Parameters
     ----------
