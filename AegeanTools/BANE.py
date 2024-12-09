@@ -22,9 +22,19 @@ from AegeanTools.logging import logger
 
 from .fits_tools import compress
 
+
+# don't freak out if numba isn't installed
+try:
+    from numba import njit
+except ImportError:
+
+    def njit(f):
+        return f
+
+
 __author__ = "Paul Hancock"
-__version__ = "v1.10.0"
-__date__ = "2022-08-17"
+__version__ = "v1.10.1"
+__date__ = "2024-12-09"
 
 # global barrier for multiprocessing
 barrier = None
@@ -40,6 +50,7 @@ def init(b, mem):
     memory_id = mem
 
 
+@njit()
 def sigmaclip(arr, lo, hi, reps=10):
     """
     Perform sigma clipping on an array, ignoring non finite values.
@@ -51,8 +62,8 @@ def sigmaclip(arr, lo, hi, reps=10):
 
     Parameters
     ----------
-    arr : iterable
-        An iterable array of numeric types.
+    arr : np.array
+        A numpy array of numeric types.
     lo : float
         The negative clipping level.
     hi : float
@@ -72,7 +83,7 @@ def sigmaclip(arr, lo, hi, reps=10):
     Scipy v0.16 now contains a comparable method that will ignore nan/inf
     values.
     """
-    clipped = np.array(arr)[np.isfinite(arr)]
+    clipped = arr[np.isfinite(arr)]
 
     if len(clipped) < 1:
         return np.nan, np.nan
@@ -93,8 +104,8 @@ def sigmaclip(arr, lo, hi, reps=10):
         std = np.std(clipped)
         mean = np.mean(clipped)
         prev_valid = curr_valid
-    else:
-        logger.debug("No stopping criteria was reached after {0} cycles".format(count))
+    # else:  # disable logging so that numba can be fast
+    #     logger.debug("No stopping criteria was reached after {0} cycles".format(count))
 
     return mean, std
 
@@ -371,7 +382,9 @@ def filter_mc_sharemem(
     try:
         global memory_id
         memory_id = str(uuid.uuid4())
-        if 'Darwin' in platform.system():  # Some python installs on OSX limit filenames to 32 chars
+        if (
+            "Darwin" in platform.system()
+        ):  # Some python installs on OSX limit filenames to 32 chars
             memory_id = memory_id[:23]
         nbytes = np.prod(shape) * np.float64(1).nbytes
         ibkg = SharedMemory(name=f"ibkg_{memory_id}", create=True, size=nbytes)
