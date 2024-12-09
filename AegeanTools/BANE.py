@@ -50,7 +50,7 @@ def init(b, mem):
     memory_id = mem
 
 
-@njit()
+@njit
 def sigmaclip(arr, lo, hi, reps=10):
     """
     Perform sigma clipping on an array, ignoring non finite values.
