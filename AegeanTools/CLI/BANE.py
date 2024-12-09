@@ -26,7 +26,7 @@ def main():
         dest="step_size",
         type=int,
         nargs=2,
-        help="The [x,y] size of the grid to use. " "Default = ~4* beam size square.",
+        help="The [x,y] size of the grid to use (units = pixels). Default = ~4* beam size square.",
     )
     group1.add_argument(
         "--box",
@@ -34,7 +34,7 @@ def main():
         type=int,
         nargs=2,
         help="The [x,y] size of the box over which the "
-        "rms/bkg is calculated. Default = 5*grid.",
+        "rms/bkg is calculated (units = pixels). Default = 5*grid.",
     )
     group1.add_argument(
         "--cores",
