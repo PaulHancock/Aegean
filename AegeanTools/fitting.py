@@ -13,7 +13,14 @@ from AegeanTools.logging import logger
 from . import flags
 from .angle_tools import bear, gcd
 from .exceptions import AegeanNaNModelError
-from numba import njit
+
+try:
+    from numba import njit
+except ImportError:
+
+    def njit(f):
+        return f
+
 
 __author__ = "Paul Hancock"
 
@@ -52,7 +59,7 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     else:
         sint = math.sin(np.radians(theta))
         cost = math.cos(np.radians(theta))
-    
+
     xxo = x - xo
     yyo = y - yo
     exp = (xxo * cost + yyo * sint) ** 2 / sx**2 + (
@@ -60,7 +67,6 @@ def elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta):
     ) ** 2 / sy**2
     exp *= -1.0 / 2
     return amp * np.exp(exp)
-
 
 
 def elliptical_gaussian_with_alpha(
@@ -229,12 +235,7 @@ def jacobian(pars, x, y):
 
         if pars[prefix + "theta"].vary:
             dmdtheta = (
-                model
-                * (sy**2 - sx**2)
-                * (xsin - ycos)
-                * (xcos + ysin)
-                / sx**2
-                / sy**2
+                model * (sy**2 - sx**2) * (xsin - ycos) * (xcos + ysin) / sx**2 / sy**2
             )
             matrix.append(dmdtheta)
 
@@ -895,13 +896,9 @@ def errors(source, model, wcshelper):
 
     # if the source wasn't fit then all errors are -1
     if source.flags & (flags.NOTFIT | flags.FITERR):
-        source.err_peak_flux = (
-            source.err_a
-        ) = (
-            source.err_b
-        ) = (
-            source.err_pa
-        ) = source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = (
+            source.err_ra
+        ) = source.err_dec = source.err_int_flux = ERR_MASK
         return source
     # copy the errors from the model
     prefix = "c{0}_".format(source.source)
@@ -1039,13 +1036,9 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
 
     # if the source wasn't fit then all errors are -1
     if source.flags & (flags.NOTFIT | flags.FITERR):
-        source.err_peak_flux = (
-            source.err_a
-        ) = (
-            source.err_b
-        ) = (
-            source.err_pa
-        ) = source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = (
+            source.err_ra
+        ) = source.err_dec = source.err_int_flux = ERR_MASK
         return source
     # copy the errors/values from the model
     prefix = "c{0}_".format(source.source)
@@ -1069,13 +1062,9 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
     # check for inf/nan errors -> these sources have poor fits.
     if not all(a is not None and np.isfinite(a) for a in pix_errs):
         source.flags |= flags.FITERR
-        source.err_peak_flux = (
-            source.err_a
-        ) = (
-            source.err_b
-        ) = (
-            source.err_pa
-        ) = source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = (
+            source.err_ra
+        ) = source.err_dec = source.err_int_flux = ERR_MASK
         return source
 
     # calculate the reference coordinate
@@ -1085,13 +1074,9 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
     # even if the ra/dec conversion works elsewhere
     if not all(np.isfinite(ref)):
         source.flags |= flags.WCSERR
-        source.err_peak_flux = (
-            source.err_a
-        ) = (
-            source.err_b
-        ) = (
-            source.err_pa
-        ) = source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
+        source.err_peak_flux = source.err_a = source.err_b = source.err_pa = (
+            source.err_ra
+        ) = source.err_dec = source.err_int_flux = ERR_MASK
         return source
 
     # calculate position errors by transforming the error ellipse
@@ -1190,6 +1175,7 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
 
     return source
 
+
 def ntwodgaussian_lmfit(params):
     """
     Convert an lmfit.Parameters object into a function which calculates the
@@ -1206,6 +1192,7 @@ def ntwodgaussian_lmfit(params):
     model : func
         A function f(x,y) that will compute the model.
     """
+
     def rfunc(x, y):
         """
         Compute the model given by params, at pixel coordinates x,y
@@ -1237,6 +1224,7 @@ def ntwodgaussian_lmfit(params):
         return result
 
     return rfunc
+
 
 def do_lmfit(data, params, B=None, errs=None, dojac=True):
     """

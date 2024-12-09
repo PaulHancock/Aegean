@@ -44,6 +44,9 @@ Documentation = "http://aegeantools.rtfd.io/"
 Issues = "https://github.com/PaulHancock/Aegean/issues"
 Changelog = "https://github.com/PaulHancock/Aegean/blob/main/CHANGELOG.md"
 
+[project.optional-dependencies]
+fast = ['numba>=0.58']
+faster = ["AegeanTools[fast]","mpi4py"]
 
 [tool.setuptools]
 include-package-data = true
