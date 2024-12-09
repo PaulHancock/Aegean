@@ -2,6 +2,7 @@
 
 # standard imports
 import argparse
+import multiprocessing
 import os
 
 from AegeanTools import BANE, __citation__
@@ -89,9 +90,8 @@ def main():
         out_base=None,
         step_size=None,
         box_size=None,
-        twopass=True,
-        cores=None,
-        usescipy=False,
+        cores=multiprocessing.cpu_count(),
+        stripes=multiprocessing.cpu_count() - 1,
         debug=False,
     )
 
@@ -126,6 +126,12 @@ def main():
             )
             logger.error("Not running")
             return 1
+
+    if options.cores <= options.stripes:
+        logger.warning(
+            f"Adjusting --stripes {options.stripes} -> {options.cores-1} to avoid hanging your system"
+        )
+        options.stripes = options.cores - 1
 
     BANE.filter_image(
         im_name=options.image,
