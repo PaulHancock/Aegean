@@ -1227,7 +1227,65 @@ def ntwodgaussian_lmfit(params):
     return rfunc
 
 
-def do_lmfit(data, params, B=None, errs=None, dojac=True):
+def nthreedgaussian_lmfit(params):
+    """
+    Convert an lmfit.Parameters object into a function which calculates the
+    model.
+
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        Model parameters, can have multiple components.
+
+    Returns
+    -------
+    model : func
+        A function f(x,y) that will compute the model.
+    """
+
+    def rfunc(v, x, y):  # TODO: Update the Doc string
+        #! v is not a pixel coordinate it should be actual frequency i.e. pix2freq
+        """
+        Compute the model given by params, at pixel coordinates x,y
+
+        Parameters
+        ----------
+        x, y : numpy.ndarray
+            The x/y pixel coordinates at which the model is being evaluated
+
+        Returns
+        -------
+        result : numpy.ndarray
+            Model
+        """
+        result = None
+
+        for i in range(params["components"].value):
+            prefix = f"c{i}_"
+            # I hope this doesn't kill our run time
+            amp = np.nan_to_num(params[prefix + "amp"].value)
+            xo = params[prefix + "xo"].value
+            yo = params[prefix + "yo"].value
+            sx = params[prefix + "sx"].value
+            sy = params[prefix + "sy"].value
+            theta = params[prefix + "theta"].value
+            alpha = params[prefix + "alpha"].value
+            nu0 = params[prefix + "nu0"].value
+            if result is not None:
+                result += elliptical_gaussian_with_alpha(
+                    x, y, v, amp, xo, yo, nu0, sx, sy, theta, alpha
+                )  # TODO: Pass the frequency into this, which is the current frequency
+            else:
+                result = elliptical_gaussian_with_alpha(
+                    x, y, v, amp, xo, yo, nu0, sx, sy, theta, alpha
+                )
+        return result
+
+    return rfunc
+
+
+def do_lmfit(data, params, B=None, errs=None, dojac=False):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.nan
@@ -1310,6 +1368,100 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     # Remake the residual so that it is once again (model - data)
     if B is not None:
         result.residual = result.residual.dot(inv(B))
+    return result, params
+
+
+def do_lmfit_3D(
+    data,
+    params,
+    freq_mapping=None,
+    B=None,
+    errs=None,
+    dojac=False,
+):  # TODO: Go through B matrix
+    """
+    Fit the model to the data
+    data may contain 'flagged' or 'masked' data with the value of np.NaN
+
+    Parameters
+    ----------
+    data : 2d-array
+        Image data
+
+    params : lmfit.Parameters
+        Initial model guess.
+
+    B : 2d-array
+        B matrix to be used in residual calculations.
+        Default = None.
+
+    errs : 1d-array
+
+    dojac : bool
+        If true then an analytic jacobian will be passed to the fitter
+
+    Returns
+    -------
+    result : ?
+        lmfit.minimize result.
+
+    params : lmfit.Params
+        Fitted model.
+
+    See Also
+    --------
+    :func:`AegeanTools.fitting.lmfit_jacobian`
+
+    """
+    # copy the params so as not to change the initial conditions
+    # in case we want to use them elsewhere
+    params = copy.deepcopy(params)
+    data = np.array(data)
+    mask = np.where(np.isfinite(data))
+    fmask = freq_mapping[mask[0]]
+
+    def residual(params, x, y, B=None, errs=None):
+        """
+        The residual function required by lmfit
+
+        Parameters
+        ----------
+        params: lmfit.Params
+            The parameters of the model being fit
+
+        Returns
+        -------
+        result : numpy.ndarray
+            Model - Data
+        """
+        f = nthreedgaussian_lmfit(params)  # A function describing the model
+        model = f(fmask, mask[1], mask[2])  # The actual model
+
+        if np.any(~np.isfinite(model)):
+            logger.debug(f"The parameters are  {params}")
+            raise AegeanNaNModelError(
+                "lmfit optimisation has return NaN in the parameter set. "
+            )
+
+        if B is None:
+            return model - data[mask]
+        else:
+            return (model - data[mask]).dot(B)
+
+    # if dojac:
+    #     result = lmfit.minimize(
+    #         residual,
+    #         params,
+    #         kws={"x": mask[0], "y": mask[1], "B": B, "errs": errs},
+    #         Dfun=lmfit_jacobian,
+    #    )
+    result = lmfit.minimize(
+        residual, params, kws={"x": mask[0], "y": mask[1], "B": B, "errs": errs}
+    )
+
+    # Remake the residual so that it is once again (model - data)
+    # if B is not None:
+    #     result.residual = result.residual.dot(inv(B))
     return result, params
 
 

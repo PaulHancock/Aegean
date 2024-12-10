@@ -8,19 +8,48 @@ import os
 import sys
 
 import astropy
+from astropy.table import vstack
 import lmfit
 import numpy as np
 import scipy
 
 from AegeanTools import __citation__, __date__, __version__
-from AegeanTools.catalogs import check_table_formats, save_catalog, show_formats
+from AegeanTools.catalogs import check_table_formats, save_catalog, show_formats, load_table, write_table
 from AegeanTools.logging import logger, logging
 from AegeanTools.source_finder import get_aux_files
 from AegeanTools.wcs_helpers import Beam
+from AegeanTools.mpi import MPI_AVAIL, MPI
+from AegeanTools.exceptions import AegeanSuffixError
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
 
+def addSuffix(file, suffix):
+    """
+    A function to add a specified suffix before the extension.
+
+    parameters
+    ----------
+    file: str
+        The current name of the file
+    
+    suffix: str or int
+        The desired suffix to be inserted before the extension
+    """
+    if isinstance(suffix, int):
+        base, ext = os.path.splitext(file)
+        base += f"_{suffix:02d}"
+        fname = base + ext
+    elif isinstance(suffix, str):
+        if suffix[0] == "_":
+            suffix = suffix[1:]
+        base, ext = os.path.splitext(file)
+        base += f"_{suffix}"
+        fname = base + ext
+    else:
+        raise AegeanSuffixError(f"This suffix type is not support: {suffix}") 
+
+    return fname
 
 def check_projection(filename, options, log=logger):
     """
@@ -155,6 +184,13 @@ def main():
         help="Automatically look for background, noise, "
         "region, and psf files using the input filename "
         "as a hint. [default: don't do this]",
+    )
+    group2.add_argument(
+        "--3d",
+        dest="threeD",
+        action="store_true",
+        default=False,
+        help="Treat the input image as a 3D cube. "
     )
 
     # Output
@@ -379,11 +415,11 @@ def main():
         print(__citation__)
         return 0
 
-    import AegeanTools
-    from AegeanTools.source_finder import SourceFinder
+    import AegeanTools #! This import is not at the top
+    from AegeanTools.source_finder import SourceFinder #! This import is not at the top
 
     # source finding object
-    sf = SourceFinder()
+    sf = SourceFinder() #! <--- This is the source finder object
 
     if options.table_formats:
         show_formats()
@@ -583,28 +619,53 @@ def main():
             logger.warning(
                 "--island requested but not yet supported for " "priorized fitting"
             )
-        sf.priorized_fit_islands(
+        if options.threeD:
+            sf.priorized_fit_islands_3D(
             filename,
             catalogue=options.input,
-            hdu_index=options.hdu_index,
-            rms=options.rms,
-            bkg=options.bkg,
+            # hdu_index=options.hdu_index,
+            # rms=options.rms,
+            # bkg=options.bkg,
             outfile=options.outfile,
             bkgin=options.backgroundimg,
             rmsin=options.noiseimg,
-            beam=options.beam,
-            imgpsf=options.imgpsf,
-            catpsf=options.catpsf,
+            # beam=options.beam,
+            # imgpsf=options.imgpsf,
+            # catpsf=options.catpsf,
             stage=options.priorized,
             ratio=options.ratio,
             outerclip=options.outerclip,
             cores=options.cores,
             doregroup=options.regroup,
             docov=options.docov,
-            cube_index=options.slice,
+            # cube_index=options.slice,
             progress=options.progress,
             regroup_eps=options.regroup_eps,
-        )
+            )
+            
+        else:
+            sf.priorized_fit_islands(
+                filename,
+                catalogue=options.input,
+                hdu_index=options.hdu_index,
+                rms=options.rms,
+                bkg=options.bkg,
+                outfile=options.outfile,
+                bkgin=options.backgroundimg,
+                rmsin=options.noiseimg,
+                beam=options.beam,
+                imgpsf=options.imgpsf,
+                catpsf=options.catpsf,
+                stage=options.priorized,
+                ratio=options.ratio,
+                outerclip=options.outerclip,
+                cores=options.cores,
+                doregroup=options.regroup,
+                docov=options.docov,
+                cube_index=options.slice,
+                progress=options.progress,
+                regroup_eps=options.regroup_eps,
+            )
 
     sources = sf.sources
 
@@ -616,6 +677,34 @@ def main():
             "FITSFILE": filename,
             "RUN-AS": invocation_string,
         }
+
+        # collect catalogues and clean up
+        if MPI_AVAIL:
+            logger.info("MPI is available")
+            catalog_list = []
         for t in options.tables.split(","):
+            final_file_name = t
+            if MPI_AVAIL:
+                t = addSuffix(t,MPI.COMM_WORLD.Get_rank())
             save_catalog(t, sources, prefix=options.column_prefix, meta=meta)
+
+        if MPI_AVAIL:
+            MPI.COMM_WORLD.Barrier()
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                for t in options.tables.split(","):
+                    flist = []
+                    final_file_name = addSuffix(t,"comp")
+                    for n in range(0, MPI.COMM_WORLD.Get_size()):
+                        base = addSuffix(t,n)
+                        base = addSuffix(base, "comp")
+                        flist.append(base)
+                    final_table = load_table(flist[0])
+                    for f in flist[1:]:
+                        table = load_table(f)
+                        final_table = vstack([final_table, table])
+                        os.remove(f)
+            
+                    write_table(final_table, final_file_name)
+                    logger.info(f"Wrote table name: {final_file_name}")
+
     return 0
