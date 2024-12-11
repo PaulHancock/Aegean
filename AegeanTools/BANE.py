@@ -433,7 +433,6 @@ def filter_image(
     out_base,
     step_size=None,
     box_size=None,
-    twopass=False,  # Deprecated
     cores=None,
     mask=True,
     compressed=False,
@@ -458,10 +457,6 @@ def filter_image(
 
     box_size : (int,int)
         The size of the box in pixels
-
-    twopass : bool
-        Perform a second pass calculation to ensure that the noise is not
-        contaminated by the background. Default = False. DEPRECATED
 
     cores : int
         Number of CPU corse to use. Default = all available
