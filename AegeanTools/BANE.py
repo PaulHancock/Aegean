@@ -104,8 +104,6 @@ def sigmaclip(arr, lo, hi, reps=10):
         std = np.std(clipped)
         mean = np.mean(clipped)
         prev_valid = curr_valid
-    # else:  # disable logging so that numba can be fast
-    #     logger.debug("No stopping criteria was reached after {0} cycles".format(count))
 
     return mean, std
 
@@ -130,7 +128,7 @@ def _sf2(args):
     except Exception as e:
         import traceback
 
-        logger.warn(e)
+        logger.warning(e)
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
