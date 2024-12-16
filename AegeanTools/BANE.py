@@ -132,7 +132,7 @@ def _sf2(args):
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
-def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_index):
+def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_index=None):
     """
     Calculate the background and rms for a sub region of an image. The results
     are written to shared memory - irms and ibkg.
@@ -152,14 +152,15 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
     box_size : (int, int)
         The size of the box over which the filter is applied (each step).
 
-    shape : tuple
-        The shape of the fits image
+    shape : (int, int, int)
+        The shape of the fits cube (1,y,x) for an image.
 
     domask : bool
         If true then copy the data mask to the output.
 
-    cube_index : int
-        The index into the 3rd dimension (if present)
+    cube_index : int or None
+        The index into the 3rd dimension (frequency?) to process.
+        Default = None => process all.
 
     Returns
     -------
@@ -176,26 +177,31 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
     # cut out the region of interest plus 1/2 the box size
     # and clip to the image size
     data_row_min = max(0, ymin - box_size[0] // 2)
-    data_row_max = min(shape[0], ymax + box_size[0] // 2)
+    data_row_max = min(shape[1], ymax + box_size[0] // 2)
 
     # Figure out how many axes are in the datafile
     NAXIS = fits.getheader(filename)["NAXIS"]
+
+    sz = slice(None)
+    sy = slice(data_row_min, data_row_max)
+    sx = slice(None)
+
+    if cube_index:
+        sz = slice(cube_index, cube_index + 1)
 
     # For some reason we can't memmap a file with BSCALE not 1.0
     # so we ignore it now and scale it later
     with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
         if NAXIS == 2:
-            data = a[0].section[data_row_min:data_row_max, 0 : shape[1]]
+            data = a[0].section[sy, sx]
+            # ensure that we always end up with a 3d image
+            data = data[None, :, :]
         elif NAXIS == 3:
-            data = np.squeeze(
-                a[0].section[cube_index, data_row_min:data_row_max, 0 : shape[1]]
-            )
+            data = a[0].section[sz, sy, sx]
         elif NAXIS == 4:
-            data = np.squeeze(
-                a[0].section[0, cube_index, data_row_min:data_row_max, 0 : shape[1]]
-            )
+            data = np.squeeze(a[0].section[0, sz, sy, sx])
         else:
-            logger.error("Too many NAXIS for me {0}".format(NAXIS))
+            logger.error(f"Too many NAXIS for me {NAXIS}")
             logger.error("fix your file to be more sane")
             raise Exception("Too many NAXIS")
 
@@ -207,10 +213,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
     # force float64 for consistency
     data = data.astype(np.float64)
 
-    # row_len = shape[1]
-
-    logger.debug("data size is {0}".format(data.shape))
-    logger.debug("data format is {0}".format(data.dtype))
+    logger.debug(f"data size is {data.shape}")
+    logger.debug(f"data format is {data.dtype}")
 
     def box(r, c):
         """
@@ -218,9 +222,9 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
         with size = box_size
         """
         r_min = max(0, r - box_size[0] // 2)
-        r_max = min(data.shape[0] - 1, r + box_size[0] // 2)
+        r_max = min(data.shape[1] - 1, r + box_size[0] // 2)
         c_min = max(0, c - box_size[1] // 2)
-        c_max = min(data.shape[1] - 1, c + box_size[1] // 2)
+        c_max = min(data.shape[2] - 1, c + box_size[1] // 2)
         return r_min, r_max, c_min, c_max
 
     # set up a grid of rows/cols at which we will compute the bkg/rms
@@ -229,75 +233,89 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
     cols = list(range(0, shape[1], step_size[1]))
     cols.append(shape[1])
 
-    # store the computed bkg/rms in this smaller array
-    vals = np.zeros(shape=(len(rows), len(cols)))
-
-    for i, row in enumerate(rows):
-        for j, col in enumerate(cols):
-            r_min, r_max, c_min, c_max = box(row, col)
-            new = data[r_min:r_max, c_min:c_max]
-            new = np.ravel(new)
-            bkg, _ = sigmaclip(new, 3, 3)
-            vals[i, j] = bkg
-
-    # indices of all the pixels within our region
-    gr, gc = np.mgrid[ymin - data_row_min : ymax - data_row_min, 0 : shape[1]]
-
     # Find the shared memory and create a numpy array interface
     ibkg_shm = SharedMemory(name=f"ibkg_{memory_id}", create=False)
     ibkg = np.ndarray(shape, dtype=np.float64, buffer=ibkg_shm.buf)
     irms_shm = SharedMemory(name=f"irms_{memory_id}", create=False)
     irms = np.ndarray(shape, dtype=np.float64, buffer=irms_shm.buf)
 
-    logger.debug("Interpolating bkg to sharemem")
-    ifunc = RegularGridInterpolator((rows, cols), vals)
-    interp_bkg = np.array(ifunc((gr, gc)), dtype=np.float64)
-    ibkg[ymin:ymax, :] = interp_bkg
-    del ifunc, interp_bkg
-    logger.debug(" ... done writing bkg")
+    for k in range(shape[0]):
+        # store the computed bkg/rms in this smaller array
+        vals = np.zeros(shape=(len(rows), len(cols)))
 
-    # wait for all to complete
-    i = barrier.wait()
-    if i == 0:
-        barrier.reset()
+        # loop over
+        for i, row in enumerate(rows):
+            for j, col in enumerate(cols):
+                r_min, r_max, c_min, c_max = box(row, col)
+                new = data[k, r_min:r_max, c_min:c_max]
+                new = np.ravel(new)
+                bkg, _ = sigmaclip(new, 3, 3)
+                vals[i, j] = bkg
 
-    logger.debug("background subtraction")
-    data[0 + ymin - data_row_min : data.shape[0] - (data_row_max - ymax), :] -= ibkg[
-        ymin:ymax, :
-    ]
-    logger.debug(".. done ")
+        # indices of all the pixels within our region
+        gr, gc = np.mgrid[ymin - data_row_min : ymax - data_row_min, 0 : shape[1]]
 
-    # reset/recycle the vals array
-    vals[:] = 0
+        logger.debug("Interpolating bkg to sharemem")
+        ifunc = RegularGridInterpolator((rows, cols), vals)
+        interp_bkg = np.array(ifunc((gr, gc)), dtype=np.float64)
+        ibkg[k, ymin:ymax, :] = interp_bkg
+        del ifunc, interp_bkg
+        logger.debug(" ... done writing bkg")
 
-    for i, row in enumerate(rows):
-        for j, col in enumerate(cols):
-            r_min, r_max, c_min, c_max = box(row, col)
-            new = data[r_min:r_max, c_min:c_max]
-            new = np.ravel(new)
-            _, rms = sigmaclip(new, 3, 3)
-            vals[i, j] = rms
-
-    logger.debug("Interpolating rms to sharemem")
-    ifunc = RegularGridInterpolator((rows, cols), vals)
-    interp_rms = np.array(ifunc((gr, gc)), dtype=np.float64)
-    irms[ymin:ymax, :] = interp_rms
-    del ifunc, interp_rms
-    logger.debug(" .. done writing rms")
-
-    if domask:
         # wait for all to complete
         i = barrier.wait()
         if i == 0:
             barrier.reset()
 
-        logger.debug("applying mask")
-        mask = ~np.isfinite(
-            data[0 + ymin - data_row_min : data.shape[0] - (data_row_max - ymax), :]
+        logger.debug("background subtraction")
+        logger.debug(f"data shape {data.shape}, ibkg shape {ibkg.shape}")
+        logger.debug(
+            f"k {k}, ymin {ymin}, ymax {ymax}, data_row_min {data_row_min}, data_row_max {data_row_max}"
         )
-        ibkg[ymin:ymax, :][mask] = np.nan
-        irms[ymin:ymax, :][mask] = np.nan
-        logger.debug("... done applying mask")
+        logger.debug(
+            f"data slice is {0 + ymin - data_row_min}:{data.shape[1] - (data_row_max - ymax)}"
+        )
+        data[
+            k, 0 + ymin - data_row_min : data.shape[1] - (data_row_max - ymax), :
+        ] -= ibkg[k, ymin:ymax, :]
+        logger.debug(".. done ")
+
+        # reset/recycle the vals array
+        vals[:] = 0
+
+        for i, row in enumerate(rows):
+            for j, col in enumerate(cols):
+                r_min, r_max, c_min, c_max = box(row, col)
+                new = data[k, r_min:r_max, c_min:c_max]
+                new = np.ravel(new)
+                _, rms = sigmaclip(new, 3, 3)
+                vals[i, j] = rms
+
+        logger.debug("Interpolating rms to sharemem")
+        ifunc = RegularGridInterpolator((rows, cols), vals)
+        interp_rms = np.array(ifunc((gr, gc)), dtype=np.float64)
+        irms[k, ymin:ymax, :] = interp_rms
+        del ifunc, interp_rms
+        logger.debug(" .. done writing rms")
+
+        if domask:
+            # wait for all to complete
+            i = barrier.wait()
+            if i == 0:
+                barrier.reset()
+
+            logger.debug("applying mask")
+            mask = ~np.isfinite(
+                data[
+                    k,  # TODO: CHECK HERE
+                    0 + ymin - data_row_min : data.shape[1] - (data_row_max - ymax),
+                    :,
+                ]
+            )
+            ibkg[k, ymin:ymax, :][mask] = np.nan
+            irms[k, ymin:ymax, :][mask] = np.nan
+            logger.debug("... done applying mask")
+
     logger.debug(
         "rows {0}-{1} finished at {2}".format(
             ymin, ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())
@@ -307,7 +325,15 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
 
 
 def filter_mc_sharemem(
-    filename, step_size, box_size, cores, shape, nslice=None, domask=True, cube_index=0
+    filename,
+    step_size,
+    box_size,
+    cores,
+    shape,
+    nslice=None,
+    domask=True,
+    cube_index=0,
+    as_cube=False,
 ):
     """
     Calculate the background and noise images corresponding to the input file.
@@ -328,18 +354,21 @@ def filter_mc_sharemem(
     cores : int
         Number of cores to use. If None then use all available.
 
+    shape : (int, int) or (int, int, int)
+        The shape of the image or cube in the given file.
+
     nslice : int
         The image will be divided into this many horizontal stripes for
         processing. Default = None = equal to cores
-
-    shape : (int, int)
-        The shape of the image in the given file.
 
     domask : bool
         True(Default) = copy data mask to output.
 
     cube_index : int
         For 3d data use this index into the third dimension. Default = 0
+
+    as_cube : bool
+        If true and the input data are 3d then compute bkg/rms over all channels.
 
     Returns
     -------
@@ -352,7 +381,11 @@ def filter_mc_sharemem(
     if (nslice is None) or (cores == 1):
         nslice = cores
 
-    img_y, img_x = shape
+    # force a 3d shape for consistency of processing
+    if not as_cube:
+        shape = (1, shape[0], shape[1])
+
+    img_y = shape[1]
 
     logger.info("using {0} cores".format(cores))
     logger.info("using {0} stripes".format(nslice))
@@ -438,6 +471,7 @@ def filter_image(
     compressed=False,
     nslice=None,
     cube_index=None,
+    as_cube=False,
 ):
     """
     Create a background and noise image from an input image. Resulting images
@@ -477,6 +511,9 @@ def filter_image(
         If the input data is 3d, then use this index for the 3rd dimension.
         Default = None, use the first index.
 
+    as_cube : bool
+        If the input data is 3d, then compute a per channel bkg/rms.
+
     Returns
     -------
     bkg, rms : `numpy.ndarray`
@@ -493,11 +530,13 @@ def filter_image(
         naxis3 = header["NAXIS3"]
         if cube_index >= naxis3:
             logger.error(
-                "3rd dimension has len {0} but index {1} was passed".format(
-                    naxis3, cube_index
-                )
+                f"3rd dimension has len {naxis3} but index {cube_index} was passed"
             )
             return None
+
+    if naxis == 2 and as_cube:
+        logger.error(f"As_cube was set true but the data only have {naxis} axes")
+        return None
 
     if step_size is None:
         step_size = get_step_size(header)
@@ -510,9 +549,7 @@ def filter_image(
         if not step_size[0] == step_size[1]:
             step_size = (min(step_size), min(step_size))
             logger.info(
-                "Changing grid to be {0} so we can compress the output".format(
-                    step_size
-                )
+                f"Changing grid to be {step_size} so we can compress the output"
             )
 
     logger.info("using grid_size {0}, box_size {1}".format(step_size, box_size))
@@ -526,6 +563,7 @@ def filter_image(
         nslice=nslice,
         domask=mask,
         cube_index=cube_index,
+        as_cube=as_cube,
     )
     logger.info("done")
 
