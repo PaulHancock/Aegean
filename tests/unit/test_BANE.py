@@ -150,6 +150,14 @@ def test_BSCALE():
     return
 
 
+def test_cube_as_cube():
+    """
+    Ensure that running BANE on a cube delivers a cube output
+    """
+    # TODO: Write this test
+    return
+
+
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
