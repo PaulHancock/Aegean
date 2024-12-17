@@ -202,7 +202,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
         elif NAXIS == 3:
             data = a[0].section[sz, sy, sx]
         elif NAXIS == 4:
-            data = np.squeeze(a[0].section[0, sz, sy, sx])
+            data = a[0].section[0, sz, sy, sx]
         else:
             logger.error(f"Too many NAXIS for me {NAXIS}")
             logger.error("fix your file to be more sane")
