@@ -230,8 +230,9 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
     # set up a grid of rows/cols at which we will compute the bkg/rms
     rows = list(range(ymin - data_row_min, ymax - data_row_min, step_size[0]))
     rows.append(ymax - data_row_min)
-    cols = list(range(0, shape[1], step_size[1]))
-    cols.append(shape[1])
+
+    cols = list(range(0, shape[2], step_size[1]))
+    cols.append(shape[2])
 
     # Find the shared memory and create a numpy array interface
     ibkg_shm = SharedMemory(name=f"ibkg_{memory_id}", create=False)
@@ -240,6 +241,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
     irms = np.ndarray(shape, dtype=np.float64, buffer=irms_shm.buf)
 
     for k in range(shape[0]):
+        logger.debug(f"Working on slice {k}")
         # store the computed bkg/rms in this smaller array
         vals = np.zeros(shape=(len(rows), len(cols)))
 
@@ -253,8 +255,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
                 vals[i, j] = bkg
 
         # indices of all the pixels within our region
-        gr, gc = np.mgrid[ymin - data_row_min : ymax - data_row_min, 0 : shape[1]]
-
+        gr, gc = np.mgrid[ymin - data_row_min : ymax - data_row_min, 0 : shape[2]]
+        logger.debug(f"gr has shape {gr.shape}")
         logger.debug("Interpolating bkg to sharemem")
         ifunc = RegularGridInterpolator((rows, cols), vals)
         interp_bkg = np.array(ifunc((gr, gc)), dtype=np.float64)
@@ -525,6 +527,9 @@ def filter_image(
 
     header = fits.getheader(im_name)
     shape = (header["NAXIS2"], header["NAXIS1"])
+    if "NAXIS3" in header:
+        shape = (header["NAXIS3"], header["NAXIS2"], header["NAXIS1"])
+
     naxis = header["NAXIS"]
     if naxis > 2:
         naxis3 = header["NAXIS3"]

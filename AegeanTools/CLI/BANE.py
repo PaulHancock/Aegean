@@ -49,10 +49,17 @@ def main():
         "--slice",
         dest="cube_index",
         type=int,
-        default=0,
+        default=None,
         help="If the input data is a cube, then this slice "
         "will determine the array index of the image "
         "which will be processed by BANE",
+    )
+    group1.add_argument(
+        "--3d",
+        dest="as_cube",
+        default=False,
+        action="store_true",
+        help="if set then output a 3d cube",
     )
     group1.add_argument(
         "--nomask",
@@ -93,6 +100,8 @@ def main():
         cores=multiprocessing.cpu_count(),
         stripes=multiprocessing.cpu_count() - 1,
         debug=False,
+        cube_index=None,
+        as_cube=False,
     )
 
     options = parser.parse_args()
@@ -143,5 +152,6 @@ def main():
         compressed=options.compress,
         nslice=options.stripes,
         cube_index=options.cube_index,
+        as_cube=options.as_cube,
     )
     return 0
