@@ -154,7 +154,13 @@ def test_cube_as_cube():
     """
     Ensure that running BANE on a cube delivers a cube output
     """
-    # TODO: Write this test
+    fname = "tests/test_files/1904-66_SIN_3d.fits"
+    # don't crash and die
+    try:
+        for index in [0, 1, 2]:
+            BANE.filter_image(fname, out_base=None, nslice=1, cube_index=None)
+    except Exception as e:
+        raise AssertionError("BANE failed to work on 3d image")
     return
 
 
