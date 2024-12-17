@@ -1035,6 +1035,8 @@ class SourceFinder(object):
                 logger.info("Loading rms data from file {0}".format(rmsin))
             self.rmsimg = self._load_aux_image(img, rmsin, as_cube=as_cube)
 
+        self.bkgimg = np.squeeze(self.bkgimg)
+        self.rmsimg = np.squeeze(self.rmsimg)
         # subtract the background image from the data image and save
         if verb and debug:
             logger.debug("Data max is {0}".format(np.nanmax(img)))
