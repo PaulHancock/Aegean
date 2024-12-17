@@ -185,9 +185,12 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
     sz = slice(None)
     sy = slice(data_row_min, data_row_max)
     sx = slice(None)
-
-    if cube_index:
+    slices = range(shape[0])
+    # if the cube_index is not none, then only
+    # load/process one slice of the cube
+    if cube_index is not None:
         sz = slice(cube_index, cube_index + 1)
+        slices = [0]
 
     # For some reason we can't memmap a file with BSCALE not 1.0
     # so we ignore it now and scale it later
@@ -205,6 +208,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
             logger.error("fix your file to be more sane")
             raise Exception("Too many NAXIS")
 
+    logger.debug(f"loaded data shape {data.shape}")
     # Manually scale the data if BSCALE is not 1.0
     header = fits.getheader(filename)
     if "BSCALE" in header:
@@ -240,7 +244,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
     irms_shm = SharedMemory(name=f"irms_{memory_id}", create=False)
     irms = np.ndarray(shape, dtype=np.float64, buffer=irms_shm.buf)
 
-    for k in range(shape[0]):
+    for k in slices:
         logger.debug(f"Working on slice {k}")
         # store the computed bkg/rms in this smaller array
         vals = np.zeros(shape=(len(rows), len(cols)))
@@ -334,8 +338,7 @@ def filter_mc_sharemem(
     shape,
     nslice=None,
     domask=True,
-    cube_index=0,
-    as_cube=False,
+    cube_index=None,
 ):
     """
     Calculate the background and noise images corresponding to the input file.
@@ -366,11 +369,10 @@ def filter_mc_sharemem(
     domask : bool
         True(Default) = copy data mask to output.
 
-    cube_index : int
-        For 3d data use this index into the third dimension. Default = 0
+    cube_index : int or None
+        For 3d data use this index into the third dimension.
+        Default = None -> 3d input gives 3d output.
 
-    as_cube : bool
-        If true and the input data are 3d then compute bkg/rms over all channels.
 
     Returns
     -------
@@ -383,10 +385,7 @@ def filter_mc_sharemem(
     if (nslice is None) or (cores == 1):
         nslice = cores
 
-    # force a 3d shape for consistency of processing
-    if not as_cube:
-        shape = (1, shape[0], shape[1])
-
+    # shape is (z,y,x)
     img_y = shape[1]
 
     logger.info("using {0} cores".format(cores))
@@ -473,7 +472,6 @@ def filter_image(
     compressed=False,
     nslice=None,
     cube_index=None,
-    as_cube=False,
 ):
     """
     Create a background and noise image from an input image. Resulting images
@@ -509,39 +507,29 @@ def filter_image(
         Return a compressed version of the background/noise images. Default =
         False
 
-    cube_index : int
+    cube_index : int or None
         If the input data is 3d, then use this index for the 3rd dimension.
-        Default = None, use the first index.
-
-    as_cube : bool
-        If the input data is 3d, then compute a per channel bkg/rms.
+        Default = None, 3d inputs give 3d outputs.
 
     Returns
     -------
     bkg, rms : `numpy.ndarray`
         The computed background and rms maps (not compressed)
     """
-    # Use the first slice of the 3rd dimension if not specified
-    if cube_index is None:
-        cube_index = 0
 
     header = fits.getheader(im_name)
-    shape = (header["NAXIS2"], header["NAXIS1"])
-    if "NAXIS3" in header:
+    shape = (1, header["NAXIS2"], header["NAXIS1"])
+    if ("NAXIS3" in header) and cube_index is None:
         shape = (header["NAXIS3"], header["NAXIS2"], header["NAXIS1"])
 
     naxis = header["NAXIS"]
     if naxis > 2:
         naxis3 = header["NAXIS3"]
-        if cube_index >= naxis3:
+        if cube_index is not None and cube_index >= naxis3:
             logger.error(
                 f"3rd dimension has len {naxis3} but index {cube_index} was passed"
             )
             return None
-
-    if naxis == 2 and as_cube:
-        logger.error(f"As_cube was set true but the data only have {naxis} axes")
-        return None
 
     if step_size is None:
         step_size = get_step_size(header)
@@ -568,7 +556,6 @@ def filter_image(
         nslice=nslice,
         domask=mask,
         cube_index=cube_index,
-        as_cube=as_cube,
     )
     logger.info("done")
 
