@@ -733,9 +733,9 @@ def writeCRTF(filename, catalog, fmt):
     if len(components) > 0:
         cat = sorted(components)
         suffix = "comp"
-    elif len(simples) > 0:
-        cat = simples
-        suffix = "simp"
+    # elif len(simples) > 0:
+    #     cat = simples
+    #     suffix = "simp"
     else:
         cat = []
 
