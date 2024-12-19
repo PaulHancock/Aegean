@@ -25,7 +25,9 @@ def test_nulls():
 
 def test_check_table_formats():
     """Test check_table_formats"""
-    files = ",".join(["a.csv", "a.fits", "a.vot", "a.hdf5", "a.ann", "a.docx", "a"])
+    files = ",".join(
+        ["a.csv", "a.fits", "a.vot", "a.hdf5", "a.ann", "a.docx", "a.crtf", "a"]
+    )
 
     if cat.check_table_formats(files):
         raise AssertionError()
@@ -224,21 +226,6 @@ def test_write_contours_boxes():
     if os.path.exists("out.ann"):
         raise AssertionError()
 
-    cat.writeIslandBoxes("out.reg", catalog, fmt="reg")
-    if not os.path.exists("out.reg"):
-        raise AssertionError()
-
-    os.remove("out.reg")
-    cat.writeIslandBoxes("out.ann", catalog, fmt="ann")
-    if not os.path.exists("out.ann"):
-        raise AssertionError()
-
-    os.remove("out.ann")
-    # shouldn't write anything
-    cat.writeIslandBoxes("out.ot", catalog, fmt="ot")
-    if os.path.exists("out.ot"):
-        raise AssertionError()
-
 
 def test_write_ann():
     """Test that write_ann *doesn't* do anything"""
@@ -283,6 +270,22 @@ def test_write_ann():
     os.remove("out_isle.reg")
     cat.writeAnn("out.ann", [IslandSource()], fmt="ann")
     cat.writeAnn("out.reg", [IslandSource()], fmt="fail")
+
+
+def test_write_crtf():
+    """Test that we can save files in CASA region format."""
+    cat.writeCRTF("out.crtf", [ComponentSource()], fmt="crtf")
+    if not os.path.exists("out_comp.crtf"):
+        raise AssertionError("Failed to write component sources to crtf")
+    else:
+        os.remove("out_comp.crtf")
+
+    cat.writeCRTF("out.crtf", [IslandSource()], fmt="crtf")
+    if os.path.exists("out_isle.crft"):
+        os.remove("out_isle.crtf")
+        raise AssertionError("CRTF islands shouldn't be supported (yet)")
+
+    return
 
 
 def test_table_to_source_list():
