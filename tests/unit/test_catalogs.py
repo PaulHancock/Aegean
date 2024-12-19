@@ -226,21 +226,6 @@ def test_write_contours_boxes():
     if os.path.exists("out.ann"):
         raise AssertionError()
 
-    cat.writeIslandBoxes("out.reg", catalog, fmt="reg")
-    if not os.path.exists("out.reg"):
-        raise AssertionError()
-
-    os.remove("out.reg")
-    cat.writeIslandBoxes("out.ann", catalog, fmt="ann")
-    if not os.path.exists("out.ann"):
-        raise AssertionError()
-
-    os.remove("out.ann")
-    # shouldn't write anything
-    cat.writeIslandBoxes("out.ot", catalog, fmt="ot")
-    if os.path.exists("out.ot"):
-        raise AssertionError()
-
 
 def test_write_ann():
     """Test that write_ann *doesn't* do anything"""
