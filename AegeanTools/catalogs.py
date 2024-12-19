@@ -729,36 +729,27 @@ def writeAnn(filename, catalog, fmt):
 
 def writeCRTF(filename, catalog, fmt):
     """ """
-    components, islands, simples = classify_catalog(catalog)
+    components, islands, _ = classify_catalog(catalog)
+
     if len(components) > 0:
-        cat = sorted(components)
-        suffix = "comp"
-    # elif len(simples) > 0:
-    #     cat = simples
-    #     suffix = "simp"
-    else:
-        cat = []
-
-    if len(cat) > 0:
-        ras = [a.ra_str for a in cat]
-        decs = [re.sub(":", ".", a.dec_str) for a in cat]
+        ras = [a.ra_str for a in components]
+        decs = [re.sub(":", ".", a.dec_str) for a in components]
         # a being the variable that I used for bmaj.
-        if not hasattr(cat[0], "a"):
-            bmajs = [30 for a in cat]
+        if not hasattr(components[0], "a"):
+            bmajs = [30 for a in components]
             bmins = bmajs
-            pas = [0 for a in cat]
+            pas = [0 for a in components]
         else:
-            bmajs = [a.a for a in cat]
-            bmins = [a.b for a in cat]
-            pas = [a.pa for a in cat]
+            bmajs = [a.a for a in components]
+            bmins = [a.b for a in components]
+            pas = [a.pa for a in components]
 
-        names = [a.__repr__() for a in cat]
-        new_file = re.sub(".crtf$", "_{0}.crtf".format(suffix), filename)
+        names = [a.__repr__() for a in components]
+        new_file = re.sub(".crtf$", "_{0}.crtf".format("comp"), filename)
 
         with open(new_file, "w") as out:
             out.write("#CRTFv0 CASA Region Text Format version 0\n")
             out.write(f"#Aegean version {__version__}-({__date__})\n")
-            # out.write("global coord=J2000\n")
 
             for ra, dec, bmaj, bmin, pa, name in zip(
                 ras, decs, bmajs, bmins, pas, names
@@ -774,9 +765,7 @@ def writeCRTF(filename, catalog, fmt):
 
     if len(islands) > 0:
         logger.warning(f"format {fmt} not supported for island annotations")
-        return
-        # writeIslandContours(new_file, islands, fmt)
-        # logger.info("wrote {0}".format(new_file))
+
     return
 
 
