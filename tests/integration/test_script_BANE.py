@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+import os
 import sys
 
 from AegeanTools.CLI import BANE
@@ -31,6 +32,19 @@ def test_noclobber():
 def test_run_BANE():
     sys.argv = ["", image_SIN]
     BANE.main()
+
+
+def test_configfile():
+    """Test that we can use a config file"""
+    cfile = "BANE.ini"
+    with open(cfile, "w") as config:
+        config.write("cite = True")
+    sys.argv = ["", "--config", cfile]
+    try:
+        BANE.main()
+    finally:
+        if os.path.exists(cfile):
+            os.remove(cfile)
 
 
 if __name__ == "__main__":

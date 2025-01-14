@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 # standard imports
-import argparse
+import configargparse
 import multiprocessing
 import os
 
@@ -12,9 +12,12 @@ __author__ = "Paul Hancock"
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="BANE", prefix_chars="-")
+    parser = configargparse.ArgumentParser(prog="BANE", prefix_chars="-")
     parser.add_argument("image", nargs="?", default=None)
     group1 = parser.add_argument_group("Configuration Options")
+    # Add configuration file argument
+    group1.add_argument("--config", is_config_file=True, help="Path to the config file")
+
     group1.add_argument(
         "--out",
         dest="out_base",
