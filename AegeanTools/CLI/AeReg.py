@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import argparse
+import configargparse
 import os
 import sys
 
@@ -13,8 +13,8 @@ from AegeanTools.cluster import check_attributes_for_regroup, regroup_dbscan, re
 from AegeanTools.logging import logger, logging
 
 __author__ = ["PaulHancock"]
-__date__ = "2024-01-24"
-__version__ = "0.9"
+__version__ = "0.9.1"
+__date__ = "2025-01-14"
 
 
 def main():
@@ -22,16 +22,13 @@ def main():
     A regrouping tool to accompany the Aegean source finding program.
     """
 
-    parser = argparse.ArgumentParser(prog="regroup", prefix_chars="-")
+    parser = configargparse.ArgumentParser(prog="AeReg", prefix_chars="-")
     group1 = parser.add_argument_group("Required")
-    group1.add_argument(
-        "--input", dest="input", type=str, required=True, help="The input catalogue."
-    )
+    group1.add_argument("--input", dest="input", type=str, help="The input catalogue.")
     group1.add_argument(
         "--table",
         dest="tables",
         type=str,
-        required=True,
         help="Table outputs, format inferred from extension.",
     )
 
@@ -72,15 +69,20 @@ def main():
     group4.add_argument(
         "--debug", dest="debug", action="store_true", default=False, help="Debug mode."
     )
+    group4.add_argument("--config", is_config_file=True, help="Path to the config file")
 
     options = parser.parse_args()
+
+    if not options.input or not options.tables:
+        parser.print_help()
+        return 0
 
     invocation_string = " ".join(sys.argv)
 
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logger.setLevel(logging_level)
-    logger.info("This is regroup {0}-({1})".format(__version__, __date__))
+    logger.info("This is AeReg {0}-({1})".format(__version__, __date__))
     logger.debug("Run as:\n{0}".format(invocation_string))
 
     # check that a valid intput filename was entered
