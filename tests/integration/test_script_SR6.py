@@ -55,6 +55,18 @@ def test_expand():
         os.remove(tempfile + ".fits")
 
 
+def test_configfile():
+    cfile = "SR6.ini"
+    try:
+        with open(cfile, "w") as config:
+            config.write("debug = False")
+        sys.argv = ["", "--config", cfile]
+        SR6.main()
+    finally:
+        if os.path.exists(cfile):
+            os.remove(cfile)
+
+
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():

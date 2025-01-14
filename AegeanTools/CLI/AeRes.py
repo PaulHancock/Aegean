@@ -1,16 +1,13 @@
 #! /usr/bin/env python
 
-import argparse
+import configargparse
 
 from AegeanTools.AeRes import make_residual
 from AegeanTools.logging import logger, logging
 
 __author__ = "Paul Hancock"
 __version__ = "v0.2.7"
-__date__ = "2024-01-24"
-
-
-# global constants
+__date__ = "2025-01-14"
 
 
 def main():
@@ -18,7 +15,7 @@ def main():
     Tool for making residual images with Aegean tables as input
     """
 
-    parser = argparse.ArgumentParser(prog="AeRes", prefix_chars="-")
+    parser = configargparse.ArgumentParser(prog="AeRes", prefix_chars="-")
     group1 = parser.add_argument_group("I/O arguments")
     group1.add_argument(
         "-c",
@@ -100,6 +97,7 @@ def main():
     group4.add_argument(
         "--debug", dest="debug", action="store_true", default=False, help="Debug mode."
     )
+    group4.add_argument("--config", is_config_file=True, help="Path to the config file")
 
     options = parser.parse_args()
 

@@ -115,6 +115,18 @@ def test_priorized3D():
     else:
         os.remove("output_comp.csv")
 
+def test_configfile():
+    cfile = "aegean.ini"
+    try:
+        with open(cfile, "w") as config:
+            config.write("debug = False")
+        sys.argv = ["", "--config", cfile]
+        aegean.main()
+    finally:
+        if os.path.exists(cfile):
+            os.remove(cfile)
+
+
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():

@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import argparse
+import configargparse
 
 # import logging.config
 import multiprocessing
@@ -80,9 +80,11 @@ def main():
     The Aegean source finding program.
     """
 
-    parser = argparse.ArgumentParser(prog="aegean", prefix_chars="-")
+    parser = configargparse.ArgumentParser(prog="aegean", prefix_chars="-")
     parser.add_argument("image", nargs="?", default=None)
     group1 = parser.add_argument_group("Configuration Options")
+
+    group1.add_argument("--config", is_config_file=True, help="Path to the config file")
 
     group1.add_argument(
         "--find",

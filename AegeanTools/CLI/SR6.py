@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-import argparse
+import configargparse
 import os
 import sys
 
@@ -12,8 +12,8 @@ from AegeanTools.fits_tools import compress, expand
 from AegeanTools.logging import logger, logging
 
 __author__ = "Paul Hancock"
-__version__ = "v1.2"
-__date__ = "2024-01-24"
+__version__ = "v1.2.1"
+__date__ = "2025-01-14"
 
 
 # command line version of this program runs from here.
@@ -24,7 +24,7 @@ def main():
     """
 
     epilog = ""
-    parser = argparse.ArgumentParser(epilog=epilog, prefix_chars="-")
+    parser = configargparse.ArgumentParser(epilog=epilog, prefix_chars="-")
 
     # tools for shrinking files
     group1 = parser.add_argument_group("Shrinking and expanding files")
@@ -81,8 +81,10 @@ def main():
         default=False,
         help="Show citation information.",
     )
+    group2.add_argument("--config", is_config_file=True, help="Path to the config file")
 
     results = parser.parse_args()
+
     # print help if the user enters no options or filename
     if len(sys.argv) == 1:
         parser.print_help()
@@ -90,6 +92,10 @@ def main():
 
     if results.cite:
         print(__citation__)
+        return 0
+
+    if results.infile is None:
+        parser.print_help()
         return 0
 
     logging_level = logging.DEBUG if results.debug else logging.INFO

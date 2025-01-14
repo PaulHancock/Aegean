@@ -1,9 +1,12 @@
 #! /usr/bin/env python
-import argparse
+import configargparse
 import sys
 
 from AegeanTools import MIMAS, __citation__
 from AegeanTools.logging import logger, logging
+
+__author__ = "Paul Hancock"
+__date__ = "2025-01-14"
 
 
 def main():
@@ -15,7 +18,7 @@ def main():
         "+r -r +c -c +p -p. This means that you might have to take "
         "multiple passes to construct overly complicated regions."
     )
-    parser = argparse.ArgumentParser(epilog=epilog, prefix_chars="+-")
+    parser = configargparse.ArgumentParser(epilog=epilog, prefix_chars="+-")
 
     group1 = parser.add_argument_group(
         "Creating/modifying regions", "Must specify -o, plus or more [+-][cr]"
@@ -246,6 +249,8 @@ def main():
         default=False,
         help="Show citation information.",
     )
+
+    group4.add_argument("--config", is_config_file=True, help="Path to the config file")
 
     results = parser.parse_args()
 
