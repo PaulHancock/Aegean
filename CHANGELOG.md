@@ -1,3 +1,9 @@
+### Jan 15 2025
+
+General
+- All command line scripts now use `configargparse`, so that users can supply a
+  configuration file via `--config` instead of a long list of command line arguments.
+
 ### Dec 09 2024
 
 General
