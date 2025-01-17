@@ -24,7 +24,6 @@ from .fits_tools import load_image_band, write_fits
 from .fitting import (
     Bmatrix,
     Cmatrix,
-    bias_correct,
     covar_errors,
     do_lmfit,
     do_lmfit_3D,
@@ -192,9 +191,6 @@ class SourceFinder(object):
     docov : bool
         If True, then fitting will be done using the covariance matrix.
 
-    dobais: bool
-        Not yet implemented. Default = False
-
     sources : [ComponentSource|IslandSource|SimpleSource]
       List of sources that have been found/measured.
     """
@@ -212,7 +208,6 @@ class SourceFinder(object):
         self.wcshelper = None
         self.blank = False
         self.docov = True
-        self.dobias = False
         self.cube_index = 0
 
         self.sources = []
@@ -1048,9 +1043,6 @@ class SourceFinder(object):
 
         self.blank = blank
         self.docov = docov
-
-        # Default to false until I can verify that this is working
-        self.dobias = False
 
         # check if the WCS is galactic
         if "lon" in self.header["CTYPE1"].lower():
@@ -2120,20 +2112,6 @@ class SourceFinder(object):
                     is_flag |= flags.FITERR
                 # get the real (sky) parameter errors
                 model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
-
-                if self.dobias and self.docov:
-                    x, y = np.indices(idata.shape)
-                    acf = elliptical_gaussian(
-                        x,
-                        y,
-                        1,
-                        0,
-                        0,
-                        pixbeam.a * FWHM2CC * fac,
-                        pixbeam.b * FWHM2CC * fac,
-                        pixbeam.pa,
-                    )
-                    bias_correct(model, idata, acf=acf * errs**2)
 
                 if not result.success:
                     is_flag |= flags.FITERR
