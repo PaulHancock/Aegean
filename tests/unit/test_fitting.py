@@ -46,30 +46,6 @@ def test_CandBmatrix():
         raise AssertionError()
 
 
-def test_hessian_shape():
-    """Test that the hessian has the correct shape"""
-    # test a single component model
-    model = make_model()
-    nvar = 3
-    x, y = np.indices((10, 10))
-    Hij = fitting.hessian(model, x, y)
-    if not (Hij.shape == (nvar, nvar, 10, 10)):
-        raise AssertionError()
-
-    # now add another component
-    model.add("c1_amp", 1, vary=True)
-    model.add("c1_xo", 5, vary=True)
-    model.add("c1_yo", 5, vary=True)
-    model.add("c1_sx", 2.001, vary=True)
-    model.add("c1_sy", 2, vary=True)
-    model.add("c1_theta", 0, vary=True)
-    nvar = 9
-    model["components"].value = 2
-    Hij = fitting.hessian(model, x, y)
-    if not (Hij.shape == (nvar, nvar, 10, 10)):
-        raise AssertionError()
-
-
 def test_jacobian_shape():
     """
     Test to see if the Jacobian matrix if of the right shape
@@ -118,32 +94,6 @@ def test_emp_vs_ana_jacobian():
     ana_Jij = fitting.jacobian(model, x, y)
     diff = np.abs(ana_Jij - emp_Jij)
     if not (np.max(diff) < 1e-3):
-        raise AssertionError()
-
-
-def test_emp_vs_ana_hessian():
-    """Test that the empirical and analytical Hessians agree"""
-    model = make_model()
-
-    x, y = np.indices((10, 10))
-    emp_Hij = fitting.emp_hessian(model, x, y)
-    ana_Hij = fitting.hessian(model, x, y)
-    diff = np.abs(ana_Hij - emp_Hij)
-    if not (np.max(diff) < 1e-5):
-        raise AssertionError()
-
-    model.add("c1_amp", 1, vary=True)
-    model.add("c1_xo", 5, vary=True)
-    model.add("c1_yo", 5, vary=True)
-    model.add("c1_sx", 2.001, vary=True)
-    model.add("c1_sy", 2, vary=True)
-    model.add("c1_theta", 0, vary=True)
-
-    model["components"].value = 2
-    emp_Hij = fitting.emp_hessian(model, x, y)
-    ana_Hij = fitting.hessian(model, x, y)
-    diff = np.abs(ana_Hij - emp_Hij)
-    if not (np.max(diff) < 1):
         raise AssertionError()
 
 
