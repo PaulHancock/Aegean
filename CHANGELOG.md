@@ -4,6 +4,15 @@ General
 - All command line scripts now use `configargparse`, so that users can supply a
   configuration file via `--config` instead of a long list of command line arguments.
 
+Aegean
+- Output format '.crtf' is now supported for catalogues.
+- See [Casa Docs](https://casaguides.nrao.edu/index.php/CASA_Region_Format) for details on this format.
+
+BANE
+- BANE is now able input/ouput data cubes in their entirety.
+- Default now is that if the input is a cube then the output will be a cube.
+- Use `--slice` to choose a single plane from a cube and output a 2d image.
+
 ### Dec 09 2024
 
 General
