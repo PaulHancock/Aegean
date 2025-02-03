@@ -6,8 +6,8 @@ from AegeanTools.AeRes import make_residual
 from AegeanTools.logging import logger, logging
 
 __author__ = "Paul Hancock"
-__version__ = "v0.2.7"
-__date__ = "2025-01-14"
+__version__ = "v0.3"
+__date__ = "2025-02-03"
 
 
 def main():
