@@ -92,6 +92,9 @@ def main():
     group3.add_argument(
         "--pacol", dest="pa_col", default="pa", help="Position angle column name"
     )
+    group3.add_argument(
+        "--alphacol", dest="alpha_col", default="alpha", help="Alpha column name"
+    )
 
     group4 = parser.add_argument_group("Extra options")
     group4.add_argument(
@@ -136,6 +139,7 @@ def main():
         "a_col": options.a_col,
         "b_col": options.b_col,
         "pa_col": options.pa_col,
+        "alpha_col": options.alpha_col,
     }
 
     make_residual(

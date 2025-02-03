@@ -12,16 +12,23 @@ from astropy.io import fits
 
 from AegeanTools import catalogs, fitting, wcs_helpers
 from AegeanTools.logging import logger, logging
+from AegeanTools.models import ComponentSource, ComponentSource3D
 
 __author__ = "Paul Hancock"
 
 FWHM2CC = 1 / (2 * np.sqrt(2 * np.log(2)))
 
 
-def load_sources(filename,
-                 ra_col='ra', dec_col='dec',
-                 peak_col='peak_flux',
-                 a_col='a', b_col='b', pa_col='pa'):
+def load_sources(
+    filename,
+    ra_col="ra",
+    dec_col="dec",
+    peak_col="peak_flux",
+    a_col="a",
+    b_col="b",
+    pa_col="pa",
+    alpha_col="alpha",
+):
     """
     Open a file, read contents, return a list of all the sources in that file.
 
@@ -32,13 +39,14 @@ def load_sources(filename,
 
     ra_col, dec_col, peak_col, a_col, b_col, pa_col : str
         The column names for each of the parameters.
-        Default = ['ra', 'dec', 'peak_flux', 'a', 'b', 'pa']
+        Default = ['ra', 'dec', 'peak_flux', 'a', 'b', 'pa', 'alpha']
 
     Return
     ------
     catalog : [`class:AegeanTools.models.ComponentSource`, ...]
         A list of source components
     """
+    srctype = ComponentSource
     table = catalogs.load_table(filename)
     required_cols = [ra_col, dec_col, peak_col, a_col, b_col, pa_col]
     # required_cols = ['ra','dec','peak_flux','a','b','pa']
@@ -51,11 +59,18 @@ def load_sources(filename,
         logger.error("Some required columns missing or mis-labeled")
         return None
     # rename the table columns
-    for old, new in zip([ra_col, dec_col, peak_col, a_col, b_col, pa_col],
-                        ['ra', 'dec', 'peak_flux', 'a', 'b', 'pa']):
+    for old, new in zip(
+        [ra_col, dec_col, peak_col, a_col, b_col, pa_col],
+        ["ra", "dec", "peak_flux", "a", "b", "pa"],
+    ):
         table.rename_column(old, new)
 
-    catalog = catalogs.table_to_source_list(table)
+    # rename the alpha column if it exists
+    if alpha_col in table.colnames:
+        table.rename_column(alpha_col, "alpha")
+        srctype = ComponentSource3D
+
+    catalog = catalogs.table_to_source_list(table, src_type=srctype)
     logger.info("read {0} sources from {1}".format(len(catalog), filename))
     return catalog
 
@@ -97,9 +112,9 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
 
     i_count = 0
     for src in sources:
-        xo, yo, sx, sy, theta = wcshelper.sky2pix_ellipse([src.ra, src.dec],
-                                                          src.a/3600,
-                                                          src.b/3600, src.pa)
+        xo, yo, sx, sy, theta = wcshelper.sky2pix_ellipse(
+            [src.ra, src.dec], src.a / 3600, src.b / 3600, src.pa
+        )
         phi = np.radians(theta)
 
         # skip sources that have a center that is outside of the image
@@ -111,11 +126,11 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
             continue
 
         # pixels over which this model is calculated
-        xoff = factor*(abs(sx*np.cos(phi)) + abs(sy*np.sin(phi)))
+        xoff = factor * (abs(sx * np.cos(phi)) + abs(sy * np.sin(phi)))
         xmin = xo - xoff
         xmax = xo + xoff
 
-        yoff = factor*(abs(sx*np.sin(phi)) + abs(sy*np.cos(phi)))
+        yoff = factor * (abs(sx * np.sin(phi)) + abs(sy * np.cos(phi)))
         ymin = yo - yoff
         ymax = yo + yoff
 
@@ -135,26 +150,29 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
             logger.debug(" sx, sy: {0} {1}".format(sx, sy))
             logger.debug(" theta, phi: {0} {1}".format(theta, phi))
             logger.debug(" xoff, yoff: {0} {1}".format(xoff, yoff))
-            logger.debug(" xmin, xmax, ymin, ymax: {0}:{1} {2}:{3}".format(
-                            xmin, xmax, ymin, ymax))
-            logger.debug(" flux, sx, sy: {0} {1} {2}".format(
-                          src.peak_flux, sx, sy))
+            logger.debug(
+                " xmin, xmax, ymin, ymax: {0}:{1} {2}:{3}".format(
+                    xmin, xmax, ymin, ymax
+                )
+            )
+            logger.debug(" flux, sx, sy: {0} {1} {2}".format(src.peak_flux, sx, sy))
 
         # positions for which we want to make the model
-        x, y = np.mgrid[int(xmin):int(xmax), int(ymin):int(ymax)]
+        x, y = np.mgrid[int(xmin) : int(xmax), int(ymin) : int(ymax)]
         x = x.ravel()
         y = y.ravel()
 
         # TODO: understand why xo/yo -1 is needed
-        model = fitting.elliptical_gaussian(x, y, src.peak_flux, xo-1, yo-1,
-                                            sx*FWHM2CC, sy*FWHM2CC, theta)
+        model = fitting.elliptical_gaussian(
+            x, y, src.peak_flux, xo - 1, yo - 1, sx * FWHM2CC, sy * FWHM2CC, theta
+        )
 
         # Mask the output image if requested
         if mask:
             if frac is not None:
-                indices = np.where(model >= (frac*src.peak_flux))
+                indices = np.where(model >= (frac * src.peak_flux))
             else:
-                indices = np.where(model >= (sigma*src.local_rms))
+                indices = np.where(model >= (sigma * src.local_rms))
             # somehow m[x,y][indices] = np.nan doesn't assign any values
             # so we have to do the more complicated
             # m[x[indices],y[indices]] = np.nan
@@ -166,9 +184,17 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
     return m
 
 
-def make_residual(fitsfile, catalog, rfile, mfile=None,
-                  add=False, mask=False, frac=None, sigma=4,
-                  colmap=None):
+def make_residual(
+    fitsfile,
+    catalog,
+    rfile,
+    mfile=None,
+    add=False,
+    mask=False,
+    frac=None,
+    sigma=4,
+    colmap=None,
+):
     """
     Take an input image and catalogue, make a model of the catalogue, and then
     add/subtract or mask the input image. Saving the residual and (optionally)
@@ -205,7 +231,7 @@ def make_residual(fitsfile, catalog, rfile, mfile=None,
 
     colmap : dict
         A mapping of column names. Default is: {'ra_col':'ra', 'dec_col':'dec',
-        'peak_col':'peak_flux', 'a_col':'a', 'b_col':'b', 'pa_col':'pa}
+        'peak_col':'peak_flux', 'a_col':'a', 'b_col':'b', 'pa_col':'pa, 'alpha_col':'alpha'}
 
     Return
     ------
