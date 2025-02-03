@@ -305,10 +305,9 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=Fa
     NAXIS = header["NAXIS"]
     with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
         if NAXIS == 2:
-            if not as_cube:
-                data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
-            else:
-                raise AegeanError("Data passed as a cube but only 2 axes were provided")
+            data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
+            if as_cube:
+                data = np.expand_dims(data, axis=0)
         elif NAXIS == 3:
             if not as_cube:
                 data = a[hdu_index].section[

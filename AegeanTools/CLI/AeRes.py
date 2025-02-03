@@ -96,6 +96,13 @@ def main():
         "--alphacol", dest="alpha_col", default="alpha", help="Alpha column name"
     )
 
+    group3.add_argument(
+        "--nu0col",
+        dest="nu0_col",
+        default="nu0",
+        help="Reference frequency column name",
+    )
+
     group4 = parser.add_argument_group("Extra options")
     group4.add_argument(
         "--debug", dest="debug", action="store_true", default=False, help="Debug mode."
@@ -140,6 +147,7 @@ def main():
         "b_col": options.b_col,
         "pa_col": options.pa_col,
         "alpha_col": options.alpha_col,
+        "nu0_col": options.nu0_col,
     }
 
     make_residual(

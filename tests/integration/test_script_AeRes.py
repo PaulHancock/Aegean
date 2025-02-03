@@ -16,6 +16,7 @@ def test_help():
 
 def test_nocat():
     try:
+        sys.argv = [""]  # no arguments
         AeRes.main()
 
         sys.argv = ["", "-c", catfile]
@@ -37,8 +38,10 @@ def test_nocat():
         ]
         AeRes.main()
     finally:
-        os.remove(tempfile)
-        os.remove(tempfile + "_model")
+        if os.path.exists(tempfile):
+            os.remove(tempfile)
+        if os.path.exists(tempfile + "_model"):
+            os.remove(tempfile + "_model")
 
 
 def test_configfile():

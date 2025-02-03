@@ -13,6 +13,7 @@ from astropy.io import fits
 from AegeanTools import catalogs, fitting, wcs_helpers
 from AegeanTools.logging import logger, logging
 from AegeanTools.models import ComponentSource, ComponentSource3D
+from AegeanTools.fits_tools import load_image_band, write_fits
 
 __author__ = "Paul Hancock"
 
@@ -28,6 +29,7 @@ def load_sources(
     b_col="b",
     pa_col="pa",
     alpha_col="alpha",
+    nu0_col="nu0",
 ):
     """
     Open a file, read contents, return a list of all the sources in that file.
@@ -39,7 +41,7 @@ def load_sources(
 
     ra_col, dec_col, peak_col, a_col, b_col, pa_col : str
         The column names for each of the parameters.
-        Default = ['ra', 'dec', 'peak_flux', 'a', 'b', 'pa', 'alpha']
+        Default = ['ra', 'dec', 'peak_flux', 'a', 'b', 'pa', 'alpha' ,'nu0']
 
     Return
     ------
@@ -68,6 +70,7 @@ def load_sources(
     # rename the alpha column if it exists
     if alpha_col in table.colnames:
         table.rename_column(alpha_col, "alpha")
+        table.rename_column(nu0_col, "nu0")
         srctype = ComponentSource3D
 
     catalog = catalogs.table_to_source_list(table, src_type=srctype)
@@ -84,7 +87,7 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
     sources : [`class:AegeanTools.models.ComponentSource`, ...]
         a list of sources
 
-    shape : [float, float]
+    shape : [int, int, int]
         the shape of the input (and output) image
 
     wcshelper : 'class:AegeanTools.wcs_helpers.WCSHelper'
@@ -111,75 +114,83 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
     factor = 5
 
     i_count = 0
-    for src in sources:
-        xo, yo, sx, sy, theta = wcshelper.sky2pix_ellipse(
-            [src.ra, src.dec], src.a / 3600, src.b / 3600, src.pa
-        )
-        phi = np.radians(theta)
-
-        # skip sources that have a center that is outside of the image
-        if not 0 < xo < shape[0]:
-            logger.debug("source {0} is not within image".format(src.island))
-            continue
-        if not 0 < yo < shape[1]:
-            logger.debug("source {0} is not within image".format(src.island))
-            continue
-
-        # pixels over which this model is calculated
-        xoff = factor * (abs(sx * np.cos(phi)) + abs(sy * np.sin(phi)))
-        xmin = xo - xoff
-        xmax = xo + xoff
-
-        yoff = factor * (abs(sx * np.sin(phi)) + abs(sy * np.cos(phi)))
-        ymin = yo - yoff
-        ymax = yo + yoff
-
-        # clip to the image size
-        ymin = max(np.floor(ymin), 0)
-        ymax = min(np.ceil(ymax), shape[1])
-
-        xmin = max(np.floor(xmin), 0)
-        xmax = min(np.ceil(xmax), shape[0])
-
-        if not np.all(np.isfinite([ymin, ymax, xmin, xmax])):
-            continue
-
-        if logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
-            logger.debug("Source ({0},{1})".format(src.island, src.source))
-            logger.debug(" xo, yo: {0} {1}".format(xo, yo))
-            logger.debug(" sx, sy: {0} {1}".format(sx, sy))
-            logger.debug(" theta, phi: {0} {1}".format(theta, phi))
-            logger.debug(" xoff, yoff: {0} {1}".format(xoff, yoff))
-            logger.debug(
-                " xmin, xmax, ymin, ymax: {0}:{1} {2}:{3}".format(
-                    xmin, xmax, ymin, ymax
-                )
+    for s in range(shape[0]):
+        for src in sources:
+            xo, yo, sx, sy, theta = wcshelper.sky2pix_ellipse(
+                [src.ra, src.dec], src.a / 3600, src.b / 3600, src.pa
             )
-            logger.debug(" flux, sx, sy: {0} {1} {2}".format(src.peak_flux, sx, sy))
+            phi = np.radians(theta)
 
-        # positions for which we want to make the model
-        x, y = np.mgrid[int(xmin) : int(xmax), int(ymin) : int(ymax)]
-        x = x.ravel()
-        y = y.ravel()
+            # skip sources that have a center that is outside of the image
+            if not 0 < xo < shape[1]:
+                logger.debug("source {0} is not within image".format(src.island))
+                continue
+            if not 0 < yo < shape[2]:
+                logger.debug("source {0} is not within image".format(src.island))
+                continue
 
-        # TODO: understand why xo/yo -1 is needed
-        model = fitting.elliptical_gaussian(
-            x, y, src.peak_flux, xo - 1, yo - 1, sx * FWHM2CC, sy * FWHM2CC, theta
-        )
+            # pixels over which this model is calculated
+            xoff = factor * (abs(sx * np.cos(phi)) + abs(sy * np.sin(phi)))
+            xmin = xo - xoff
+            xmax = xo + xoff
 
-        # Mask the output image if requested
-        if mask:
-            if frac is not None:
-                indices = np.where(model >= (frac * src.peak_flux))
+            yoff = factor * (abs(sx * np.sin(phi)) + abs(sy * np.cos(phi)))
+            ymin = yo - yoff
+            ymax = yo + yoff
+
+            # clip to the image size
+            ymin = max(np.floor(ymin), 0)
+            ymax = min(np.ceil(ymax), shape[2])
+
+            xmin = max(np.floor(xmin), 0)
+            xmax = min(np.ceil(xmax), shape[1])
+
+            if not np.all(np.isfinite([ymin, ymax, xmin, xmax])):
+                continue
+
+            # Compute the peak flux at this frequency
+            peak_flux = src.peak_flux
+            if hasattr(src, "nu0"):
+                peak_flux *= (wcshelper.pix2freq(s) / src.nu0) ** src.alpha
+
+            if logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
+                logger.debug("Source ({0},{1})".format(src.island, src.source))
+                logger.debug(" xo, yo: {0} {1}".format(xo, yo))
+                logger.debug(" sx, sy: {0} {1}".format(sx, sy))
+                logger.debug(" theta, phi: {0} {1}".format(theta, phi))
+                logger.debug(" xoff, yoff: {0} {1}".format(xoff, yoff))
+                logger.debug(
+                    " xmin, xmax, ymin, ymax: {0}:{1} {2}:{3}".format(
+                        xmin, xmax, ymin, ymax
+                    )
+                )
+                logger.debug(" flux, sx, sy: {0} {1} {2}".format(peak_flux, sx, sy))
+
+            # positions for which we want to make the model
+            x, y = np.mgrid[int(xmin) : int(xmax), int(ymin) : int(ymax)]
+            x = x.ravel()
+            y = y.ravel()
+
+            # TODO: understand why xo/yo -1 is needed
+            model = fitting.elliptical_gaussian(
+                x, y, src.peak_flux, xo - 1, yo - 1, sx * FWHM2CC, sy * FWHM2CC, theta
+            )
+
+            # Mask the output image if requested
+            if mask:
+                if frac is not None:
+                    indices = np.where(model >= (frac * peak_flux))
+                else:
+                    indices = np.where(model >= (sigma * src.local_rms))
+                # somehow m[x,y][indices] = np.nan doesn't assign any values
+                # so we have to do the more complicated
+                # m[x[indices],y[indices]] = np.nan
+                m[s, x[indices], y[indices]] = np.nan
             else:
-                indices = np.where(model >= (sigma * src.local_rms))
-            # somehow m[x,y][indices] = np.nan doesn't assign any values
-            # so we have to do the more complicated
-            # m[x[indices],y[indices]] = np.nan
-            m[x[indices], y[indices]] = np.nan
-        else:
-            m[x, y] += model
-        i_count += 1
+                m[s, x, y] += model
+
+            if s == 0:
+                i_count += 1
     logger.info("modeled {0} sources".format(i_count))
     return m
 
@@ -245,12 +256,8 @@ def make_residual(
 
     if source_list is None:
         return None
-    # force two axes so that we dump redundant stokes/freq axes if they are
-    # present.
-    hdulist = fits.open(fitsfile, naxis=2)
-    # ignore dimensions of length 1
-    data = np.squeeze(hdulist[0].data)
-    header = hdulist[0].header
+
+    data, header = load_image_band(fitsfile, as_cube=True)
 
     wcshelper = wcs_helpers.WCSHelper.from_header(header)
 
@@ -261,11 +268,8 @@ def make_residual(
     else:
         residual = data - model
 
-    hdulist[0].data = residual
-    hdulist.writeto(rfile, overwrite=True)
-    logger.info("wrote residual to {0}".format(rfile))
+    write_fits(residual, header, rfile)
     if mfile is not None:
-        hdulist[0].data = model
-        hdulist.writeto(mfile, overwrite=True)
-        logger.info("wrote model to {0}".format(mfile))
+        write_fits(model, header, mfile)
+
     return
