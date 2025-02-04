@@ -150,7 +150,7 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
 
             # Compute the peak flux at this frequency
             peak_flux = src.peak_flux
-            if hasattr(src, "nu0"):
+            if hasattr(src, "nu0") and wcshelper.has_freq:
                 peak_flux *= (wcshelper.pix2freq(s) / src.nu0) ** src.alpha
 
             if logger.isEnabledFor(logging.DEBUG):  # pragma: no cover
