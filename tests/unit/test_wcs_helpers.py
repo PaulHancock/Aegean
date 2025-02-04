@@ -266,17 +266,24 @@ def test_fix_aips_header():
     header["HISTORY"] = "AIPS   CLEAN BMAJ=  1.2500E-02 BMIN=  1.2500E-02 BPA=   0.00"
     _ = fix_aips_header(header)
 
+
 def test_pix2freq():
-    wcs = WCSHelper.from_file("tests/test_files/synthetic_with_alpha.fits")
+    wcs = WCSHelper.from_file("tests/test_files/synthetic_cube.fits")
     freq = wcs.pix2freq(8)
-    if freq != 223.76000000000005:
-        raise AssertionError(f"The expected value is 223.76000000000005. However, {freq} was returned.")
+    if freq != 170.0:
+        raise AssertionError(
+            f"The expected value is 223.76000000000005. However, {freq} was returned."
+        )
+
 
 def test_freq2pix():
-    wcs = WCSHelper.from_file("tests/test_files/synthetic_with_alpha.fits")
-    z = wcs.freq2pix(223.76000000000005)
-    if z != 7.999999999999999:
-        raise AssertionError(f"The expected value is 7.999999999999999. However, {z} was returned.")
+    wcs = WCSHelper.from_file("tests/test_files/synthetic_cube.fits")
+    z = wcs.freq2pix(170.0)
+    if z != 8.0:
+        raise AssertionError(
+            f"The expected value is 7.999999999999999. However, {z} was returned."
+        )
+
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'

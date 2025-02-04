@@ -162,8 +162,8 @@ def test_load_globals():
 def test_load_globals_cube():
     """Test load_globals"""
     sfinder = sf.SourceFinder()
-    filename = "tests/test_files/synthetic_with_alpha.fits"
-    # aux_files = sf.get_aux_files("tests/test_files/synthetic_with_alpha.fits")
+    filename = "tests/test_files/synthetic_cube.fits"
+    # aux_files = sf.get_aux_files("tests/test_files/synthetic_cube.fits")
     bkg = filename
     rms = filename
     sfinder.load_globals(filename, bkgin=bkg, rmsin=rms, as_cube=True)

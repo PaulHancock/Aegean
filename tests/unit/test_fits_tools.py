@@ -171,7 +171,7 @@ def test_load_image_band_data_header_check():
     and that the header is a fits.hdu.Header object"""
     try:
         data, header = fits_tools.load_image_band(
-            "tests/test_files/synthetic_with_alpha.fits", as_cube=True
+            "tests/test_files/synthetic_cube.fits", as_cube=True
         )
     except Exception as e:
         raise e
@@ -186,7 +186,7 @@ def test_load_image_band_cube_as_cube_true():
     """Load an image of a cube with as_cube = True"""
     try:
         data, header = fits_tools.load_image_band(
-            "tests/test_files/synthetic_with_alpha.fits", as_cube=True
+            "tests/test_files/synthetic_cube.fits", as_cube=True
         )
     except Exception as e:
         raise e
@@ -199,7 +199,7 @@ def test_load_image_band_cube_as_cube_false():
     """Load an image of a cube with as_cube = False"""
     try:
         data, header = fits_tools.load_image_band(
-            "tests/test_files/synthetic_with_alpha.fits", as_cube=False
+            "tests/test_files/synthetic_cube.fits", as_cube=False
         )
     except Exception as e:
         raise e

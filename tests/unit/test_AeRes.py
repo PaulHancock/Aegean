@@ -23,7 +23,7 @@ def test_load_sources():
 
 def test_load_soruces_with_alpha():
     """Test load_sources with alpha column"""
-    filename = "tests/test_files/synthetic_with_alpha_comp.fits"
+    filename = "tests/test_files/synthetic_cat_with_alpha_comp.fits"
     cat = ar.load_sources(filename)
     if cat is None:
         raise AssertionError("load_sources failed with alpha column")
@@ -83,9 +83,9 @@ def test_make_model():
 
 def test_make_model_with_alpha():
     """Test make_model with alpha column"""
-    filename = "tests/test_files/synthetic_with_alpha_comp.fits"
+    filename = "tests/test_files/synthetic_cat_with_alpha_comp.fits"
     sources = ar.load_sources(filename)
-    hdulist = fits.open("tests/test_files/synthetic_with_alpha.fits")
+    hdulist = fits.open("tests/test_files/synthetic_cube.fits")
     wcs_helper = wcs_helpers.WCSHelper.from_header(header=hdulist[0].header)
     # regular run
     model = ar.make_model(

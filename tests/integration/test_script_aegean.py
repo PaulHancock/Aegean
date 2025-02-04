@@ -104,16 +104,30 @@ def test_priorized():
     ]
     aegean.main()
 
+
 def test_priorized3D():
-    sys.argv = ["", "tests/test_files/synthetic_with_alpha.fits", "--noise", "tests/test_files/synthetic_with_alpha_rms.fits",
-                "--background", "tests/test_files/synthetic_with_alpha_bkg.fits", "--table", "output.csv", "--3d",
-                "--priorized", "1", "--input", "tests/test_files/synthetic_with_alpha_comp.fits"]
+    sys.argv = [
+        "",
+        "tests/test_files/synthetic_cube.fits",
+        "--noise",
+        "tests/test_files/synthetic_cube_rms.fits",
+        "--background",
+        "tests/test_files/synthetic_cube_bkg.fits",
+        "--table",
+        "output.csv",
+        "--3d",
+        "--priorized",
+        "1",
+        "--input",
+        "tests/test_files/synthetic_cat_no_alpha_comp.fits",
+    ]
     aegean.main()
 
     if not os.path.exists("output_comp.csv"):
         raise AssertionError("output file not created")
     else:
         os.remove("output_comp.csv")
+
 
 def test_configfile():
     cfile = "aegean.ini"
