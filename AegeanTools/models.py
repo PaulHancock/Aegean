@@ -579,7 +579,28 @@ class ComponentSource3D(ComponentSource):
         super().__init__()  # Call the parent class constructor
         self.alpha = 0  # Add the alpha attribute
         self.nu0 = 0  # Add the nu0 attribute
-        self.nu0 = 0 # Add the nu0 attribute
+
+    @staticmethod
+    def from_component_source(component_source):
+        """
+        Create a new ComponentSource3D object from a ComponentSource object.
+
+        Parameters
+        ----------
+        component_source : ComponentSource
+            The ComponentSource object to convert to a ComponentSource3D object.
+
+        Returns
+        -------
+        ComponentSource3D
+            The new ComponentSource3D object.
+        """
+        component_source_3d = ComponentSource3D()
+        for name in component_source.names:
+            # Set the attribute of the ComponentSource3D object to the
+            # attribute of the ComponentSource object
+            setattr(component_source_3d, name, getattr(component_source, name))
+        return component_source_3d
 
 
 class PixelIsland(object):
