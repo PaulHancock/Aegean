@@ -104,6 +104,7 @@ def make_catalogue():
             src.ra_str = "00:00:00"
             src.dec_str = "-00:00:00"
             src.a, src.b, src.pa = psf
+            src.psf_a, src.psf_b, src.psf_pa = psf
             src.island = i * 10 + j
             src.peak_flux = fluxes[i * 10 + j]
             src.background = 0
@@ -119,6 +120,7 @@ def make_catalogue():
     src.ra_str = "00:00:00"
     src.dec_str = "-00:00:00"
     src.a, src.b, src.pa = psf
+    src.psf_a, src.psf_b, src.psf_pa = psf
     src.a *= 3
     src.b *= 3
     src.peak_flux = 6 * noise
@@ -129,6 +131,7 @@ def make_catalogue():
     src.ra = 30.78
     src.dec = -15.102
     src.a, src.b, src.pa = psf
+    src.psf_a, src.psf_b, src.psf_pa = psf
     src.ra_str = "00:00:00"
     src.dec_str = "-00:00:00"
     src.island = 101
