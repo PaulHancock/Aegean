@@ -48,7 +48,7 @@ def test_filter_image():
         raise AssertionError()
 
     os.remove(bkg)
-    BANE.filter_image(fname, cores=2, out_base=outbase, twopass=True, compressed=True)
+    BANE.filter_image(fname, cores=2, out_base=outbase, compressed=True)
     if not os.path.exists(rms):
         raise AssertionError()
 
@@ -147,6 +147,20 @@ def test_BSCALE():
         raise AssertionError("BSCALE=2.0 causes crash")
     finally:
         os.remove("dlme.fits")
+    return
+
+
+def test_cube_as_cube():
+    """
+    Ensure that running BANE on a cube delivers a cube output
+    """
+    fname = "tests/test_files/1904-66_SIN_3d.fits"
+    # don't crash and die
+    try:
+        for index in [0, 1, 2]:
+            BANE.filter_image(fname, out_base=None, nslice=1, cube_index=None)
+    except Exception as e:
+        raise AssertionError("BANE failed to work on 3d image")
     return
 
 

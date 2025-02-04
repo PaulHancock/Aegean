@@ -251,7 +251,7 @@ def write_fits(data, header, file_name):
     return
 
 
-def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0):
+def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=False):
     """
     Load a subset of an image from a given filename.
     The subset is controlled using the band, which is (this band, total bands)
@@ -263,6 +263,16 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0):
     band : (int, int)
         (this band, total bands)
         Default (0,1)
+
+    hdu_index : int
+        The index of the HDU to load from the fits file.
+
+    cube_index : int
+        The index of the cube to load from the fits file.
+
+    as_cube : boolean
+        This is a flag that determines whether the data to be processed is a cube
+        or a frequency slice, if the data is 3 dimensional and as_cube is True, then a 3-dimensional array will be returned.
 
     returns
     -------
@@ -296,14 +306,22 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0):
     with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
         if NAXIS == 2:
             data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
+            if as_cube:
+                data = np.expand_dims(data, axis=0)
         elif NAXIS == 3:
-            data = a[hdu_index].section[
-                cube_index, row_min:row_max, 0 : header["NAXIS1"]
-            ]
+            if not as_cube:
+                data = a[hdu_index].section[
+                    cube_index, row_min:row_max, 0 : header["NAXIS1"]
+                ]
+            else:
+                data = a[hdu_index].section[:, row_min:row_max, 0 : header["NAXIS1"]]
         elif NAXIS == 4:
-            data = a[hdu_index].section[
-                0, cube_index, row_min:row_max, 0 : header["NAXIS1"]
-            ]
+            if not as_cube:
+                data = a[hdu_index].section[
+                    0, cube_index, row_min:row_max, 0 : header["NAXIS1"]
+                ]
+            else:
+                data = a[hdu_index].section[0, :, row_min:row_max, 0 : header["NAXIS1"]]
         else:
             raise Exception(f"Too many NAXIS: {NAXIS}>4")
     if "BSCALE" in header:

@@ -52,7 +52,7 @@ def main():
         "--slice",
         dest="cube_index",
         type=int,
-        default=0,
+        default=None,
         help="If the input data is a cube, then this slice "
         "will determine the array index of the image "
         "which will be processed by BANE",
@@ -96,6 +96,7 @@ def main():
         cores=multiprocessing.cpu_count(),
         stripes=multiprocessing.cpu_count() - 1,
         debug=False,
+        cube_index=None,
     )
 
     options = parser.parse_args()
