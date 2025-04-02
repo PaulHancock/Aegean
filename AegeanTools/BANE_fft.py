@@ -64,8 +64,8 @@ def _ft_kernel(kernel: NDArray[np.float32], shape: tuple) -> NDArray[np.float32]
 
 @nb.njit(
     nb.float32[:, :](
-        nb.float32[:, :], 
-        nb.types.UniTuple(nb.int64, 2), 
+        nb.float32[:, :],
+        nb.types.UniTuple(nb.int64, 2),
     ),
     fastmath=True,
     cache=True,
@@ -238,7 +238,7 @@ def get_kernel(
     """Get the kernel for FFT BANE
 
     Note that here the `step` is the downsampling factor, and the `box` is the kernel size.
-    
+
     Args:
         header (fits.Header | dict[str, Any]): Header of the image
         step_size (int | None, optional): Step size in pixels. Defaults to 3 beams. Values of < 0 will specify the number of beams/step.
@@ -268,7 +268,7 @@ def get_kernel(
         nbeam_step = 3 if step_size is None else abs(step_size)
         logging.info(f"Using step size of {nbeam_step} beams per step")
         step_size_pix = int(np.ceil((nbeam_step * pix_per_beam).to(u.pix).value))
-    
+
     else:
         step_size_pix = step_size
 
@@ -280,7 +280,7 @@ def get_kernel(
         logging.info(f"Using a box size of {nbeam_box} beams per box")
         scaler = step_size_pix if step_size_pix > 0 else 1
         box_size_pix = abs(int(np.ceil(pix_per_beam.value * nbeam_box / scaler)))
-    
+
     else:
         box_size_pix = box_size
 
@@ -416,19 +416,17 @@ def estimate_rms(
         bin_perc /= 100.0
 
     if mode == "std":
-        clipping_func = lambda data: np.nanstd(data)
-        # clipping_func = std_jit
+        clipping_func = std_jit
 
     elif mode == "mad":
-        clipping_func = lambda data: np.nanmedian(np.abs(data - np.nanmedian(data)))
-        # clipping_func = mad_jit
+        clipping_func = mad_jit
 
     else:
         raise ValueError(
             f"{mode} not supported as a clipping mode, available modes are `std` and `mad`. "
         )
 
-    cen_func = lambda data: np.nanmedian(data)
+    cen_func = median_jit
 
     for i in range(clip_rounds):
         data = data[np.abs(data - cen_func(data)) < outlier_thres * clipping_func(data)]
@@ -529,7 +527,9 @@ def robust_bane(
     snr = np.abs(image_mask) / rms_est
     mask = snr > clip_sigma
     logging.info(f"Quick RMS estimate: {rms_est:.2f}")
-    logging.info(f"Masking {np.sum(mask)} ({np.sum(mask) / image.size *100:0.1f}%) pixels with SNR > {clip_sigma}")
+    logging.info(
+        f"Masking {np.sum(mask)} ({np.sum(mask) / image.size * 100:0.1f}%) pixels with SNR > {clip_sigma}"
+    )
     # Clip and fill sources with noise
     image_mask[mask] = np.random.normal(
         loc=0, scale=rms_est, size=image_mask[mask].shape
@@ -575,17 +575,13 @@ def robust_bane(
     avg_rms = np.nan_to_num(avg_rms, nan=0.0)
 
     if step_size_pix > 0:
-        logging.info(f"Upsampling back to original image size")
+        logging.info("Upsampling back to original image size")
         # Upsample the mean and RMS to the original image size
         # Trying a shift first to see if it helps with the edge effects
         # mean_shift = ndimage.shift(mean, box_size*step_size)
         # avg_rms_shift = ndimage.shift(avg_rms, box_size*step_size)
-        mean = ndimage.zoom(
-            mean, zoom, order=3, grid_mode=True, mode="reflect"
-        )
-        avg_rms = ndimage.zoom(
-            avg_rms, zoom, order=3, grid_mode=True, mode="reflect"
-        )
+        mean = ndimage.zoom(mean, zoom, order=3, grid_mode=True, mode="reflect")
+        avg_rms = ndimage.zoom(avg_rms, zoom, order=3, grid_mode=True, mode="reflect")
 
     # Reapply mask
     mean[nan_mask] = np.nan
