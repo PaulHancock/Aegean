@@ -4,6 +4,7 @@
 BANE: Background and Noise Estimation
 ...but with FFTs
 """
+from __future__ import annotations
 
 # TODO: Images come out with a slight offset. Need to figure out why.
 
@@ -16,11 +17,12 @@ from multiprocessing.pool import ThreadPool
 import os
 from pathlib import Path
 from time import time
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import astropy.units as u
 import numba as nb
 import numpy as np
+from numpy.typing import NDArray
 from astropy.io import fits
 from astropy.stats import mad_std, sigma_clip
 from astropy.wcs import WCS
@@ -39,42 +41,86 @@ logging = bane.logging
     fastmath=True,
     cache=True,
 )
-def _ft_kernel(kernel: np.ndarray, shape: tuple) -> np.ndarray:
+def _ft_kernel(kernel: NDArray[np.float32], shape: tuple) -> NDArray[np.float32]:
     """Compute the Fourier transform of a kernel
 
     Args:
-        kernel (np.ndarray): 2D kernel
+        kernel (NDArray[np.float32]): 2D kernel
         shape (tuple): Shape of the image
 
     Returns:
-        np.ndarray: FFT of the kernel
+        NDArray[np.float32]: FFT of the kernel
     """
     return fft.rfft2(kernel, s=shape)
 
+@nb.njit
+def pad(array: NDArray[np.float32], pad_width: tuple[int, int], mode="constant", constant_values: float=0) -> NDArray[np.float32]:
+
+    if mode not in ["constant", "reflect"]:
+        raise ValueError(f"Mode {mode} not supported")
+
+    nx, ny = array.shape
+    px, py = pad_width
+
+    # Create the padded array
+    padded = np.empty((nx + 2 * px, ny + 2 * py), dtype=array.dtype)
+
+    # Fill with the constant value if mode is "constant"
+    if mode == "constant":
+        padded[:, :] = constant_values
+
+    # Copy the original array into the center
+    padded[px:px + nx, py:py + ny] = array
+
+    if mode == "reflect":
+        # Reflect top and bottom
+        for i in range(px):
+            padded[px - 1 - i, py:py + ny] = array[i + 1, :]
+            padded[nx + px + i, py:py + ny] = array[nx - 2 - i, :]
+
+        # Reflect left and right
+        for j in range(py):
+            padded[:, py - 1 - j] = padded[:, py + j + 1]
+            padded[:, ny + py + j] = padded[:, ny + py - 2 - j]
+
+    return padded
 
 @nb.njit(
     nb.float32[:, :](nb.float32[:, :], nb.float32[:, :], nb.float32),
     fastmath=True,
     cache=True,
 )
-def fft_average(image: np.ndarray, kernel: np.ndarray, kern_sum: float) -> np.ndarray:
+def fft_average(image: NDArray[np.float32], kernel: NDArray[np.float32], kern_sum: float) -> NDArray[np.float32]:
     """Compute an average with FFT magic
 
     Args:
-        image (np.ndarray): 2D image to average spatially
-        kernel (np.ndarray): 2D kernel
+        image (NDArray[np.float32]): 2D image to average spatially
+        kernel (NDArray[np.float32]): 2D kernel
         kern_sum (float): Sum of the kernel in image space
 
     Returns:
-        np.ndarray: Averaged image
+        NDArray[np.float32]: Averaged image
     """
-    image_fft = fft.rfft2(image)
-    kernel_fft = _ft_kernel(kernel, shape=image.shape)
+    # pad the image by the kernel size
+    pad_x, pad_y = kernel.shape[0] // 2, kernel.shape[1] // 2
+    image_padded = pad(
+        array=image,
+        pad_width=(pad_x, pad_y),
+        mode="reflect",
+    )
+    image_fft = fft.rfft2(image_padded)
+    kernel_fft = _ft_kernel(kernel, shape=image_padded.shape)
 
     smooth_fft = image_fft * kernel_fft
 
     smooth = fft.irfft2(smooth_fft) / kern_sum
-    return smooth
+
+    smooth_trimmed = smooth[
+        pad_x : -pad_x,
+        pad_y : -pad_y,
+    ]
+
+    return smooth_trimmed
 
 
 @nb.njit(
@@ -85,19 +131,19 @@ def fft_average(image: np.ndarray, kernel: np.ndarray, kern_sum: float) -> np.nd
     cache=True,
 )
 def bane_fft(
-    image: np.ndarray,
-    kernel: np.ndarray,
+    image: NDArray[np.float32],
+    kernel: NDArray[np.float32],
     kern_sum: float,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
     """BANE but with FFTs
 
     Args:
-        image (np.ndarray): Image to find background and RMS of
-        kernel (np.ndarray): Tophat kernel
+        image (NDArray[np.float32]): Image to find background and RMS of
+        kernel (NDArray[np.float32]): Tophat kernel
         kern_sum (float): Sum of the kernel in image domain
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: Mean and RMS of the image
+        Tuple[NDArray[np.float32], NDArray[np.float32]]: Mean and RMS of the image
     """
     mean = fft_average(image, kernel, kern_sum)
     rms = (image - mean) ** 2
@@ -112,7 +158,7 @@ def tophat_kernel(diameter: int):
         radius (int): Radius of the kernel
 
     Returns:
-        np.ndarray: Tophat kernel
+        NDArray[np.float32]: Tophat kernel
     """
     radius = diameter // 2
     kernel = np.zeros((radius * 2 + 1, radius * 2 + 1), dtype=np.float32)
@@ -124,14 +170,14 @@ def tophat_kernel(diameter: int):
     return kernel
 
 
-def gaussian_kernel(fwhm: int) -> np.ndarray:
+def gaussian_kernel(fwhm: int) -> NDArray[np.float32]:
     """Make a Gaussian kernel
 
     Args:
         fwhm (int): FWHM of the kernel in pixels
 
     Returns:
-        np.ndarray: Gaussian kernel
+        NDArray[np.float32]: Gaussian kernel
     """
     kernel = np.zeros((fwhm * 2 + 1, fwhm * 2 + 1), dtype=np.float32)
     xx = np.arange(-fwhm, fwhm + 1)
@@ -145,14 +191,14 @@ def gaussian_kernel(fwhm: int) -> np.ndarray:
     nb.boolean[:, :](nb.float32[:, :], nb.float32[:, :]),
     cache=True,
 )
-def get_nan_mask(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+def get_nan_mask(image: NDArray[np.float32], kernel: NDArray[np.float32]) -> NDArray[np.float32]:
     """Get a mask of NaNs in the image
 
     Args:
-        image (np.ndarray): Image to mask
+        image (NDArray[np.float32]): Image to mask
 
     Returns:
-        np.ndarray: Mask of NaNs
+        NDArray[np.float32]: Mask of NaNs
     """
     immask = np.isfinite(image)
     immask_fft = fft.rfft2(immask)
@@ -163,21 +209,21 @@ def get_nan_mask(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
 
 
 def get_kernel(
-    header: Union[fits.Header, dict],
-    step_size: Optional[int] = None,
-    box_size: Optional[int] = None,
+    header: fits.Header | dict[str, Any],
+    step_size: int | None = None,
+    box_size: int | None = None,
     kernel_func: Callable = gaussian_kernel,
-) -> Tuple[np.ndarray, float, int]:
+) -> Tuple[NDArray[np.float32], float, int]:
     """Get the kernel for FFT BANE
 
     Args:
-        header (Union[fits.Header, dict]): Header of the image
-        step_size (Optional[int], optional): Step size in pixels. Defaults to 3/beam. Values of < 0 will specify the number of pixels per beam.
-        box_size (Optional[int], optional): Box size in pixels. Defaults to None. Values of < 0 will specify the number of pixels per beam.
+        header (fits.Header | dict[str, Any]): Header of the image
+        step_size (int | None, optional): Step size in pixels. Defaults to 3/beam. Values of < 0 will specify the number of pixels per beam.
+        box_size (int | None, optional): Box size in pixels. Defaults to None. Values of < 0 will specify the number of pixels per beam.
 
 
     Returns:
-        Tuple[np.ndarray, float]: The kernel and sum of the kernel
+        Tuple[NDArray[np.float32], float]: The kernel and sum of the kernel
     """
 
     if not step_size or step_size < 0 or not box_size or box_size < 0:
@@ -218,7 +264,7 @@ def get_kernel(
     fastmath=True,
     cache=True,
 )
-def chunk_image(image_shape: Tuple[int, int], box_size: int) -> np.ndarray:
+def chunk_image(image_shape: Tuple[int, int], box_size: int) -> NDArray[np.float32]:
     """Divide the image into chunks that overlap by half the box size
 
     Chunk only the y-axis
@@ -228,7 +274,7 @@ def chunk_image(image_shape: Tuple[int, int], box_size: int) -> np.ndarray:
         box_size (int): Size of the box
 
     Returns:
-        np.ndarray: Chunk coordinates (start, end) x nchunks
+        NDArray[np.float32]: Chunk coordinates (start, end) x nchunks
     """
 
     nchunks = image_shape[0] // (box_size // 2) - 1
@@ -248,11 +294,11 @@ def chunk_image(image_shape: Tuple[int, int], box_size: int) -> np.ndarray:
     ),
     cache=True,
 )
-def median_jit(data: np.ndarray) -> float:
+def median_jit(data: NDArray[np.float32]) -> float:
     """Median of an array
 
     Args:
-        data (np.ndarray): Data to find the median of
+        data (NDArray[np.float32]): Data to find the median of
 
     Returns:
         float: Median of the data
@@ -265,11 +311,11 @@ def median_jit(data: np.ndarray) -> float:
     ),
     cache=True,
 )
-def std_jit(data: np.ndarray) -> float:
+def std_jit(data: NDArray[np.float32]) -> float:
     """Standard deviation of an array
 
     Args:
-        data (np.ndarray): Data to find the standard deviation of
+        data (NDArray[np.float32]): Data to find the standard deviation of
 
     Returns:
         float: Standard deviation of the data
@@ -282,11 +328,11 @@ def std_jit(data: np.ndarray) -> float:
     ),
     cache=True,
 )
-def mad_jit(data: np.ndarray) -> float:
+def mad_jit(data: NDArray[np.float32]) -> float:
     """Median absolute deviation of an array
 
     Args:
-        data (np.ndarray): Data to find the median absolute deviation of
+        data (NDArray[np.float32]): Data to find the median absolute deviation of
 
     Returns:
         float: Median absolute deviation of the data
@@ -304,7 +350,7 @@ def mad_jit(data: np.ndarray) -> float:
     cache=True,
 )
 def estimate_rms(
-    data: np.ndarray,
+    data: NDArray[np.float32],
     mode: str = "mad",
     clip_rounds: int = 2,
     bin_perc: float = 0.25,
@@ -315,7 +361,7 @@ def estimate_rms(
     pixel distribution histogram, with the standard deviation being return.
 
     Arguments:
-        data (np.ndarray) -- 1D data to estimate the noise level of
+        data (NDArray[np.float32]) -- 1D data to estimate the noise level of
 
     Keyword Arguments:
         mode (str) -- Clipping mode used to flag outlying pixels, either made on the median absolute deviation (`mad`) or standard deviation (`std`) (default: ('mad'))
@@ -376,11 +422,11 @@ def estimate_rms(
     return noise
 
 
-def estimate_rms_astropy(image: np.ndarray):
+def estimate_rms_astropy(image: NDArray[np.float32]):
     """Estimate the RMS of an image using astropy
 
     Args:
-        image (np.ndarray): Image to estimate the RMS of
+        image (NDArray[np.float32]): Image to estimate the RMS of
 
     Returns:
         float: RMS of the image
@@ -400,21 +446,21 @@ def estimate_rms_astropy(image: np.ndarray):
 
 
 def robust_bane(
-    image: np.ndarray,
-    header: Union[fits.Header, dict],
-    step_size: Optional[int] = None,
-    box_size: Optional[int] = None,
+    image: NDArray[np.float32],
+    header: fits.Header | dict[str, Any],
+    step_size: int | None = None,
+    box_size: int | None = None,
     kernel_func: Callable = gaussian_kernel,
     rms_estimator: Callable = mad_std,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
     """Two-round BANE with FFTs
 
     Args:
-        image (np.ndarray): Image to find background and RMS of
-        header (Union[fits.Header, dict]): Header of the image
+        image (NDArray[np.float32]): Image to find background and RMS of
+        header (fits.Header | dict[str, Any]): Header of the image
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: Mean and RMS of the image
+        Tuple[NDArray[np.float32], NDArray[np.float32]]: Mean and RMS of the image
     """
     logging.info("Running FFT BANE")
     tick = time()
@@ -531,8 +577,8 @@ def init_outputs(
 
 def write_outputs(
     out_files: List[Path],
-    mean: np.ndarray,
-    rms: np.ndarray,
+    mean: NDArray[np.float32],
+    rms: NDArray[np.float32],
 ):
     rms_file, bkg_file = out_files
     with fits.open(rms_file, memmap=True, mode="update") as hdul:
@@ -549,14 +595,14 @@ def write_outputs(
 
 
 def bane_2d(
-    image: np.ndarray,
-    header: Union[fits.Header, dict],
+    image: NDArray[np.float32],
+    header: fits.Header | dict[str, Any],
     out_files: List[Path],
-    step_size: Optional[int] = None,
-    box_size: Optional[int] = None,
+    step_size: int | None = None,
+    box_size: int | None = None,
     kernel_func: Callable = gaussian_kernel,
     rms_estimator: Callable = mad_std,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
     logging.info(f"Running BANE on image {image.shape}")
     # Run BANE
     bkg, rms = robust_bane(
@@ -573,13 +619,13 @@ def bane_2d(
 
 
 def bane_3d_loop(
-    plane: np.ndarray,
+    plane: NDArray[np.float32],
     idx: int,
-    header: Union[fits.Header, dict],
+    header: fits.Header | dict[str, Any],
     out_files: List[Path],
     ext: int = 0,
-    step_size: Optional[int] = None,
-    box_size: Optional[int] = None,
+    step_size: int | None = None,
+    box_size: int | None = None,
     kernel_func: Callable = gaussian_kernel,
     rms_estimator: Callable = mad_std,
 ):
@@ -604,16 +650,16 @@ def bane_3d_loop(
 
 
 def bane_3d(
-    cube: np.ndarray,
-    header: Union[fits.Header, dict],
+    cube: NDArray[np.float32],
+    header: fits.Header | dict[str, Any],
     out_files: List[Path],
     ext: int = 0,
-    step_size: Optional[int] = None,
-    box_size: Optional[int] = None,
-    ncores: Optional[int] = None,
+    step_size: int | None = None,
+    box_size: int | None = None,
+    ncores: int | None = None,
     kernel_func: Callable = gaussian_kernel,
     rms_estimator: Callable = mad_std,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
     logging.info(f"Running BANE on cube {cube.shape}")
     # Run BANE
     ncores = mp.cpu_count() if not ncores else ncores
@@ -649,13 +695,13 @@ def bane_3d(
 
 def fits_idx_to_np(
     fits_idx: int,
-    header: Union[fits.Header, dict],
+    header: fits.Header | dict[str, Any],
 ) -> int:
     """Convert FITS index to numpy index
 
     Args:
         fits_idx (int): FITS index
-        header (Union[fits.Header, dict]): FITS header
+        header (fits.Header | dict[str, Any]): FITS header
 
     Returns:
         int: numpy index
@@ -666,11 +712,11 @@ def fits_idx_to_np(
     return header["NAXIS"] - fits_idx
 
 
-def find_stokes_axis(header: Union[fits.Header, dict]) -> int:
+def find_stokes_axis(header: fits.Header | dict[str, Any]) -> int:
     """Find the Stokes axis
 
     Args:
-        header (Union[fits.Header, dict]): FITS header
+        header (fits.Header | dict[str, Any]): FITS header
 
     Returns:
         int: Stokes axis (numpy index)
@@ -688,13 +734,13 @@ def find_stokes_axis(header: Union[fits.Header, dict]) -> int:
 def main(
     fits_file: Path,
     ext: int = 0,
-    step_size: Optional[int] = None,
-    box_size: Optional[int] = None,
-    ncores: Optional[int] = None,
+    step_size: int | None = None,
+    box_size: int | None = None,
+    ncores: int | None = None,
     kernel_str: str = "gauss",
     estimator_str: str = "mad_std",
     all_in_mem: bool = False,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
     logging.info("Starting BANE (tools will be compiled...)")
     # Init output files
     out_files = init_outputs(fits_file, ext=ext)
