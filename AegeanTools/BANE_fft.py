@@ -240,8 +240,9 @@ def get_kernel(
         try:
             beam = Beam.from_fits_header(header)
             logging.info(f"Beam: {beam.__repr__()}")
-            scales = proj_plane_pixel_scales(WCS(header)) * u.deg
+            scales = proj_plane_pixel_scales(WCS(header)) * u.deg / u.pixel
             pix_per_beam = beam.minor / scales.min()
+            logging.info(f"Pixels per beam: {pix_per_beam:0.1f}")
         except ValueError:
             raise ValueError(
                 "Could not parse beam from header - try specifying step size"
@@ -249,21 +250,21 @@ def get_kernel(
 
     if step_size is None or step_size < 0:
         # Step size
-        npix_step = 3 if step_size is None else abs(step_size)
-        logging.info(f"Using step size of {npix_step} pixels per beam")
-        step_size_pix = int(np.ceil(pix_per_beam / npix_step))
+        nbeam_step = 3 if step_size is None else abs(step_size)
+        logging.info(f"Using step size of {nbeam_step} beams per step")
+        step_size_pix = int(np.ceil((nbeam_step * pix_per_beam).to(u.pix).value))
     
     else:
         step_size_pix = step_size
 
-    logging.info(f"Using step size of {step_size} pixels")
+    logging.info(f"Using step size of {step_size_pix} pixels")
 
     if box_size is None or box_size < 0:
         # Box size
-        npix_box = 10 if box_size is None else abs(box_size)
-        logging.info(f"Using a box size of {npix_box} per beam")
-        scaler = step_size if step_size > 0 else 1
-        box_size_pix = int(np.ceil(pix_per_beam * npix_box / scaler))
+        nbeam_box = 10 if box_size is None else abs(box_size)
+        logging.info(f"Using a box size of {nbeam_box} beams per box")
+        scaler = step_size_pix if step_size_pix > 0 else 1
+        box_size_pix = abs(int(np.ceil(pix_per_beam.value * nbeam_box / scaler)))
     
     else:
         box_size_pix = box_size
@@ -506,8 +507,8 @@ def robust_bane(
     image_mask[mask] = np.random.normal(
         loc=0, scale=rms_est, size=image_mask[mask].shape
     )
-
     if step_size_pix > 0:
+        logging.info(f"Downsampling image by {step_size_pix} pixels")
         # Downsample the image
         # Create slice for downsampled image
         # Ensure downsampled image has even number of pixels
@@ -529,7 +530,7 @@ def robust_bane(
         x_slice = slice(start_idx, stop_x, step_size_pix)
         y_slice = slice(start_idx, stop_y, step_size_pix)
         image_mask = image_mask[(y_slice, x_slice)]
-        logging.info(f"Downsampled image to {image.shape}")
+        logging.info(f"Downsampled image to {image_mask.shape}")
         for i in range(2):
             assert image.shape[i] % 2 == 0, (
                 "Downsampled image must have even number of pixels"
@@ -547,15 +548,16 @@ def robust_bane(
     avg_rms = np.nan_to_num(avg_rms, nan=0.0)
 
     if step_size_pix > 0:
+        logging.info(f"Upsampling back to original image size")
         # Upsample the mean and RMS to the original image size
         # Trying a shift first to see if it helps with the edge effects
         # mean_shift = ndimage.shift(mean, box_size*step_size)
         # avg_rms_shift = ndimage.shift(avg_rms, box_size*step_size)
         mean = ndimage.zoom(
-            mean, zoom, order=3, grid_mode=True, mode="grid-constant"
+            mean, zoom, order=3, grid_mode=True, mode="reflect"
         )
         avg_rms = ndimage.zoom(
-            avg_rms, zoom, order=3, grid_mode=True, mode="grid-constant"
+            avg_rms, zoom, order=3, grid_mode=True, mode="reflect"
         )
 
     # Reapply mask
@@ -871,13 +873,13 @@ def cli():
         "--step-size",
         type=int,
         default=None,
-        help="Step size for BANE. Negative values will be interpreted as number of pixels per beam.",
+        help="Step size for BANE (i.e. downsampling factor). Negative values will be interpreted as number of beams per step.",
     )
     parser.add_argument(
         "--box-size",
         type=int,
         default=None,
-        help="Box size for BANE. Negative values will be interpreted as number of pixels per beam.",
+        help="Box size for BANE (i.e. kernel size). Negative values will be interpreted as number of beams per step.",
     )
     parser.add_argument(
         "--ncores",
