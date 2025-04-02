@@ -12,13 +12,12 @@ from __future__ import annotations
 __author__ = ["Alec Thomson", "Tim Galvin"]
 __version__ = "0.0.0"
 
-from concurrent.futures import ThreadPoolExecutor
 import multiprocessing as mp
 from multiprocessing.pool import ThreadPool
 import os
 from pathlib import Path
 from time import time
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Tuple
 import logging
 
 import astropy.units as u
@@ -33,7 +32,6 @@ from numpy import fft
 from radio_beam import Beam
 from scipy import ndimage
 
-from AegeanTools import BANE as bane
 from AegeanTools import numba_polyfit
 
 logging.basicConfig(
@@ -253,20 +251,29 @@ def get_kernel(
         # Step size
         npix_step = 3 if step_size is None else abs(step_size)
         logging.info(f"Using step size of {npix_step} pixels per beam")
-        step_size = int(np.ceil(pix_per_beam / npix_step))
+        step_size_pix = int(np.ceil(pix_per_beam / npix_step))
+    
+    else:
+        step_size_pix = step_size
+
     logging.info(f"Using step size of {step_size} pixels")
 
     if box_size is None or box_size < 0:
         # Box size
         npix_box = 10 if box_size is None else abs(box_size)
         logging.info(f"Using a box size of {npix_box} per beam")
-        box_size = int(np.ceil(pix_per_beam * npix_box / step_size))
-    logging.info(f"Using box size of {box_size} pixels (scaled by step size)")
+        scaler = step_size if step_size > 0 else 1
+        box_size_pix = int(np.ceil(pix_per_beam * npix_box / scaler))
+    
+    else:
+        box_size_pix = box_size
 
-    kernel = kernel_func(box_size)
+    logging.info(f"Using box size of {box_size_pix} pixels (scaled by step size)")
+
+    kernel = kernel_func(box_size_pix)
     kernel /= kernel.max()
 
-    return kernel, step_size
+    return kernel, step_size_pix
 
 
 @nb.njit(
@@ -464,6 +471,7 @@ def robust_bane(
     box_size: int | None = None,
     kernel_func: Callable = gaussian_kernel,
     rms_estimator: Callable = mad_std,
+    clip_sigma: float = 5,
 ) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
     """Two-round BANE with FFTs
 
@@ -477,13 +485,13 @@ def robust_bane(
     logging.info("Running FFT BANE")
     tick = time()
     # Setups
-    kernel, step_size = get_kernel(
+    kernel, step_size_pix = get_kernel(
         header=header,
         step_size=step_size,
         box_size=box_size,
         kernel_func=kernel_func,
     )
-    assert step_size >= 0, "Step size must be positive"
+    assert step_size_pix >= 0, "Step size must be positive"
     # nan_mask = get_nan_mask(image, kernel)
     nan_mask = ~np.isfinite(image)
     image_mask = np.nan_to_num(image)
@@ -491,67 +499,74 @@ def robust_bane(
     # Quick and dirty rms estimate
     rms_est = rms_estimator(image_mask[~nan_mask].ravel())
     snr = np.abs(image_mask) / rms_est
-    mask = snr > 5
+    mask = snr > clip_sigma
+    logging.info(f"Quick RMS estimate: {rms_est:.2f}")
+    logging.info(f"Masking {np.sum(mask)} ({np.sum(mask) / image.size *100:0.1f}%) pixels with SNR > {clip_sigma}")
     # Clip and fill sources with noise
     image_mask[mask] = np.random.normal(
         loc=0, scale=rms_est, size=image_mask[mask].shape
     )
 
-    # Downsample the image
-    # Create slice for downsampled image
-    # Ensure downsampled image has even number of pixels
-    start_idx = step_size
-    stop_x = image_mask.shape[1] - step_size
-    stop_y = image_mask.shape[0] - step_size
+    if step_size_pix > 0:
+        # Downsample the image
+        # Create slice for downsampled image
+        # Ensure downsampled image has even number of pixels
+        start_idx = step_size_pix
+        stop_x = image_mask.shape[1] - step_size_pix
+        stop_y = image_mask.shape[0] - step_size_pix
 
-    divx, modx = divmod(stop_x, step_size)
-    divy, mody = divmod(stop_y, step_size)
+        divx, modx = divmod(stop_x, step_size_pix)
+        divy, mody = divmod(stop_y, step_size_pix)
 
-    while divx % 2 != 0:
-        stop_x -= 1
-        divx, modx = divmod(stop_x, step_size)
+        while divx % 2 != 0:
+            stop_x -= 1
+            divx, modx = divmod(stop_x, step_size_pix)
 
-    while divy % 2 != 0:
-        stop_y -= 1
-        divy, mody = divmod(stop_y, step_size)
+        while divy % 2 != 0:
+            stop_y -= 1
+            divy, mody = divmod(stop_y, step_size_pix)
 
-    x_slice = slice(start_idx, stop_x, step_size)
-    y_slice = slice(start_idx, stop_y, step_size)
-    image_ds = image_mask[(y_slice, x_slice)]
-    logging.info(f"Downsampled image to {image_ds.shape}")
-    for i in range(2):
-        assert image_ds.shape[i] % 2 == 0, (
-            "Downsampled image must have even number of pixels"
-        )
+        x_slice = slice(start_idx, stop_x, step_size_pix)
+        y_slice = slice(start_idx, stop_y, step_size_pix)
+        image_mask = image_mask[(y_slice, x_slice)]
+        logging.info(f"Downsampled image to {image.shape}")
+        for i in range(2):
+            assert image.shape[i] % 2 == 0, (
+                "Downsampled image must have even number of pixels"
+            )
 
-    # Create zoom factor for upsampling
-    zoom_x = image.shape[1] / image_ds.shape[1]
-    zoom_y = image.shape[0] / image_ds.shape[0]
-    zoom = (zoom_y, zoom_x)
+        # Create zoom factor for upsampling
+        zoom_x = image.shape[1] / image_mask.shape[1]
+        zoom_y = image.shape[0] / image_mask.shape[0]
+        zoom = (zoom_y, zoom_x)
 
     # Run the FFT
-    mean, avg_rms = bane_fft(image_ds, kernel)
+    mean, avg_rms = bane_fft(image_mask, kernel)
     # Catch small values
     mean = np.nan_to_num(mean, nan=0.0)
     avg_rms = np.nan_to_num(avg_rms, nan=0.0)
-    # Upsample the mean and RMS to the original image size
-    # Trying a shift first to see if it helps with the edge effects
-    # mean_shift = ndimage.shift(mean, box_size*step_size)
-    # avg_rms_shift = ndimage.shift(avg_rms, box_size*step_size)
-    mean_us = ndimage.zoom(mean, zoom, order=3, grid_mode=True, mode="grid-constant")
-    avg_rms_us = ndimage.zoom(
-        avg_rms, zoom, order=3, grid_mode=True, mode="grid-constant"
-    )
+
+    if step_size_pix > 0:
+        # Upsample the mean and RMS to the original image size
+        # Trying a shift first to see if it helps with the edge effects
+        # mean_shift = ndimage.shift(mean, box_size*step_size)
+        # avg_rms_shift = ndimage.shift(avg_rms, box_size*step_size)
+        mean = ndimage.zoom(
+            mean, zoom, order=3, grid_mode=True, mode="grid-constant"
+        )
+        avg_rms = ndimage.zoom(
+            avg_rms, zoom, order=3, grid_mode=True, mode="grid-constant"
+        )
 
     # Reapply mask
-    mean_us[nan_mask] = np.nan
-    avg_rms_us[nan_mask] = np.nan
+    mean[nan_mask] = np.nan
+    avg_rms[nan_mask] = np.nan
 
     tock = time()
 
     logging.info(f"FFT BANE took {tock - tick:.2f} seconds")
 
-    return mean_us, avg_rms_us
+    return mean, avg_rms
 
 
 def init_outputs(
@@ -699,7 +714,7 @@ def bane_3d(
             ],
         )
 
-    logging.info(f"Finished BANE on cube")
+    logging.info("Finished BANE on cube")
     rms_file, bkg_file = out_files
     with (
         fits.open(rms_file, memmap=True, mode="denywrite") as rms_hdul,
