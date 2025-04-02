@@ -3,6 +3,11 @@
 """
 BANE: Background and Noise Estimation
 ...but with FFTs
+
+Unlike the original BANE, this version uses FFTs to compute the background and noise.
+Further, the `step` and `box` parameters are now the downsampling factor and kernel size, respectively.
+Downsampling is done by taking every `step`th pixel in each dimension, and the kernel is applied to the downsampled image.
+
 """
 
 from __future__ import annotations
@@ -57,39 +62,48 @@ def _ft_kernel(kernel: NDArray[np.float32], shape: tuple) -> NDArray[np.float32]
     return fft.rfft2(kernel, s=shape)
 
 
-@nb.njit
-def pad(
+@nb.njit(
+    nb.float32[:, :](
+        nb.float32[:, :], 
+        nb.types.UniTuple(nb.int64, 2), 
+    ),
+    fastmath=True,
+    cache=True,
+)
+def pad_reflect(
     array: NDArray[np.float32],
     pad_width: tuple[int, int],
-    mode="constant",
-    constant_values: float = 0,
 ) -> NDArray[np.float32]:
-    if mode not in ["constant", "reflect"]:
-        raise ValueError(f"Mode {mode} not supported")
+    """Numba compatible version of np.pad with reflect mode
 
+    Args:
+        array (NDArray[np.float32]): Array to pad
+        pad_width (tuple[int, int]): Width of the padding
+
+    Raises:
+        ValueError: If mode is not supported
+
+    Returns:
+        NDArray[np.float32]: Padded array
+    """
     nx, ny = array.shape
     px, py = pad_width
 
     # Create the padded array
     padded = np.empty((nx + 2 * px, ny + 2 * py), dtype=array.dtype)
 
-    # Fill with the constant value if mode is "constant"
-    if mode == "constant":
-        padded[:, :] = constant_values
-
     # Copy the original array into the center
     padded[px : px + nx, py : py + ny] = array
 
-    if mode == "reflect":
-        # Reflect top and bottom
-        for i in range(px):
-            padded[px - 1 - i, py : py + ny] = array[i + 1, :]
-            padded[nx + px + i, py : py + ny] = array[nx - 2 - i, :]
+    # Reflect top and bottom
+    for i in range(px):
+        padded[px - 1 - i, py : py + ny] = array[i + 1, :]
+        padded[nx + px + i, py : py + ny] = array[nx - 2 - i, :]
 
-        # Reflect left and right
-        for j in range(py):
-            padded[:, py - 1 - j] = padded[:, py + j + 1]
-            padded[:, ny + py + j] = padded[:, ny + py - 2 - j]
+    # Reflect left and right
+    for j in range(py):
+        padded[:, py - 1 - j] = padded[:, py + j + 1]
+        padded[:, ny + py + j] = padded[:, ny + py - 2 - j]
 
     return padded
 
@@ -113,10 +127,9 @@ def fft_average(
     """
     # pad the image by the kernel size * 2
     pad_x, pad_y = kernel.shape
-    image_padded = pad(
+    image_padded = pad_reflect(
         array=image,
         pad_width=(pad_x, pad_y),
-        mode="reflect",
     )
     image_fft = fft.rfft2(image_padded)
     kernel_fft = _ft_kernel(kernel, shape=image_padded.shape)
@@ -224,10 +237,12 @@ def get_kernel(
 ) -> Tuple[NDArray[np.float32], int]:
     """Get the kernel for FFT BANE
 
+    Note that here the `step` is the downsampling factor, and the `box` is the kernel size.
+    
     Args:
         header (fits.Header | dict[str, Any]): Header of the image
-        step_size (int | None, optional): Step size in pixels. Defaults to 3/beam. Values of < 0 will specify the number of pixels per beam.
-        box_size (int | None, optional): Box size in pixels. Defaults to None. Values of < 0 will specify the number of pixels per beam.
+        step_size (int | None, optional): Step size in pixels. Defaults to 3 beams. Values of < 0 will specify the number of beams/step.
+        box_size (int | None, optional): Box size in pixels. Defaults to 10 beams. Values of < 0 will specify the number of beams/box.
 
 
     Returns:
@@ -390,7 +405,6 @@ def estimate_rms(
         clip_rounds (int) -- Number of times to perform the clipping of outlying pixels (default: (2))
         bin_perc (float) -- Bins need to have `bin_perc*MAX(BINS)` of counts to be included in the fitting procedure (default: (0.25))
         outlier_thres (float) -- Number of units of the adopted outlier statistic required for a item to be considered an outlier (default: (3))
-        nan_check (bool) -- If true, non-finite values will be removed from the `data` which would otherwise cause the rms derivation to fail. If fail `data` remains untouched (default: (True))
 
     Raises:
         ValueError: Raised if a mode is specified but not supported
@@ -476,9 +490,22 @@ def robust_bane(
 ) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
     """Two-round BANE with FFTs
 
+    Note that here the `step` is the downsampling factor, and the `box` is the kernel size.
+    The first round is a quick RMS estimate, the second round is the actual BANE.
+
+    A round of clipping is done to remove sources from the image. The clipped image is then filled with
+    noise drawn from a Gaussian distribution with the estimated RMS. The image is then downsampled by the
+    step size, and the kernel is applied to the image. The kernel is then upsampled back to the original
+    image size.
+
     Args:
         image (NDArray[np.float32]): Image to find background and RMS of
         header (fits.Header | dict[str, Any]): Header of the image
+        step_size (int | None, optional): Step size in pixels. Defaults to 3 beams. Values of < 0 will specify the number of beams/step.
+        box_size (int | None, optional): Box size in pixels. Defaults to 10 beams. Values of < 0 will specify the number of beams/box.
+        kernel_func (Callable, optional): Kernel function to use. Defaults to gaussian_kernel.
+        rms_estimator (Callable, optional): RMS estimator to use. Defaults to mad_std.
+        clip_sigma (float, optional): Sigma to clip the image. Defaults to 5.
 
     Returns:
         Tuple[NDArray[np.float32], NDArray[np.float32]]: Mean and RMS of the image
@@ -873,7 +900,7 @@ def cli():
         "--step-size",
         type=int,
         default=None,
-        help="Step size for BANE (i.e. downsampling factor). Negative values will be interpreted as number of beams per step.",
+        help="Step size for BANE (i.e. downsampling factor). Negative values will be interpreted as number of beams per step. Set to 0 for no downsampling.",
     )
     parser.add_argument(
         "--box-size",
