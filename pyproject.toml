@@ -57,27 +57,22 @@ test = [
 ]
 
 [project.scripts]
-aegean = "scripts.aegean"
-BANE = "scripts.BANE"
-SR6 = "scripts.SR6"
-AeRes = "scripts.AeRes"
-MIMAS = "scripts.MIMAS"
-AeReg = "scripts.AeReg"
-fix_beam = "scripts.fix_beam"
-BANE_fft = "scripts.BANE_fft"
+aegean = "treasure_island.CLI.aegean:main"
+BANE = "treasure_island.CLI.BANE:main"
+SR6 = "treasure_island.CLI.SR6:main"
+AeRes = "treasure_island.CLI.AeRes:main"
+MIMAS = "treasure_island.CLI.MIMAS:main"
+AeReg = "treasure_island.CLI.AeReg:main"
+fix_beam = "treasure_island.CLI.fix_beam:main"
+BANE_fft = "treasure_island.CLI.BANE_fft:main"
 
 [tool.hatch]
 version.source = "vcs"
-build.hooks.vcs.version-file = "jolly_roger/_version.py"
-
-[tool.hatch.build.targets.wheel]
-packages = ["AegeanTools"]
-
-[tool.hatch.build]
-include = [
-  "AegeanTools/data/MOC.fits",
-  "scripts/**"
+build.hooks.vcs.version-file = "treasure_island/_version.py"
+build.include = [
+  "scripts/**",
 ]
+
 
 [tool.hatch.metadata]
 keywords = [

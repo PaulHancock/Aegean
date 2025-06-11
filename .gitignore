@@ -19,3 +19,4 @@ doc/_build/
 AegeanTools/__pycache__
 AegeanTools/test.ipynb
 test.ipynb
+treasure_island/_version.py
