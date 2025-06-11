@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-from AegeanTools.CLI import AeRes
+from treasure_island.CLI import AeRes
 import os
 
 image_SIN = 'tests/test_files/1904-66_SIN.fits'

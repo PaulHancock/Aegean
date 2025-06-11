@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-from AegeanTools.CLI import aegean
+from treasure_island.CLI import aegean
 import os
 
 image_SIN = 'tests/test_files/1904-66_SIN.fits'

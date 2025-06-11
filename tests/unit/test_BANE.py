@@ -5,7 +5,7 @@ Test BANE.py
 import os
 
 import numpy as np
-from AegeanTools import BANE
+from treasure_island import BANE
 from astropy.io import fits
 
 __author__ = 'Paul Hancock'

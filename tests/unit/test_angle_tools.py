@@ -5,7 +5,7 @@ Test the angle_tools module
 
 import astropy.units as u
 import numpy as np
-from AegeanTools import angle_tools as at
+from treasure_island import angle_tools as at
 from astropy.coordinates import Angle
 from numpy.testing import assert_almost_equal, assert_approx_equal
 

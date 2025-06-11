@@ -11,7 +11,7 @@ def test_exceptions():
     import and raise exceptions
     """
     try:
-        from AegeanTools.exceptions import AegeanError, AegeanNaNModelError
+        from treasure_island.exceptions import AegeanError, AegeanNaNModelError
     except ImportError as e:
         raise AssertionError("Cannot import AegeanTools.exceptions\n"+e.msg)
 

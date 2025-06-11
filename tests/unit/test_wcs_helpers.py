@@ -4,7 +4,7 @@ Test wcs_helpers.py
 """
 
 import numpy as np
-from AegeanTools.wcs_helpers import (Beam, WCSHelper,
+from treasure_island.wcs_helpers import (Beam, WCSHelper,
                                      fix_aips_header,
                                      get_beam, get_pixinfo)
 from astropy.io import fits

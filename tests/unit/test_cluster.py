@@ -7,8 +7,8 @@ import math
 from copy import deepcopy
 
 import numpy as np
-from AegeanTools import catalogs, cluster, wcs_helpers
-from AegeanTools.models import SimpleSource
+from treasure_island import catalogs, cluster, wcs_helpers
+from treasure_island.models import SimpleSource
 from astropy.io import fits
 
 __author__ = 'Paul Hancock'

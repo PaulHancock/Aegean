@@ -5,10 +5,10 @@ Test fits_interp.py
 
 __author__ = 'Paul Hancock'
 
-from AegeanTools import fits_tools
-from AegeanTools.wcs_helpers import WCSHelper
-from AegeanTools.angle_tools import gcd
-from AegeanTools.exceptions import AegeanError
+from treasure_island import fits_tools
+from treasure_island.wcs_helpers import WCSHelper
+from treasure_island.angle_tools import gcd
+from treasure_island.exceptions import AegeanError
 from astropy.io import fits
 import numpy as np
 import os

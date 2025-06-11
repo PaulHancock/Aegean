@@ -5,7 +5,7 @@ Test regions.py
 import os
 
 import numpy as np
-from AegeanTools.regions import Region
+from treasure_island.regions import Region
 
 __author__ = 'Paul Hancock'
 

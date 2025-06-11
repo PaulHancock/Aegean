@@ -6,12 +6,12 @@ Test source_finder.py
 __author__ = 'Paul Hancock'
 
 from astropy.io import fits
-from AegeanTools import source_finder as sf
-from AegeanTools.wcs_helpers import Beam, WCSHelper
-from AegeanTools import models, flags
-from AegeanTools.models import classify_catalog
-from AegeanTools.regions import Region
-from AegeanTools.exceptions import AegeanError
+from treasure_island import source_finder as sf
+from treasure_island.wcs_helpers import Beam, WCSHelper
+from treasure_island import models, flags
+from treasure_island.models import classify_catalog
+from treasure_island.regions import Region
+from treasure_island.exceptions import AegeanError
 from copy import deepcopy
 import numpy as np
 import logging
@@ -156,7 +156,7 @@ def test_load_globals():
     del sfinder
     sfinder = sf.SourceFinder(log=log)
     aux_files = sf.get_aux_files('tests/test_files/1904-66_SIN.fits')
-    from AegeanTools.regions import Region
+    from treasure_island.regions import Region
     sfinder.load_globals(filename, rms=1, mask=Region())
     if sfinder.global_data.region is None:
         raise AssertionError()

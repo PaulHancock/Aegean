@@ -8,9 +8,9 @@ __author__ = 'Paul Hancock'
 
 def test_flags():
     """Test that the flags import without errors"""
-    import AegeanTools.flags
+    import treasure_island.flags
     # use a flag
-    if not AegeanTools.flags.FITERR > 0:
+    if not treasure_island.flags.FITERR > 0:
         raise AssertionError("FITERR is not >0")
     return
 

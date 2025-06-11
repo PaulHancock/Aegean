@@ -4,7 +4,7 @@ Test fitting.py
 """
 import lmfit
 import numpy as np
-from AegeanTools import fitting
+from treasure_island import fitting
 
 __author__ = 'Paul Hancock'
 

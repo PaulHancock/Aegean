@@ -5,7 +5,7 @@ Test models.py
 
 __author__ = 'Paul Hancock'
 
-from AegeanTools import models
+from treasure_island import models
 import numpy as np
 
 

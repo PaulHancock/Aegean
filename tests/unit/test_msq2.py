@@ -3,7 +3,7 @@
 Test msq2.py
 """
 import numpy as np
-from AegeanTools.msq2 import MarchingSquares
+from treasure_island.msq2 import MarchingSquares
 
 __author__ = 'Paul Hancock'
 

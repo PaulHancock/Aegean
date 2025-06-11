@@ -2,8 +2,8 @@
 """
 Test MIMAS.py
 """
-from AegeanTools import MIMAS
-from AegeanTools.regions import Region
+from treasure_island import MIMAS
+from treasure_island.regions import Region
 from astropy.table import Table
 import numpy as np
 import os

@@ -11,7 +11,7 @@ from astropy.wcs import WCS
 import astropy.units as u
 from radio_beam import Beam
 
-from AegeanTools.BANE_fft import bane_fft, gaussian_kernel, pad_reflect, robust_bane
+from treasure_island.BANE_fft import bane_fft, gaussian_kernel, pad_reflect, robust_bane
 
 
 rng = np.random.default_rng(12345)

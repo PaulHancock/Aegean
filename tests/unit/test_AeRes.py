@@ -5,8 +5,8 @@ Test the AeRes module
 import os
 
 import numpy as np
-from AegeanTools import AeRes as ar
-from AegeanTools import catalogs, wcs_helpers
+from treasure_island import AeRes as ar
+from treasure_island import catalogs, wcs_helpers
 from astropy.io import fits
 
 __author__ = 'Paul Hancock'

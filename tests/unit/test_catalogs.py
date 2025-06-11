@@ -7,9 +7,9 @@ import logging
 import os
 
 import numpy as np
-from AegeanTools import catalogs as cat
-from AegeanTools.models import ComponentSource, IslandSource, SimpleSource
-from AegeanTools.msq2 import MarchingSquares
+from treasure_island import catalogs as cat
+from treasure_island.models import ComponentSource, IslandSource, SimpleSource
+from treasure_island.msq2 import MarchingSquares
 from astropy import table
 from numpy.testing import assert_raises
 
