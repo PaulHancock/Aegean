@@ -2,6 +2,7 @@
 """
 Test cluster.py
 """
+
 from __future__ import annotations
 
 import logging
@@ -14,7 +15,7 @@ from astropy.io import fits
 from treasure_island import catalogs, cluster, wcs_helpers
 from treasure_island.models import SimpleSource
 
-__author__ = 'Paul Hancock'
+__author__ = "Paul Hancock"
 
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
@@ -26,18 +27,18 @@ def test_norm_dist():
     src1 = SimpleSource()
     src1.ra = 0
     src1.dec = 0
-    src1.a = 1.
-    src1.b = 1.
-    src1.pa = 0.
+    src1.a = 1.0
+    src1.b = 1.0
+    src1.pa = 0.0
     src2 = SimpleSource()
     src2.ra = 0
-    src2.dec = 1/3600.
+    src2.dec = 1 / 3600.0
     src2.a = 1
     src2.b = 1
-    src2.pa = 0.
+    src2.pa = 0.0
     if not cluster.norm_dist(src1, src1) == 0:
         raise AssertionError()
-    if not cluster.norm_dist(src1, src2) == 1/math.sqrt(2):
+    if not cluster.norm_dist(src1, src2) == 1 / math.sqrt(2):
         raise AssertionError()
 
 
@@ -48,10 +49,10 @@ def test_sky_dist():
     src1.dec = 0
     src2 = SimpleSource()
     src2.ra = 0
-    src2.dec = 1/3600.
-    if not cluster.sky_dist(src1, src1) == 0.:
+    src2.dec = 1 / 3600.0
+    if not cluster.sky_dist(src1, src1) == 0.0:
         raise AssertionError()
-    if not cluster.sky_dist(src1, src2) == 1/3600.:
+    if not cluster.sky_dist(src1, src2) == 1 / 3600.0:
         raise AssertionError()
 
 
@@ -59,10 +60,18 @@ def test_vectorized():
     """Test that norm_dist and sky_dist can be vectorized"""
     # random data as struct array with interface like SimpleSource
     X = np.random.RandomState(0).rand(20, 6)
-    Xr = np.rec.array(X.view([('ra', 'f8'), ('dec', 'f8'),
-                              ('a', 'f8'), ('b', 'f8'),
-                              ('pa', 'f8'),
-                              ('peak_flux', 'f8')]).ravel())
+    Xr = np.rec.array(
+        X.view(
+            [
+                ("ra", "f8"),
+                ("dec", "f8"),
+                ("a", "f8"),
+                ("b", "f8"),
+                ("pa", "f8"),
+                ("peak_flux", "f8"),
+            ]
+        ).ravel()
+    )
 
     def to_ss(x):
         "Convert numpy.rec to SimpleSource"
@@ -90,17 +99,17 @@ def test_pairwise_elliptical_binary():
     src1 = SimpleSource()
     src1.ra = 0
     src1.dec = 0
-    src1.a = 1.
-    src1.b = 1.
-    src1.pa = 0.
+    src1.a = 1.0
+    src1.b = 1.0
+    src1.pa = 0.0
     src2 = deepcopy(src1)
-    src2.dec = 1/3600.
+    src2.dec = 1 / 3600.0
     src3 = deepcopy(src1)
     src3.dec = 50
     mat = cluster.pairwise_ellpitical_binary([src1, src2, src3], eps=0.5)
-    if not np.all(mat == [[False, True, False],
-                          [True, False, False],
-                          [False, False, False]]):
+    if not np.all(
+        mat == [[False, True, False], [True, False, False], [False, False, False]]
+    ):
         raise AssertionError()
 
 
@@ -113,74 +122,62 @@ def test_regroup():
         print(f"Correctly raised error {type(e)}")
 
     # this should result in 51 groups
-    a = cluster.regroup('tests/test_files/1904_comp.fits',
-                        eps=1/3600.)
+    a = cluster.regroup("tests/test_files/1904_comp.fits", eps=1 / 3600.0)
     if len(a) != 51:
         msg = f"Regroup with eps=1/3600. gave {len(a)} groups instead of 51"
-        raise AssertionError(
-            msg
-            )
+        raise AssertionError(msg)
 
     # this should give 1 group
-    a = cluster.regroup('tests/test_files/1904_comp.fits', eps=10, far=1000)
+    a = cluster.regroup("tests/test_files/1904_comp.fits", eps=10, far=1000)
     if len(a) != 1:
         msg = f"Regroup with eps=10, far=1000. gave {len(a)} groups instead of 51"
-        raise AssertionError(
-            msg
-            )
+        raise AssertionError(msg)
 
 
 def test_regroup_dbscan():
-    table = catalogs.load_table('tests/test_files/1904_comp.fits')
+    table = catalogs.load_table("tests/test_files/1904_comp.fits")
     srccat = catalogs.table_to_source_list(table)
-    a = cluster.regroup_dbscan(srccat,
-                               eps=1/3600.)
+    a = cluster.regroup_dbscan(srccat, eps=1 / 3600.0)
     if len(a) != 51:
         msg = f"Regroup_dbscan with eps=1/3600. gave {len(a)} groups instead of 51"
-        raise AssertionError(
-            msg
-            )
+        raise AssertionError(msg)
 
 
 def test_resize_ratio():
     """Test that resize works with ratio"""
     # Load a table
-    table = catalogs.load_table('tests/test_files/1904_comp.fits')
+    table = catalogs.load_table("tests/test_files/1904_comp.fits")
     srccat = catalogs.table_to_source_list(table)
 
     first = deepcopy(srccat[0])
     out = cluster.resize(deepcopy(srccat), ratio=1)
 
-    if not ((first.a - out[0].a < 1e-9) and
-            (first.b - out[0].b < 1e-9)):
+    if not ((first.a - out[0].a < 1e-9) and (first.b - out[0].b < 1e-9)):
         msg = "resize of 1 is not identity"
         raise AssertionError(msg)
-
 
 
 def test_resize_psfhelper():
     """Test that resize works with psfhelpers"""
     # Load a table
-    table = catalogs.load_table('tests/test_files/1904_comp.fits')
+    table = catalogs.load_table("tests/test_files/1904_comp.fits")
     srccat = catalogs.table_to_source_list(table)
     # make psfhelper
-    head = fits.getheader('tests/test_files/1904-66_SIN.fits')
+    head = fits.getheader("tests/test_files/1904-66_SIN.fits")
     psfhelper = wcs_helpers.WCSHelper.from_header(head)
 
     first = deepcopy(srccat[0])
     out = cluster.resize(deepcopy(srccat), psfhelper=psfhelper)
     print(first.a, out[0].a)
 
-    if not ((first.a - out[0].a < 1e-9) and
-            (first.b - out[0].b < 1e-9)):
+    if not ((first.a - out[0].a < 1e-9) and (first.b - out[0].b < 1e-9)):
         msg = "resize with psfhelper is not identity"
         raise AssertionError(msg)
-
 
 
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
-        if f.startswith('test'):
+        if f.startswith("test"):
             print(f)
             globals()[f]()

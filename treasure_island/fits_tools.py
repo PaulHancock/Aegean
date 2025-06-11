@@ -3,6 +3,7 @@
 """
 A module for fits file utility functions.
 """
+
 from __future__ import annotations
 
 import logging
@@ -13,8 +14,8 @@ from scipy.interpolate import RegularGridInterpolator
 
 from .exceptions import AegeanError
 
-__author__ = 'Paul Hancock'
-__date__ = '2022-11-29'
+__author__ = "Paul Hancock"
+__date__ = "2022-11-29"
 
 
 def load_file_or_hdu(filename):
@@ -90,31 +91,31 @@ def compress(datafile, factor, outfile=None):
     new_data[-1, -1] = data[-1, -1]
 
     # TODO: Figure out what to do when CD2_1 and CD1_2 are non-zero
-    if 'CDELT1' in header:
-        header['CDELT1'] *= factor
-    elif 'CD1_1' in header:
-        header['CD1_1'] *= factor
+    if "CDELT1" in header:
+        header["CDELT1"] *= factor
+    elif "CD1_1" in header:
+        header["CD1_1"] *= factor
     else:
         logging.error("Error: Can't find CDELT1 or CD1_1")
         return None
-    if 'CDELT2' in header:
-        header['CDELT2'] *= factor
+    if "CDELT2" in header:
+        header["CDELT2"] *= factor
     elif "CD2_2" in header:
-        header['CD2_2'] *= factor
+        header["CD2_2"] *= factor
     else:
         logging.error("Error: Can't find CDELT2 or CD2_2")
         return None
     # Move the reference pixel so that the WCS is correct
-    header['CRPIX1'] = (header['CRPIX1'] + factor - 1) / factor
-    header['CRPIX2'] = (header['CRPIX2'] + factor - 1) / factor
+    header["CRPIX1"] = (header["CRPIX1"] + factor - 1) / factor
+    header["CRPIX2"] = (header["CRPIX2"] + factor - 1) / factor
 
     # Update the header so that we can do the correct interpolation later on
-    header['BN_CFAC'] = (factor, "Compression factor (grid size) used by BANE")
-    header['BN_NPX1'] = (header['NAXIS1'], 'original NAXIS1 value')
-    header['BN_NPX2'] = (header['NAXIS2'], 'original NAXIS2 value')
-    header['BN_RPX1'] = (lcx, 'Residual on axis 1')
-    header['BN_RPX2'] = (lcy, 'Residual on axis 2')
-    header['HISTORY'] = f"Compressed by a factor of {factor}"
+    header["BN_CFAC"] = (factor, "Compression factor (grid size) used by BANE")
+    header["BN_NPX1"] = (header["NAXIS1"], "original NAXIS1 value")
+    header["BN_NPX2"] = (header["NAXIS2"], "original NAXIS2 value")
+    header["BN_RPX1"] = (lcx, "Residual on axis 1")
+    header["BN_RPX2"] = (lcy, "Residual on axis 2")
+    header["HISTORY"] = f"Compressed by a factor of {factor}"
 
     # save the changes
     hdulist[0].data = np.array(new_data, dtype=np.float32)
@@ -141,8 +142,9 @@ def is_compressed(header):
     compressed : bool
         True if the file was compressed
     """
-    return all(a in header for a in
-               ['BN_CFAC', 'BN_NPX1', 'BN_NPX2', 'BN_RPX1', 'BN_RPX2'])
+    return all(
+        a in header for a in ["BN_CFAC", "BN_NPX1", "BN_NPX2", "BN_RPX1", "BN_RPX2"]
+    )
 
 
 def expand(datafile, outfile=None):
@@ -179,44 +181,45 @@ def expand(datafile, outfile=None):
     if not is_compressed(header):
         return hdulist
 
-    factor = header['BN_CFAC']
-    (gx, gy) = np.mgrid[0:header['BN_NPX2'], 0:header['BN_NPX1']]
+    factor = header["BN_CFAC"]
+    (gx, gy) = np.mgrid[0 : header["BN_NPX2"], 0 : header["BN_NPX1"]]
     # fix the last column of the grid to account for residuals
-    lcx = header['BN_RPX2']
-    lcy = header['BN_RPX1']
+    lcx = header["BN_RPX2"]
+    lcy = header["BN_RPX1"]
 
-    rows = (np.arange(data.shape[0]) + int(lcx/factor))*factor
-    cols = (np.arange(data.shape[1]) + int(lcy/factor))*factor
+    rows = (np.arange(data.shape[0]) + int(lcx / factor)) * factor
+    cols = (np.arange(data.shape[1]) + int(lcy / factor)) * factor
 
     # Do the interpolation
-    hdulist[0].data = np.array(RegularGridInterpolator(
-        (rows, cols), data)((gx, gy)), dtype=np.float32)
+    hdulist[0].data = np.array(
+        RegularGridInterpolator((rows, cols), data)((gx, gy)), dtype=np.float32
+    )
 
     # update the fits keywords so that the WCS is correct
-    header['CRPIX1'] = (header['CRPIX1'] - 1) * factor + 1
-    header['CRPIX2'] = (header['CRPIX2'] - 1) * factor + 1
+    header["CRPIX1"] = (header["CRPIX1"] - 1) * factor + 1
+    header["CRPIX2"] = (header["CRPIX2"] - 1) * factor + 1
 
-    if 'CDELT1' in header:
-        header['CDELT1'] /= factor
-    elif 'CD1_1' in header:
-        header['CD1_1'] /= factor
+    if "CDELT1" in header:
+        header["CDELT1"] /= factor
+    elif "CD1_1" in header:
+        header["CD1_1"] /= factor
     else:
         logging.error("Error: Can't find CD1_1 or CDELT1")
         return None
 
-    if 'CDELT2' in header:
-        header['CDELT2'] /= factor
+    if "CDELT2" in header:
+        header["CDELT2"] /= factor
     elif "CD2_2" in header:
-        header['CD2_2'] /= factor
+        header["CD2_2"] /= factor
     else:
         logging.error("Error: Can't find CDELT2 or CD2_2")
         return None
 
-    header['HISTORY'] = f'Expanded by factor {factor}'
+    header["HISTORY"] = f"Expanded by factor {factor}"
 
     # don't need these any more so delete them.
-    del header['BN_CFAC'], header['BN_NPX1'], header['BN_NPX2']
-    del header['BN_RPX1'], header['BN_RPX2']
+    del header["BN_CFAC"], header["BN_NPX1"], header["BN_NPX2"]
+    del header["BN_RPX1"], header["BN_RPX2"]
     hdulist[0].header = header
     if outfile is not None:
         hdulist.writeto(outfile, overwrite=True)
@@ -250,10 +253,7 @@ def write_fits(data, header, file_name):
     logging.info(f"Wrote {file_name}")
 
 
-def load_image_band(filename,
-                    band=(0, 1),
-                    hdu_index=0,
-                    cube_index=0):
+def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0):
     """
     Load a subset of an image from a given filename.
     The subset is controlled using the band, which is (this band, total bands)
@@ -268,13 +268,10 @@ def load_image_band(filename,
     """
     if band[1] <= 0:
         msg = f"band[1] number {band[1]} not valid"
-        raise AegeanError(
-            msg
-        )
+        raise AegeanError(msg)
     if band[0] >= band[1]:
         msg = f"band number {band[0]} too large for total bands = {band[1]}"
-        raise AegeanError(
-            msg)
+        raise AegeanError(msg)
     if band[0] < 0:
         msg = f"band[0] number {band[0]} not valid"
         raise AegeanError(msg)
@@ -287,8 +284,8 @@ def load_image_band(filename,
         hdulist = expand(filename)
         header = hdulist[0].header
 
-    row_min = int(header['NAXIS2']/band[1] * (band[0]))
-    row_max = int(header['NAXIS2']/band[1] * (band[0]+1))
+    row_min = int(header["NAXIS2"] / band[1] * (band[0]))
+    row_max = int(header["NAXIS2"] / band[1] * (band[0] + 1))
 
     if compressed:
         return hdulist[0].data[row_min:row_max, :], header
@@ -297,19 +294,21 @@ def load_image_band(filename,
     NAXIS = header["NAXIS"]
     with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
         if NAXIS == 2:
-            data = a[hdu_index].section[row_min:row_max, 0:header['NAXIS1']]
+            data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
         elif NAXIS == 3:
-            data = a[hdu_index].section[cube_index,
-                                        row_min:row_max, 0:header['NAXIS1']]
+            data = a[hdu_index].section[
+                cube_index, row_min:row_max, 0 : header["NAXIS1"]
+            ]
         elif NAXIS == 4:
-            data = a[hdu_index].section[0, cube_index,
-                                        row_min:row_max, 0:header['NAXIS1']]
+            data = a[hdu_index].section[
+                0, cube_index, row_min:row_max, 0 : header["NAXIS1"]
+            ]
         else:
             msg = f"Too many NAXIS: {NAXIS}>4"
             raise Exception(msg)
-    if 'BSCALE' in header:
-        data *= header['BSCALE']
+    if "BSCALE" in header:
+        data *= header["BSCALE"]
     # adjust the header to match the data shape
-    header['NAXIS2'] = row_max-row_min
-    header['CRPIX2'] -= row_min
+    header["NAXIS2"] = row_max - row_min
+    header["CRPIX2"] -= row_min
     return data, header

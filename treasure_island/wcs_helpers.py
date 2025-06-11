@@ -1,9 +1,9 @@
-#! /usr/bin/env python
 """
 This module contains two classes that provide WCS functions that are not
 part of the WCS toolkit, as well as some wrappers around the provided tools
 to make them a lot easier to use.
 """
+
 from __future__ import annotations
 
 import logging
@@ -108,8 +108,9 @@ class WCSHelper:
         if self.psf_file is None:
             ra, dec = self.pix2sky([self.refpix[1], self.refpix[0]])
             pos = [ra, dec]
-            _, _, self._psf_a, self._psf_b, self._psf_theta = \
-              self.sky2pix_ellipse(pos, self.beam.a, self.beam.b, self.beam.pa)
+            _, _, self._psf_a, self._psf_b, self._psf_theta = self.sky2pix_ellipse(
+                pos, self.beam.a, self.beam.b, self.beam.pa
+            )
 
     # This construct gives us an attribute 'self.psf_map' which is only loaded
     # on demand
@@ -133,7 +134,8 @@ class WCSHelper:
             header = fits.getheader(self.psf_file)
             try:
                 wcs = WCS(header, naxis=2)
-            except:
+            except Exception as e:
+                log.error(e)
                 wcs = WCS(str(header), naxis=2)
             self._psf_wcs = wcs
         return self._psf_wcs
@@ -162,7 +164,8 @@ class WCSHelper:
         """
         try:
             wcs = WCS(header, naxis=2)
-        except:  # TODO: figure out what error is being thrown
+        except Exception as e:  # TODO: figure out what error is being thrown
+            log.error(e)
             wcs = WCS(str(header), naxis=2)
 
         beam = get_beam(header) if beam is None else beam
@@ -219,8 +222,7 @@ class WCSHelper:
         """
         x, y = pixel
         # wcs and python have opposite ideas of x/y
-        return self.wcs.all_pix2world([[y, x]], 1, 
-                                      ra_dec_order=self.ra_dec_order)[0]
+        return self.wcs.all_pix2world([[y, x]], 1, ra_dec_order=self.ra_dec_order)[0]
 
     def sky2pix(self, pos):
         """
@@ -238,8 +240,7 @@ class WCSHelper:
             The (x,y) pixel coordinates
 
         """
-        pixel = self.wcs.all_world2pix(
-            [pos], 1, ra_dec_order=self.ra_dec_order)
+        pixel = self.wcs.all_world2pix([pos], 1, ra_dec_order=self.ra_dec_order)
         # wcs and python have opposite ideas of x/y
         return [pixel[0][1], pixel[0][0]]
 
@@ -261,8 +262,7 @@ class WCSHelper:
         """
         # wcs and python have opposite ideas of x/y
         if self.psf_wcs is not None:
-            pixel = self.psf_wcs.all_world2pix(
-                [pos], 1, ra_dec_order=self.ra_dec_order)
+            pixel = self.psf_wcs.all_world2pix([pos], 1, ra_dec_order=self.ra_dec_order)
             return [pixel[0][1], pixel[0][0]]
         return None
 
@@ -322,8 +322,7 @@ class WCSHelper:
         """
         ra1, dec1 = self.pix2sky(pixel)
         x, y = pixel
-        a = (x + r * np.cos(np.radians(theta)),
-             y + r * np.sin(np.radians(theta)))
+        a = (x + r * np.cos(np.radians(theta)), y + r * np.sin(np.radians(theta)))
         locations = self.pix2sky(a)
         ra2, dec2 = locations
         a = gcd(ra1, dec1, ra2, dec2)
@@ -399,8 +398,7 @@ class WCSHelper:
         """
         ra, dec = self.pix2sky(pixel)
         x, y = pixel
-        v_sx = (x + sx * np.cos(np.radians(theta)),
-                y + sx * np.sin(np.radians(theta)))
+        v_sx = (x + sx * np.cos(np.radians(theta)), y + sx * np.sin(np.radians(theta)))
         ra2, dec2 = self.pix2sky(v_sx)
         major = gcd(ra, dec, ra2, dec2)
         pa = bear(ra, dec, ra2, dec2)
@@ -453,7 +451,8 @@ class WCSHelper:
         # sense
         x, y = self.psf_sky2pix((ra, dec))
 
-        log.debug(f"sky2sky {ra}, {dec}, {x}, {y}")
+        msg = f"sky2sky {ra}, {dec}, {x}, {y}"
+        log.debug(msg)
 
         x = int(np.clip(x, 0, self.psf_map.shape[1] - 1))
         y = int(np.clip(y, 0, self.psf_map.shape[2] - 1))
@@ -482,9 +481,7 @@ class WCSHelper:
             return self._psf_a, self._psf_b, self._psf_theta
 
         psf_sky = self.get_psf_sky2sky(ra, dec)
-        return self.sky2pix_ellipse((ra, dec), psf_sky[0], psf_sky[1], psf_sky[2])[
-            2:
-        ]
+        return self.sky2pix_ellipse((ra, dec), psf_sky[0], psf_sky[1], psf_sky[2])[2:]
 
     def get_psf_pix2pix(self, x, y):
         """
@@ -641,20 +638,17 @@ def get_pixinfo(header):
         pixscale = (header["CDELT1"], header["CDELT2"])
     elif all(a in header for a in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]):
         pixarea = abs(
-            header["CD1_1"] * header["CD2_2"] -
-            header["CD1_2"] * header["CD2_1"]
+            header["CD1_1"] * header["CD2_2"] - header["CD1_2"] * header["CD2_1"]
         )
         pixscale = (header["CD1_1"], header["CD2_2"])
         if not (header["CD1_2"] == 0 and header["CD2_1"] == 0):
-            log.warning(
-                "Pixels don't appear to be square -> pixscale is wrong")
+            log.warning("Pixels don't appear to be square -> pixscale is wrong")
     elif all(a in header for a in ["CD1_1", "CD2_2"]):
         pixarea = abs(header["CD1_1"] * header["CD2_2"])
         pixscale = (header["CD1_1"], header["CD2_2"])
     else:
         log.critical(
-            "cannot determine pixel area" +
-            "using zero EVEN THOUGH THIS IS WRONG!"
+            "cannot determine pixel area using zero EVEN THOUGH THIS IS WRONG!"
         )
         pixarea = 0
         pixscale = (0, 0)

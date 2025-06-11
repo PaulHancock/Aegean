@@ -1,7 +1,9 @@
 #! /usr/bin/env python
 """
- Tool for making residual images with Aegean tables as input
+Tool for making residual images with Aegean tables as input
 """
+
+from __future__ import annotations
 
 import sys
 

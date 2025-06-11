@@ -1,10 +1,10 @@
-#! /usr/bin/env python
 """
 MIMAS - The Multi-resolution Image Mask for Aegean Software
 
 TODO: Write an in/out reader for MOC formats described by
 http://arxiv.org/abs/1505.02937
 """
+
 from __future__ import annotations
 
 import logging
@@ -22,8 +22,8 @@ from .catalogs import load_table, write_table
 from .regions import Region
 
 __author__ = "Paul Hancock"
-__version__ = 'v1.4.0'
-__date__ = '2022-08-01'
+__version__ = "v1.4.0"
+__date__ = "2022-08-01"
 
 
 # globals
@@ -89,7 +89,7 @@ def galactic2fk5(l, b):
     ra, dec : float
         FK5 ecliptic coordinates in radians.
     """
-    a = SkyCoord(l, b, unit=(u.radian, u.radian), frame='galactic')
+    a = SkyCoord(l, b, unit=(u.radian, u.radian), frame="galactic")
     return a.fk5.ra.radian, a.fk5.dec.radian
 
 
@@ -118,12 +118,12 @@ def mask_plane(data, wcs, region, negate=False):
         The original array, but masked as required.
     """
     # create an array but don't set the values (they are random)
-    indexes = np.empty((data.shape[0]*data.shape[1], 2), dtype=int)
+    indexes = np.empty((data.shape[0] * data.shape[1], 2), dtype=int)
     idx = np.array([(j, 0) for j in range(data.shape[1])])
     j = data.shape[1]
     for i in range(data.shape[0]):
         idx[:, 1] = i
-        indexes[i*j:(i+1)*j] = idx
+        indexes[i * j : (i + 1) * j] = idx
 
     # put ALL the pixles into our vectorized functions
     # and minimise our overheads
@@ -170,12 +170,12 @@ def mask_file(regionfile, infile, outfile, negate=False):
     im = pyfits.open(infile)
     if not os.path.exists(regionfile):
         msg = f"Cannot locate region file {regionfile}"
-        raise AssertionError(
-            msg)
+        raise AssertionError(msg)
     region = Region.load(regionfile)
     try:
         wcs = pywcs.WCS(im[0].header, naxis=2)
-    except:  # TODO: figure out what error is being thrown
+    except Exception as e:  # TODO: figure out what error is being thrown
+        logging.error(e)
         wcs = pywcs.WCS(str(im[0].header), naxis=2)
 
     data = np.squeeze(im[0].data) if len(im[0].data.shape) > 2 else im[0].data
@@ -191,7 +191,7 @@ def mask_file(regionfile, infile, outfile, negate=False):
     logging.info(f"Wrote {outfile}")
 
 
-def mask_table(region, table, negate=False, racol='ra', deccol='dec'):
+def mask_table(region, table, negate=False, racol="ra", deccol="dec"):
     """
     Apply a given mask (region) to the table, removing all the rows with ra/dec
     inside the region. If negate=False then remove the rows with ra/dec outside
@@ -223,9 +223,7 @@ def mask_table(region, table, negate=False, racol='ra', deccol='dec'):
     return table[mask]
 
 
-def mask_catalog(regionfile, infile, outfile,
-                 negate=False,
-                 racol='ra', deccol='dec'):
+def mask_catalog(regionfile, infile, outfile, negate=False, racol="ra", deccol="dec"):
     """
     Apply a region file as a mask to a catalog, removing all the rows with
     ra/dec inside the region. If negate=False then remove the rows with ra/dec
@@ -261,8 +259,7 @@ def mask_catalog(regionfile, infile, outfile,
     region = Region.load(regionfile)
     logging.info(f"Loading catalog from {infile}")
     table = load_table(infile)
-    masked_table = mask_table(
-        region, table, negate=negate, racol=racol, deccol=deccol)
+    masked_table = mask_table(region, table, negate=negate, racol=racol, deccol=deccol)
     write_table(masked_table, outfile)
 
 
@@ -297,8 +294,7 @@ def mim2fits(mimfile, fitsfile):
         Output file.
     """
     region = Region.load(mimfile)
-    region.write_fits(
-        fitsfile, moctool=f'MIMAS {__version__}-{__date__}')
+    region.write_fits(fitsfile, moctool=f"MIMAS {__version__}-{__date__}")
     logging.info(f"Converted {mimfile} -> {fitsfile}")
 
 
@@ -356,20 +352,20 @@ def box2poly(line):
     poly : [ra, dec, ...]
         The corners of the box in clockwise order from top left.
     """
-    words = re.split('[(\s,)]', line)
+    words = re.split("[(\s,)]", line)
     ra = words[1]
     dec = words[2]
     width = words[3]
     height = words[4]
     ra = Angle(ra, unit=u.hour) if ":" in ra else Angle(ra, unit=u.degree)
     dec = Angle(dec, unit=u.degree)
-    width = Angle(float(width[:-1])/2, unit=u.arcsecond)  # strip the "
-    height = Angle(float(height[:-1])/2, unit=u.arcsecond)  # strip the "
+    width = Angle(float(width[:-1]) / 2, unit=u.arcsecond)  # strip the "
+    height = Angle(float(height[:-1]) / 2, unit=u.arcsecond)  # strip the "
     center = SkyCoord(ra, dec)
-    tl = center.ra.degree+width.degree, center.dec.degree+height.degree
-    tr = center.ra.degree-width.degree, center.dec.degree+height.degree
-    bl = center.ra.degree+width.degree, center.dec.degree-height.degree
-    br = center.ra.degree-width.degree, center.dec.degree-height.degree
+    tl = center.ra.degree + width.degree, center.dec.degree + height.degree
+    tr = center.ra.degree - width.degree, center.dec.degree + height.degree
+    bl = center.ra.degree + width.degree, center.dec.degree - height.degree
+    br = center.ra.degree - width.degree, center.dec.degree - height.degree
     return np.ravel([tl, tr, br, bl]).tolist()
 
 
@@ -387,7 +383,7 @@ def circle2circle(line):
     circle : [ra, dec, radius]
         The center and radius of the circle.
     """
-    words = re.split('[(,\s)]', line)
+    words = re.split("[(,\s)]", line)
     ra = words[1]
     dec = words[2]
     radius = words[3][:-1]  # strip the "
@@ -414,12 +410,12 @@ def poly2poly(line):
     poly : [ra, dec, ...]
         The coordinates of the polygon.
     """
-    words = re.split('[(\s,)]', line)
+    words = re.split("[(\s,)]", line)
     ras = np.array(words[1::2])
     decs = np.array(words[2::2])
     coords = []
     for ra, dec in zip(ras, decs, strict=False):
-        if ra.strip() == '' or dec.strip() == '':
+        if ra.strip() == "" or dec.strip() == "":
             continue
         if ":" in ra:
             pos = SkyCoord(Angle(ra, unit=u.hour), Angle(dec, unit=u.degree))
@@ -447,17 +443,16 @@ def reg2mim(regfile, mimfile, maxdepth):
 
     """
     logging.info(f"Reading regions from {regfile}")
-    lines = (ln for ln in open(regfile) if not ln.startswith('#'))
+    lines = (ln for ln in open(regfile) if not ln.startswith("#"))
     poly = []
     circles = []
     for line in lines:
-        if line.startswith('box'):
+        if line.startswith("box"):
             poly.append(box2poly(line))
-        elif line.startswith('circle'):
+        elif line.startswith("circle"):
             circles.append(circle2circle(line))
-        elif line.startswith('polygon'):
-            logging.warning(
-                "Polygons break a lot, but I'll try this one anyway.")
+        elif line.startswith("polygon"):
+            logging.warning("Polygons break a lot, but I'll try this one anyway.")
             poly.append(poly2poly(line))
         else:
             logging.warning(f"Not sure what to do with {line[:-1]}")
@@ -507,10 +502,10 @@ def combine_regions(container):
         for c in container.include_circles:
             circles = np.radians(np.array(c))
             if container.galactic:
-                l, b, radii = circles.reshape(3, circles.shape[0]//3)
+                l, b, radii = circles.reshape(3, circles.shape[0] // 3)
                 ras, decs = galactic2fk5(l, b)
             else:
-                ras, decs, radii = circles.reshape(3, circles.shape[0]//3)
+                ras, decs, radii = circles.reshape(3, circles.shape[0] // 3)
             region.add_circles(ras, decs, radii)
 
     # remove circles
@@ -519,10 +514,10 @@ def combine_regions(container):
             r2 = Region(container.maxdepth)
             circles = np.radians(np.array(c))
             if container.galactic:
-                l, b, radii = circles.reshape(3, circles.shape[0]//3)
+                l, b, radii = circles.reshape(3, circles.shape[0] // 3)
                 ras, decs = galactic2fk5(l, b)
             else:
-                ras, decs, radii = circles.reshape(3, circles.shape[0]//3)
+                ras, decs, radii = circles.reshape(3, circles.shape[0] // 3)
             r2.add_circles(ras, decs, radii)
             region.without(r2)
 
@@ -530,14 +525,14 @@ def combine_regions(container):
     if len(container.include_polygons) > 0:
         for p in container.include_polygons:
             poly = np.radians(np.array(p))
-            poly = poly.reshape((poly.shape[0]//2, 2))
+            poly = poly.reshape((poly.shape[0] // 2, 2))
             region.add_poly(poly)
 
     # remove polygons
     if len(container.exclude_polygons) > 0:
         for p in container.exclude_polygons:
             poly = np.array(np.radians(p))
-            poly = poly.reshape((poly.shape[0]//2, 2))
+            poly = poly.reshape((poly.shape[0] // 2, 2))
             r2 = Region(container.maxdepth)
             r2.add_poly(poly)
             region.without(r2)

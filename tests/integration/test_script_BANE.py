@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from treasure_island.CLI import BANE
 
-image_SIN = 'tests/test_files/1904-66_SIN.fits'
-image_AIT = 'tests/test_files/1904-66_AIT.fits'
-tempfile = 'dlme'
+image_SIN = "tests/test_files/1904-66_SIN.fits"
+image_AIT = "tests/test_files/1904-66_AIT.fits"
+tempfile = "dlme"
 
 
 def test_help():
@@ -13,7 +13,7 @@ def test_help():
 
 
 def test_cite():
-    BANE.main(['--cite'])
+    BANE.main(["--cite"])
 
 
 def test_invalid_file():
@@ -21,7 +21,7 @@ def test_invalid_file():
 
 
 def test_noclobber():
-    BANE.main(['--noclobber', image_SIN])
+    BANE.main(["--noclobber", image_SIN])
 
 
 def test_run_BANE():
@@ -31,6 +31,6 @@ def test_run_BANE():
 if __name__ == "__main__":
     # introspect and run all the functions starting with 'test'
     for f in dir():
-        if f.startswith('test'):
+        if f.startswith("test"):
             print(f)
             globals()[f]()

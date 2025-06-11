@@ -1,8 +1,8 @@
-#! /usr/bin/env python
 """
 Provie a class which performs the marching squares algorithm on an image.
 The desired output is a set of regions / contours.
 """
+
 from __future__ import annotations
 
 from copy import copy
@@ -104,7 +104,7 @@ class MarchingSquares:
         solid : bool
             True if the pixel is not zero.
         """
-        if not(0 <= x < self.xsize) or not(0 <= y < self.ysize):
+        if not (0 <= x < self.xsize) or not (0 <= y < self.ysize):
             return False
         return self.data[x, y] != 0
 
@@ -191,14 +191,13 @@ class MarchingSquares:
             self.data[p] = 0
 
             # blank until we reach the other perimeter
-            for i in range(p[1]+1, self.data.shape[1]):
+            for i in range(p[1] + 1, self.data.shape[1]):
                 q = p[0], i
                 # stop when we reach another part of the perimeter
                 if q in perimeter:
                     break
                 # fill everything in between, even inclusions
                 self.data[q] = 0
-
 
     def do_march_all(self):
         """

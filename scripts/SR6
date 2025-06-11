@@ -4,6 +4,8 @@ A program to provide a command line interface to the
 AegeanTools.fits_tools module
 """
 
+from __future__ import annotations
+
 import sys
 
 from AegeanTools.CLI import SR6

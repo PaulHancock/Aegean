@@ -11,7 +11,7 @@ General
 -  Added new module `CLI` which contains the CLI interface for all scripts
 -  Scripts are now wrappers around the CLI module
 -  Rename `AegeanTools.fits_interp` to `AegeanTools.fits_tools`
--  Remove the `fits_image.FitsImage` class 
+-  Remove the `fits_image.FitsImage` class
 -  Move functions from `AegeanTools.fits_image` into `AegeanTools.fits_tools`
 -  Remove dependency on `pprocess` and remove it from this repo
 -  Added a build script in `containers/` for making docker images of AegeanTools
@@ -120,12 +120,12 @@ Aegean
 
 General
 -  drop support for python <2.7
- 
+
 Aegean
 -  Support for lmfit v 0.9.15 and above (affects priorized fitting only)
 -  force `psf_pa` to be a float (ie 0.0) when BPA is not supplied
 -  ensure that `err_*` columns are always reported as floats (ie errs are now -1.0)
--  report filename of interest when region files can't be found 
+-  report filename of interest when region files can't be found
 
 BANE
 -  `filter_image` will now return maps and saving to a file is optional

@@ -115,10 +115,17 @@ extend-select = [
 ignore = [
   "PLR09",    # Too many <...>
   "PLR2004",  # Magic value used in comparison
+  "G004",     # Logging statement uses f-string
+  "PTH",
+  "SIM115",
+  "B904",
+  "E741",
+  "G003",
+  "G001",
+  "PLW0603"
 ]
 isort.required-imports = ["from __future__ import annotations"]
 # Uncomment if using a _compat.typing backport
-# typing-modules = ["jolly_roger._compat.typing"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["T20"]
+"tests/**" = ["ALL"]

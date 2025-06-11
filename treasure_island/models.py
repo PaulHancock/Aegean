@@ -1,8 +1,8 @@
-#! /usr/bin/env python
 """
 Different types of sources that Aegean is able to fit
 
 """
+
 from __future__ import annotations
 
 import uuid
@@ -50,16 +50,32 @@ class SimpleSource:
     --------
     :mod:`AegeanTools.flags`
     """
-    header = "#RA           DEC          Flux      err     a     b         pa     flags\n" + \
-             "#                        Jy/beam   Jy/beam   ''    ''        deg  ZWNCPES\n" + \
-             "#========================================================================"
 
-    formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} " + \
-                "{0.err_peak_flux: 8.6f} {0.a:5.2f} {0.b:5.2f} " + \
-                "{0.pa:6.1f} {0.flags:07b}"
-    names = ['background', 'local_rms', 'ra', 'dec', 'peak_flux',
-             'err_peak_flux', 'flags', 'peak_pixel', 'a', 'b',
-             'pa', 'uuid']
+    header = (
+        "#RA           DEC          Flux      err     a     b         pa     flags\n"
+        + "#                        Jy/beam   Jy/beam   ''    ''        deg  ZWNCPES\n"
+        + "#========================================================================"
+    )
+
+    formatter = (
+        "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} "
+        + "{0.err_peak_flux: 8.6f} {0.a:5.2f} {0.b:5.2f} "
+        + "{0.pa:6.1f} {0.flags:07b}"
+    )
+    names = [  # noqa: RUF012 TODO: Type as typing.ClassVar
+        "background",
+        "local_rms",
+        "ra",
+        "dec",
+        "peak_flux",
+        "err_peak_flux",
+        "flags",
+        "peak_pixel",
+        "a",
+        "b",
+        "pa",
+        "uuid",
+    ]
     galactic = False
 
     def __init__(self):
@@ -185,18 +201,38 @@ class IslandSource(SimpleSource):
     :mod:`AegeanTools.flags`
 
     """
-    names = ['island', 'components', 'background', 'local_rms', 'ra_str',
-             'dec_str', 'ra', 'dec', 'peak_flux', 'int_flux', 'err_int_flux',
-             'eta', 'x_width', 'y_width', 'max_angular_size', 'pa',
-             'pixels', 'area', 'beam_area', 'flags', 'uuid']
+
+    names = [  # noqa: RUF012 TODO: Type as typing.ClassVar
+        "island",
+        "components",
+        "background",
+        "local_rms",
+        "ra_str",
+        "dec_str",
+        "ra",
+        "dec",
+        "peak_flux",
+        "int_flux",
+        "err_int_flux",
+        "eta",
+        "x_width",
+        "y_width",
+        "max_angular_size",
+        "pa",
+        "pixels",
+        "area",
+        "beam_area",
+        "flags",
+        "uuid",
+    ]
 
     def __init__(self):
         SimpleSource.__init__(self)
         self.island = 0  # island number
         # background = None # local background zero point
         # local_rms= None #local image rms
-        self.ra_str = ''  # str
-        self.dec_str = ''  # str
+        self.ra_str = ""  # str
+        self.dec_str = ""  # str
         # ra = None # degrees
         # dec = None # degrees
         # peak_flux = None # Jy/beam
@@ -222,17 +258,17 @@ class IslandSource(SimpleSource):
         return f"({self.island:d})"
 
     def __eq__(self, other):
-        if hasattr(other, 'island'):
+        if hasattr(other, "island"):
             return self.island == other.island
         return False
 
     def __ne__(self, other):
-        if hasattr(other, 'island'):
+        if hasattr(other, "island"):
             return self.island != other.island
         return True
 
     def __lt__(self, other):
-        if hasattr(other, 'island'):
+        if hasattr(other, "island"):
             return self.island < other.island
         return True
 
@@ -240,7 +276,7 @@ class IslandSource(SimpleSource):
         return self.__lt__(other) or self.__eq__(other)
 
     def __gt__(self, other):
-        if hasattr(other, 'island'):
+        if hasattr(other, "island"):
             return self.island > other.island
         return False
 
@@ -305,26 +341,54 @@ class ComponentSource(SimpleSource):
     :mod:`AegeanTools.flags`
 
     """
+
     # header for the output
-    header = "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err    flags\n" + \
-             "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   ZWNCPES\n" + \
-             "#============================================================================================================================================================================================"
+    header = (
+        "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err    flags\n"
+        + "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   ZWNCPES\n"
+        + "#============================================================================================================================================================================================"
+    )
 
     # formatting strings for making nice output
-    formatter = "({0.island:04d},{0.source:02d}) {0.background: 8.6f} " + \
-                "{0.local_rms: 8.6f} {0.ra_str:12s} {0.dec_str:12s} " + \
-                "{0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} " + \
-                "{0.err_dec: 9.7f} {0.peak_flux: 8.6f} " + \
-                "{0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} " + \
-                "{0.err_int_flux: 8.6f} {0.a:5.2f} {0.err_a:5.2f} " + \
-                "{0.b:5.2f} {0.err_b:5.2f} {0.pa:6.1f} {0.err_pa:5.1f}   " + \
-                "{0.flags:07b}"
-    names = ['island', 'source', 'background', 'local_rms',
-             'ra_str', 'dec_str', 'ra', 'err_ra', 'dec', 'err_dec',
-             'peak_flux', 'err_peak_flux', 'int_flux', 'err_int_flux',
-             'a', 'err_a', 'b', 'err_b', 'pa', 'err_pa',
-             'flags', 'residual_mean', 'residual_std',
-             'uuid', 'psf_a', 'psf_b', 'psf_pa']
+    formatter = (
+        "({0.island:04d},{0.source:02d}) {0.background: 8.6f} "
+        + "{0.local_rms: 8.6f} {0.ra_str:12s} {0.dec_str:12s} "
+        + "{0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} "
+        + "{0.err_dec: 9.7f} {0.peak_flux: 8.6f} "
+        + "{0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} "
+        + "{0.err_int_flux: 8.6f} {0.a:5.2f} {0.err_a:5.2f} "
+        + "{0.b:5.2f} {0.err_b:5.2f} {0.pa:6.1f} {0.err_pa:5.1f}   "
+        + "{0.flags:07b}"
+    )
+    names = [  # noqa: RUF012 TODO: Type as typing.ClassVar
+        "island",
+        "source",
+        "background",
+        "local_rms",
+        "ra_str",
+        "dec_str",
+        "ra",
+        "err_ra",
+        "dec",
+        "err_dec",
+        "peak_flux",
+        "err_peak_flux",
+        "int_flux",
+        "err_int_flux",
+        "a",
+        "err_a",
+        "b",
+        "err_b",
+        "pa",
+        "err_pa",
+        "flags",
+        "residual_mean",
+        "residual_std",
+        "uuid",
+        "psf_a",
+        "psf_b",
+        "psf_pa",
+    ]
 
     def __init__(self):
         SimpleSource.__init__(self)
@@ -332,8 +396,8 @@ class ComponentSource(SimpleSource):
         self.source = 0  # source number
         # background = None # local background zero point
         # local_rms= None #local image rms
-        self.ra_str = ''  # str
-        self.dec_str = ''  # str
+        self.ra_str = ""  # str
+        self.dec_str = ""  # str
         # ra = None # degrees
         self.err_ra = np.nan  # degrees
         # dec = None # degrees
@@ -365,22 +429,22 @@ class ComponentSource(SimpleSource):
     def __eq__(self, other):
         if self.island != other.island:
             return False
-        if not hasattr(other, 'source'):
+        if not hasattr(other, "source"):
             return False
         return self.source == other.source
 
     def __ne__(self, other):
         if self.island != other.island:
             return True
-        if not hasattr(other, 'source'):
+        if not hasattr(other, "source"):
             return True
         return self.source != other.source
 
     def __lt__(self, other):
-        if not hasattr(other, 'island'):
+        if not hasattr(other, "island"):
             return True
         # Islands are always less than components
-        if not hasattr(other, 'source'):
+        if not hasattr(other, "source"):
             return True
         if self.island < other.island:
             return True
@@ -389,10 +453,10 @@ class ComponentSource(SimpleSource):
         return None
 
     def __le__(self, other):
-        if not hasattr(other, 'island'):
+        if not hasattr(other, "island"):
             return True
         # Islands are always less than components
-        if not hasattr(other, 'source'):
+        if not hasattr(other, "source"):
             return True
         if self.island < other.island:
             return True
@@ -401,10 +465,10 @@ class ComponentSource(SimpleSource):
         return None
 
     def __gt__(self, other):
-        if not hasattr(other, 'island'):
+        if not hasattr(other, "island"):
             return False
         # Islands are always less than components
-        if not hasattr(other, 'source'):
+        if not hasattr(other, "source"):
             return False
         if self.island > other.island:
             return True
@@ -413,10 +477,10 @@ class ComponentSource(SimpleSource):
         return None
 
     def __ge__(self, other):
-        if not hasattr(other, 'island'):
+        if not hasattr(other, "island"):
             return False
         # Islands are always less than components
-        if not hasattr(other, 'source'):
+        if not hasattr(other, "source"):
             return False
         if self.island > other.island:
             return True
@@ -513,9 +577,10 @@ class PixelIsland:
         """
         if len(data.shape) != self.dim:
             raise AssertionError(
-                ("mask shape {0} is of the wrong dimension. " +
-                 "Expecting {1}").format(data.shape, self.dim)
+                ("mask shape {0} is of the wrong dimension. " + "Expecting {1}").format(
+                    data.shape, self.dim
                 )
+            )
         self.mask = data
 
     def calc_bounding_box(self, data, offsets):
@@ -535,9 +600,7 @@ class PixelIsland:
         """
         if len(offsets) != self.dim:
             msg = f"{len(offsets)} offsets were passed but {self.dim} are required"
-            raise AssertionError(
-                msg
-                    )
+            raise AssertionError(msg)
         # TODO: Figure out 3d boxes
         # set the bounding box one dimension at a time
         ndrow = np.any(data, axis=0)
@@ -548,7 +611,7 @@ class PixelIsland:
         cmin, cmax = np.where(ndcol)[0][[0, -1]]
         self.bounding_box[0][0] = offsets[0] + cmin
         self.bounding_box[0][1] = offsets[0] + cmax + 1
-        self.set_mask(data[rmin:rmax+1, cmin:cmax+1])
+        self.set_mask(data[rmin : rmax + 1, cmin : cmax + 1])
 
 
 class IslandFittingData:
@@ -576,9 +639,9 @@ class IslandFittingData:
         If true then also measure properties of the island.
     """
 
-    def __init__(self, isle_num=0, i=None,
-                 scalars=None, offsets=(0, 0, 1, 1),
-                 doislandflux=False):
+    def __init__(
+        self, isle_num=0, i=None, scalars=None, offsets=(0, 0, 1, 1), doislandflux=False
+    ):
         self.isle_num = isle_num
         self.i = i
         self.scalars = scalars

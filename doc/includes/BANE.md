@@ -4,8 +4,8 @@
 
 Aegean has an inbuilt background and noise calculation algorithm (the zones algorithm) which is very basic and is useful for images that have a slowly changing background and noise. For images with more complicated background and noise statistics it is advised that you use an external program to pre-compute these maps and then feed them into Aegean with the --background and --noise flags. Since I have not come across a program that can calculate these images in a speedy manner I have built one myself.
 
-## Aim 
-The quick-and-dirty method for calculating the background and noise of an image is to pass a sliding boxcar filter over the image and, for each pixel, calculate the mean and standard deviation of all pixels within a box centred on that pixel. The problem with this approach is two-fold: one - although it is easy to code it is very time consuming, and two - the standard deviation is biased in the presence of sources. 
+## Aim
+The quick-and-dirty method for calculating the background and noise of an image is to pass a sliding boxcar filter over the image and, for each pixel, calculate the mean and standard deviation of all pixels within a box centred on that pixel. The problem with this approach is two-fold: one - although it is easy to code it is very time consuming, and two - the standard deviation is biased in the presence of sources.
 
 The aim of BANE is to provide an accurate measure of the background and noise properties of an image, and to do so in a relatively short amount of time.
 

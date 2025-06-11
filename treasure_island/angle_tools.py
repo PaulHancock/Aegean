@@ -1,5 +1,3 @@
-#! /usr/bin/env python
-
 """
 Tools for manipulating angles on the surface of a sphere
 - distance
@@ -9,6 +7,7 @@ Tools for manipulating angles on the surface of a sphere
 
 also angle <-> string conversion tools for Aegean
 """
+
 from __future__ import annotations
 
 __author__ = "Paul Hancock"
@@ -34,7 +33,7 @@ def ra2dec(ra):
     ra : float
         The RA in degrees.
     """
-    return dec2dec(ra)*15
+    return dec2dec(ra) * 15
 
 
 def dec2dec(dec):
@@ -53,10 +52,10 @@ def dec2dec(dec):
     dec : float
         The Dec in degrees.
     """
-    d = dec.replace(':', ' ').split()
+    d = dec.replace(":", " ").split()
     if len(d) == 2:
-        d.append('0.0')
-    if d[0].startswith('-') or float(d[0]) < 0:
+        d.append("0.0")
+    if d[0].startswith("-") or float(d[0]) < 0:
         return float(d[0]) - float(d[1]) / 60.0 - float(d[2]) / 3600.0
     return float(d[0]) + float(d[1]) / 60.0 + float(d[2]) / 3600.0
 
@@ -77,13 +76,13 @@ def dec2dms(x):
         or XX:XX:XX.XX if x is not finite.
     """
     if not np.isfinite(x):
-        return 'XX:XX:XX.XX'
-    sign = '-' if x < 0 else '+'
+        return "XX:XX:XX.XX"
+    sign = "-" if x < 0 else "+"
     x = abs(x)
     d = math.floor(x)
     m = math.floor((x - d) * 60)
     s = float(((x - d) * 60 - m) * 60)
-    return f'{sign}{d:02d}:{m:02d}:{s:05.2f}'
+    return f"{sign}{d:02d}:{m:02d}:{s:05.2f}"
 
 
 def dec2hms(x):
@@ -102,7 +101,7 @@ def dec2hms(x):
         or XX:XX:XX.XX if x is not finite.
     """
     if not np.isfinite(x):
-        return 'XX:XX:XX.XX'
+        return "XX:XX:XX.XX"
     # wrap negative RA's
     if x < 0:
         x += 360
@@ -111,7 +110,7 @@ def dec2hms(x):
     x = (x - h) * 60
     m = int(x)
     s = (x - m) * 60
-    return f'{h:02d}:{m:02d}:{s:05.2f}'
+    return f"{h:02d}:{m:02d}:{s:05.2f}"
 
 
 # The following functions are explained at
@@ -146,9 +145,11 @@ def gcd(ra1, dec1, ra2, dec2):
     dlon = ra2 - ra1
     dlat = dec2 - dec1
     a = np.sin(np.radians(dlat) / 2) ** 2
-    a += np.cos(np.radians(dec1)) \
-        * np.cos(np.radians(dec2)) \
+    a += (
+        np.cos(np.radians(dec1))
+        * np.cos(np.radians(dec2))
         * np.sin(np.radians(dlon) / 2) ** 2
+    )
     return np.degrees(2 * np.arcsin(np.minimum(1, np.sqrt(a))))
 
 
@@ -170,7 +171,7 @@ def bear(ra1, dec1, ra2, dec2):
     """
     rdec1 = np.radians(dec1)
     rdec2 = np.radians(dec2)
-    rdlon = np.radians(ra2-ra1)
+    rdlon = np.radians(ra2 - ra1)
     y = np.sin(rdlon) * np.cos(rdec2)
     x = np.cos(rdec1) * np.sin(rdec2)
     x -= np.sin(rdec1) * np.cos(rdec2) * np.cos(rdlon)
@@ -196,15 +197,13 @@ def translate(ra, dec, r, theta):
         The translated position (degrees).
     """
     factor = np.sin(np.radians(dec)) * np.cos(np.radians(r))
-    factor += np.cos(np.radians(dec)) \
-            * np.sin(np.radians(r)) \
-            * np.cos(np.radians(theta))
+    factor += (
+        np.cos(np.radians(dec)) * np.sin(np.radians(r)) * np.cos(np.radians(theta))
+    )
     dec_out = np.degrees(np.arcsin(factor))
 
-    y = np.sin(np.radians(theta)) * np.sin(np.radians(r)) \
-        * np.cos(np.radians(dec))
-    x = np.cos(np.radians(r)) - np.sin(np.radians(dec)) \
-        * np.sin(np.radians(dec_out))
+    y = np.sin(np.radians(theta)) * np.sin(np.radians(r)) * np.cos(np.radians(dec))
+    x = np.cos(np.radians(r)) - np.sin(np.radians(dec)) * np.sin(np.radians(dec_out))
     ra_out = ra + np.degrees(np.arctan2(y, x))
     return ra_out, dec_out
 
@@ -299,8 +298,7 @@ def translate_rhumb(ra, dec, r, theta):
     if abs(dphi) < 1e-9:
         q = np.cos(phi1)
     else:
-        dpsi = np.log(np.tan(np.pi / 4 + phi2 / 2)
-                      / np.tan(np.pi / 4 + phi1 / 2))
+        dpsi = np.log(np.tan(np.pi / 4 + phi2 / 2) / np.tan(np.pi / 4 + phi1 / 2))
         q = dphi / dpsi
 
     lambda1 = np.radians(ra)

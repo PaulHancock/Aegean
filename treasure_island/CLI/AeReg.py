@@ -12,9 +12,9 @@ from treasure_island import wcs_helpers
 from treasure_island.catalogs import load_table, save_catalog, table_to_source_list
 from treasure_island.cluster import check_attributes_for_regroup, regroup_dbscan, resize
 
-__author__ = ['PaulHancock']
-__date__ = '2021-09-09'
-__version__ = '0.9'
+__author__ = ["PaulHancock"]
+__date__ = "2021-09-09"
+__version__ = "0.9"
 
 
 def main(argv=()):
@@ -22,32 +22,56 @@ def main(argv=()):
     A regrouping tool to accompany the Aegean source finding program.
     """
 
-    parser = argparse.ArgumentParser(prog='regroup', prefix_chars='-')
+    parser = argparse.ArgumentParser(prog="regroup", prefix_chars="-")
     group1 = parser.add_argument_group("Required")
-    group1.add_argument('--input', dest='input', type=str,
-                        required=True, help='The input catalogue.')
-    group1.add_argument("--table", dest='tables', type=str,
-                        required=True,
-                        help="Table outputs, format inferred from extension.")
+    group1.add_argument(
+        "--input", dest="input", type=str, required=True, help="The input catalogue."
+    )
+    group1.add_argument(
+        "--table",
+        dest="tables",
+        type=str,
+        required=True,
+        help="Table outputs, format inferred from extension.",
+    )
 
     group2 = parser.add_argument_group("Clustering options")
-    group2.add_argument('--eps', dest='eps', default=4, type=float,
-                        help="The grouping parameter epsilon (~arcmin)")
-    group2.add_argument('--noregroup', dest='regroup', default=True,
-                        action='store_false',
-                        help='Do not perform regrouping (default False)')
+    group2.add_argument(
+        "--eps",
+        dest="eps",
+        default=4,
+        type=float,
+        help="The grouping parameter epsilon (~arcmin)",
+    )
+    group2.add_argument(
+        "--noregroup",
+        dest="regroup",
+        default=True,
+        action="store_false",
+        help="Do not perform regrouping (default False)",
+    )
 
     group3 = parser.add_argument_group("Scaling options")
-    group3.add_argument('--ratio', dest='ratio', default=None, type=float,
-                        help="The ratio of synthesized beam sizes "
-                             + "(image psf / input catalog psf).")
-    group3.add_argument('--psfheader', dest='psfheader', default=None,
-                        type=str,
-                        help="A file from which the *target* psf is read.")
+    group3.add_argument(
+        "--ratio",
+        dest="ratio",
+        default=None,
+        type=float,
+        help="The ratio of synthesized beam sizes "
+        + "(image psf / input catalog psf).",
+    )
+    group3.add_argument(
+        "--psfheader",
+        dest="psfheader",
+        default=None,
+        type=str,
+        help="A file from which the *target* psf is read.",
+    )
 
     group4 = parser.add_argument_group("Other options")
-    group4.add_argument('--debug', dest='debug', action='store_true',
-                        default=False, help="Debug mode.")
+    group4.add_argument(
+        "--debug", dest="debug", action="store_true", default=False, help="Debug mode."
+    )
 
     options = parser.parse_args(args=argv)
 
@@ -56,8 +80,9 @@ def main(argv=()):
     # configure logging
     logging_level = logging.DEBUG if options.debug else logging.INFO
     log = logging.getLogger("Aegean")
-    logging.basicConfig(level=logging_level,
-                        format="%(process)d:%(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging_level, format="%(process)d:%(levelname)s %(message)s"
+    )
     log.info(f"This is regroup {__version__}-({__date__})")
     log.debug(f"Run as:\n{invocation_string}")
 
@@ -93,7 +118,7 @@ def main(argv=()):
             log.error("Cannot use catalog")
             return 1
         log.debug(f"Regrouping with eps={options.eps}[arcmin]")
-        eps = np.sin(np.radians(options.eps/60))
+        eps = np.sin(np.radians(options.eps / 60))
         groups = regroup_dbscan(sources, eps=eps)
         sources = [source for group in groups for source in group]
         log.debug(f"{len(sources)} sources regrouped")
@@ -101,11 +126,13 @@ def main(argv=()):
         log.debug("Not regrouping")
 
     if options.tables:
-        meta = {"PROGRAM": "regroup",
-                "PROGVER": f"{__version__}-({__date__})",
-                "CATFILE": filename,
-                "RUN-AS": invocation_string}
-        for t in options.tables.split(','):
+        meta = {
+            "PROGRAM": "regroup",
+            "PROGVER": f"{__version__}-({__date__})",
+            "CATFILE": filename,
+            "RUN-AS": invocation_string,
+        }
+        for t in options.tables.split(","):
             log.debug(f"writing {t}")
             save_catalog(t, sources, meta=meta)
     return 0

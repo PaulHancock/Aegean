@@ -253,8 +253,8 @@ The parameters that are free/fixed in the fitting process depends on the 'level'
 3. Everything is allowed to vary.
 
 In the case that the psf of the input catalogue and the supplied image are different there are three options for describing this difference:
- 
-1. Use the `--ratio` option, which specifies the ratio of major axes (image psf / catalogue psf). This method works well for small images where the psf doesn't really change over the image, or when the difference is small. 
+
+1. Use the `--ratio` option, which specifies the ratio of major axes (image psf / catalogue psf). This method works well for small images where the psf doesn't really change over the image, or when the difference is small.
 2. Supply a psf map for the input catalogue using the `--catpsf` option. This will give you ultimate fine control over what the psf of your input catalogue is.
 3. Include the psf parameters in the input catalogue as columns `psf_a, psf_b, psf_pa`
 
@@ -266,9 +266,9 @@ Any [[format|Output-Formats]] that Aegean can write, is an acceptable input form
 The easiest way to create an input table is to modify and existing catalogue.
 The following columns are used for priorized fitting:
 
-- Required:  
+- Required:
   - `ra`, `dec`, `peak_flux`, `a`, `b`, `pa`
-- Optional: 
+- Optional:
   - `psf_a`, `psf_b`, `psf_pa` used for re-scaling the source shapes.
   - `uuid` copied from input to output catalogues
   - `err_ra`, `err_dec` copied from input to output catalogues when positions are not being fit

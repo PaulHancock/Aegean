@@ -1,7 +1,7 @@
-#! /usr/bin/env python
 """
 Describe sky areas as a collection of HEALPix pixels
 """
+
 from __future__ import annotations
 
 import _pickle as cPickle
@@ -39,7 +39,7 @@ class Region:
 
     def __init__(self, maxdepth=11):
         self.maxdepth = maxdepth
-        self.pixeldict = {i: set() for i in range(1, maxdepth+1)}
+        self.pixeldict = {i: set() for i in range(1, maxdepth + 1)}
         self.demoted = set()
 
     @classmethod
@@ -57,7 +57,7 @@ class Region:
         region : `AegeanTools.regions.Region`
             A region object
         """
-        return cPickle.load(open(mimfile, 'rb'))
+        return cPickle.load(open(mimfile, "rb"))
 
     def save(self, mimfile):
         """
@@ -68,7 +68,8 @@ class Region:
         mimfile : str
             File to write
         """
-        cPickle.dump(self, open(mimfile, 'wb'), protocol=2)
+        with open(mimfile, "wb") as f:
+            cPickle.dump(self, f, protocol=2)
 
     def __repr__(self):
         r = "Region with maximum depth {0}, and total area {1:5.2g} deg^2"
@@ -119,16 +120,14 @@ class Region:
         """
         if not (len(positions) >= 3):
             msg = "A minimum of three coordinate pairs are required"
-            raise AssertionError(
-                msg)
+            raise AssertionError(msg)
 
         if depth is None or depth > self.maxdepth:
             depth = self.maxdepth
 
         ras, decs = np.array(list(zip(*positions, strict=False)))
         sky = self.radec2sky(ras, decs)
-        pix = hp.query_polygon(2**depth, self.sky2vec(sky),
-                               inclusive=True, nest=True)
+        pix = hp.query_polygon(2**depth, self.sky2vec(sky), inclusive=True, nest=True)
         self.add_pixels(pix, depth)
         self._renorm()
 
@@ -164,9 +163,8 @@ class Region:
             The area of the region.
         """
         area = 0
-        for d in range(1, self.maxdepth+1):
-            area += len(self.pixeldict[d]) * \
-                hp.nside2pixarea(2**d, degrees=degrees)
+        for d in range(1, self.maxdepth + 1):
+            area += len(self.pixeldict[d]) * hp.nside2pixarea(2**d, degrees=degrees)
         return area
 
     def get_demoted(self):
@@ -194,9 +192,9 @@ class Region:
             pd = self.pixeldict
             for d in range(1, self.maxdepth):
                 for p in pd[d]:
-                    pd[d+1].update({4*p, 4*p+1, 4*p+2, 4*p+3})
+                    pd[d + 1].update({4 * p, 4 * p + 1, 4 * p + 2, 4 * p + 3})
                 pd[d] = set()  # clear the pixels from this level
-            self.demoted = pd[d+1]
+            self.demoted = pd[d + 1]
 
     def _renorm(self):
         """
@@ -211,12 +209,12 @@ class Region:
             plist = self.pixeldict[d].copy()
             for p in plist:
                 if p % 4 == 0:
-                    nset = {p, p+1, p+2, p+3}
-                    if p+1 in plist and p+2 in plist and p+3 in plist:
+                    nset = {p, p + 1, p + 2, p + 3}
+                    if p + 1 in plist and p + 2 in plist and p + 3 in plist:
                         # remove the four pixels from this level
                         self.pixeldict[d].difference_update(nset)
                         # add a new pixel to the next level up
-                        self.pixeldict[d-1].add(p/4)
+                        self.pixeldict[d - 1].add(p / 4)
         self.demoted = set()
 
     def sky_within(self, ra, dec, degin=False):
@@ -244,8 +242,7 @@ class Region:
 
         theta_phi = self.sky2ang(sky)
         # Set values that are nan to be zero and record a mask
-        mask = np.bitwise_not(np.logical_and.reduce(
-            np.isfinite(theta_phi), axis=1))
+        mask = np.bitwise_not(np.logical_and.reduce(np.isfinite(theta_phi), axis=1))
         theta_phi[mask, :] = 0
 
         theta, phi = theta_phi.transpose()
@@ -270,16 +267,16 @@ class Region:
             Default = True.
         """
         # merge the pixels that are common to both
-        for d in range(1, min(self.maxdepth, other.maxdepth)+1):
+        for d in range(1, min(self.maxdepth, other.maxdepth) + 1):
             self.add_pixels(other.pixeldict[d], d)
 
         # if the other region is at higher resolution, then include a degraded
         # version of the remaining pixels.
         if self.maxdepth < other.maxdepth:
-            for d in range(self.maxdepth+1, other.maxdepth+1):
+            for d in range(self.maxdepth + 1, other.maxdepth + 1):
                 for p in other.pixeldict[d]:
                     # promote this pixel to self.maxdepth
-                    pp = p/4**(d-self.maxdepth)
+                    pp = p / 4 ** (d - self.maxdepth)
                     self.pixeldict[self.maxdepth].add(pp)
         if renorm:
             self._renorm()
@@ -360,27 +357,29 @@ class Region:
         filename : str
             File to write
         """
-        with open(filename, 'w') as out:
-            for d in range(1, self.maxdepth+1):
+        with open(filename, "w") as out:
+            for d in range(1, self.maxdepth + 1):
                 for p in self.pixeldict[d]:
                     line = "fk5; polygon("
                     # the following int() gets around some problems with
                     # np.int64 that exist prior to numpy v 1.8.1
                     vectors = list(
-                        zip(*hp.boundaries(2**d, int(p), step=1, nest=True), strict=False))
+                        zip(
+                            *hp.boundaries(2**d, int(p), step=1, nest=True),
+                            strict=False,
+                        )
+                    )
                     positions = []
                     for sky in self.vec2sky(np.array(vectors), degrees=True):
                         ra, dec = sky
-                        pos = SkyCoord(ra/15, dec, unit=(u.degree, u.degree))
-                        positions.append(
-                            pos.ra.to_string(sep=':', precision=2))
-                        positions.append(
-                            pos.dec.to_string(sep=':', precision=2))
-                    line += ','.join(positions)
+                        pos = SkyCoord(ra / 15, dec, unit=(u.degree, u.degree))
+                        positions.append(pos.ra.to_string(sep=":", precision=2))
+                        positions.append(pos.dec.to_string(sep=":", precision=2))
+                    line += ",".join(positions)
                     line += ")"
                     print(line, file=out)
 
-    def write_fits(self, filename, moctool=''):
+    def write_fits(self, filename, moctool=""):
         """
         Write a fits file representing the MOC of this region.
 
@@ -393,25 +392,26 @@ class Region:
             String to be written to fits header with key "MOCTOOL".
             Default = ''
         """
-        datafile = os.path.join(os.path.dirname(
-            os.path.abspath(__file__)), 'data', 'MOC.fits')
+        datafile = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "data", "MOC.fits"
+        )
         hdulist = fits.open(datafile)
-        cols = fits.Column(name='NPIX', array=self._uniq(), format='1K')
+        cols = fits.Column(name="NPIX", array=self._uniq(), format="1K")
         tbhdu = fits.BinTableHDU.from_columns([cols])
         hdulist[1] = tbhdu
-        hdulist[1].header['PIXTYPE'] = ('HEALPIX ', 'HEALPix magic code')
-        hdulist[1].header['ORDERING'] = ('NUNIQ ', 'NUNIQ coding method')
-        hdulist[1].header['COORDSYS'] = ('C ', 'ICRS reference frame')
-        hdulist[1].header['MOCORDER'] = (
-            self.maxdepth, 'MOC resolution (best order)')
-        hdulist[1].header['MOCTOOL'] = (moctool, 'Name of the MOC generator')
-        hdulist[1].header['MOCTYPE'] = (
-            'CATALOG', 'Source type (IMAGE or CATALOG)')
-        hdulist[1].header['MOCID'] = (' ', 'Identifier of the collection')
-        hdulist[1].header['ORIGIN'] = (' ', 'MOC origin')
+        hdulist[1].header["PIXTYPE"] = ("HEALPIX ", "HEALPix magic code")
+        hdulist[1].header["ORDERING"] = ("NUNIQ ", "NUNIQ coding method")
+        hdulist[1].header["COORDSYS"] = ("C ", "ICRS reference frame")
+        hdulist[1].header["MOCORDER"] = (self.maxdepth, "MOC resolution (best order)")
+        hdulist[1].header["MOCTOOL"] = (moctool, "Name of the MOC generator")
+        hdulist[1].header["MOCTYPE"] = ("CATALOG", "Source type (IMAGE or CATALOG)")
+        hdulist[1].header["MOCID"] = (" ", "Identifier of the collection")
+        hdulist[1].header["ORIGIN"] = (" ", "MOC origin")
         time = datetime.datetime.utcnow()
-        hdulist[1].header['DATE'] = (datetime.datetime.strftime(
-            time, format="%Y-%m-%dT%H:%m:%SZ"), 'MOC creation date')
+        hdulist[1].header["DATE"] = (
+            datetime.datetime.strftime(time, format="%Y-%m-%dT%H:%m:%SZ"),
+            "MOC creation date",
+        )
         hdulist.writeto(filename, overwrite=True)
 
     def _uniq(self):
@@ -426,7 +426,7 @@ class Region:
         """
         pd = []
         for d in range(1, self.maxdepth):
-            pd.extend(int(4**(d+1) + x) for x in self.pixeldict[d])
+            pd.extend(int(4 ** (d + 1) + x) for x in self.pixeldict[d])
         return sorted(pd)
 
     @staticmethod
@@ -474,7 +474,7 @@ class Region:
         except AttributeError as _:
             theta_phi = np.array(sky)
         theta_phi[:, [1, 0]] = theta_phi[:, [0, 1]]
-        theta_phi[:, 0] = np.pi/2 - theta_phi[:, 0]
+        theta_phi[:, 0] = np.pi / 2 - theta_phi[:, 0]
         # # force 0<=theta<=2pi
         # theta_phi[:, 0] -= 2*np.pi*(theta_phi[:, 0]//(2*np.pi))
         # # and now -pi<=theta<=pi
@@ -529,7 +529,7 @@ class Region:
         """
         theta, phi = hp.vec2ang(vec)
         ra = phi
-        dec = np.pi/2-theta
+        dec = np.pi / 2 - theta
 
         if degrees:
             ra = np.degrees(ra)

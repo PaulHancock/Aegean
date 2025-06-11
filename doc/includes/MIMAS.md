@@ -16,7 +16,7 @@ MIMAS was created with the following three goals in mind:
 
 ## Methodology
 
-MIMAS is a wrapper script that uses the regions module that is now part of AegeanTools. The regions module contains a suite of unit tests and a single class called Region. The Region class is built on top of the [HealPy](https://github.com/healpy/healpy) module, which is in turn a wrapper around the [HEALPix](http://adsabs.harvard.edu/cgi-bin/nph-bib_query?bibcode=2005ApJ...622..759G&db_key=AST&high=41069202cf02947) software. 
+MIMAS is a wrapper script that uses the regions module that is now part of AegeanTools. The regions module contains a suite of unit tests and a single class called Region. The Region class is built on top of the [HealPy](https://github.com/healpy/healpy) module, which is in turn a wrapper around the [HEALPix](http://adsabs.harvard.edu/cgi-bin/nph-bib_query?bibcode=2005ApJ...622..759G&db_key=AST&high=41069202cf02947) software.
 
 
 ## Usage
@@ -92,7 +92,7 @@ Extra options:
 Regions are added/subtracted in the following order, +r -r +c -c +p -p. This means that you might have to take multiple passes to construct overly complicated regions.
 ```
 
-### Data model and operation 
+### Data model and operation
 
 At the most basic level, The Regions class takes a description of a sky area, either a circle or a polygon, and converts it into a list of HELAPix pixels. These pixels are stored as a python set, making it easy to implement set operations on these regions. HEALpix is a parameterization of the sky that maps diamond shaped regions of equal area, onto a pixel number. There are many interesting properties of the nested HEALPix parameterization that make it easy to implement the Region class. Firstly, HEALPix can represent areas of sky that are as coarse as 1/12th of the entire sky, to regions that are 1/2^30 times smaller. A depth or resolution parameter of 2^12 represents a pixel size of less than one arcminute. By making use of different resolutions of pixels, it is possible to represent any region in an efficient manner. The sky area that is represented by a Region is a combination of pixels of different resolutions, with the smallest resolution being supplied by the user.
 

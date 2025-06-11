@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 BANE: Background and Noise Estimation
 ...but with FFTs
@@ -14,7 +13,6 @@ from __future__ import annotations
 # TODO: Images come out with a slight offset. Need to figure out why.
 
 __author__ = ["Alec Thomson", "Tim Galvin"]
-__version__ = "0.0.0"
 
 import logging
 import multiprocessing as mp
@@ -44,6 +42,7 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
+rng = np.random.default_rng()
 
 @nb.njit(
     fastmath=True,
@@ -142,7 +141,6 @@ def fft_average(
         pad_x:-pad_x,
         pad_y:-pad_y,
     ]
-
 
 
 @nb.njit(
@@ -258,9 +256,7 @@ def get_kernel(
             logging.info(f"Pixels per beam: {pix_per_beam:0.1f}")
         except ValueError:
             msg = "Could not parse beam from header - try specifying step size"
-            raise ValueError(
-                msg
-            )
+            raise ValueError(msg)
 
     if step_size is None or step_size < 0:
         # Step size
@@ -422,9 +418,7 @@ def estimate_rms(
 
     else:
         msg = f"{mode} not supported as a clipping mode, available modes are `std` and `mad`. "
-        raise ValueError(
-            msg
-        )
+        raise ValueError(msg)
 
     cen_func = median_jit
 
@@ -450,7 +444,6 @@ def estimate_rms(
     x2 = (-b - np.sqrt(b**2 - 4.0 * a * (c - np.log10(0.5)))) / (2.0 * a)
     fwhm = np.abs(x1 - x2)
     return fwhm / 2.355
-
 
 
 def estimate_rms_astropy(image: NDArray[np.float32]):
@@ -530,7 +523,7 @@ def robust_bane(
         f"Masking {np.sum(mask)} ({np.sum(mask) / image.size * 100:0.1f}%) pixels with SNR > {clip_sigma}"
     )
     # Clip and fill sources with noise
-    image_mask[mask] = np.random.normal(
+    image_mask[mask] = rng.normal(
         loc=0, scale=rms_est, size=image_mask[mask].shape
     )
     if step_size_pix > 0:
@@ -934,7 +927,7 @@ def cli():
         "-v",
         "--version",
         action="version",
-        version=f"%(prog)s: {__doc__} -- version {__version__}",
+        version=f"%(prog)s: {__doc__}",
     )
     args = parser.parse_args()
 

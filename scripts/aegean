@@ -4,6 +4,8 @@ The Aegean source finding program.
 
 """
 
+from __future__ import annotations
+
 import sys
 
 from AegeanTools.CLI import aegean

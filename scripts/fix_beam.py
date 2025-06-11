@@ -3,6 +3,7 @@
 Script to fix the BEAM info for images created by AIPS
 Will read beam info from HISTORY and put it into the correct fits keywords
 """
+
 from __future__ import annotations
 
 __author__ = ["Guo Shaoguang", "Paul Hancock"]
@@ -55,7 +56,6 @@ if __name__ == "__main__":
     if not results.infile:
         parser.print_help()
         sys.exit()
-
 
     hdulist = load_file_or_hdu(results.infile)
     found = search_beam(hdulist)
