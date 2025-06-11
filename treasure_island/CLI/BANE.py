@@ -1,10 +1,12 @@
 #! /usr/bin/env python
 
 # standard imports
+from __future__ import annotations
+
 import argparse
 import os
 
-from treasure_island import BANE, __citation__
+from treasure_island import BANE
 
 __author__ = 'Paul Hancock'
 
@@ -53,7 +55,6 @@ def main(argv=()):
     options = parser.parse_args(args=argv)
 
     if options.cite:
-        print(__citation__)
         return 0
 
     if options.image is None:
@@ -66,10 +67,10 @@ def main(argv=()):
     logging.basicConfig(level=logging_level,
                         format="%(process)d:%(levelname)s %(message)s")
     logging.info(
-        "This is BANE {0}-({1})".format(BANE.__version__, BANE.__date__))
+        f"This is BANE {BANE.__version__}-({BANE.__date__})")
 
     if not os.path.exists(options.image):
-        logging.error("File not found: {0} ".format(options.image))
+        logging.error(f"File not found: {options.image} ")
         return 1
 
     if options.out_base is None:
@@ -79,8 +80,7 @@ def main(argv=()):
         bkgout = options.out_base + '_bkg.fits'
         rmsout = options.out_base + '_rms.fits'
         if os.path.exists(bkgout) and os.path.exists(rmsout):
-            logging.error("{0} and {1} exist and you said noclobber"
-                          "".format(bkgout, rmsout))
+            logging.error(f"{bkgout} and {rmsout} exist and you said noclobber")
             logging.error("Not running")
             return 1
 

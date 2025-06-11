@@ -2,34 +2,37 @@
 """
 Test fits_interp.py
 """
+from __future__ import annotations
 
 __author__ = 'Paul Hancock'
 
+import os
+
+import numpy as np
+from astropy.io import fits
+
 from treasure_island import fits_tools
-from treasure_island.wcs_helpers import WCSHelper
 from treasure_island.angle_tools import gcd
 from treasure_island.exceptions import AegeanError
-from astropy.io import fits
-import numpy as np
-import os
+from treasure_island.wcs_helpers import WCSHelper
 
 
 def test_load_file_or_hdu():
     """Test that we can 'open' either a file or HDU"""
     fname = 'tests/test_files/1904-66_AIT.fits'
     hdulist = fits.open(fname)
-    if not (fits_tools.load_file_or_hdu(hdulist) is hdulist):
+    if fits_tools.load_file_or_hdu(hdulist) is not hdulist:
         raise AssertionError()
 
 
 def test_compress():
     """Test the compression functionality"""
     # return None when the factor is not a positive integer
-    if not (fits_tools.compress(None, factor=-1) is None):
+    if fits_tools.compress(None, factor=-1) is not None:
         raise AssertionError()
-    if not (fits_tools.compress(None, factor=0.3) is None):
+    if fits_tools.compress(None, factor=0.3) is not None:
         raise AssertionError()
-    if not (fits_tools.compress(None, factor=0) is None):
+    if fits_tools.compress(None, factor=0) is not None:
         raise AssertionError()
     # test with factor = 10 for speed
     fname = 'tests/test_files/1904-66_AIT.fits'
@@ -48,11 +51,11 @@ def test_compress():
         raise AssertionError()
     # now strip CD2_2 and we should get error
     del hdulist[0].header['CD2_2']
-    if not (fits_tools.compress(hdulist, factor=10) is None):
+    if fits_tools.compress(hdulist, factor=10) is not None:
         raise AssertionError()
     # same for CD1_1
     del hdulist[0].header['CD1_1']
-    if not (fits_tools.compress(hdulist, factor=10) is None):
+    if fits_tools.compress(hdulist, factor=10) is not None:
         raise AssertionError()
 
 
@@ -65,12 +68,13 @@ def test_expand():
     expanded = fits_tools.expand(compressed)
 
     # the uncompressed hdu list is missing header keys so test that this gives the expected result
-    if not (expanded is hdulist):
+    if expanded is not hdulist:
         raise AssertionError()
 
     # ensure that the interpolation isn't completely incorrect
     if not np.all(expanded[0].data == 1.0):
-        raise AssertionError("image is not all 1.0")
+        msg = "image is not all 1.0"
+        raise AssertionError(msg)
 
     # now mix up the CDELT and CD keys
     # reload because we pass references
@@ -80,16 +84,17 @@ def test_expand():
     compressed[0].header['CD2_2'] = compressed[0].header['CDELT2']
     del compressed[0].header['CDELT2']
     if not (isinstance(fits_tools.expand(compressed), fits.HDUList)):
-        raise AssertionError("CD1_1/CD2_2 doesn't work")
+        msg = "CD1_1/CD2_2 doesn't work"
+        raise AssertionError(msg)
 
     # now strip CD2_2 and we should return None
     compressed = fits_tools.compress(fname, factor=10)
     del compressed[0].header['CDELT2']
-    if not (fits_tools.expand(compressed) is None):
+    if fits_tools.expand(compressed) is not None:
         raise AssertionError()
     # same for CD1_1
     del compressed[0].header['CDELT1']
-    if not (fits_tools.expand(compressed) is None):
+    if fits_tools.expand(compressed) is not None:
         raise AssertionError()
 
 
@@ -111,8 +116,9 @@ def test_write_fits():
     outname = 'tests/temp/dlme.fits'
     fits_tools.write_fits(data, header, outname)
     if not os.path.exists(outname):
+        msg = f"Failed to write data to file {outname}"
         raise AssertionError(
-            "Failed to write data to file {0}".format(outname))
+            msg)
     os.remove(outname)
 
 
@@ -124,10 +130,11 @@ def test_load_image_band_defaults():
     except Exception as e:
         raise e
     if not isinstance(data, np.ndarray):
-        raise AssertionError("Loaded data is not an np.ndarray object")
+        msg = "Loaded data is not an np.ndarray object"
+        raise AssertionError(msg)
     if not isinstance(header, fits.Header):
-        raise AssertionError("header is not a fits.hdu.Header object")
-    return
+        msg = "header is not a fits.hdu.Header object"
+        raise AssertionError(msg)
 
 
 def test_load_image_band_multi_bands():
@@ -137,17 +144,19 @@ def test_load_image_band_multi_bands():
     """
     try:
         _ = fits_tools.load_image_band(None, band=(0, 0))
-    except AegeanError as e:
+    except AegeanError:
         pass
     else:
-        raise AssertionError("Tried to load a total of zero bands")
+        msg = "Tried to load a total of zero bands"
+        raise AssertionError(msg)
 
     try:
         _ = fits_tools.load_image_band(None, band=(1, 1))
-    except AegeanError as e:
+    except AegeanError:
         pass
     else:
-        raise AssertionError("Tried to load an invalid band combination")
+        msg = "Tried to load an invalid band combination"
+        raise AssertionError(msg)
 
     data0, header0 = fits_tools.load_image_band(
         "tests/test_files/1904-66_SIN.fits", band=(0, 2))
@@ -161,8 +170,8 @@ def test_load_image_band_multi_bands():
 
     dist = gcd(*pos0, *pos1)
     if dist > np.hypot(header0['CDELT1'], header0['CDELT2'])/2:
-        raise AssertionError("adjacent bands don't match up at edges")
-    return
+        msg = "adjacent bands don't match up at edges"
+        raise AssertionError(msg)
 
 
 def test_load_image_band_cube_index():

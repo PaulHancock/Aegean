@@ -2,6 +2,7 @@
 """
 Flag constants for use by Aegean.
 """
+from __future__ import annotations
 
 __author__ = "Paul Hancock"
 

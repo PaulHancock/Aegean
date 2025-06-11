@@ -5,7 +5,7 @@ Aegean Residual (AeRes) has the following capability:
 - subtract image model from image
 - write model and residual files
 """
-
+from __future__ import annotations
 
 import logging
 
@@ -46,18 +46,18 @@ def load_sources(filename,
     good = True
     for c in required_cols:
         if c not in table.colnames:
-            logging.error("Column {0} not found".format(c))
+            logging.error(f"Column {c} not found")
             good = False
     if not good:
         logging.error("Some required columns missing or mis-labeled")
         return None
     # rename the table columns
     for old, new in zip([ra_col, dec_col, peak_col, a_col, b_col, pa_col],
-                        ['ra', 'dec', 'peak_flux', 'a', 'b', 'pa']):
+                        ['ra', 'dec', 'peak_flux', 'a', 'b', 'pa'], strict=False):
         table.rename_column(old, new)
 
     catalog = catalogs.table_to_source_list(table)
-    logging.info("read {0} sources from {1}".format(len(catalog), filename))
+    logging.info(f"read {len(catalog)} sources from {filename}")
     return catalog
 
 
@@ -105,10 +105,10 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
 
         # skip sources that have a center that is outside of the image
         if not 0 < xo < shape[0]:
-            logging.debug("source {0} is not within image".format(src.island))
+            logging.debug(f"source {src.island} is not within image")
             continue
         if not 0 < yo < shape[1]:
-            logging.debug("source {0} is not within image".format(src.island))
+            logging.debug(f"source {src.island} is not within image")
             continue
 
         # pixels over which this model is calculated
@@ -131,15 +131,13 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
             continue
 
         if logging.getLogger().isEnabledFor(logging.DEBUG):  # pragma: no cover
-            logging.debug("Source ({0},{1})".format(src.island, src.source))
-            logging.debug(" xo, yo: {0} {1}".format(xo, yo))
-            logging.debug(" sx, sy: {0} {1}".format(sx, sy))
-            logging.debug(" theta, phi: {0} {1}".format(theta, phi))
-            logging.debug(" xoff, yoff: {0} {1}".format(xoff, yoff))
-            logging.debug(" xmin, xmax, ymin, ymax: {0}:{1} {2}:{3}".format(
-                            xmin, xmax, ymin, ymax))
-            logging.debug(" flux, sx, sy: {0} {1} {2}".format(
-                          src.peak_flux, sx, sy))
+            logging.debug(f"Source ({src.island},{src.source})")
+            logging.debug(f" xo, yo: {xo} {yo}")
+            logging.debug(f" sx, sy: {sx} {sy}")
+            logging.debug(f" theta, phi: {theta} {phi}")
+            logging.debug(f" xoff, yoff: {xoff} {yoff}")
+            logging.debug(f" xmin, xmax, ymin, ymax: {xmin}:{xmax} {ymin}:{ymax}")
+            logging.debug(f" flux, sx, sy: {src.peak_flux} {sx} {sy}")
 
         # positions for which we want to make the model
         x, y = np.mgrid[int(xmin):int(xmax), int(ymin):int(ymax)]
@@ -163,7 +161,7 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
         else:
             m[x, y] += model
         i_count += 1
-    logging.info("modeled {0} sources".format(i_count))
+    logging.info(f"modeled {i_count} sources")
     return m
 
 
@@ -219,7 +217,7 @@ def make_residual(fitsfile, catalog, rfile, mfile=None,
     source_list = load_sources(catalog, **colmap)
 
     if source_list is None:
-        return None
+        return
     # force two axes so that we dump redundant stokes/freq axes if they are
     # present.
     hdulist = fits.open(fitsfile, naxis=2)
@@ -231,16 +229,13 @@ def make_residual(fitsfile, catalog, rfile, mfile=None,
 
     model = make_model(source_list, data.shape, wcshelper, mask, frac, sigma)
 
-    if add or mask:
-        residual = data + model
-    else:
-        residual = data - model
+    residual = data + model if add or mask else data - model
 
     hdulist[0].data = residual
     hdulist.writeto(rfile, overwrite=True)
-    logging.info("wrote residual to {0}".format(rfile))
+    logging.info(f"wrote residual to {rfile}")
     if mfile is not None:
         hdulist[0].data = model
         hdulist.writeto(mfile, overwrite=True)
-        logging.info("wrote model to {0}".format(mfile))
+        logging.info(f"wrote model to {mfile}")
     return

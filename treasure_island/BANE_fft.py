@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 BANE: Background and Noise Estimation
 ...but with FFTs
@@ -17,23 +16,24 @@ from __future__ import annotations
 __author__ = ["Alec Thomson", "Tim Galvin"]
 __version__ = "0.0.0"
 
+import logging
 import multiprocessing as mp
-from multiprocessing.pool import ThreadPool
 import os
+from collections.abc import Callable
+from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from time import time
-from typing import Any, Callable, Dict, List, Tuple
-import logging
+from typing import Any
 
 import astropy.units as u
 import numba as nb
 import numpy as np
-from numpy.typing import NDArray
 from astropy.io import fits
 from astropy.stats import mad_std, sigma_clip
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from numpy import fft
+from numpy.typing import NDArray
 from radio_beam import Beam
 from scipy import ndimage
 
@@ -138,12 +138,11 @@ def fft_average(
 
     smooth = fft.irfft2(smooth_fft) / kernel.sum()
 
-    smooth_trimmed = smooth[
+    return smooth[
         pad_x:-pad_x,
         pad_y:-pad_y,
     ]
 
-    return smooth_trimmed
 
 
 @nb.njit(
@@ -154,7 +153,7 @@ def fft_average(
 def bane_fft(
     image: NDArray[np.float32],
     kernel: NDArray[np.float32],
-) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
+) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
     """BANE but with FFTs
 
     Args:
@@ -184,7 +183,7 @@ def tophat_kernel(diameter: int):
     xx = np.arange(-radius, radius + 1)
     yy = np.arange(-radius, radius + 1)
     X, Y = np.meshgrid(xx, yy)
-    mask = X**2 + Y**2 <= radius**2
+    mask = radius**2 >= X**2 + Y**2
     kernel[mask] = 1
     return kernel
 
@@ -225,8 +224,7 @@ def get_nan_mask(
     immask_fft = fft.rfft2(immask)
     kernel_fft = _ft_kernel(kernel, shape=image.shape)
     conv = fft.irfft2(immask_fft * kernel_fft)
-    mask = conv < 1
-    return mask
+    return conv < 1
 
 
 def get_kernel(
@@ -234,7 +232,7 @@ def get_kernel(
     step_size: int | None = None,
     box_size: int | None = None,
     kernel_func: Callable = gaussian_kernel,
-) -> Tuple[NDArray[np.float32], int]:
+) -> tuple[NDArray[np.float32], int]:
     """Get the kernel for FFT BANE
 
     Note that here the `step` is the downsampling factor, and the `box` is the kernel size.
@@ -259,8 +257,9 @@ def get_kernel(
             pix_per_beam = beam.minor / scales.min()
             logging.info(f"Pixels per beam: {pix_per_beam:0.1f}")
         except ValueError:
+            msg = "Could not parse beam from header - try specifying step size"
             raise ValueError(
-                "Could not parse beam from header - try specifying step size"
+                msg
             )
 
     if step_size is None or step_size < 0:
@@ -297,7 +296,7 @@ def get_kernel(
     fastmath=True,
     cache=True,
 )
-def chunk_image(image_shape: Tuple[int, int], box_size: int) -> NDArray[np.float32]:
+def chunk_image(image_shape: tuple[int, int], box_size: int) -> NDArray[np.float32]:
     """Divide the image into chunks that overlap by half the box size
 
     Chunk only the y-axis
@@ -422,13 +421,14 @@ def estimate_rms(
         clipping_func = mad_jit
 
     else:
+        msg = f"{mode} not supported as a clipping mode, available modes are `std` and `mad`. "
         raise ValueError(
-            f"{mode} not supported as a clipping mode, available modes are `std` and `mad`. "
+            msg
         )
 
     cen_func = median_jit
 
-    for i in range(clip_rounds):
+    for _i in range(clip_rounds):
         data = data[np.abs(data - cen_func(data)) < outlier_thres * clipping_func(data)]
 
     # Attempts to ensure a sane number of bins to fit against
@@ -449,9 +449,8 @@ def estimate_rms(
     x1 = (-b + np.sqrt(b**2 - 4.0 * a * (c - np.log10(0.5)))) / (2.0 * a)
     x2 = (-b - np.sqrt(b**2 - 4.0 * a * (c - np.log10(0.5)))) / (2.0 * a)
     fwhm = np.abs(x1 - x2)
-    noise = fwhm / 2.355
+    return fwhm / 2.355
 
-    return noise
 
 
 def estimate_rms_astropy(image: NDArray[np.float32]):
@@ -485,7 +484,7 @@ def robust_bane(
     kernel_func: Callable = gaussian_kernel,
     rms_estimator: Callable = mad_std,
     clip_sigma: float = 5,
-) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
+) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
     """Two-round BANE with FFTs
 
     Note that here the `step` is the downsampling factor, and the `box` is the kernel size.
@@ -597,7 +596,7 @@ def robust_bane(
 def init_outputs(
     fits_file: Path,
     ext: int = 0,
-) -> List[Path]:
+) -> list[Path]:
     """Initialize the output files
 
     Args:
@@ -605,7 +604,7 @@ def init_outputs(
         ext (int, optional): HDU extension. Defaults to 0.
     """
     logging.info("Initializing output files")
-    out_files: List[Path] = []
+    out_files: list[Path] = []
     with fits.open(fits_file, memmap=True, mode="denywrite") as hdul:
         header = hdul[ext].header
     # Create an arbitrarly large file without holding it in memory
@@ -631,7 +630,7 @@ def init_outputs(
 
 
 def write_outputs(
-    out_files: List[Path],
+    out_files: list[Path],
     mean: NDArray[np.float32],
     rms: NDArray[np.float32],
 ):
@@ -652,12 +651,12 @@ def write_outputs(
 def bane_2d(
     image: NDArray[np.float32],
     header: fits.Header | dict[str, Any],
-    out_files: List[Path],
+    out_files: list[Path],
     step_size: int | None = None,
     box_size: int | None = None,
     kernel_func: Callable = gaussian_kernel,
     rms_estimator: Callable = mad_std,
-) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
+) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
     logging.info(f"Running BANE on image {image.shape}")
     # Run BANE
     bkg, rms = robust_bane(
@@ -677,7 +676,7 @@ def bane_3d_loop(
     plane: NDArray[np.float32],
     idx: int,
     header: fits.Header | dict[str, Any],
-    out_files: List[Path],
+    out_files: list[Path],
     ext: int = 0,
     step_size: int | None = None,
     box_size: int | None = None,
@@ -708,17 +707,17 @@ def bane_3d_loop(
 def bane_3d(
     cube: NDArray[np.float32],
     header: fits.Header | dict[str, Any],
-    out_files: List[Path],
+    out_files: list[Path],
     ext: int = 0,
     step_size: int | None = None,
     box_size: int | None = None,
     ncores: int | None = None,
     kernel_func: Callable = gaussian_kernel,
     rms_estimator: Callable = mad_std,
-) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
+) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
     logging.info(f"Running BANE on cube {cube.shape}")
     # Run BANE
-    ncores = mp.cpu_count() if not ncores else ncores
+    ncores = ncores if ncores else mp.cpu_count()
     logging.info(f"Running BANE with {ncores} cores")
     with ThreadPool(ncores) as pool:
         pool.starmap(
@@ -784,7 +783,8 @@ def find_stokes_axis(header: fits.Header | dict[str, Any]) -> int:
             stokes_axis = ii
             break
     if stokes_axis is None:
-        raise ValueError("No Stokes axis found")
+        msg = "No Stokes axis found"
+        raise ValueError(msg)
     return fits_idx_to_np(stokes_axis, header)
 
 
@@ -797,7 +797,7 @@ def main(
     kernel_str: str = "gauss",
     estimator_str: str = "mad_std",
     all_in_mem: bool = False,
-) -> Tuple[NDArray[np.float32], NDArray[np.float32]]:
+) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
     logging.info("Starting BANE (tools will be compiled...)")
     # Init output files
     out_files = init_outputs(fits_file, ext=ext)
@@ -814,12 +814,12 @@ def main(
     is_stokes_cube = len(data.shape) > 3 and data.shape[-1] > 1
     is_cube = len(data.shape) == 3
 
-    estimators: Dict[str, Callable] = {
+    estimators: dict[str, Callable] = {
         "galvin": estimate_rms,
         "mad_std": mad_std,
         "astropy": estimate_rms_astropy,
     }
-    kernels: Dict[str, Callable] = {
+    kernels: dict[str, Callable] = {
         "gauss": gaussian_kernel,
         "tophat": tophat_kernel,
     }
@@ -830,7 +830,8 @@ def main(
         # Check if Stokes axis is unitary
         stokes_axis = find_stokes_axis(header)
         if data.shape[stokes_axis] != 1:
-            raise NotImplementedError("Stokes cube not implemented")
+            msg = "Stokes cube not implemented"
+            raise NotImplementedError(msg)
 
         # Remove Stokes axis
         # Create slice to index all but Stokes axis

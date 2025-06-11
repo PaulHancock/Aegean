@@ -3,6 +3,7 @@
 Different types of sources that Aegean is able to fit
 
 """
+from __future__ import annotations
 
 import uuid
 
@@ -11,7 +12,7 @@ import numpy as np
 __author__ = "Paul Hancock"
 
 
-class SimpleSource(object):
+class SimpleSource:
     """
     The base source class for an elliptical Gaussian.
 
@@ -218,25 +219,22 @@ class IslandSource(SimpleSource):
         self.pix_mask = []
 
     def __str__(self):
-        return "({0:d})".format(self.island)
+        return f"({self.island:d})"
 
     def __eq__(self, other):
         if hasattr(other, 'island'):
             return self.island == other.island
-        else:
-            return False
+        return False
 
     def __ne__(self, other):
         if hasattr(other, 'island'):
             return self.island != other.island
-        else:
-            return True
+        return True
 
     def __lt__(self, other):
         if hasattr(other, 'island'):
             return self.island < other.island
-        else:
-            return True
+        return True
 
     def __le__(self, other):
         return self.__lt__(other) or self.__eq__(other)
@@ -244,8 +242,7 @@ class IslandSource(SimpleSource):
     def __gt__(self, other):
         if hasattr(other, 'island'):
             return self.island > other.island
-        else:
-            return False
+        return False
 
     def __ge__(self, other):
         return self.__gt__(other) or self.__eq__(other)
@@ -354,7 +351,6 @@ class ComponentSource(SimpleSource):
         self.flags = 0x0
         self.residual_mean = np.nan
         self.residual_std = np.nan
-        #
         self.psf_a = np.nan
         self.psf_b = np.nan
         self.psf_pa = np.nan
@@ -364,7 +360,7 @@ class ComponentSource(SimpleSource):
         return self.formatter.format(self)
 
     def __repr__(self):
-        return "({0:d},{1:d})".format(self.island, self.source)
+        return f"({self.island:d},{self.source:d})"
 
     def __eq__(self, other):
         if self.island != other.island:
@@ -390,6 +386,7 @@ class ComponentSource(SimpleSource):
             return True
         if self.island == other.island:
             return self.source < other.source
+        return None
 
     def __le__(self, other):
         if not hasattr(other, 'island'):
@@ -401,6 +398,7 @@ class ComponentSource(SimpleSource):
             return True
         if self.island == other.island:
             return self.source <= other.source
+        return None
 
     def __gt__(self, other):
         if not hasattr(other, 'island'):
@@ -412,6 +410,7 @@ class ComponentSource(SimpleSource):
             return True
         if self.island == other.island:
             return self.source > other.source
+        return None
 
     def __ge__(self, other):
         if not hasattr(other, 'island'):
@@ -423,9 +422,10 @@ class ComponentSource(SimpleSource):
             return True
         if self.island == other.island:
             return self.source >= other.source
+        return None
 
 
-class GlobalFittingData(object):
+class GlobalFittingData:
     """
     A class to hold the properties associated with an image. [ These were once
     in the global scope of a monolithic script, hence the name]. (should be)
@@ -479,10 +479,9 @@ class GlobalFittingData(object):
         self.psfhelper = None
         self.blank = False
         self.cube_index = None
-        return
 
 
-class PixelIsland(object):
+class PixelIsland:
     """
     An island of pixels within an image or cube
 
@@ -504,7 +503,6 @@ class PixelIsland(object):
         self.bounding_box = np.zeros((self.dim, 2), dtype=np.int32)
         self.mask = None
         self.partial = False
-        return
 
     def set_mask(self, data):
         """
@@ -519,7 +517,6 @@ class PixelIsland(object):
                  "Expecting {1}").format(data.shape, self.dim)
                 )
         self.mask = data
-        return
 
     def calc_bounding_box(self, data, offsets):
         """
@@ -537,9 +534,9 @@ class PixelIsland(object):
             len(offsets)==dim
         """
         if len(offsets) != self.dim:
+            msg = f"{len(offsets)} offsets were passed but {self.dim} are required"
             raise AssertionError(
-                "{0} offsets were passed but {1} are required".format(
-                    len(offsets), self.dim)
+                msg
                     )
         # TODO: Figure out 3d boxes
         # set the bounding box one dimension at a time
@@ -552,10 +549,9 @@ class PixelIsland(object):
         self.bounding_box[0][0] = offsets[0] + cmin
         self.bounding_box[0][1] = offsets[0] + cmax + 1
         self.set_mask(data[rmin:rmax+1, cmin:cmax+1])
-        return
 
 
-class IslandFittingData(object):
+class IslandFittingData:
     """
     All the data required to fit a single island. Instances are pickled and
     passed to the fitting subprocesses
@@ -590,7 +586,7 @@ class IslandFittingData(object):
         self.doislandflux = doislandflux
 
 
-class DummyLM(object):
+class DummyLM:
     """
     A dummy copy of the lmfit results, for use when no fitting was done.
 
@@ -688,4 +684,3 @@ def island_itergen(catalog):
                 continue
             yield group
             group = []
-    return

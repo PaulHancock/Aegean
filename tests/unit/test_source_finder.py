@@ -2,20 +2,23 @@
 """
 Test source_finder.py
 """
+from __future__ import annotations
 
 __author__ = 'Paul Hancock'
 
-from astropy.io import fits
-from treasure_island import source_finder as sf
-from treasure_island.wcs_helpers import Beam, WCSHelper
-from treasure_island import models, flags
-from treasure_island.models import classify_catalog
-from treasure_island.regions import Region
-from treasure_island.exceptions import AegeanError
-from copy import deepcopy
-import numpy as np
 import logging
 import os
+from copy import deepcopy
+
+import numpy as np
+from astropy.io import fits
+
+from treasure_island import flags, models
+from treasure_island import source_finder as sf
+from treasure_island.exceptions import AegeanError
+from treasure_island.models import classify_catalog
+from treasure_island.regions import Region
+from treasure_island.wcs_helpers import Beam, WCSHelper
 
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("Aegean")
@@ -41,12 +44,11 @@ def test_psf_with_nans():
     except AssertionError as e:
         os.remove('dlme_psf.fits')
         if 'major' in e.args[0]:
-            raise AssertionError("Broken on psf maps with nans")
-        else:
-            raise
+            msg = "Broken on psf maps with nans"
+            raise AssertionError(msg)
+        raise
     else:
         os.remove('dlme_psf.fits')
-    return
 
 
 def test_misc():
@@ -104,9 +106,11 @@ def test__make_bkg_rms():
 
     # check that we don't make mistake #163 again.
     if not np.all(sfinder.global_data.rmsimg[50:55, 50:55] > 0):
-        raise AssertionError("RMS map is not positive in the middle")
+        msg = "RMS map is not positive in the middle"
+        raise AssertionError(msg)
     if not np.any(sfinder.global_data.bkgimg[50:55, 50:55] != 0):
-        raise AssertionError("BKG map is all zero in the middle")
+        msg = "BKG map is all zero in the middle"
+        raise AssertionError(msg)
 
 
 def test_load_globals():
@@ -173,16 +177,18 @@ def test_find_and_prior_sources():
 
     # vanilla source finding
     found = sfinder.find_sources_in_image(filename, cores=1, rms=0.5, bkg=0)
-    if not (len(found) == nsrc):
+    if len(found) != nsrc:
+        msg = f"Found the wrong number of sources {len(found)}"
         raise AssertionError(
-            "Found the wrong number of sources {0}".format(len(found)))
+            msg)
 
     # source finding but not fitting
     found = sfinder.find_sources_in_image(
         filename, cores=1, max_summits=0, rms=0.5, bkg=0)
-    if not (len(found) == nsrc):
+    if len(found) != nsrc:
+        msg = f"Found the wrong number of sources {len(found)}"
         raise AssertionError(
-            "Found the wrong number of sources {0}".format(len(found)))
+            msg)
 
     # now with some options
     aux_files = sf.get_aux_files(filename)
@@ -193,9 +199,10 @@ def test_find_and_prior_sources():
                                            bkgin=aux_files['bkg'],
                                            mask=aux_files['mask'],
                                            cores=1, docov=False)
-    if not (len(found2) == ntot):
+    if len(found2) != ntot:
+        msg = f"Found the wrong number of sources {len(found2)}"
         raise AssertionError(
-            "Found the wrong number of sources {0}".format(len(found2)))
+            msg)
     isle1 = found2[1]
     if not (isle1.int_flux > 0):
         raise AssertionError()
@@ -215,9 +222,10 @@ def test_find_and_prior_sources():
                                               rmsin=aux_files['rms'],
                                               bkgin=aux_files['bkg'],
                                               docov=False)
-    if not (len(priorized) == nsrc):
+    if len(priorized) != nsrc:
+        msg = f"Found the wrong number of sources {len(priorized)}"
         raise AssertionError(
-            "Found the wrong number of sources {0}".format(len(priorized)))
+            msg)
 
     priorized = sfinder.priorized_fit_islands(filename, catalogue=found,
                                               doregroup=True, cores=1,
@@ -225,14 +233,16 @@ def test_find_and_prior_sources():
                                               bkgin=aux_files['bkg'],
                                               outfile=open('dlme', 'w'),
                                               stage=1)
-    if not (len(priorized) == nsrc):
+    if len(priorized) != nsrc:
+        msg = f"Found the wrong number of sources {len(priorized)}"
         raise AssertionError(
-            "Found the wrong number of sources {0}".format(len(priorized)))
+            msg)
     if not (len(sfinder.priorized_fit_islands(filename, catalogue=[])) == 0):
         raise AssertionError()
     # we should have written some output file
     if not (os.path.exists('dlme')):
-        raise AssertionError("Failed to creat outputfile")
+        msg = "Failed to creat outputfile"
+        raise AssertionError(msg)
     os.remove('dlme')
 
 
@@ -247,8 +257,9 @@ def dont_test_find_and_prior_parallel():
     sfinder = sf.SourceFinder(log=log)
     found = sfinder.find_sources_in_image(filename, cores=cores,
                                           bkg=0, rms=0.5)
-    if not (len(found) == 98):
-        raise AssertionError('found {0} sources'.format(len(found)))
+    if len(found) != 98:
+        msg = f'found {len(found)} sources'
+        raise AssertionError(msg)
     # now with some options
     aux_files = sf.get_aux_files(filename)
 
@@ -285,9 +296,9 @@ def test_save_files():
     filename = 'tests/test_files/small.fits'
     sfinder.save_background_files(image_filename=filename, outbase='dlme')
     for ext in ['bkg', 'rms', 'snr', 'crv']:
-        if not (os.path.exists("dlme_{0}.fits".format(ext))):
+        if not (os.path.exists(f"dlme_{ext}.fits")):
             raise AssertionError()
-        os.remove("dlme_{0}.fits".format(ext))
+        os.remove(f"dlme_{ext}.fits")
 
 
 def test_save_image():
@@ -327,10 +338,10 @@ def test_esimate_lmfit_parinfo():
     except AssertionError as e:
         e.message = 'Passed'
     else:
+        msg = "estimate_lmfit_parinfo should err when curve.shape != data.shape"
         raise AssertionError(
-            "estimate_lmfit_parinfo should err when curve.shape != data.shape")
+            msg)
 
-    return
 
 
 def test_island_contours():
@@ -353,8 +364,8 @@ def test_island_contours():
                                (45, 403), (44, 403), (43, 403), (43, 404),
                                (42, 404), (42, 405)])
     if not np.all(np.array(islands[0].contour) == isle_0_contour):
-        raise AssertionError("Island contour for island 0 is incorrect")
-    return
+        msg = "Island contour for island 0 is incorrect"
+        raise AssertionError(msg)
 
 
 # for 3.0 functionality
@@ -382,33 +393,33 @@ def test_find_islands():
     islands = sf.find_islands(im, bkg, rms, log=log)
 
     if len(islands) != 1:
+        msg = f"Incorrect number of islands found {len(islands)}, expecting 1"
         raise AssertionError(
-            "Incorrect number of islands found {0}, expecting 1".format(
-                len(islands))
+            msg
         )
     if not isinstance(islands[0], models.PixelIsland):
+        msg = f"Islands[0] is not a PixelIsland but instead a {type(islands[0])}"
         raise AssertionError(
-            "Islands[0] is not a PixelIsland but instead a {0}".format(
-                type(islands[0]))
+            msg
         )
 
     correct_box = [[3, 6], [4, 7]]
     if not np.all(islands[0].bounding_box == correct_box):
+        msg = f"Bounding box incorrect, should be {correct_box}, but is {islands[0].bounding_box}"
         raise AssertionError(
-            "Bounding box incorrect, should be {0}, but is {1}".format(
-                correct_box, islands[0].bounding_box)
+            msg
         )
 
     # add another island that is between the seed/flood thresholds
     im[7:9, 2:5] = 4.5
     islands = sf.find_islands(im, bkg, rms, log=log)
     if len(islands) != 1:
+        msg = f"Incorrect number of islands found {len(islands)}, expecting 1"
         raise AssertionError(
-            "Incorrect number of islands found {0}, expecting 1".format(
-                len(islands))
+            msg
         )
 
-    return
+    return None
 
 
 def test_estimate_parinfo_image():
@@ -431,17 +442,23 @@ def test_estimate_parinfo_image():
         islands, im=im, rms=rms, wcshelper=wcshelper, log=log)
 
     if len(sources) != 1:
+        msg = f"Incorrect number of sources found {len(sources)}, expecting 1"
         raise AssertionError(
-            "Incorrect number of sources found {0}, expecting 1".format(
-                len(sources))
+            msg
         )
-    if not sources[0]['components'].value == 1:
-        raise AssertionError("Found {0} components, expecting 1".format(
+    if sources[0]['components'].value != 1:
+        msg = (
+            "Found {} components, expecting 1".format(
             sources[0]['components'].value)
         )
-    if not sources[0]['c0_amp'].value == 8.0:
-        raise AssertionError("c0_amp is not 8.0 (is {0})".format(
+        raise AssertionError(msg
+        )
+    if sources[0]['c0_amp'].value != 8.0:
+        msg = (
+            "c0_amp is not 8.0 (is {})".format(
             sources[0]['c0_amp'].value)
+        )
+        raise AssertionError(msg
         )
 
     # test on a negative island
@@ -451,17 +468,21 @@ def test_estimate_parinfo_image():
         islands, im=im, rms=rms, wcshelper=wcshelper, log=log)
 
     if len(sources) != 1:
+        msg = f"Incorrect number of sources found {len(sources)}, expecting 1"
         raise AssertionError(
-            "Incorrect number of sources found {0}, expecting 1".format(
-                len(sources))
+            msg
         )
-    if not sources[0]['components'].value == 1:
-        raise AssertionError("Found {0} components, expecting 1".format(
+    if sources[0]['components'].value != 1:
+        msg = (
+            "Found {} components, expecting 1".format(
             sources[0]['components'].value)
         )
-    if not sources[0]['c0_amp'].value == -8.0:
+        raise AssertionError(msg
+        )
+    if sources[0]['c0_amp'].value != -8.0:
+        msg = "c0_amp is not -8.0 (is {})".format(sources[0]['c0_amp'].value)
         raise AssertionError(
-            "c0_amp is not -8.0 (is {0})".format(sources[0]['c0_amp'].value)
+            msg
         )
 
     # test on a small island
@@ -473,15 +494,19 @@ def test_estimate_parinfo_image():
     sources = sf.estimate_parinfo_image(
         islands, im=im, rms=rms, wcshelper=wcshelper, log=log)
     if len(sources) != 1:
+        msg = f"Incorrect number of sources found {len(sources)}, expecting 1"
         raise AssertionError(
-            "Incorrect number of sources found {0}, expecting 1".format(
-                len(sources))
+            msg
         )
-    if not sources[0]['components'].value == 1:
-        raise AssertionError("Found {0} components, expecting 1".format(
-            sources[0]['components'].value))
+    if sources[0]['components'].value != 1:
+        msg = (
+            "Found {} components, expecting 1".format(
+            sources[0]['components'].value)
+        )
+        raise AssertionError(msg)
     if not (sources[0]['c0_flags'].value & flags.FIXED2PSF):
-        raise AssertionError("FIXED2PSF flag not detected")
+        msg = "FIXED2PSF flag not detected"
+        raise AssertionError(msg)
 
 
 def test_regions_used_in_finding():
@@ -506,7 +531,8 @@ def test_regions_used_in_finding():
                                             bkgin=aux_files['bkg'],
                                             cores=1, mask=reg1)
     if len(sources) > 0:
-        raise AssertionError("Found sources outside of region specified.")
+        msg = "Found sources outside of region specified."
+        raise AssertionError(msg)
 
     del sfinder, sources
     sfinder = sf.SourceFinder(log=log)
@@ -516,10 +542,10 @@ def test_regions_used_in_finding():
                                             cores=1, mask=reg2)
     if len(sources) == 0:
         print(len(sources))
+        msg = "Failed to find any islands within region specified."
         raise AssertionError(
-            "Failed to find any islands within region specified.")
+            msg)
 
-    return
 
 
 def test_load_compressed_aux_files():
@@ -537,7 +563,6 @@ def test_load_compressed_aux_files():
         sfinder.load_globals(image, bkgin=background, rmsin=noise)
     except AegeanError as ae:
         raise AssertionError(ae)
-    return
 
 
 if __name__ == "__main__":

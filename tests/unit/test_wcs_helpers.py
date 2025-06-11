@@ -2,13 +2,19 @@
 """
 Test wcs_helpers.py
 """
+from __future__ import annotations
 
 import numpy as np
-from treasure_island.wcs_helpers import (Beam, WCSHelper,
-                                     fix_aips_header,
-                                     get_beam, get_pixinfo)
 from astropy.io import fits
 from numpy.testing import assert_almost_equal
+
+from treasure_island.wcs_helpers import (
+    Beam,
+    WCSHelper,
+    fix_aips_header,
+    get_beam,
+    get_pixinfo,
+)
 
 __author__ = 'Paul Hancock'
 
@@ -36,12 +42,12 @@ def test_from_header():
     # Raise an error when the beam information can't be determined
     try:
         _ = WCSHelper.from_header(header)
-    except AssertionError as e:
+    except AssertionError:
         pass
     else:
+        msg = "Header with no beam information should thrown an exception."
         raise AssertionError(
-            "Header with no beam information should thrown an exception.")
-    return
+            msg)
 
 
 def test_from_file():
@@ -84,7 +90,8 @@ def test_psf_files():
     # The psf image has only 19x19 pix and this ra/dec is
     a, b, pa = helper.get_psf_sky2sky(290., -63.)
     if not np.all(np.isfinite((a, b, pa))):
-        raise AssertionError("Beam contains nans")
+        msg = "Beam contains nans"
+        raise AssertionError(msg)
 
 
 def test_sky_sep():
@@ -125,7 +132,7 @@ def test_ellipse_round_trip():
     # SIN projection isn't valid for all decs
     declist = list(range(-85, -10, 10))
     ras, decs = np.meshgrid(ralist, declist)
-    for _, (ra, dec) in enumerate(zip(ras.ravel(), decs.ravel())):
+    for _, (ra, dec) in enumerate(zip(ras.ravel(), decs.ravel(), strict=False)):
         if ra < 0:
             ra += 360
         x, y, sx, sy, theta = helper.sky2pix_ellipse((ra, dec), a, b, pa)
@@ -168,13 +175,14 @@ def test_psf_funcs():
 
     diff = np.subtract(psf_zero, psf_refcoord)
     if not np.all(diff < 1e-5):
-        raise AssertionError("psf varies in pixel coordinates (it should not)")
+        msg = "psf varies in pixel coordinates (it should not)"
+        raise AssertionError(msg)
 
     diff = np.subtract(psf_refcoord, (helper._psf_a,
                        helper._psf_b, helper._psf_theta))
     if not np.all(diff < 1e-5):
-        raise AssertionError("psf varies in pixel coordinates (it should not)")
-    return
+        msg = "psf varies in pixel coordinates (it should not)"
+        raise AssertionError(msg)
 
 
 def test_galactic_coords():
@@ -182,10 +190,10 @@ def test_galactic_coords():
     fname = 'tests/test_files/1904-66_SIN.lb.fits'
     header = fits.getheader(fname)
     try:
-        helper = WCSHelper.from_header(header)
-    except ValueError as e:
-        raise AssertionError("galactic coordinates break WCSHelper")
-    return
+        WCSHelper.from_header(header)
+    except ValueError:
+        msg = "galactic coordinates break WCSHelper"
+        raise AssertionError(msg)
 
 
 def test_get_pixinfo():

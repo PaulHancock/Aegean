@@ -2,12 +2,15 @@
 """
 Test the AeRes module
 """
+from __future__ import annotations
+
 import os
 
 import numpy as np
+from astropy.io import fits
+
 from treasure_island import AeRes as ar
 from treasure_island import catalogs, wcs_helpers
-from astropy.io import fits
 
 __author__ = 'Paul Hancock'
 
@@ -17,8 +20,8 @@ def test_load_sources():
     filename = 'tests/test_files/1904_comp.fits'
     cat = ar.load_sources(filename)
     if cat is None:
-        raise AssertionError("load_sources failed")
-    return
+        msg = "load_sources failed"
+        raise AssertionError(msg)
 
 
 def test_load_soruces_renamed_columns():
@@ -32,8 +35,8 @@ def test_load_soruces_renamed_columns():
                 'pa_col': 'bpa'}
     cat = ar.load_sources(filename, **colnames)
     if cat is None:
-        raise AssertionError("load_sources failed with renamed columns")
-    return
+        msg = "load_sources failed with renamed columns"
+        raise AssertionError(msg)
 
 
 def test_load_sources_missing_columns():
@@ -46,8 +49,8 @@ def test_load_sources_missing_columns():
         os.remove('dlme.fits')
 
     if cat is not None:
-        raise AssertionError("Missing columns should be caught, but weren't")
-    return
+        msg = "Missing columns should be caught, but weren't"
+        raise AssertionError(msg)
 
 
 def test_make_model():
@@ -60,14 +63,16 @@ def test_make_model():
     model = ar.make_model(sources=sources, shape=hdulist[0].data.shape,
                           wcshelper=wcs_helper)
     if np.all(model == 0.):
-        raise AssertionError("Model is empty")
+        msg = "Model is empty"
+        raise AssertionError(msg)
 
     # model with *all* sources outside region
     # shape (100,2) means we only sometimes reject a source based on it's x-coord
     model = ar.make_model(sources=sources, shape=(100, 2),
                           wcshelper=wcs_helper)
     if not np.all(model == 0.):
-        raise AssertionError("Model is *not* empty")
+        msg = "Model is *not* empty"
+        raise AssertionError(msg)
 
 
 def test_make_masked_model():
@@ -83,11 +88,14 @@ def test_make_masked_model():
 
     finite = np.where(np.isfinite(model))
     if np.all(model == 0.):
-        raise AssertionError("Model is empty")
+        msg = "Model is empty"
+        raise AssertionError(msg)
     if not np.any(np.isnan(model)):
-        raise AssertionError("Model is not masked")
+        msg = "Model is not masked"
+        raise AssertionError(msg)
     if not np.all(model[finite] == 0.):
-        raise AssertionError("Model has values that are not zero or nan")
+        msg = "Model has values that are not zero or nan"
+        raise AssertionError(msg)
 
     # test mask with frac
     model = ar.make_model(sources=sources, shape=hdulist[0].data.shape,
@@ -95,11 +103,14 @@ def test_make_masked_model():
 
     finite = np.where(np.isfinite(model))
     if np.all(model == 0.):
-        raise AssertionError("Model is empty")
+        msg = "Model is empty"
+        raise AssertionError(msg)
     if not np.any(np.isnan(model)):
-        raise AssertionError("Model is not masked")
+        msg = "Model is not masked"
+        raise AssertionError(msg)
     if not np.all(model[finite] == 0.):
-        raise AssertionError("Model has values that are not zero or nan")
+        msg = "Model has values that are not zero or nan"
+        raise AssertionError(msg)
 
 
 def test_make_residual():
@@ -112,14 +123,16 @@ def test_make_residual():
     ar.make_residual(fitsfile=fitsfile, catalog=catalog,
                      rfile=residual, mfile=masked, mask=False)
     if not os.path.exists(masked):
-        raise AssertionError("Mask file not written")
+        msg = "Mask file not written"
+        raise AssertionError(msg)
     os.remove(masked)
 
     # with masking
     ar.make_residual(fitsfile=fitsfile, catalog=catalog,
                      rfile=residual, mfile=masked, mask=True)
     if not os.path.exists(masked):
-        raise AssertionError("Mask file not written")
+        msg = "Mask file not written"
+        raise AssertionError(msg)
     os.remove(masked)
 
 

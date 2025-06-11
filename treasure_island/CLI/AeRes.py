@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+from __future__ import annotations
 
 import argparse
 import logging
@@ -68,7 +69,7 @@ def main(argv=()):
     logging_level = logging.DEBUG if options.debug else logging.INFO
     logging.basicConfig(level=logging_level,
                         format="%(process)d:%(levelname)s %(message)s")
-    logging.info("This is AeRes {0}-({1})".format(__version__, __date__))
+    logging.info(f"This is AeRes {__version__}-({__date__})")
 
     if options.catalog is None:
         logging.error("input catalog is required")
@@ -86,10 +87,9 @@ def main(argv=()):
     if options.frac <= 0:
         options.frac = None
 
-    logging.info("Using {0} and {1} to make {2}".format(
-        options.fitsfile, options.catalog, options.rfile))
+    logging.info(f"Using {options.fitsfile} and {options.catalog} to make {options.rfile}")
     if options.mfile is not None:
-        logging.info(" and writing model to {0}".format(options.mfile))
+        logging.info(f" and writing model to {options.mfile}")
 
     colmap = {'ra_col': options.ra_col,
               'dec_col': options.dec_col,

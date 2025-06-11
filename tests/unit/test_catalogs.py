@@ -2,16 +2,18 @@
 """
 Test catalogues.py
 """
+from __future__ import annotations
 
 import logging
 import os
 
 import numpy as np
+from astropy import table
+from numpy.testing import assert_raises
+
 from treasure_island import catalogs as cat
 from treasure_island.models import ComponentSource, IslandSource, SimpleSource
 from treasure_island.msq2 import MarchingSquares
-from astropy import table
-from numpy.testing import assert_raises
 
 __author__ = 'Paul Hancock'
 
@@ -22,9 +24,11 @@ log.setLevel(logging.INFO)
 
 def test_nulls():
     if cat.nulls(-1) is not None:
-        raise AssertionError("nulls(-1) is broken")
+        msg = "nulls(-1) is broken"
+        raise AssertionError(msg)
     if cat.nulls(0) is None:
-        raise AssertionError("nulls(0) is broken")
+        msg = "nulls(0) is broken"
+        raise AssertionError(msg)
 
 
 def test_check_table_formats():
@@ -191,20 +195,20 @@ def test_write_fits_table_variable_uuid_lengths():
     for l in range(10):
         c = ComponentSource()
         c.ra_str = c.dec_str = "hello!"
-        c.uuid = 'source-{0:d}'.format(2**l)
+        c.uuid = f'source-{2**l:d}'
         catalog.append(c)
     cat.save_catalog('a.fits', catalog, meta={'Purpose': 'Testing'})
     if not os.path.exists('a_comp.fits'):
         raise AssertionError()
 
     rcat = cat.load_table('a_comp.fits')
-    for src1, src2 in zip(rcat, catalog):
+    for src1, src2 in zip(rcat, catalog, strict=False):
         if len(src1['uuid']) != len(src2.uuid):
-            print("len mismatch for source {0}".format(src1))
-            print("uuid should be len={0}".format(len(src2.uuid)))
-            raise AssertionError("UUID col is of wrong length")
+            print(f"len mismatch for source {src1}")
+            print(f"uuid should be len={len(src2.uuid)}")
+            msg = "UUID col is of wrong length"
+            raise AssertionError(msg)
     os.remove('a_comp.fits')
-    return
 
 
 def test_write_contours_boxes():
@@ -249,7 +253,8 @@ def test_write_ann():
     """Test that write_ann *doesn't* do anything"""
     cat.writeAnn('out.ann', [], fmt='fail')
     if os.path.exists('out.ann'):
-        raise AssertionError("Shoudn't have written anything")
+        msg = "Shoudn't have written anything"
+        raise AssertionError(msg)
 
     src = ComponentSource()
     # remove the parameter a to hit a checkpoint

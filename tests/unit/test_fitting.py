@@ -2,8 +2,11 @@
 """
 Test fitting.py
 """
+from __future__ import annotations
+
 import lmfit
 import numpy as np
+
 from treasure_island import fitting
 
 __author__ = 'Paul Hancock'

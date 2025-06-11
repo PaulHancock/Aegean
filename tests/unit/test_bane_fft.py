@@ -3,16 +3,15 @@ from __future__ import annotations
 import logging
 from typing import NamedTuple
 
+import astropy.units as u
 import numpy as np
-from numpy.typing import NDArray
 import pytest
 from astropy.io import fits
 from astropy.wcs import WCS
-import astropy.units as u
+from numpy.typing import NDArray
 from radio_beam import Beam
 
 from treasure_island.BANE_fft import bane_fft, gaussian_kernel, pad_reflect, robust_bane
-
 
 rng = np.random.default_rng(12345)
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
@@ -67,7 +66,7 @@ def test_pad_reflect(ranmdom_arrays: RandomArrays):
 def test_bane_fft(ranmdom_arrays: RandomArrays):
     gaussian_kernel_arr = gaussian_kernel(10)
     for array, loc, scale in zip(
-        ranmdom_arrays.arrays, ranmdom_arrays.locs, ranmdom_arrays.scales
+        ranmdom_arrays.arrays, ranmdom_arrays.locs, ranmdom_arrays.scales, strict=False
     ):
         bkg, rms = bane_fft(
             image=array,
@@ -89,7 +88,7 @@ def test_robust_bane(ranmdom_arrays: RandomArrays):
     Test the robust bane function.
     """
     for array, loc, scale in zip(
-        ranmdom_arrays.arrays, ranmdom_arrays.locs, ranmdom_arrays.scales
+        ranmdom_arrays.arrays, ranmdom_arrays.locs, ranmdom_arrays.scales, strict=False
     ):
         header = fits.Header()
         header["NAXIS"] = 2

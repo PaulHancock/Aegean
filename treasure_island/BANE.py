@@ -4,6 +4,7 @@
 This module contains all of the BANE specific code
 The function filter_image should be imported from elsewhere and run as is.
 """
+from __future__ import annotations
 
 import copy
 import logging
@@ -93,7 +94,7 @@ def sigmaclip(arr, lo, hi, reps=10):
         prev_valid = curr_valid
     else:
         logging.debug(
-            "No stopping criteria was reached after {0} cycles".format(count))
+            f"No stopping criteria was reached after {count} cycles")
 
     return mean, std
 
@@ -117,7 +118,7 @@ def _sf2(args):
         return sigma_filter(*args)
     except Exception as e:
         import traceback
-        logging.warn(e)
+        logging.warning(e)
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
@@ -157,7 +158,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
     """
 
     ymin, ymax = region
-    logging.debug('rows {0}-{1} starting at {2}'.format(ymin,
+    logging.debug('rows {}-{} starting at {}'.format(ymin,
                   ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
 
     # cut out the region of interest plus 1/2 the box size
@@ -184,9 +185,10 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
                              data_row_min:data_row_max, 0:shape[1]]
             )
         else:
-            logging.error("Too many NAXIS for me {0}".format(NAXIS))
+            logging.error(f"Too many NAXIS for me {NAXIS}")
             logging.error("fix your file to be more sane")
-            raise Exception("Too many NAXIS")
+            msg = "Too many NAXIS"
+            raise Exception(msg)
 
     # Manually scale the data if BSCALE is not 1.0
     header = fits.getheader(filename)
@@ -198,8 +200,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
 
     # row_len = shape[1]
 
-    logging.debug('data size is {0}'.format(data.shape))
-    logging.debug('data format is {0}'.format(data.dtype))
+    logging.debug(f'data size is {data.shape}')
+    logging.debug(f'data format is {data.dtype}')
 
     def box(r, c):
         """
@@ -286,9 +288,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
         ibkg[ymin:ymax, :][mask] = np.nan
         irms[ymin:ymax, :][mask] = np.nan
         logging.debug("... done applying mask")
-    logging.debug('rows {0}-{1} finished at {2}'.format(ymin,
+    logging.debug('rows {}-{} finished at {}'.format(ymin,
                   ymax, strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-    return
 
 
 def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
@@ -339,8 +340,8 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
 
     img_y, img_x = shape
 
-    logging.info("using {0} cores".format(cores))
-    logging.info("using {0} stripes".format(nslice))
+    logging.info(f"using {cores} cores")
+    logging.info(f"using {nslice} stripes")
 
     if nslice > 1:
         # box widths should be multiples of the step_size, and not zero
@@ -354,11 +355,11 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
         ymins = [0]
         ymaxs = [img_y]
 
-    logging.debug("ymins {0}".format(ymins))
-    logging.debug("ymaxs {0}".format(ymaxs))
+    logging.debug(f"ymins {ymins}")
+    logging.debug(f"ymaxs {ymaxs}")
 
     args = []
-    for region in zip(ymins, ymaxs):
+    for region in zip(ymins, ymaxs, strict=False):
         args.append((filename, region, step_size, box_size,
                     shape, domask, cube_index))
 
@@ -466,8 +467,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
         naxis3 = header['NAXIS3']
         if cube_index >= naxis3:
             logging.error(
-                "3rd dimension has len {0} but index {1} was passed".format(
-                    naxis3, cube_index)
+                f"3rd dimension has len {naxis3} but index {cube_index} was passed"
             )
             return None
 
@@ -478,17 +478,14 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
         # default to 6x the step size so we have ~ 30beams
         box_size = (step_size[0]*6, step_size[1]*6)
 
-    if compressed:
-        if not step_size[0] == step_size[1]:
-            step_size = (min(step_size), min(step_size))
-            logging.info(
-                "Changing grid to be {0} so we can compress the output".format(
-                    step_size)
-            )
+    if compressed and step_size[0] != step_size[1]:
+        step_size = (min(step_size), min(step_size))
+        logging.info(
+            f"Changing grid to be {step_size} so we can compress the output"
+        )
 
-    logging.info("using grid_size {0}, box_size {1}".format(
-                 step_size, box_size))
-    logging.info("on data shape {0}".format(shape))
+    logging.info(f"using grid_size {step_size}, box_size {box_size}")
+    logging.info(f"on data shape {shape}")
     bkg, rms = filter_mc_sharemem(im_name,
                                   step_size=step_size, box_size=box_size,
                                   cores=cores, shape=shape, nslice=nslice,
@@ -497,7 +494,7 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
 
     if out_base is not None:
         # add a comment to the fits header
-        header['HISTORY'] = 'BANE {0}-({1})'.format(__version__, __date__)
+        header['HISTORY'] = f'BANE {__version__}-({__date__})'
 
         bkg_out = '_'.join([os.path.expanduser(out_base), 'bkg.fits'])
         rms_out = '_'.join([os.path.expanduser(out_base), 'rms.fits'])
@@ -566,8 +563,7 @@ def get_step_size(header):
         logging.info("BMAJ and/or BMIN not in fits header.")
         logging.info("Assuming 4 pix/beam, so we have step_size = 16 pixels")
         step_size = 16
-    step_size = (step_size, step_size)
-    return step_size
+    return (step_size, step_size)
 
 
 def write_fits(data, header, file_name):
@@ -593,5 +589,4 @@ def write_fits(data, header, file_name):
     hdu.header = header
     hdulist = fits.HDUList([hdu])
     hdulist.writeto(file_name, overwrite=True)
-    logging.info("Wrote {0}".format(file_name))
-    return
+    logging.info(f"Wrote {file_name}")

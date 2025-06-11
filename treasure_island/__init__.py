@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-
+from __future__ import annotations
 
 __citation__ = r"""
 % If your work makes use of AegeanTools please cite the following papers as

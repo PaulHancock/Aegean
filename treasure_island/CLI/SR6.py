@@ -1,13 +1,15 @@
 #! /usr/bin/env python
+from __future__ import annotations
+
 import argparse
 import logging
 import os
 
 import numpy as np
-from treasure_island import __citation__
+from astropy.io import fits
+
 from treasure_island.BANE import get_step_size
 from treasure_island.fits_tools import compress, expand
-from astropy.io import fits
 
 __author__ = "Paul Hancock"
 __version__ = 'v1.2'
@@ -45,8 +47,7 @@ def main(argv=()):
                         default=False,
                         help='Debug output')
     group2.add_argument('--version', action='version',
-                        version='%(prog)s {0}-({1})'.format(__version__,
-                                                            __date__))
+                        version=f'%(prog)s {__version__}-({__date__})')
     group2.add_argument('--cite', dest='cite', action="store_true",
                         default=False,
                         help='Show citation information.')
@@ -58,16 +59,15 @@ def main(argv=()):
         return 0
 
     if results.cite:
-        print(__citation__)
         return 0
 
     logging_level = logging.DEBUG if results.debug else logging.INFO
     logging.basicConfig(level=logging_level,
                         format="%(process)d:%(levelname)s %(message)s")
-    logging.info("This is SR6 {0}-({1})".format(__version__, __date__))
+    logging.info(f"This is SR6 {__version__}-({__date__})")
 
     if not os.path.exists(results.infile):
-        logging.error("{0} does not exist".format(results.infile))
+        logging.error(f"{results.infile} does not exist")
         return 1
 
     if results.expand:
@@ -77,16 +77,18 @@ def main(argv=()):
             hdulist = expand(results.infile)
             hdulist[0].data[mask] = np.nan
             hdulist.writeto(results.outfile, overwrite=True)
-            logging.info("Wrote masked file: {0}".format(results.outfile))
-        elif results.maskfile is None:
+            logging.info(f"Wrote masked file: {results.outfile}")
+            return None
+        if results.maskfile is None:
             expand(results.infile, results.outfile)
-        else:
-            logging.error("Can't find {0}".format(results.maskfile))
+            return None
+        logging.error(f"Can't find {results.maskfile}")
+        return None
 
-    else:
-        if results.factor is None:
-            header = fits.getheader(results.infile)
-            results.factor = get_step_size(header)[0]
-            logging.info(
-                "Using compression factor of {0}".format(results.factor))
-        compress(results.infile, results.factor, results.outfile)
+    if results.factor is None:
+        header = fits.getheader(results.infile)
+        results.factor = get_step_size(header)[0]
+        logging.info(
+            f"Using compression factor of {results.factor}")
+    compress(results.infile, results.factor, results.outfile)
+    return None

@@ -1,15 +1,16 @@
 #! /usr/bin/env python
+from __future__ import annotations
 
 import argparse
 import logging
 import os
 
 import numpy as np
+from astropy.io import fits
+
 from treasure_island import wcs_helpers
 from treasure_island.catalogs import load_table, save_catalog, table_to_source_list
-from treasure_island.cluster import (check_attributes_for_regroup, regroup_dbscan,
-                                 resize)
-from astropy.io import fits
+from treasure_island.cluster import check_attributes_for_regroup, regroup_dbscan, resize
 
 __author__ = ['PaulHancock']
 __date__ = '2021-09-09'
@@ -57,13 +58,13 @@ def main(argv=()):
     log = logging.getLogger("Aegean")
     logging.basicConfig(level=logging_level,
                         format="%(process)d:%(levelname)s %(message)s")
-    log.info("This is regroup {0}-({1})".format(__version__, __date__))
-    log.debug("Run as:\n{0}".format(invocation_string))
+    log.info(f"This is regroup {__version__}-({__date__})")
+    log.debug(f"Run as:\n{invocation_string}")
 
     # check that a valid intput filename was entered
     filename = options.input
     if not os.path.exists(filename):
-        log.error("{0} not found".format(filename))
+        log.error(f"{filename} not found")
         return 1
 
     input_table = load_table(options.input)
@@ -80,10 +81,10 @@ def main(argv=()):
         head = fits.getheader(options.psfheader)
         psfhelper = wcs_helpers.WCSHelper.from_header(head)
         sources = resize(sources, psfhelper=psfhelper)
-        log.debug("{0} sources resized".format(len(sources)))
+        log.debug(f"{len(sources)} sources resized")
     elif options.ratio is not None:
         sources = resize(sources, ratio=options.ratio)
-        log.debug("{0} sources resized".format(len(sources)))
+        log.debug(f"{len(sources)} sources resized")
     else:
         log.debug("Not rescaling")
 
@@ -91,20 +92,20 @@ def main(argv=()):
         if not check_attributes_for_regroup(sources):
             log.error("Cannot use catalog")
             return 1
-        log.debug("Regrouping with eps={0}[arcmin]".format(options.eps))
+        log.debug(f"Regrouping with eps={options.eps}[arcmin]")
         eps = np.sin(np.radians(options.eps/60))
         groups = regroup_dbscan(sources, eps=eps)
         sources = [source for group in groups for source in group]
-        log.debug("{0} sources regrouped".format(len(sources)))
+        log.debug(f"{len(sources)} sources regrouped")
     else:
         log.debug("Not regrouping")
 
     if options.tables:
         meta = {"PROGRAM": "regroup",
-                "PROGVER": "{0}-({1})".format(__version__, __date__),
+                "PROGVER": f"{__version__}-({__date__})",
                 "CATFILE": filename,
                 "RUN-AS": invocation_string}
         for t in options.tables.split(','):
-            log.debug("writing {0}".format(t))
+            log.debug(f"writing {t}")
             save_catalog(t, sources, meta=meta)
     return 0

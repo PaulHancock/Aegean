@@ -4,6 +4,7 @@ This module contains two classes that provide WCS functions that are not
 part of the WCS toolkit, as well as some wrappers around the provided tools
 to make them a lot easier to use.
 """
+from __future__ import annotations
 
 import logging
 
@@ -18,7 +19,7 @@ __author__ = "Paul Hancock"
 log = logging.getLogger("Aegean")
 
 
-class WCSHelper(object):
+class WCSHelper:
     """
     A wrapper around astropy.wcs that provides extra functionality, and hides
     the c/fortran indexing troubles.
@@ -120,11 +121,10 @@ class WCSHelper(object):
             self._psf_map = fits.open(self.psf_file, memmap=True)[0].data
             if len(self._psf_map.shape) != 3:
                 log.critical(
-                    "PSF file needs to have 3 dimensions, found {0}".format(
-                        len(self._psf_map.shape)
-                    )
+                    f"PSF file needs to have 3 dimensions, found {len(self._psf_map.shape)}"
                 )
-                raise Exception("Invalid PSF file {0}".format(self.psf_file))
+                msg = f"Invalid PSF file {self.psf_file}"
+                raise Exception(msg)
         return self._psf_map
 
     @property
@@ -165,14 +165,12 @@ class WCSHelper(object):
         except:  # TODO: figure out what error is being thrown
             wcs = WCS(str(header), naxis=2)
 
-        if beam is None:
-            beam = get_beam(header)
-        else:
-            beam = beam
+        beam = get_beam(header) if beam is None else beam
 
         if beam is None:
             logging.critical("Cannot determine beam information")
-            raise AssertionError("Cannot determine beam information")
+            msg = "Cannot determine beam information"
+            raise AssertionError(msg)
 
         _, pixscale = get_pixinfo(header)
         refpix = (header["CRPIX1"], header["CRPIX2"])
@@ -455,12 +453,11 @@ class WCSHelper(object):
         # sense
         x, y = self.psf_sky2pix((ra, dec))
 
-        log.debug("sky2sky {0}, {1}, {2}, {3}".format(ra, dec, x, y))
+        log.debug(f"sky2sky {ra}, {dec}, {x}, {y}")
 
         x = int(np.clip(x, 0, self.psf_map.shape[1] - 1))
         y = int(np.clip(y, 0, self.psf_map.shape[2] - 1))
-        psf_sky = self.psf_map[:3, x, y]
-        return psf_sky
+        return self.psf_map[:3, x, y]
 
     def get_psf_sky2pix(self, ra, dec):
         """
@@ -485,10 +482,9 @@ class WCSHelper(object):
             return self._psf_a, self._psf_b, self._psf_theta
 
         psf_sky = self.get_psf_sky2sky(ra, dec)
-        psf_pix = self.sky2pix_ellipse((ra, dec), psf_sky[0], psf_sky[1], psf_sky[2])[
+        return self.sky2pix_ellipse((ra, dec), psf_sky[0], psf_sky[1], psf_sky[2])[
             2:
         ]
-        return psf_pix
 
     def get_psf_pix2pix(self, x, y):
         """
@@ -592,11 +588,10 @@ class WCSHelper(object):
         """
         pos1 = self.pix2sky(pix1)
         pos2 = self.pix2sky(pix2)
-        sep = gcd(pos1[0], pos1[1], pos2[0], pos2[1])
-        return sep
+        return gcd(pos1[0], pos1[1], pos2[0], pos2[1])
 
 
-class Beam(object):
+class Beam:
     """
     Small class to hold the properties of the beam. Properties are a,b,pa. No
     assumptions are made as to the units, but both a and b have to be >0.
@@ -604,15 +599,17 @@ class Beam(object):
 
     def __init__(self, a, b, pa):
         if not (a > 0):
-            raise AssertionError("major axis must be >0")
+            msg = "major axis must be >0"
+            raise AssertionError(msg)
         if not (b > 0):
-            raise AssertionError("minor axis must be >0")
+            msg = "minor axis must be >0"
+            raise AssertionError(msg)
         self.a = a
         self.b = b
         self.pa = pa
 
     def __str__(self):
-        return "a={0} b={1} pa={2}".format(self.a, self.b, self.pa)
+        return f"a={self.a} b={self.b} pa={self.pa}"
 
 
 def get_pixinfo(header):
@@ -702,8 +699,7 @@ def get_beam(header):
         bmin = header["BMIN"]
     if None in [bmaj, bmin, bpa]:
         return None
-    beam = Beam(bmaj, bmin, bpa)
-    return beam
+    return Beam(bmaj, bmin, bpa)
 
 
 def fix_aips_header(header):

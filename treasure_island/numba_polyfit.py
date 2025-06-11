@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Numpy polyfit using numba."""
 # From https://gist.github.com/kadereub/9eae9cff356bb62cdbd672931e8e5ec4
 # kadereub/numba_polyfit.py
+from __future__ import annotations
+
 __author__ = "kadereub"
 # Load relevant libraries
-import numpy as np
-import numba as nb
 import matplotlib.pyplot as plt
+import numba as nb
+import numpy as np
 
 # Goal is to implement a numba compatible polyfit (note does not include error handling)
 
@@ -27,8 +28,7 @@ def _coeff_mat(x, deg):
 @nb.njit("f8[:](f8[:,:], f8[:])")
 def _fit_x(a, b):
     # linalg solves ax = b
-    det_ = np.linalg.lstsq(a, b)[0]
-    return det_
+    return np.linalg.lstsq(a, b)[0]
 
 @nb.njit("f8[:](f8[:], f8[:], i8)")
 def fit_poly(x, y, deg):

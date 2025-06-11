@@ -2,14 +2,17 @@
 """
 Test cluster.py
 """
+from __future__ import annotations
+
 import logging
 import math
 from copy import deepcopy
 
 import numpy as np
+from astropy.io import fits
+
 from treasure_island import catalogs, cluster, wcs_helpers
 from treasure_island.models import SimpleSource
-from astropy.io import fits
 
 __author__ = 'Paul Hancock'
 
@@ -112,17 +115,19 @@ def test_regroup():
     # this should result in 51 groups
     a = cluster.regroup('tests/test_files/1904_comp.fits',
                         eps=1/3600.)
-    if not len(a) == 51:
+    if len(a) != 51:
+        msg = f"Regroup with eps=1/3600. gave {len(a)} groups instead of 51"
         raise AssertionError(
-            "Regroup with eps=1/3600. gave {0} groups instead of 51"
-            .format(len(a)))
+            msg
+            )
 
     # this should give 1 group
     a = cluster.regroup('tests/test_files/1904_comp.fits', eps=10, far=1000)
-    if not len(a) == 1:
+    if len(a) != 1:
+        msg = f"Regroup with eps=10, far=1000. gave {len(a)} groups instead of 51"
         raise AssertionError(
-            "Regroup with eps=10, far=1000. gave {0} groups instead of 51"
-            .format(len(a)))
+            msg
+            )
 
 
 def test_regroup_dbscan():
@@ -130,11 +135,11 @@ def test_regroup_dbscan():
     srccat = catalogs.table_to_source_list(table)
     a = cluster.regroup_dbscan(srccat,
                                eps=1/3600.)
-    if not len(a) == 51:
+    if len(a) != 51:
+        msg = f"Regroup_dbscan with eps=1/3600. gave {len(a)} groups instead of 51"
         raise AssertionError(
-            "Regroup_dbscan with eps=1/3600. gave {0} groups instead of 51"
-            .format(len(a)))
-    return
+            msg
+            )
 
 
 def test_resize_ratio():
@@ -148,9 +153,9 @@ def test_resize_ratio():
 
     if not ((first.a - out[0].a < 1e-9) and
             (first.b - out[0].b < 1e-9)):
-        raise AssertionError("resize of 1 is not identity")
+        msg = "resize of 1 is not identity"
+        raise AssertionError(msg)
 
-    return
 
 
 def test_resize_psfhelper():
@@ -168,9 +173,9 @@ def test_resize_psfhelper():
 
     if not ((first.a - out[0].a < 1e-9) and
             (first.b - out[0].b < 1e-9)):
-        raise AssertionError("resize with psfhelper is not identity")
+        msg = "resize with psfhelper is not identity"
+        raise AssertionError(msg)
 
-    return
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+from __future__ import annotations
 
 from treasure_island.CLI import BANE
 

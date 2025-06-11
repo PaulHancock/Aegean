@@ -2,11 +2,13 @@
 """
 Test models.py
 """
+from __future__ import annotations
 
 __author__ = 'Paul Hancock'
 
-from treasure_island import models
 import numpy as np
+
+from treasure_island import models
 
 
 def test_simple_source():
@@ -19,7 +21,7 @@ def test_simple_source():
     ss._sanitise()
     if not (isinstance(ss.ra, np.float64)): raise AssertionError()
     # convert to string without failing
-    a = "{0}".format(ss)
+    a = f"{ss}"
     if not (a == ' 12.0000000   0.0000000  0.000000  0.000000  0.00  0.00    0.0 0000000'): raise AssertionError()
     if not (ss.__repr__() == ss.__str__()): raise AssertionError()
     if not (np.all(ss.as_list()[:-1] == [0.0, 0.0, 12.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0, 0.0, 0.0])): raise AssertionError()
@@ -91,32 +93,37 @@ def test_PixelIsland():
     except AssertionError:
         pass
     else:
-        raise AssertionError("set_mask should complain when given 3d data")
+        msg = "set_mask should complain when given 3d data"
+        raise AssertionError(msg)
 
     data = np.ones((2,2))
     pi.set_mask(data)
     if pi.mask is not data:
-        raise AssertionError("set_mask is not storing the mask properly")
+        msg = "set_mask is not storing the mask properly"
+        raise AssertionError(msg)
 
     try:
         pi.calc_bounding_box(data, offsets=[0,0,0])
     except AssertionError:
         pass
     else:
-        raise AssertionError("calc_bounding_box should complain about mismatched offsets")
+        msg = "calc_bounding_box should complain about mismatched offsets"
+        raise AssertionError(msg)
 
     pi.calc_bounding_box(data, offsets=[0,0])
     # if pi.mask is not data:
     #     raise AssertionError("calc_bounding_box is not storing the mask properly")
 
     if not np.all(pi.bounding_box == [[0,2],[0,2]]):
-        raise AssertionError("bounding box not computed correctly")
+        msg = "bounding box not computed correctly"
+        raise AssertionError(msg)
 
     data = np.zeros((5,5))
     data[2, 3] = 1
     pi.calc_bounding_box(data, offsets=[0,0])
     if not np.all(pi.bounding_box == [[2,3],[3,4]]):
-        raise AssertionError("bounding box not computed correctly")
+        msg = "bounding box not computed correctly"
+        raise AssertionError(msg)
 
     # # now test with 3d cubes
     # data = np.ones((2,2,2))

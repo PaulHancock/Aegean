@@ -2,11 +2,15 @@
 """
 Test MIMAS.py
 """
+from __future__ import annotations
+
+import os
+
+import numpy as np
+from astropy.table import Table
+
 from treasure_island import MIMAS
 from treasure_island.regions import Region
-from astropy.table import Table
-import numpy as np
-import os
 
 __author__ = 'Paul Hancock'
 
@@ -16,8 +20,8 @@ def test_Dummy():
     try:
         MIMAS.Dummy()
     except:
-        raise AssertionError("Dummy.__init__ is broken")
-    return
+        msg = "Dummy.__init__ is broken"
+        raise AssertionError(msg)
 
 
 def test_galactic2fk5():
@@ -26,8 +30,8 @@ def test_galactic2fk5():
         l, b = np.radians(13), np.radians(-41)
         MIMAS.galactic2fk5(l, b)
     except:
-        raise AssertionError("galactic2fk5 is broken")
-    return
+        msg = "galactic2fk5 is broken"
+        raise AssertionError(msg)
 
 
 def test_mask_plane():
@@ -46,14 +50,16 @@ def test_mask_file():
     try:
         MIMAS.mask_file('nofile', 'nofile', 'nofile')
     except AssertionError as e:
-        if not 'fits file' in e.args[0]:
-            raise AssertionError('Failed to catch file not found err (image)')
+        if 'fits file' not in e.args[0]:
+            msg = 'Failed to catch file not found err (image)'
+            raise AssertionError(msg)
 
     try:
         MIMAS.mask_file('nofile', infile, 'nofile')
     except AssertionError as e:
-        if not 'region file' in e.args[0]:
-            raise AssertionError('Faile to catch file not found err (region)')
+        if 'region file' not in e.args[0]:
+            msg = 'Faile to catch file not found err (region)'
+            raise AssertionError(msg)
 
     # make a region file and test that a masked outfile can be made
     region.save(rfile)
@@ -61,18 +67,19 @@ def test_mask_file():
     MIMAS.mask_file(rfile, infile, outfile)
     if not os.path.exists(outfile):
         os.remove(rfile)
-        raise AssertionError("Failed to create masked file")
+        msg = "Failed to create masked file"
+        raise AssertionError(msg)
     os.remove(outfile)
 
     MIMAS.mask_file(rfile, infile, outfile, negate=True)
     if not os.path.exists(outfile):
         os.remove(rfile)
-        raise AssertionError("Failed to create masked file")
+        msg = "Failed to create masked file"
+        raise AssertionError(msg)
 
     # cleanup
     os.remove(rfile)
     os.remove(outfile)
-    return
 
 
 def test_mask_table():
@@ -84,12 +91,13 @@ def test_mask_table():
     masked = MIMAS.mask_table(region, tab)
     if len(masked) != 6:
         print(len(masked))
-        raise AssertionError("failed to mask table correctly")
+        msg = "failed to mask table correctly"
+        raise AssertionError(msg)
 
     masked = MIMAS.mask_table(region, tab, negate=True)
     if len(masked) != 5:
-        raise AssertionError("failed to mask table correctly")
-    return
+        msg = "failed to mask table correctly"
+        raise AssertionError(msg)
 
 
 def test_mask_catalog():
@@ -99,15 +107,16 @@ def test_mask_catalog():
 
     MIMAS.mask_catalog(regionfile, infile, outfile)
     if not os.path.exists(outfile):
-        raise AssertionError("failed to mask catalogue")
+        msg = "failed to mask catalogue"
+        raise AssertionError(msg)
     os.remove(outfile)
 
     MIMAS.mask_catalog(regionfile, infile, outfile, negate=True)
     if not os.path.exists(outfile):
-        raise AssertionError("failed to mask catalogue")
+        msg = "failed to mask catalogue"
+        raise AssertionError(msg)
     os.remove(outfile)
 
-    return
 
 
 def test_mim2reg():
@@ -119,10 +128,10 @@ def test_mim2reg():
     MIMAS.mim2reg(rfile, regfile)
     if not os.path.exists(regfile):
         os.remove(rfile)
-        raise AssertionError("Failed to convert mim2reg")
+        msg = "Failed to convert mim2reg"
+        raise AssertionError(msg)
     os.remove(rfile)
     os.remove(regfile)
-    return
 
 
 def test_mim2fits():
@@ -134,10 +143,10 @@ def test_mim2fits():
     MIMAS.mim2fits(rfile, fitsfile)
     if not os.path.exists(fitsfile):
         os.remove(rfile)
-        raise AssertionError("Failed to convert mim2fits")
+        msg = "Failed to convert mim2fits"
+        raise AssertionError(msg)
     os.remove(rfile)
     os.remove(fitsfile)
-    return
 
 
 def test_mask2mim():
@@ -161,36 +170,36 @@ def test_mask2mim():
             "Failed to convert {0}->{1}".foramt(maskfile, mimfile))
     os.remove(mimfile)
 
-    return
 
 
 def test_box2poly():
     box = 'box(290.3305929,-61.97230589,12720.000",10080.000",75.15517)'
     b = MIMAS.box2poly(box)
     if len(b) != 8:
-        raise AssertionError("box2poly failed")
-    return
+        msg = "box2poly failed"
+        raise AssertionError(msg)
 
 
 def test_circle2circle():
     circle = 'circle(19:56:03.7988,-69:00:43.304,5755.555")'
     c = MIMAS.circle2circle(circle)
     if len(c) != 3:
-        raise AssertionError("circle2circle failed")
+        msg = "circle2circle failed"
+        raise AssertionError(msg)
 
     circle = 'circle(203.7988,-47,360")'
     c = MIMAS.circle2circle(circle)
     if len(c) != 3:
-        raise AssertionError("circle2circle failed")
-    return
+        msg = "circle2circle failed"
+        raise AssertionError(msg)
 
 
 def test_poly2poly():
     poly = "polygon(,,293.09,-71:13:55.511,19:28:20.4283,-69:05:34.569,19:20:41.1627,-69:00:08.332,19:10:57.4154,-70:03:28.840,18:43:29.5694,-67:46:43.665,19:03:21.1495,-72:00:50.438)"
     r = MIMAS.poly2poly(poly)
     if len(r) != 12:
-        raise AssertionError("poly2poly failed")
-    return
+        msg = "poly2poly failed"
+        raise AssertionError(msg)
 
 
 def test_reg2mim():
@@ -198,9 +207,9 @@ def test_reg2mim():
     outfile = 'dlme.mim'
     MIMAS.reg2mim(reg, outfile, maxdepth=4)
     if not os.path.exists(outfile):
-        raise AssertionError("reg2mim failed")
+        msg = "reg2mim failed"
+        raise AssertionError(msg)
     os.remove(outfile)
-    return
 
 
 def test_combine_regions():
@@ -211,7 +220,7 @@ def test_combine_regions():
     r1.save(file1)
     r1.save(file2)
 
-    class O(object):
+    class O:
         pass
 
     c = O()
@@ -231,7 +240,6 @@ def test_combine_regions():
 
     os.remove(file1)
     os.remove(file2)
-    return
 
 
 def test_intersect_regions():
@@ -242,7 +250,8 @@ def test_intersect_regions():
         MIMAS.intersect_regions([None])
     except Exception as e:
         if "Require" not in e.args[0]:
-            raise AssertionError("intersect_regions failed")
+            msg = "intersect_regions failed"
+            raise AssertionError(msg)
 
     r1 = Region(maxdepth=3)
     r1.add_circles(np.radians(285), np.radians(-65), 1.8)
@@ -253,9 +262,9 @@ def test_intersect_regions():
     os.remove(file1)
     os.remove(file2)
     if not a:
-        raise AssertionError("intersect_regions failed")
+        msg = "intersect_regions failed"
+        raise AssertionError(msg)
 
-    return
 
 
 def test_save_region():
@@ -264,9 +273,9 @@ def test_save_region():
     region.add_circles(np.radians(285), np.radians(-65), 1.8)
     MIMAS.save_region(region, rfile)
     if not os.path.exists(rfile):
-        raise AssertionError("save_region failed")
+        msg = "save_region failed"
+        raise AssertionError(msg)
     os.remove(rfile)
-    return
 
 
 if __name__ == "__main__":

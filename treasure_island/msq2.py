@@ -3,14 +3,16 @@
 Provie a class which performs the marching squares algorithm on an image.
 The desired output is a set of regions / contours.
 """
+from __future__ import annotations
 
 from copy import copy
+
 import numpy as np
 
 __author__ = "Paul Hancock"
 
 
-class MarchingSquares():
+class MarchingSquares:
     """
     Implementation of a marching squares algorithm. With reference to
     http://devblog.phillipspiess.com/2010/02/23/better-know-an-algorithm-1-marching-squares/
@@ -29,7 +31,6 @@ class MarchingSquares():
         self.data = np.nan_to_num(data)  # set all the nan values to be zero
         self.xsize, self.ysize = data.shape
         self.perimeter = self.do_march()
-        return
 
     def find_start_point(self):
         """
@@ -39,6 +40,7 @@ class MarchingSquares():
             for j, _ in enumerate(row):
                 if self.data[i, j] != 0:  # or not np.isfinite(self.data[i,j]):
                     return i, j
+        return None
 
     def step(self, x, y):
         """
@@ -87,7 +89,6 @@ class MarchingSquares():
                 self.next = self.DOWN
         else:
             self.next = self.NOWHERE
-        return
 
     def solid(self, x, y):
         """
@@ -105,9 +106,7 @@ class MarchingSquares():
         """
         if not(0 <= x < self.xsize) or not(0 <= y < self.ysize):
             return False
-        if self.data[x, y] == 0:
-            return False
-        return True
+        return self.data[x, y] != 0
 
     def walk_perimeter(self, startx, starty):
         """
@@ -165,8 +164,7 @@ class MarchingSquares():
             The pixels on the perimeter of the region [[x1, y1], ...]
         """
         x, y = self.find_start_point()
-        perimeter = self.walk_perimeter(x, y)
-        return perimeter
+        return self.walk_perimeter(x, y)
 
     def _blank_within(self, perimeter):
         """
@@ -201,7 +199,6 @@ class MarchingSquares():
                 # fill everything in between, even inclusions
                 self.data[q] = 0
 
-        return
 
     def do_march_all(self):
         """

@@ -1,7 +1,9 @@
 #! /usr/bin/env python
+from __future__ import annotations
+
+import os
 
 from treasure_island.CLI import AeReg
-import os
 
 image_SIN = 'tests/test_files/1904-66_SIN.fits'
 catfile = 'tests/test_files/1904_comp.fits'

@@ -5,6 +5,7 @@ MIMAS - The Multi-resolution Image Mask for Aegean Software
 TODO: Write an in/out reader for MOC formats described by
 http://arxiv.org/abs/1505.02937
 """
+from __future__ import annotations
 
 import logging
 import os
@@ -29,7 +30,7 @@ __date__ = '2022-08-01'
 filewcs = None
 
 
-class Dummy():
+class Dummy:
     """
     A state storage class for MIMAS to work with.
 
@@ -72,7 +73,6 @@ class Dummy():
         self.exclude_polygons = []
         self.maxdepth = maxdepth
         self.galactic = False
-        return
 
 
 def galactic2fk5(l, b):
@@ -165,21 +165,20 @@ def mask_file(regionfile, infile, outfile, negate=False):
     """
     # Check that the input file is accessible and then open it
     if not os.path.exists(infile):
-        raise AssertionError("Cannot locate fits file {0}".format(infile))
+        msg = f"Cannot locate fits file {infile}"
+        raise AssertionError(msg)
     im = pyfits.open(infile)
     if not os.path.exists(regionfile):
+        msg = f"Cannot locate region file {regionfile}"
         raise AssertionError(
-            "Cannot locate region file {0}".format(regionfile))
+            msg)
     region = Region.load(regionfile)
     try:
         wcs = pywcs.WCS(im[0].header, naxis=2)
     except:  # TODO: figure out what error is being thrown
         wcs = pywcs.WCS(str(im[0].header), naxis=2)
 
-    if len(im[0].data.shape) > 2:
-        data = np.squeeze(im[0].data)
-    else:
-        data = im[0].data
+    data = np.squeeze(im[0].data) if len(im[0].data.shape) > 2 else im[0].data
 
     # print(data.shape)
     if len(data.shape) == 3:
@@ -189,8 +188,7 @@ def mask_file(regionfile, infile, outfile, negate=False):
         mask_plane(data, wcs, region, negate)
     im[0].data = data
     im.writeto(outfile, overwrite=True)
-    logging.info("Wrote {0}".format(outfile))
-    return
+    logging.info(f"Wrote {outfile}")
 
 
 def mask_table(region, table, negate=False, racol='ra', deccol='dec'):
@@ -221,10 +219,7 @@ def mask_table(region, table, negate=False, racol='ra', deccol='dec'):
         A view of the given table which has been masked.
     """
     inside = region.sky_within(table[racol], table[deccol], degin=True)
-    if not negate:
-        mask = np.bitwise_not(inside)
-    else:
-        mask = inside
+    mask = np.bitwise_not(inside) if not negate else inside
     return table[mask]
 
 
@@ -262,14 +257,13 @@ def mask_catalog(regionfile, infile, outfile,
 
     :func:`AegeanTools.catalogs.load_table`
     """
-    logging.info("Loading region from {0}".format(regionfile))
+    logging.info(f"Loading region from {regionfile}")
     region = Region.load(regionfile)
-    logging.info("Loading catalog from {0}".format(infile))
+    logging.info(f"Loading catalog from {infile}")
     table = load_table(infile)
     masked_table = mask_table(
         region, table, negate=negate, racol=racol, deccol=deccol)
     write_table(masked_table, outfile)
-    return
 
 
 def mim2reg(mimfile, regfile):
@@ -287,8 +281,7 @@ def mim2reg(mimfile, regfile):
     """
     region = Region.load(mimfile)
     region.write_reg(regfile)
-    logging.info("Converted {0} -> {1}".format(mimfile, regfile))
-    return
+    logging.info(f"Converted {mimfile} -> {regfile}")
 
 
 def mim2fits(mimfile, fitsfile):
@@ -305,9 +298,8 @@ def mim2fits(mimfile, fitsfile):
     """
     region = Region.load(mimfile)
     region.write_fits(
-        fitsfile, moctool='MIMAS {0}-{1}'.format(__version__, __date__))
-    logging.info("Converted {0} -> {1}".format(mimfile, fitsfile))
-    return
+        fitsfile, moctool=f'MIMAS {__version__}-{__date__}')
+    logging.info(f"Converted {mimfile} -> {fitsfile}")
 
 
 def mask2mim(maskfile, mimfile, threshold=1.0, maxdepth=8):
@@ -346,8 +338,7 @@ def mask2mim(maskfile, mimfile, threshold=1.0, maxdepth=8):
     region.add_pixels(pix, depth=maxdepth)
     region._renorm()
     save_region(region, mimfile)
-    logging.info("Converted {0} -> {1}".format(maskfile, mimfile))
-    return
+    logging.info(f"Converted {maskfile} -> {mimfile}")
 
 
 def box2poly(line):
@@ -370,10 +361,7 @@ def box2poly(line):
     dec = words[2]
     width = words[3]
     height = words[4]
-    if ":" in ra:
-        ra = Angle(ra, unit=u.hour)
-    else:
-        ra = Angle(ra, unit=u.degree)
+    ra = Angle(ra, unit=u.hour) if ":" in ra else Angle(ra, unit=u.degree)
     dec = Angle(dec, unit=u.degree)
     width = Angle(float(width[:-1])/2, unit=u.arcsecond)  # strip the "
     height = Angle(float(height[:-1])/2, unit=u.arcsecond)  # strip the "
@@ -403,10 +391,7 @@ def circle2circle(line):
     ra = words[1]
     dec = words[2]
     radius = words[3][:-1]  # strip the "
-    if ":" in ra:
-        ra = Angle(ra, unit=u.hour)
-    else:
-        ra = Angle(ra, unit=u.degree)
+    ra = Angle(ra, unit=u.hour) if ":" in ra else Angle(ra, unit=u.degree)
     dec = Angle(dec, unit=u.degree)
     radius = Angle(radius, unit=u.arcsecond)
     return [ra.degree, dec.degree, radius.degree]
@@ -433,7 +418,7 @@ def poly2poly(line):
     ras = np.array(words[1::2])
     decs = np.array(words[2::2])
     coords = []
-    for ra, dec in zip(ras, decs):
+    for ra, dec in zip(ras, decs, strict=False):
         if ra.strip() == '' or dec.strip() == '':
             continue
         if ":" in ra:
@@ -461,8 +446,8 @@ def reg2mim(regfile, mimfile, maxdepth):
         Depth/resolution of the region file.
 
     """
-    logging.info("Reading regions from {0}".format(regfile))
-    lines = (ln for ln in open(regfile, 'r') if not ln.startswith('#'))
+    logging.info(f"Reading regions from {regfile}")
+    lines = (ln for ln in open(regfile) if not ln.startswith('#'))
     poly = []
     circles = []
     for line in lines:
@@ -475,14 +460,13 @@ def reg2mim(regfile, mimfile, maxdepth):
                 "Polygons break a lot, but I'll try this one anyway.")
             poly.append(poly2poly(line))
         else:
-            logging.warning("Not sure what to do with {0}".format(line[:-1]))
+            logging.warning(f"Not sure what to do with {line[:-1]}")
     container = Dummy(maxdepth=maxdepth)
     container.include_circles = circles
     container.include_polygons = poly
 
     region = combine_regions(container)
     save_region(region, mimfile)
-    return
 
 
 def combine_regions(container):
@@ -509,12 +493,12 @@ def combine_regions(container):
 
     # add/rem all the regions from files
     for r in container.add_region:
-        logging.info("adding region from {0}".format(r))
+        logging.info(f"adding region from {r}")
         r2 = Region.load(r[0])
         region.union(r2)
 
     for r in container.rem_region:
-        logging.info("removing region from {0}".format(r))
+        logging.info(f"removing region from {r}")
         r2 = Region.load(r[0])
         region.without(r2)
 
@@ -577,7 +561,8 @@ def intersect_regions(flist):
         The intersection of all regions, possibly empty.
     """
     if len(flist) < 2:
-        raise Exception("Require at least two regions to perform intersection")
+        msg = "Require at least two regions to perform intersection"
+        raise Exception(msg)
     a = Region.load(flist[0])
     for b in [Region.load(f) for f in flist[1:]]:
         a.intersect(b)
@@ -597,5 +582,4 @@ def save_region(region, filename):
         Output file name.
     """
     region.save(filename)
-    logging.info("Wrote {0}".format(filename))
-    return
+    logging.info(f"Wrote {filename}")

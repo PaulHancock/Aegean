@@ -2,6 +2,7 @@
 """
 Test exceptions.py
 """
+from __future__ import annotations
 
 __author__ = 'Paul Hancock'
 
@@ -16,10 +17,11 @@ def test_exceptions():
         raise AssertionError("Cannot import AegeanTools.exceptions\n"+e.msg)
 
     if not issubclass(AegeanError, Exception):
-        raise AssertionError("AegeanError is not an Exception")
+        msg = "AegeanError is not an Exception"
+        raise AssertionError(msg)
     if not issubclass(AegeanNaNModelError, AegeanError):
-        raise AssertionError("AegeanNaNModelError is not an AegeanError")
-    return
+        msg = "AegeanNaNModelError is not an AegeanError"
+        raise AssertionError(msg)
 
 
 if __name__ == "__main__":

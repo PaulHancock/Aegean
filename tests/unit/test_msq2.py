@@ -2,7 +2,10 @@
 """
 Test msq2.py
 """
+from __future__ import annotations
+
 import numpy as np
+
 from treasure_island.msq2 import MarchingSquares
 
 __author__ = 'Paul Hancock'

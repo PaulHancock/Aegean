@@ -1,7 +1,9 @@
 #! /usr/bin/env python
+from __future__ import annotations
+
+import os
 
 from treasure_island.CLI import aegean
-import os
 
 image_SIN = 'tests/test_files/1904-66_SIN.fits'
 image_AIT = 'tests/test_files/1904-66_AIT.fits'
@@ -26,7 +28,8 @@ def test_versions():
 
 def test_invalid_image():
     if not aegean.main(['none']):
-        raise AssertionError('tried to run on invalid image')
+        msg = 'tried to run on invalid image'
+        raise AssertionError(msg)
 
 
 def test_check_projection():

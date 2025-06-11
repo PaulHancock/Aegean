@@ -2,6 +2,7 @@
 """
 Provide fitting routines and helper functions to Aegean
 """
+from __future__ import annotations
 
 import copy
 import logging
@@ -100,8 +101,7 @@ def elliptical_gaussian_with_alpha(x, y, v, amp,
     if beta is not None:
         exponent += beta * np.log10(v/vo)
     snu = amp * (v/vo) ** (exponent)
-    gauss = elliptical_gaussian(x, y, snu, xo, yo, sx, sy, theta)
-    return gauss
+    return elliptical_gaussian(x, y, snu, xo, yo, sx, sy, theta)
 
 
 def Cmatrix(x, y, sx, sy, theta):
@@ -124,9 +124,8 @@ def Cmatrix(x, y, sx, sy, theta):
     data : array-like
         The C-matrix.
     """
-    C = np.vstack([elliptical_gaussian(x, y, 1, i, j, sx, sy, theta)
-                  for i, j in zip(x, y)])
-    return C
+    return np.vstack([elliptical_gaussian(x, y, 1, i, j, sx, sy, theta)
+                  for i, j in zip(x, y, strict=False)])
 
 
 def Bmatrix(C):
@@ -149,10 +148,9 @@ def Bmatrix(C):
     L, Q = eigh(C)
     # force very small eigenvalues to have some minimum non-zero value
     minL = 1e-9*L[-1]
-    L[L < minL] = minL
+    L[minL > L] = minL
     S = np.diag(1 / np.sqrt(L))
-    B = Q.dot(S)
-    return B
+    return Q.dot(S)
 
 
 def jacobian(pars, x, y):
@@ -181,7 +179,7 @@ def jacobian(pars, x, y):
     matrix = []
 
     for i in range(pars['components'].value):
-        prefix = "c{0}_".format(i)
+        prefix = f"c{i}_"
         amp = pars[prefix + 'amp'].value
         xo = pars[prefix + 'xo'].value
         yo = pars[prefix + 'yo'].value
@@ -260,15 +258,14 @@ def emp_jacobian(pars, x, y):
     matrix = []
     model = ntwodgaussian_lmfit(pars)(x, y)
     for i in range(pars['components'].value):
-        prefix = "c{0}_".format(i)
+        prefix = f"c{i}_"
         for p in ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']:
             if pars[prefix + p].vary:
                 pars[prefix + p].value += eps
                 dmdp = ntwodgaussian_lmfit(pars)(x, y) - model
                 matrix.append(dmdp / eps)
                 pars[prefix + p].value -= eps
-    matrix = np.array(matrix)
-    return matrix
+    return np.array(matrix)
 
 
 def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
@@ -322,8 +319,7 @@ def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
     if B is not None:
         matrix = matrix.dot(B)
 
-    matrix = np.transpose(matrix)
-    return matrix
+    return np.transpose(matrix)
 
 
 def hessian(pars, x, y):
@@ -351,13 +347,13 @@ def hessian(pars, x, y):
     """
     j = 0  # keeping track of the number of variable parameters
     # total number of variable parameters
-    ntvar = np.sum([pars[k].vary for k in pars.keys() if k != 'components'])
+    ntvar = np.sum([pars[k].vary for k in pars if k != 'components'])
     # construct an empty matrix of the correct size
     hmat = np.zeros((ntvar, ntvar, x.shape[0], x.shape[1]))
     npvar = 0
 
     for i in range(pars['components'].value):
-        prefix = "c{0}_".format(i)
+        prefix = f"c{i}_"
         amp = pars[prefix + 'amp'].value
         xo = pars[prefix + 'xo'].value
         yo = pars[prefix + 'yo'].value
@@ -660,15 +656,14 @@ def emp_hessian(pars, x, y):
     matrix = []
     for i in range(pars['components'].value):
         model = emp_jacobian(pars, x, y)
-        prefix = "c{0}_".format(i)
+        prefix = f"c{i}_"
         for p in ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']:
             if pars[prefix+p].vary:
                 pars[prefix+p].value += eps
                 dm2didj = emp_jacobian(pars, x, y) - model
                 matrix.append(dm2didj/eps)
                 pars[prefix+p].value -= eps
-    matrix = np.array(matrix)
-    return matrix
+    return np.array(matrix)
 
 
 def nan_acf(noise):
@@ -733,8 +728,8 @@ def make_ita(noise, acf=None):
     xm, ym = np.where(np.isfinite(noise))
     ita = np.zeros((s, s))
     # iterate over the pixels
-    for i, (x1, y1) in enumerate(zip(xm, ym)):
-        for j, (x2, y2) in enumerate(zip(xm, ym)):
+    for i, (x1, y1) in enumerate(zip(xm, ym, strict=False)):
+        for j, (x2, y2) in enumerate(zip(xm, ym, strict=False)):
             k = abs(x1-x2)
             l = abs(y1-y2)
             ita[i, j] = acf[k, l]
@@ -767,8 +762,8 @@ def RB_bias(data, pars, ita=None, acf=None):
     bias : array
         The bias on each of the parameters
     """
-    log.info("data {0}".format(data.shape))
-    nparams = np.sum([pars[k].vary for k in pars.keys() if k != 'components'])
+    log.info(f"data {data.shape}")
+    nparams = np.sum([pars[k].vary for k in pars if k != 'components'])
     # masked pixels
     xm, ym = np.where(np.isfinite(data))
     # all pixels
@@ -795,10 +790,10 @@ def RB_bias(data, pars, ita=None, acf=None):
         if acf is None:
             acf = nan_acf(N)
         ita = make_ita(N, acf=acf)
-        log.info('acf.shape {0}'.format(acf.shape))
-        log.info('acf[0] {0}'.format(acf[0]))
-        log.info('ita.shape {0}'.format(ita.shape))
-        log.info('ita[0] {0}'.format(ita[0]))
+        log.info(f'acf.shape {acf.shape}')
+        log.info(f'acf[0] {acf[0]}')
+        log.info(f'ita.shape {ita.shape}')
+        log.info(f'ita[0] {ita[0]}')
 
     # Included for completeness but not required
 
@@ -813,7 +808,7 @@ def RB_bias(data, pars, ita=None, acf=None):
     bias_1 = np.einsum('imn, mn', Cimn, Vij)
     bias_2 = np.einsum('ilkm, mlk', Eilkm, Uijk)
     bias = bias_1 + bias_2
-    log.info('bias {0}'.format(bias))
+    log.info(f'bias {bias}')
     return bias
 
 
@@ -849,7 +844,6 @@ def bias_correct(params, data, acf=None):
         if params[p].vary:
             params[p].value -= bias[i]
             i += 1
-    return
 
 
 def errors(source, model, wcshelper):
@@ -881,7 +875,7 @@ def errors(source, model, wcshelper):
             source.err_int_flux = ERR_MASK
         return source
     # copy the errors from the model
-    prefix = "c{0}_".format(source.source)
+    prefix = f"c{source.source}_"
     err_amp = model[prefix + 'amp'].stderr
     xo, yo = model[prefix + 'xo'].value, model[prefix + 'yo'].value
     err_xo = model[prefix + 'xo'].stderr
@@ -897,7 +891,7 @@ def errors(source, model, wcshelper):
     source.err_peak_flux = err_amp
     pix_errs = [err_xo, err_yo, err_sx, err_sy, err_theta]
 
-    log.debug("Pix errs: {0}".format(pix_errs))
+    log.debug(f"Pix errs: {pix_errs}")
 
     ref = wcshelper.pix2sky([xo, yo])
     # check to see if the reference position has a valid WCS coordinate
@@ -998,7 +992,7 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
             source.err_ra = source.err_dec = source.err_int_flux = ERR_MASK
         return source
     # copy the errors/values from the model
-    prefix = "c{0}_".format(source.source)
+    prefix = f"c{source.source}_"
     err_amp = model[prefix + 'amp'].stderr
     xo, yo = model[prefix + 'xo'].value, model[prefix + 'yo'].value
     err_xo = model[prefix + 'xo'].stderr
@@ -1139,7 +1133,7 @@ def ntwodgaussian_lmfit(params):
         """
         result = None
         for i in range(params['components'].value):
-            prefix = "c{0}_".format(i)
+            prefix = f"c{i}_"
             # I hope this doesn't kill our run time
             amp = np.nan_to_num(params[prefix + 'amp'].value)
             xo = params[prefix + 'xo'].value
@@ -1215,13 +1209,13 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
         model = f(*mask)  # The actual model
 
         if np.any(~np.isfinite(model)):
+            msg = "lmfit optimisation has return NaN in the parameter set. "
             raise AegeanNaNModelError(
-                "lmfit optimisation has return NaN in the parameter set. ")
+                msg)
 
         if B is None:
             return model - data[mask]
-        else:
-            return (model - data[mask]).dot(B)
+        return (model - data[mask]).dot(B)
 
     if dojac:
         result = lmfit.minimize(residual, params,
@@ -1290,7 +1284,7 @@ def covar_errors(params, data, errs, B, C=None):
             onesigma = [-2] * len(mask[0])
 
     for i in range(params['components'].value):
-        prefix = "c{0}_".format(i)
+        prefix = f"c{i}_"
         j = 0
         for p in ['amp', 'xo', 'yo', 'sx', 'sy', 'theta']:
             if params[prefix + p].vary:

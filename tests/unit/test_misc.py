@@ -2,6 +2,7 @@
 """
 Tests for modules that are too small to warrant their own test suite
 """
+from __future__ import annotations
 
 __author__ = 'Paul Hancock'
 
@@ -11,8 +12,8 @@ def test_flags():
     import treasure_island.flags
     # use a flag
     if not treasure_island.flags.FITERR > 0:
-        raise AssertionError("FITERR is not >0")
-    return
+        msg = "FITERR is not >0"
+        raise AssertionError(msg)
 
 
 if __name__ == "__main__":

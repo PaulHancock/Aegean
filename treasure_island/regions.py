@@ -2,11 +2,12 @@
 """
 Describe sky areas as a collection of HEALPix pixels
 """
+from __future__ import annotations
 
+import _pickle as cPickle
 import datetime
 import os
 
-import _pickle as cPickle
 import astropy.units as u
 import healpy as hp
 import numpy as np
@@ -16,7 +17,7 @@ from astropy.io import fits
 __author__ = "Paul Hancock"
 
 
-class Region(object):
+class Region:
     """
     A Region object represents a footprint on the sky. This is done in a way
     similar to a MOC. The region is stored as a list of healpix pixels,
@@ -38,9 +39,8 @@ class Region(object):
 
     def __init__(self, maxdepth=11):
         self.maxdepth = maxdepth
-        self.pixeldict = dict((i, set()) for i in range(1, maxdepth+1))
+        self.pixeldict = {i: set() for i in range(1, maxdepth+1)}
         self.demoted = set()
-        return
 
     @classmethod
     def load(cls, mimfile):
@@ -57,8 +57,7 @@ class Region(object):
         region : `AegeanTools.regions.Region`
             A region object
         """
-        reg = cPickle.load(open(mimfile, 'rb'))
-        return reg
+        return cPickle.load(open(mimfile, 'rb'))
 
     def save(self, mimfile):
         """
@@ -70,7 +69,6 @@ class Region(object):
             File to write
         """
         cPickle.dump(self, open(mimfile, 'wb'), protocol=2)
-        return
 
     def __repr__(self):
         r = "Region with maximum depth {0}, and total area {1:5.2g} deg^2"
@@ -93,7 +91,7 @@ class Region(object):
         if depth is None or depth > self.maxdepth:
             depth = self.maxdepth
         try:
-            sky = list(zip(ra_cen, dec_cen))
+            sky = list(zip(ra_cen, dec_cen, strict=False))
             rad = radius
         except TypeError:
             sky = [[ra_cen, dec_cen]]
@@ -101,11 +99,10 @@ class Region(object):
         sky = np.array(sky)
         rad = np.array(rad)
         vectors = self.sky2vec(sky)
-        for vec, r in zip(vectors, rad):
+        for vec, r in zip(vectors, rad, strict=False):
             pix = hp.query_disc(2**depth, vec, r, inclusive=True, nest=True)
             self.add_pixels(pix, depth)
         self._renorm()
-        return
 
     def add_poly(self, positions, depth=None):
         """
@@ -121,19 +118,19 @@ class Region(object):
             The deepth at which the polygon will be inserted.
         """
         if not (len(positions) >= 3):
+            msg = "A minimum of three coordinate pairs are required"
             raise AssertionError(
-                "A minimum of three coordinate pairs are required")
+                msg)
 
         if depth is None or depth > self.maxdepth:
             depth = self.maxdepth
 
-        ras, decs = np.array(list(zip(*positions)))
+        ras, decs = np.array(list(zip(*positions, strict=False)))
         sky = self.radec2sky(ras, decs)
         pix = hp.query_polygon(2**depth, self.sky2vec(sky),
                                inclusive=True, nest=True)
         self.add_pixels(pix, depth)
         self._renorm()
-        return
 
     def add_pixels(self, pix, depth):
         """
@@ -197,10 +194,9 @@ class Region(object):
             pd = self.pixeldict
             for d in range(1, self.maxdepth):
                 for p in pd[d]:
-                    pd[d+1].update(set((4*p, 4*p+1, 4*p+2, 4*p+3)))
+                    pd[d+1].update({4*p, 4*p+1, 4*p+2, 4*p+3})
                 pd[d] = set()  # clear the pixels from this level
             self.demoted = pd[d+1]
-        return
 
     def _renorm(self):
         """
@@ -215,14 +211,13 @@ class Region(object):
             plist = self.pixeldict[d].copy()
             for p in plist:
                 if p % 4 == 0:
-                    nset = set((p, p+1, p+2, p+3))
+                    nset = {p, p+1, p+2, p+3}
                     if p+1 in plist and p+2 in plist and p+3 in plist:
                         # remove the four pixels from this level
                         self.pixeldict[d].difference_update(nset)
                         # add a new pixel to the next level up
                         self.pixeldict[d-1].add(p/4)
         self.demoted = set()
-        return
 
     def sky_within(self, ra, dec, degin=False):
         """
@@ -256,7 +251,7 @@ class Region(object):
         theta, phi = theta_phi.transpose()
         pix = hp.ang2pix(2**self.maxdepth, theta, phi, nest=True)
         pixelset = self.get_demoted()
-        result = np.in1d(pix, list(pixelset))
+        result = np.isin(pix, list(pixelset))
         # apply the mask and set the shonky values to False
         result[mask] = False
         return result
@@ -288,7 +283,6 @@ class Region(object):
                     self.pixeldict[self.maxdepth].add(pp)
         if renorm:
             self._renorm()
-        return
 
     def without(self, other):
         """
@@ -304,13 +298,13 @@ class Region(object):
         """
         # work only on the lowest level
         # TODO: Allow this to be done for regions with different depths.
-        if not (self.maxdepth == other.maxdepth):
-            raise AssertionError("Regions must have the same maxdepth")
+        if self.maxdepth != other.maxdepth:
+            msg = "Regions must have the same maxdepth"
+            raise AssertionError(msg)
         self._demote_all()
         opd = set(other.get_demoted())
         self.pixeldict[self.maxdepth].difference_update(opd)
         self._renorm()
-        return
 
     def intersect(self, other):
         """
@@ -326,13 +320,13 @@ class Region(object):
         """
         # work only on the lowest level
         # TODO: Allow this to be done for regions with different depths.
-        if not (self.maxdepth == other.maxdepth):
-            raise AssertionError("Regions must have the same maxdepth")
+        if self.maxdepth != other.maxdepth:
+            msg = "Regions must have the same maxdepth"
+            raise AssertionError(msg)
         self._demote_all()
         opd = set(other.get_demoted())
         self.pixeldict[self.maxdepth].intersection_update(opd)
         self._renorm()
-        return
 
     def symmetric_difference(self, other):
         """
@@ -348,13 +342,13 @@ class Region(object):
         """
         # work only on the lowest level
         # TODO: Allow this to be done for regions with different depths.
-        if not (self.maxdepth == other.maxdepth):
-            raise AssertionError("Regions must have the same maxdepth")
+        if self.maxdepth != other.maxdepth:
+            msg = "Regions must have the same maxdepth"
+            raise AssertionError(msg)
         self._demote_all()
         opd = set(other.get_demoted())
         self.pixeldict[self.maxdepth].symmetric_difference_update(opd)
         self._renorm()
-        return
 
     def write_reg(self, filename):
         """
@@ -373,7 +367,7 @@ class Region(object):
                     # the following int() gets around some problems with
                     # np.int64 that exist prior to numpy v 1.8.1
                     vectors = list(
-                        zip(*hp.boundaries(2**d, int(p), step=1, nest=True)))
+                        zip(*hp.boundaries(2**d, int(p), step=1, nest=True), strict=False))
                     positions = []
                     for sky in self.vec2sky(np.array(vectors), degrees=True):
                         ra, dec = sky
@@ -385,7 +379,6 @@ class Region(object):
                     line += ','.join(positions)
                     line += ")"
                     print(line, file=out)
-        return
 
     def write_fits(self, filename, moctool=''):
         """
@@ -420,7 +413,6 @@ class Region(object):
         hdulist[1].header['DATE'] = (datetime.datetime.strftime(
             time, format="%Y-%m-%dT%H:%m:%SZ"), 'MOC creation date')
         hdulist.writeto(filename, overwrite=True)
-        return
 
     def _uniq(self):
         """
@@ -434,7 +426,7 @@ class Region(object):
         """
         pd = []
         for d in range(1, self.maxdepth):
-            pd.extend(map(lambda x: int(4**(d+1) + x), self.pixeldict[d]))
+            pd.extend(int(4**(d+1) + x) for x in self.pixeldict[d])
         return sorted(pd)
 
     @staticmethod
@@ -454,7 +446,7 @@ class Region(object):
             array of (ra,dec) coordinates.
         """
         try:
-            sky = np.array(list(zip(ra, dec)))
+            sky = np.array(list(zip(ra, dec, strict=False)))
         except TypeError:
             sky = np.array([(ra, dec)])
         return sky
@@ -509,9 +501,8 @@ class Region(object):
         :func:`AegeanTools.regions.Region.vec2sky`
         """
         theta_phi = cls.sky2ang(sky)
-        theta, phi = map(np.array, list(zip(*theta_phi)))
-        vec = hp.ang2vec(theta, phi)
-        return vec
+        theta, phi = map(np.array, list(zip(*theta_phi, strict=False)))
+        return hp.ang2vec(theta, phi)
 
     @classmethod
     def vec2sky(cls, vec, degrees=False):

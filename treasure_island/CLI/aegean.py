@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+from __future__ import annotations
 
 import argparse
 import logging
@@ -11,9 +12,9 @@ import astropy
 import lmfit
 import numpy as np
 import scipy
-from treasure_island import __citation__, __date__, __version__
-from treasure_island.catalogs import (check_table_formats, save_catalog,
-                                  show_formats)
+
+from treasure_island import __date__, __version__
+from treasure_island.catalogs import check_table_formats, save_catalog, show_formats
 from treasure_island.source_finder import get_aux_files
 from treasure_island.wcs_helpers import Beam
 
@@ -35,13 +36,11 @@ def check_projection(filename, options, log):
         Options from the command line
     """
     header = astropy.io.fits.getheader(filename)
-    if not("SIN" in header['CTYPE1']):
-        if options.imgpsf is None:
-            projection = header['CTYPE1'].split('-')[-1]
-            log.warning(
-                "For projection {0} you should consider supplying a psf via"
-                " --psf".format(projection))
-    return
+    if "SIN" not in header['CTYPE1'] and options.imgpsf is None:
+        projection = header['CTYPE1'].split('-')[-1]
+        log.warning(
+            f"For projection {projection} you should consider supplying a psf via"
+            " --psf")
 
 
 def main(argv=()):
@@ -219,13 +218,12 @@ def main(argv=()):
     log = logging.getLogger("Aegean")
     logging_level = logging.DEBUG if options.debug else logging.INFO
     log.setLevel(logging_level)
-    log.info("This is Aegean {0}-({1})".format(__version__, __date__))
+    log.info(f"This is Aegean {__version__}-({__date__})")
 
-    log.debug("Run as:\n{0}".format(invocation_string))
+    log.debug(f"Run as:\n{invocation_string}")
 
     # options that don't require image inputs
     if options.cite:
-        print(__citation__)
         return 0
 
     import treasure_island
@@ -239,15 +237,11 @@ def main(argv=()):
         return 0
 
     if options.file_versions:
-        log.info("AegeanTools {0} from {1}".format(
-            treasure_island.__version__, treasure_island.__file__))
-        log.info("Numpy {0} from {1} ".format(np.__version__, np.__file__))
-        log.info("Scipy {0} from {1}".format(
-            scipy.__version__, scipy.__file__))
-        log.info("AstroPy {0} from {1}".format(
-            astropy.__version__, astropy.__file__))
-        log.info("LMFit {0} from {1}".format(
-            lmfit.__version__, lmfit.__file__))
+        log.info(f"AegeanTools {treasure_island.__version__} from {treasure_island.__file__}")
+        log.info(f"Numpy {np.__version__} from {np.__file__} ")
+        log.info(f"Scipy {scipy.__version__} from {scipy.__file__}")
+        log.info(f"AstroPy {astropy.__version__} from {astropy.__file__}")
+        log.info(f"LMFit {lmfit.__version__} from {lmfit.__file__}")
         return 0
 
     # print help if the user enters no options or filename
@@ -258,7 +252,7 @@ def main(argv=()):
     # check that a valid filename was entered
     filename = options.image
     if not os.path.exists(filename):
-        log.error("{0} not found".format(filename))
+        log.error(f"{filename} not found")
         return 1
 
     # check to see if the user has supplied --telescope/--psf when required
@@ -289,20 +283,19 @@ def main(argv=()):
     # check/set cores to use
     if options.cores is None:
         options.cores = multiprocessing.cpu_count()
-        log.info("Found {0} cores".format(options.cores))
-    log.info("Using {0} cores".format(options.cores))
+        log.info(f"Found {options.cores} cores")
+    log.info(f"Using {options.cores} cores")
 
     hdu_index = options.hdu_index
     if hdu_index > 0:
-        log.info("Using hdu index {0}".format(hdu_index))
+        log.info(f"Using hdu index {hdu_index}")
 
     # create a beam object from user input
     if options.beam is not None:
         beam = options.beam
         options.beam = Beam(beam[0], beam[1], beam[2])
         log.info("Using user supplied beam parameters")
-        log.info("Beam is {0} deg x {1} deg with pa {2}".format(
-            options.beam.a, options.beam.b, options.beam.pa))
+        log.info(f"Beam is {options.beam.a} deg x {options.beam.b} deg with pa {options.beam.pa}")
 
     # auto-load background, noise, psf and region files
     basename = os.path.splitext(filename)[0]
@@ -310,35 +303,34 @@ def main(argv=()):
         files = get_aux_files(filename)
         if files['bkg'] and not options.backgroundimg:
             options.backgroundimg = files['bkg']
-            log.info("Found background {0}".format(options.backgroundimg))
+            log.info(f"Found background {options.backgroundimg}")
         if files['rms'] and not options.noiseimg:
             options.noiseimg = files['rms']
-            log.info("Found noise {0}".format(options.noiseimg))
+            log.info(f"Found noise {options.noiseimg}")
         if files['mask'] and not options.region:
             options.region = files['mask']
-            log.info("Found region {0}".format(options.region))
+            log.info(f"Found region {options.region}")
         if files['psf'] and not options.imgpsf:
             options.imgpsf = files['psf']
-            log.info("Found psf {0}".format(options.imgpsf))
+            log.info(f"Found psf {options.imgpsf}")
 
     # check that the aux input files exist
     if options.backgroundimg and not os.path.exists(options.backgroundimg):
-        log.error("{0} not found".format(options.backgroundimg))
+        log.error(f"{options.backgroundimg} not found")
         return 1
     if options.noiseimg and not os.path.exists(options.noiseimg):
-        log.error("{0} not found".format(options.noiseimg))
+        log.error(f"{options.noiseimg} not found")
         return 1
     if options.imgpsf and not os.path.exists(options.imgpsf):
-        log.error("{0} not found".format(options.imgpsf))
+        log.error(f"{options.imgpsf} not found")
         return 1
     if options.catpsf and not os.path.exists(options.catpsf):
-        log.error("{0} not found".format(options.catpsf))
+        log.error(f"{options.catpsf} not found")
         return 1
 
-    if options.region is not None:
-        if not os.path.exists(options.region):
-            log.error("Region file {0} not found".format(options.region))
-            return 1
+    if options.region is not None and not os.path.exists(options.region):
+        log.error(f"Region file {options.region} not found")
+        return 1
 
     # Generate and save the background FITS files with the Aegean default
     # calculator
@@ -354,11 +346,10 @@ def main(argv=()):
 
     # check that the output table formats are supported (if given)
     # BEFORE any cpu intensive work is done
-    if options.tables is not None:
-        if not check_table_formats(options.tables):
-            log.critical(
-                "One or more output table formats are not supported: Exiting")
-            return 1
+    if options.tables is not None and not check_table_formats(options.tables):
+        log.critical(
+            "One or more output table formats are not supported: Exiting")
+        return 1
 
     # if an outputfile was specified open it for writing
     if options.outfile == 'stdout':
@@ -407,11 +398,11 @@ def main(argv=()):
                       "--priorized is selected")
             return 1
         if not os.path.exists(options.input):
-            log.error("{0} not found".format(options.input))
+            log.error(f"{options.input} not found")
             return 1
         log.info("Priorized fitting of sources in input catalog.")
 
-        log.info("Stage = {0}".format(options.priorized))
+        log.info(f"Stage = {options.priorized}")
         if options.doislandflux:
             log.warning("--island requested but not yet supported for "
                         "priorized fitting")
@@ -434,10 +425,10 @@ def main(argv=()):
 
     sources = sf.sources
 
-    log.info("found {0} sources total".format(len(sources)))
+    log.info(f"found {len(sources)} sources total")
     if len(sources) > 0 and options.tables:
         meta = {"PROGRAM": "Aegean",
-                "PROGVER": "{0}-({1})".format(__version__, __date__),
+                "PROGVER": f"{__version__}-({__date__})",
                 "FITSFILE": filename,
                 "RUN-AS": invocation_string}
         for t in options.tables.split(','):

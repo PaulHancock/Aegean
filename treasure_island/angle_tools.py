@@ -9,10 +9,12 @@ Tools for manipulating angles on the surface of a sphere
 
 also angle <-> string conversion tools for Aegean
 """
+from __future__ import annotations
 
 __author__ = "Paul Hancock"
 
 import math
+
 import numpy as np
 
 
@@ -76,15 +78,12 @@ def dec2dms(x):
     """
     if not np.isfinite(x):
         return 'XX:XX:XX.XX'
-    if x < 0:
-        sign = '-'
-    else:
-        sign = '+'
+    sign = '-' if x < 0 else '+'
     x = abs(x)
-    d = int(math.floor(x))
-    m = int(math.floor((x - d) * 60))
+    d = math.floor(x)
+    m = math.floor((x - d) * 60)
     s = float(((x - d) * 60 - m) * 60)
-    return '{0}{1:02d}:{2:02d}:{3:05.2f}'.format(sign, d, m, s)
+    return f'{sign}{d:02d}:{m:02d}:{s:05.2f}'
 
 
 def dec2hms(x):
@@ -112,7 +111,7 @@ def dec2hms(x):
     x = (x - h) * 60
     m = int(x)
     s = (x - m) * 60
-    return '{0:02d}:{1:02d}:{2:05.2f}'.format(h, m, s)
+    return f'{h:02d}:{m:02d}:{s:05.2f}'
 
 
 # The following functions are explained at
@@ -150,8 +149,7 @@ def gcd(ra1, dec1, ra2, dec2):
     a += np.cos(np.radians(dec1)) \
         * np.cos(np.radians(dec2)) \
         * np.sin(np.radians(dlon) / 2) ** 2
-    sep = np.degrees(2 * np.arcsin(np.minimum(1, np.sqrt(a))))
-    return sep
+    return np.degrees(2 * np.arcsin(np.minimum(1, np.sqrt(a))))
 
 
 def bear(ra1, dec1, ra2, dec2):
@@ -237,10 +235,7 @@ def dist_rhumb(ra1, dec1, ra2, dec2):
     lambda1 = np.radians(ra1)
     lambda2 = np.radians(ra2)
     dpsi = np.log(np.tan(np.pi / 4 + phi2 / 2) / np.tan(np.pi / 4 + phi1 / 2))
-    if dpsi < 1e-12:
-        q = np.cos(phi1)
-    else:
-        q = dpsi / dphi
+    q = np.cos(phi1) if dpsi < 1e-12 else dpsi / dphi
     dlambda = lambda2 - lambda1
     if dlambda > np.pi:
         dlambda -= 2 * np.pi

@@ -5,6 +5,7 @@ Cluster and crossmatch tools and analysis functions.
 Includes:
 - DBSCAN clustering
 """
+from __future__ import annotations
 
 import logging
 import math
@@ -60,8 +61,7 @@ def norm_dist(src1, src2):
                                   src1.b * np.cos(np.radians(phi - src1.pa)))
     r2 = src2.a*src2.b / np.hypot(src2.a * np.sin(np.radians(180 + phi - src2.pa)),
                                   src2.b * np.cos(np.radians(180 + phi - src2.pa)))
-    R = dist / (np.hypot(r1, r2) / 3600)
-    return R
+    return dist / (np.hypot(r1, r2) / 3600)
 
 
 def sky_dist(src1, src2):
@@ -189,7 +189,7 @@ def regroup_dbscan(srccat, eps=4):
         group = list(map(srccat.__getitem__, np.where(labels == l)[0]))
         groups[i] = group
 
-    log.info("Found {0:d} clusters".format(len(unique_labels)))
+    log.info(f"Found {len(unique_labels):d} clusters")
 
     log.debug("Labeling/sorting sources")
     islands = []
@@ -399,7 +399,7 @@ def resize(catalog, ratio=None, psfhelper=None):
     # If ratio is provided we just the psf by this amount
     if ratio is not None:
         log.info(
-            "Using ratio of {0} to scale input source shapes".format(ratio))
+            f"Using ratio of {ratio} to scale input source shapes")
 
         for i, src in enumerate(catalog):
             # the new source size is the previous size, convolved with the
@@ -470,8 +470,7 @@ def resize(catalog, ratio=None, psfhelper=None):
     else:
         log.info("Not scaling input source sizes")
     # return only the sources where resizing was possible
-    out_cat = list(map(catalog.__getitem__, np.where(src_mask)[0]))
-    return out_cat
+    return list(map(catalog.__getitem__, np.where(src_mask)[0]))
 
 
 def check_attributes_for_regroup(catalog):

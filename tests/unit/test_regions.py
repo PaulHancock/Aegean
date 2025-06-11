@@ -2,9 +2,12 @@
 """
 Test regions.py
 """
+from __future__ import annotations
+
 import os
 
 import numpy as np
+
 from treasure_island.regions import Region
 
 __author__ = 'Paul Hancock'
@@ -15,13 +18,15 @@ def test_radec2sky():
     ra, dec = (15, -45)
     sky = Region.radec2sky(ra, dec)
     if not (np.all(sky == [(ra, dec)])):
-        raise AssertionError("radec2sky broken on non-list input")
+        msg = "radec2sky broken on non-list input"
+        raise AssertionError(msg)
     ra = [0, 10]
     dec = [-45, 45]
     sky = Region.radec2sky(ra, dec)
     answer = np.array([(ra[0], dec[0]), (ra[1], dec[1])])
     if not (np.all(sky == answer)):
-        raise AssertionError('radec2sky broken on list input')
+        msg = 'radec2sky broken on list input'
+        raise AssertionError(msg)
 
 
 def test_sky2ang_symmetric():
@@ -32,7 +37,8 @@ def test_sky2ang_symmetric():
     sky2 = Region.sky2ang(tp)
     sky2 = np.array([[sky2[0][1], sky2[0][0]]])
     if not (np.all(abs(sky-sky2) < 1e-9)):
-        raise AssertionError("sky2ang failed to be symmetric")
+        msg = "sky2ang failed to be symmetric"
+        raise AssertionError(msg)
 
 
 def test_sky2ang_corners():
@@ -41,7 +47,8 @@ def test_sky2ang_corners():
     theta_phi = Region.sky2ang(corners)
     answers = np.array([[np.pi/2, 0], [np.pi, 2*np.pi]])
     if not (np.all(theta_phi - answers < 1e-9)):
-        raise AssertionError('sky2ang corner cases failed')
+        msg = 'sky2ang corner cases failed'
+        raise AssertionError(msg)
 
 
 def test_sky2vec_corners():
@@ -50,7 +57,8 @@ def test_sky2vec_corners():
     answers = np.array([[1, 0, 0], [0, 0, 1], [0, 0, -1]])
     vec = Region.sky2vec(sky)
     if not (np.all(vec - answers < 1e-9)):
-        raise AssertionError('sky2vec corner cases failed')
+        msg = 'sky2vec corner cases failed'
+        raise AssertionError(msg)
 
 
 def test_vec2sky_corners():
@@ -59,7 +67,8 @@ def test_vec2sky_corners():
     skycoords = Region.vec2sky(vectors, degrees=True)
     answers = np.array([[0, 0], [0, 90], [0, -90]])
     if not (np.all(skycoords == answers)):
-        raise AssertionError('vec2sky fails on corners')
+        msg = 'vec2sky fails on corners'
+        raise AssertionError(msg)
 
 
 def test_sky2vec2sky():
@@ -69,10 +78,12 @@ def test_sky2vec2sky():
     vec = Region.sky2vec(sky)
     sky2 = Region.vec2sky(vec)
     if not (np.all(np.array(sky2) - np.array(sky) == 0)):
-        raise AssertionError("sky2vec2sky failed")
+        msg = "sky2vec2sky failed"
+        raise AssertionError(msg)
     vec2 = Region.sky2vec(sky2)
     if not (np.all(np.array(vec) - np.array(vec2) == 0)):
-        raise AssertionError('vec2sky2vec failed')
+        msg = 'vec2sky2vec failed'
+        raise AssertionError(msg)
 
 
 def test_add_circles_list_scalar():
@@ -94,8 +105,9 @@ def test_add_circles_list_scalar():
         if len(region1.pixeldict[i].difference(region2.pixeldict[i])) > 0:
             test = False
     if not (test):
+        msg = 'add_circles gives different results for lists and scalars'
         raise AssertionError(
-            'add_circles gives different results for lists and scalars')
+            msg)
 
 
 def test_renorm_demote_symmetric():
@@ -115,7 +127,8 @@ def test_renorm_demote_symmetric():
         if len(end_dict[i].difference(start_dict[i])) > 0:
             test = False
     if not (test):
-        raise AssertionError('renorm and demote are not symmetric')
+        msg = 'renorm and demote are not symmetric'
+        raise AssertionError(msg)
 
 
 def test_sky_within():
@@ -126,11 +139,14 @@ def test_sky_within():
     region = Region(maxdepth=11)
     region.add_circles(ra, dec, radius)
     if not (np.all(region.sky_within(ra[0], dec[0]))):
-        raise AssertionError("Failed on position at center of region")
+        msg = "Failed on position at center of region"
+        raise AssertionError(msg)
     if not (np.all(region.sky_within(ra, dec))):
-        raise AssertionError("Failed on list of positions")
+        msg = "Failed on list of positions"
+        raise AssertionError(msg)
     if np.any(region.sky_within(ra[0]+5*radius[0], dec[0])):
-        raise AssertionError("Failed on position outside of region")
+        msg = "Failed on position outside of region"
+        raise AssertionError(msg)
     try:
         region.sky_within(np.nan, dec[0])
     except ValueError as e:
@@ -150,8 +166,9 @@ def test_pickle():
         import pickle
     pickle.dump(region, open('out_temp.mim', 'wb'))
     region2 = pickle.load(open('out_temp.mim', 'rb'))
-    if not (region.pixeldict == region2.pixeldict):
-        raise AssertionError('pickle/unpickle does not give same region')
+    if region.pixeldict != region2.pixeldict:
+        msg = 'pickle/unpickle does not give same region'
+        raise AssertionError(msg)
     os.remove('out_temp.mim')
 
 
@@ -178,7 +195,7 @@ def test_poly():
     ra = [5., 5., 7., 7.]
     dec = [-2., -2.5, -2.5, -2.]
     region = Region(maxdepth=6)
-    positions = list(zip(np.radians(ra), np.radians(dec)))
+    positions = list(zip(np.radians(ra), np.radians(dec), strict=False))
     region.add_poly(positions)
     region.write_reg('test.reg')
     if not (os.path.exists('test.reg')):
@@ -207,7 +224,8 @@ def test_without():
     b.add_circles(0, np.radians(-90), np.radians(0.5))
     a.without(b)
     if not (a.get_area() <= (area - b.get_area())):
-        raise AssertionError("test_without FAILED")
+        msg = "test_without FAILED"
+        raise AssertionError(msg)
 
 
 def test_intersect():
@@ -219,16 +237,18 @@ def test_intersect():
     b = Region(maxdepth=7)
     b.add_circles(0, np.radians(-90), np.radians(0.5))
     a.intersect(b)
-    if not (a.get_area() == b.get_area()):
-        raise AssertionError("test_intersect FAILED")
+    if a.get_area() != b.get_area():
+        msg = "test_intersect FAILED"
+        raise AssertionError(msg)
 
     a = Region(maxdepth=8)
     a.add_circles(0, np.radians(75), np.radians(3))
     c = Region(maxdepth=8)
     c.add_circles(0, np.radians(90), np.radians(10))
     a.intersect(c)
-    if not (a.get_area() == 0.):
-        raise AssertionError("test_intersect FAILED")
+    if a.get_area() != 0.0:
+        msg = "test_intersect FAILED"
+        raise AssertionError(msg)
 
 
 def test_demote():
@@ -254,8 +274,9 @@ def test_symmetric_difference():
     b = Region(maxdepth=7)
     b.add_circles(0, np.radians(-90), np.radians(0.5))
     a.symmetric_difference(b)
-    if not (a.get_area() == area - b.get_area()):
-        raise AssertionError("test_symmetric_difference FAILED")
+    if a.get_area() != area - b.get_area():
+        msg = "test_symmetric_difference FAILED"
+        raise AssertionError(msg)
 
 
 if __name__ == "__main__":

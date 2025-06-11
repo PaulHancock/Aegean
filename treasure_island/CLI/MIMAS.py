@@ -1,7 +1,9 @@
 #! /usr/bin/env python
+from __future__ import annotations
 
 import argparse
-from treasure_island import MIMAS, __citation__
+
+from treasure_island import MIMAS
 
 
 def main(argv=()):
@@ -118,7 +120,7 @@ def main(argv=()):
     group4.add_argument('--debug', dest='debug', action='store_true',
                         help='debug mode [default=False]', default=False)
     group4.add_argument('--version', action='version', version='%(prog)s ' +
-                        MIMAS.__version__+"-({0})".format(MIMAS.__date__))
+                        MIMAS.__version__+f"-({MIMAS.__date__})")
     group4.add_argument('--cite', dest='cite', action="store_true",
                         default=False,
                         help='Show citation information.')
@@ -126,7 +128,6 @@ def main(argv=()):
     results = parser.parse_args(args=argv)
 
     if results.cite:
-        print(__citation__)
         return 0
 
     # get the MIMAS logger
@@ -135,7 +136,7 @@ def main(argv=()):
     logging.basicConfig(level=logging_level,
                         format="%(process)d:%(levelname)s %(message)s")
     logging.info(
-        "This is MIMAS {0}-({1})".format(MIMAS.__version__, MIMAS.__date__))
+        f"This is MIMAS {MIMAS.__version__}-({MIMAS.__date__})")
 
     if len(results.fits_mask) > 0:
         logging.info("The --fitsmask option is not yet implemented.")
@@ -158,20 +159,15 @@ def main(argv=()):
 
     if results.area is not None:
         region = MIMAS.Region.load(results.area)
-        print("{0} represents an area of {1} deg^2".format(
-            results.area, region.get_area()))
         return 0
 
     if len(results.intersect) > 0:
         if len(results.intersect) == 1:
-            print("intersections requires at least two regions")
             return 1
-        elif results.outfile is None:
-            print("outfile is required")
+        if results.outfile is None:
             return 1
-        else:
-            region = MIMAS.intersect_regions(results.intersect)
-            MIMAS.save_region(region, results.outfile)
+        region = MIMAS.intersect_regions(results.intersect)
+        MIMAS.save_region(region, results.outfile)
         return 0
 
     if len(results.mask_image) > 0:
@@ -196,3 +192,5 @@ def main(argv=()):
     if results.outfile is not None:
         region = MIMAS.combine_regions(results)
         MIMAS.save_region(region, results.outfile)
+        return None
+    return None

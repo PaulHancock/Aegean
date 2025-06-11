@@ -2,11 +2,14 @@
 """
 Test BANE.py
 """
+from __future__ import annotations
+
 import os
 
 import numpy as np
-from treasure_island import BANE
 from astropy.io import fits
+
+from treasure_island import BANE
 
 __author__ = 'Paul Hancock'
 
@@ -79,10 +82,11 @@ def test_ND_images():
     fname = fbase.format(5)
     try:
         BANE.filter_image(fname, out_base=outbase)
-    except Exception as e:
+    except Exception:
         pass
     else:
-        raise AssertionError("BANE failed on 5d image in unexpected way")
+        msg = "BANE failed on 5d image in unexpected way"
+        raise AssertionError(msg)
 
 
 def test_slice():
@@ -94,14 +98,16 @@ def test_slice():
     try:
         for index in [0, 1, 2]:
             BANE.filter_image(fname, out_base=None, nslice=1, cube_index=0)
-    except Exception as e:
-        raise AssertionError("Error on cube_index {0}:\n{0}".format(index, e))
+    except Exception:
+        msg = f"Error on cube_index {index}:\n{index}"
+        raise AssertionError(msg)
 
     # die niecely when using an invalid cube_index
     try:
         BANE.filter_image(fname, out_base=None, nslice=1, cube_index=3)
-    except Exception as e:
-        raise AssertionError("BANE didn't die safely with cube_index=3")
+    except Exception:
+        msg = "BANE didn't die safely with cube_index=3"
+        raise AssertionError(msg)
 
 
 def test_quantitative():
@@ -122,14 +128,15 @@ def test_quantitative():
     os.remove(rms)
     os.remove(bkg)
     if not np.allclose(r1, r2, atol=0.01, equal_nan=True):
+        msg = f"rms is wrong {np.nanmax(np.abs(r1-r2))}"
         raise AssertionError(
-            "rms is wrong {0}".format(np.nanmax(np.abs(r1-r2))))
+            msg)
 
     if not np.allclose(b1, b2, atol=0.01, equal_nan=True):
+        msg = f"bkg is wrong {np.nanmax(np.abs(b1-b2))}"
         raise AssertionError(
-            "bkg is wrong {0}".format(np.nanmax(np.abs(b1-b2))))
+            msg)
 
-    return
 
 
 def test_BSCALE():
@@ -141,8 +148,9 @@ def test_BSCALE():
     hdu.writeto('dlme.fits')
     try:
         BANE.filter_image(outbase+'.fits', out_base=outbase, cores=1, nslice=1)
-    except ValueError as e:
-        raise AssertionError("BSCALE=1.0 causes crash")
+    except ValueError:
+        msg = "BSCALE=1.0 causes crash"
+        raise AssertionError(msg)
     finally:
         os.remove('dlme.fits')
 
@@ -150,11 +158,11 @@ def test_BSCALE():
     hdu.writeto('dlme.fits')
     try:
         BANE.filter_image(outbase+'.fits', out_base=outbase, cores=1, nslice=1)
-    except ValueError as e:
-        raise AssertionError("BSCALE=2.0 causes crash")
+    except ValueError:
+        msg = "BSCALE=2.0 causes crash"
+        raise AssertionError(msg)
     finally:
         os.remove('dlme.fits')
-    return
 
 
 if __name__ == "__main__":
