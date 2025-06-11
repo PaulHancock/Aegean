@@ -37,7 +37,7 @@ from numpy import fft
 from radio_beam import Beam
 from scipy import ndimage
 
-from AegeanTools import numba_polyfit
+from treasure_island import numba_polyfit
 
 logging.basicConfig(
     format="%(module)s:%(levelname)s %(message)s",

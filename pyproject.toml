@@ -1,0 +1,92 @@
+[build-system]
+requires = ["hatchling>=1.26", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+
+
+[project]
+name = "treasure-island"
+description = "A pirate version of the Aegean source finding program, and associated tools."
+readme = "README.md"
+license = { text = "AFL-3.0" }
+authors = [
+    { name = "Alec Thomson"},
+    { name = "Tim Galvin"},
+    { name = "Paul Hancock", email = "Mr.Paul.Hancock@gmail.com" }
+]
+requires-python = ">=3.10"
+dynamic = ["version"]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
+]
+dependencies = [
+    "scipy>=0.16",
+    "tqdm>=4",
+    "numpy>=1.22,<2",
+    "astropy>=2.0",
+    "healpy>=1.10",
+    "lmfit>=0.9.2",
+    "scikit-learn>=0.24.2",
+    "rocket-fft>=0.2.3",
+    "numba>=0.58",
+    "radio-beam"
+]
+
+[project.urls]
+Homepage = "https://github.com/flint-crew/treasure-island"
+"Bug Tracker" = "https://github.com/flint-crew/treasure-island/issues"
+Discussions = "https://github.com/flint-crew/treasure-island/discussions"
+Changelog = "https://github.com/flint-crew/treasure-island/releases"
+
+[dependency-groups]
+test = [
+  "pytest >=6",
+  "pytest-cov >=3",
+]
+
+[project.scripts]
+aegean = "scripts.aegean"
+BANE = "scripts.BANE"
+SR6 = "scripts.SR6"
+AeRes = "scripts.AeRes"
+MIMAS = "scripts.MIMAS"
+AeReg = "scripts.AeReg"
+fix_beam = "scripts.fix_beam"
+BANE_fft = "scripts.BANE_fft"
+
+[tool.hatch]
+version.source = "vcs"
+build.hooks.vcs.version-file = "jolly_roger/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["AegeanTools"]
+
+[tool.hatch.build]
+include = [
+  "AegeanTools/data/MOC.fits",
+  "scripts/**"
+]
+
+[tool.hatch.metadata]
+keywords = [
+  "image processing",
+  "radioastronomy"
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest",
+  "nose"
+]

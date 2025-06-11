@@ -12,7 +12,7 @@ import logging
 import numpy as np
 from astropy.io import fits
 
-from AegeanTools import catalogs, fitting, wcs_helpers
+from treasure_island import catalogs, fitting, wcs_helpers
 
 __author__ = "Paul Hancock"
 

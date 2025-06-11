@@ -11,11 +11,11 @@ import astropy
 import lmfit
 import numpy as np
 import scipy
-from AegeanTools import __citation__, __date__, __version__
-from AegeanTools.catalogs import (check_table_formats, save_catalog,
+from treasure_island import __citation__, __date__, __version__
+from treasure_island.catalogs import (check_table_formats, save_catalog,
                                   show_formats)
-from AegeanTools.source_finder import get_aux_files
-from AegeanTools.wcs_helpers import Beam
+from treasure_island.source_finder import get_aux_files
+from treasure_island.wcs_helpers import Beam
 
 header = """#Aegean version {0}
 # on dataset: {1}"""
@@ -228,8 +228,8 @@ def main(argv=()):
         print(__citation__)
         return 0
 
-    import AegeanTools
-    from AegeanTools.source_finder import SourceFinder
+    import treasure_island
+    from treasure_island.source_finder import SourceFinder
 
     # source finding object
     sf = SourceFinder(log=log)
@@ -240,7 +240,7 @@ def main(argv=()):
 
     if options.file_versions:
         log.info("AegeanTools {0} from {1}".format(
-            AegeanTools.__version__, AegeanTools.__file__))
+            treasure_island.__version__, treasure_island.__file__))
         log.info("Numpy {0} from {1} ".format(np.__version__, np.__file__))
         log.info("Scipy {0} from {1}".format(
             scipy.__version__, scipy.__file__))

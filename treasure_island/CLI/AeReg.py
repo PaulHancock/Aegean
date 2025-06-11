@@ -5,9 +5,9 @@ import logging
 import os
 
 import numpy as np
-from AegeanTools import wcs_helpers
-from AegeanTools.catalogs import load_table, save_catalog, table_to_source_list
-from AegeanTools.cluster import (check_attributes_for_regroup, regroup_dbscan,
+from treasure_island import wcs_helpers
+from treasure_island.catalogs import load_table, save_catalog, table_to_source_list
+from treasure_island.cluster import (check_attributes_for_regroup, regroup_dbscan,
                                  resize)
 from astropy.io import fits
 

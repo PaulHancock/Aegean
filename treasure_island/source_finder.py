@@ -16,8 +16,8 @@ from scipy.ndimage import find_objects, label, maximum_filter, minimum_filter
 from scipy.special import erf
 from tqdm import tqdm
 
-from AegeanTools import wcs_helpers
-from AegeanTools.fits_tools import write_fits
+from treasure_island import wcs_helpers
+from treasure_island.fits_tools import write_fits
 
 from . import cluster, flags
 from .__init__ import __date__, __version__
@@ -2446,7 +2446,7 @@ class SourceFinder(object):
 
         """
 
-        from AegeanTools.cluster import regroup_dbscan
+        from treasure_island.cluster import regroup_dbscan
 
         self.load_globals(
             filename,

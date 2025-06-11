@@ -4,9 +4,9 @@ import logging
 import os
 
 import numpy as np
-from AegeanTools import __citation__
-from AegeanTools.BANE import get_step_size
-from AegeanTools.fits_tools import compress, expand
+from treasure_island import __citation__
+from treasure_island.BANE import get_step_size
+from treasure_island.fits_tools import compress, expand
 from astropy.io import fits
 
 __author__ = "Paul Hancock"

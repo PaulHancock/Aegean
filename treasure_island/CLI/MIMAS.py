@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 import argparse
-from AegeanTools import MIMAS, __citation__
+from treasure_island import MIMAS, __citation__
 
 
 def main(argv=()):

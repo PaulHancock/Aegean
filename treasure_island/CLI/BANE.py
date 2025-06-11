@@ -4,7 +4,7 @@
 import argparse
 import os
 
-from AegeanTools import BANE, __citation__
+from treasure_island import BANE, __citation__
 
 __author__ = 'Paul Hancock'
 
