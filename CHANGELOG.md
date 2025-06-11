@@ -53,7 +53,7 @@ AeReg
 
 Aegean
 -  Fix a bug which allowed components of one island to appear in nearby islands (see #158)
--  Update documentation and associated [website](http://aegeantools.rtfd.io/)
+-  Update documentation and associated [website](http://treasure_island.rtfd.io/)
 -  Change the regrouping algorithm to be crazy fast (compared to stupid slow)
   -  adds `scikit-learn>=0.24.2` as a dependency
   -  see `AeReg` above

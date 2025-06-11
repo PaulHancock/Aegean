@@ -110,7 +110,7 @@ html_static_path = ["_static"]
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = "AegeanToolsdoc"
+htmlhelp_basename = "treasure_islanddoc"
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -148,7 +148,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "aegeantools", "treasure_island Documentation", [author], 1)]
+man_pages = [(master_doc, "treasure_island", "treasure_island Documentation", [author], 1)]
 
 
 # -- Options for Texinfo output -------------------------------------------
