@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 __citation__ = r"""
-% If your work makes use of AegeanTools please cite the following papers as
+% If your work makes use of treasure_island please cite the following papers as
 % appropriate:
 
 % Advanced features of Aegean, plus description of BANE, MIMAS, and AeRes

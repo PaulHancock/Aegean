@@ -42,7 +42,7 @@ def load_sources(
 
     Return
     ------
-    catalog : [`class:AegeanTools.models.ComponentSource`, ...]
+    catalog : [`class:treasure_island.models.ComponentSource`, ...]
         A list of source components
     """
     table = catalogs.load_table(filename)
@@ -75,13 +75,13 @@ def make_model(sources, shape, wcshelper, mask=False, frac=None, sigma=4):
 
     Parameters
     ----------
-    sources : [`class:AegeanTools.models.ComponentSource`, ...]
+    sources : [`class:treasure_island.models.ComponentSource`, ...]
         a list of sources
 
     shape : [float, float]
         the shape of the input (and output) image
 
-    wcshelper : 'class:AegeanTools.wcs_helpers.WCSHelper'
+    wcshelper : 'class:treasure_island.wcs_helpers.WCSHelper'
         A WCSHelper object corresponding to the input image
 
     mask : bool

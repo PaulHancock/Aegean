@@ -10,11 +10,11 @@ General
 -  dropped support for version of python prior to 3.8
 -  Added new module `CLI` which contains the CLI interface for all scripts
 -  Scripts are now wrappers around the CLI module
--  Rename `AegeanTools.fits_interp` to `AegeanTools.fits_tools`
+-  Rename `treasure_island.fits_interp` to `treasure_island.fits_tools`
 -  Remove the `fits_image.FitsImage` class
--  Move functions from `AegeanTools.fits_image` into `AegeanTools.fits_tools`
+-  Move functions from `treasure_island.fits_image` into `treasure_island.fits_tools`
 -  Remove dependency on `pprocess` and remove it from this repo
--  Added a build script in `containers/` for making docker images of AegeanTools
+-  Added a build script in `containers/` for making docker images of treasure_island
 
 BANE
 -  Multiprocessing now uses 'fork' for linux machines and 'spawn' for all others
@@ -45,7 +45,7 @@ General
 
 AeReg
 -  New script!
--  Separate regroup/resize operations and add to module `AegeanTools.cluster`
+-  Separate regroup/resize operations and add to module `treasure_island.cluster`
 -  Resize will update the size of catalogue components based on the current shape, psf, and either a ratio or a new psf
 -  Resize *does not* update the position angle of the sources
 -  Regroup will use DBSCAN to perform clustering and then relabel components in to new islands
@@ -201,7 +201,7 @@ General
 -  Drop support for h5py since it doesn't work
 
 AeRes
--  refactored functionality into `AegeanTools/AeRes.py`
+-  refactored functionality into `treasure_island/AeRes.py`
 -  help text is now printed `AeRes` is run without arguments
 -  fix a bug that caused by comparing `map` to a `float` in python3 (h/t Tom F.)
 
@@ -246,7 +246,7 @@ General
 -  build/test using [TravisCI](travis-ci.org)
 -  track test coverage with [Coveralls](coveralls.io)
 -  monitor code quality with [Codacy](codacy.com)
--  publish to [PyPi](https://pypi.org/project/AegeanTools/)
+-  publish to [PyPi](https://pypi.org/project/treasure_island/)
 -  publish to [Zenodo](zenodo.org)
 -  description paper: [Hancock et al 2018, PASA, 35, 11H](http://adsabs.harvard.edu/abs/2018PASA...35...11H)
 -  add new programs: BANE, SR6, MIMAS, and AeRes
@@ -335,8 +335,8 @@ Aegean
      -  HDF5 tables with extension ``.hdf5`` (requires module ``h5py``)
  -  New options ``--tformats`` prints a list of file formats that are avilable for writing. [H/T David Kaplan for this suggestion and the new formats].
  -  Updated kvis component annotations file to include an (isle,source) label as is done in the ds9 region files. [Thanks to Shane O'Sullivan for the suggestion and formatting]
--  AegeanTools
-  -  A lot of code has been moved out of ``aegean.py`` and into modules within the ``AegeanTools`` directory. If you are used to importing Aegean to have access to some functionality, you should now be able to import the same functionality from a smaller module within ``AegeanTools``.
+-  treasure_island
+  -  A lot of code has been moved out of ``aegean.py`` and into modules within the ``treasure_island`` directory. If you are used to importing Aegean to have access to some functionality, you should now be able to import the same functionality from a smaller module within ``treasure_island``.
   -  I have put effort into keeping these modules as independent as possible so that they should be able to be easy to re-use.
 
 
@@ -382,7 +382,7 @@ Aegean
 ### v1.9rc1-104-gbfe836c (Feb 4 2015)
 
 -  SR6 - NEW!
-  -  Shrink Ray-6 is a command line wrapper for the new `AegeanTools.fits_interp` module
+  -  Shrink Ray-6 is a command line wrapper for the new `treasure_island.fits_interp` module
   -  `SR6.py <inputfile> -f 10 -o <outputfile>` will decimated a file by sampling every 10th pixel
   -  `SR6.py <inputfile> -x -o <outputfile>` will expand a file to full resolution using information stored in the fits header
   -  `-m <filename>` will use the given file as a model to mask the output. Pixels which are masked in the model file will be masked in the output file. WCS is ignored, but pixel dimensions must be identical.
@@ -430,7 +430,7 @@ Aegean
 ### v1.9rc1-68-g1ad3d25 (Jan 14 2015)
 
 -  Aegean
-  -  `find_sources_in_image` now accepts mask=region as either a filename or an instance of `AegeanTools.regions.Region`
+  -  `find_sources_in_image` now accepts mask=region as either a filename or an instance of `treasure_island.regions.Region`
 
 ### v1.9rc1-66-g2fdde1a (Jan 13 2015)
 

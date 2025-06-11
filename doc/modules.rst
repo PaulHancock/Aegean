@@ -1,84 +1,84 @@
 .. _modules:
 
 ===================
-AegeanTools modules
+treasure_island modules
 ===================
 
 
 angle_tools
 -----------
 
-.. automodule:: AegeanTools.angle_tools
+.. automodule:: treasure_island.angle_tools
     :members:
 
 BANE
 ----
 
-.. automodule:: AegeanTools.BANE
+.. automodule:: treasure_island.BANE
     :members:
 
 catalogs
 --------
 
-.. automodule:: AegeanTools.catalogs
+.. automodule:: treasure_island.catalogs
     :members:
 
 cluster
 -------
 
-.. automodule:: AegeanTools.cluster
+.. automodule:: treasure_island.cluster
     :members:
 
 fits_tools
 -----------
 
-.. automodule:: AegeanTools.fits_tools
+.. automodule:: treasure_island.fits_tools
     :members:
 
 fitting
 -------
 
-.. automodule:: AegeanTools.fitting
+.. automodule:: treasure_island.fitting
     :members:
 
 flags
 -----
 
-.. automodule:: AegeanTools.flags
+.. automodule:: treasure_island.flags
     :members:
 
 MIMAS
 -----
 
-.. automodule:: AegeanTools.MIMAS
+.. automodule:: treasure_island.MIMAS
     :members:
 
 models
 ------
 
-.. automodule:: AegeanTools.models
+.. automodule:: treasure_island.models
     :members:
 
 msq2
 ----
 
-.. automodule:: AegeanTools.msq2
+.. automodule:: treasure_island.msq2
     :members:
 
 regions
 -------
 
-.. automodule:: AegeanTools.regions
+.. automodule:: treasure_island.regions
     :members:
 
 source_finder
 -------------
 
-.. automodule:: AegeanTools.source_finder
+.. automodule:: treasure_island.source_finder
     :members:
 
 wcs_helpers
 -----------
 
-.. automodule:: AegeanTools.wcs_helpers
+.. automodule:: treasure_island.wcs_helpers
     :members:

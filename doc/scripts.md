@@ -1,6 +1,6 @@
-# AegeanTools scripts
+# treasure_island scripts
 
-The following scripts are provided as part of the AegeanTools package:
+The following scripts are provided as part of the treasure_island package:
 
 - [aegean](includes/aegean) - Aegean source finding
 - [BANE](includes/BANE) - Background and Noise Estimation

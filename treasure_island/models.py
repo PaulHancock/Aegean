@@ -37,7 +37,7 @@ class SimpleSource:
         Value of the brightest pixel for this source.
 
     flags : int
-        Flags. See :mod:`AegeanTools.flags`.
+        Flags. See :mod:`treasure_island.flags`.
 
     a, b, pa : float
         Shape parameters for this source.
@@ -48,7 +48,7 @@ class SimpleSource:
 
     See Also
     --------
-    :mod:`AegeanTools.flags`
+    :mod:`treasure_island.flags`
     """
 
     header = (
@@ -190,7 +190,7 @@ class IslandSource(SimpleSource):
         of this island.
 
     flags : int
-        Flags. See :mod:`AegeanTools.flags`.
+        Flags. See :mod:`treasure_island.flags`.
 
     uuid : str
         Unique ID for this source. This is random and not dependent on the
@@ -198,7 +198,7 @@ class IslandSource(SimpleSource):
 
     See Also
     --------
-    :mod:`AegeanTools.flags`
+    :mod:`treasure_island.flags`
 
     """
 
@@ -330,7 +330,7 @@ class ComponentSource(SimpleSource):
         (degrees).
 
     flags : int
-        Flags. See :mod:`AegeanTools.flags`.
+        Flags. See :mod:`treasure_island.flags`.
 
     uuid : str
         Unique ID for this source. This is random and not dependent on the
@@ -338,7 +338,7 @@ class ComponentSource(SimpleSource):
 
     See Also
     --------
-    :mod:`AegeanTools.flags`
+    :mod:`treasure_island.flags`
 
     """
 
@@ -497,7 +497,7 @@ class GlobalFittingData:
 
     Attributes
     ----------
-    img : :class:`AegeanTools.fits_image.FitsImage`
+    img : :class:`treasure_island.fits_image.FitsImage`
         Image that is being analysed, aka the input image.
 
     dcurve : 2d-array
@@ -509,16 +509,16 @@ class GlobalFittingData:
     hdu_header : HDUHeader
         FITS header for the input image.
 
-    beam : :class:`AegeanTools.wcs_helpers.Beam`
+    beam : :class:`treasure_island.wcs_helpers.Beam`
         The synthesized beam of the input image.
 
     dtype : {np.float32, np.float64}
         The data type for the input image. Will be enforced upon writing.
 
-    region : :class:`AegeanTools.regions.Region`
+    region : :class:`treasure_island.regions.Region`
         The region that will be used to limit the source finding of Aegean.
 
-    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
+    wcshelper : :class:`treasure_island.wcs_helpers.WCSHelper`
         A helper object for WCS operations, created from `hdu_header`.
 
     blank : bool
@@ -710,7 +710,7 @@ def island_itergen(catalog):
     Parameters
     ----------
     catalog : iterable
-        A list or iterable of :class:`AegeanTools.models.ComponentSource`
+        A list or iterable of :class:`treasure_island.models.ComponentSource`
         objects.
 
     Yields

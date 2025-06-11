@@ -124,7 +124,7 @@ def update_meta_data(meta=None):
     if "DATE" not in meta:
         meta["DATE"] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
     if "PROGRAM" not in meta:
-        meta["PROGRAM"] = "AegeanTools.catalogs"
+        meta["PROGRAM"] = "treasure_island.catalogs"
         meta["PROGVER"] = f"{__version__}-({__date__})"
     return meta
 
@@ -136,9 +136,9 @@ def save_catalog(filename, catalog, meta=None, prefix=None):
 
     Each type of source will be in a separate file:
 
-    - base_comp.ext :class:`AegeanTools.models.ComponentSource`
-    - base_isle.ext :class:`AegeanTools.models.IslandSource`
-    - base_simp.ext :class:`AegeanTools.models.SimpleSource`
+    - base_comp.ext :class:`treasure_island.models.ComponentSource`
+    - base_isle.ext :class:`treasure_island.models.IslandSource`
+    - base_simp.ext :class:`treasure_island.models.SimpleSource`
 
 
     Where filename = base.ext
@@ -150,9 +150,9 @@ def save_catalog(filename, catalog, meta=None, prefix=None):
 
     catalog : list
         A list of sources to write. Sources must be of type
-        :class:`AegeanTools.models.ComponentSource`,
-        :class:`AegeanTools.models.SimpleSource`, or
-        :class:`AegeanTools.models.IslandSource`.
+        :class:`treasure_island.models.ComponentSource`,
+        :class:`treasure_island.models.SimpleSource`, or
+        :class:`treasure_island.models.IslandSource`.
 
     meta : dict
         Meta data to be written to the output file. Support for metadata
@@ -305,9 +305,9 @@ def table_to_source_list(table, src_type=ComponentSource):
     Convert a table of data into a list of sources.
 
     A single table must have consistent source types given by src_type.
-    src_type should be one of :class:`AegeanTools.models.ComponentSource`,
-    :class:`AegeanTools.models.SimpleSource`, or
-    :class:`AegeanTools.models.IslandSource`.
+    src_type should be one of :class:`treasure_island.models.ComponentSource`,
+    :class:`treasure_island.models.SimpleSource`, or
+    :class:`treasure_island.models.IslandSource`.
 
 
     Parameters
@@ -316,9 +316,9 @@ def table_to_source_list(table, src_type=ComponentSource):
         Table of sources
 
     src_type : class
-        Sources must be of type :class:`AegeanTools.models.ComponentSource`,
-        :class:`AegeanTools.models.SimpleSource`, or
-        :class:`AegeanTools.models.IslandSource`.
+        Sources must be of type :class:`treasure_island.models.ComponentSource`,
+        :class:`treasure_island.models.SimpleSource`, or
+        :class:`treasure_island.models.IslandSource`.
 
     Returns
     -------
@@ -351,9 +351,9 @@ def write_catalog(filename, catalog, fmt=None, meta=None, prefix=None):
     Write a catalog (list of sources) to a file with format determined by
     extension.
 
-    Sources must be of type :class:`AegeanTools.models.ComponentSource`,
-    :class:`AegeanTools.models.SimpleSource`, or
-    :class:`AegeanTools.models.IslandSource`.
+    Sources must be of type :class:`treasure_island.models.ComponentSource`,
+    :class:`treasure_island.models.SimpleSource`, or
+    :class:`treasure_island.models.IslandSource`.
 
     Parameters
     ----------
@@ -363,9 +363,9 @@ def write_catalog(filename, catalog, fmt=None, meta=None, prefix=None):
 
     catalog : list
         A list of source objects. Sources must be of type
-        :class:`AegeanTools.models.ComponentSource`,
-        :class:`AegeanTools.models.SimpleSource`, or
-        :class:`AegeanTools.models.IslandSource`.
+        :class:`treasure_island.models.ComponentSource`,
+        :class:`treasure_island.models.SimpleSource`, or
+        :class:`treasure_island.models.IslandSource`.
 
     fmt : str
         The file format extension.
@@ -509,7 +509,7 @@ def writeIslandContours(filename, catalog, fmt="reg"):
 
     catalog : list
         List of sources. Only those of type
-        :class:`AegeanTools.models.IslandSource` will have contours drawn.
+        :class:`treasure_island.models.IslandSource` will have contours drawn.
 
     fmt : str
         Output format type. Currently only 'reg' is supported (default)
@@ -520,7 +520,7 @@ def writeIslandContours(filename, catalog, fmt="reg"):
 
     See Also
     --------
-    :func:`AegeanTools.catalogs.writeIslandBoxes`
+    :func:`treasure_island.catalogs.writeIslandBoxes`
     """
     if fmt != "reg":
         log.warning(f"Format {fmt} not yet supported")
@@ -529,7 +529,7 @@ def writeIslandContours(filename, catalog, fmt="reg"):
 
     out = open(filename, "w")
     print("#Aegean island contours", file=out)
-    print(f"#AegeanTools.catalogs version {__version__}-({__date__})", file=out)
+    print(f"#treasure_island.catalogs version {__version__}-({__date__})", file=out)
     line_fmt = "image;line({0},{1},{2},{3})"
     text_fmt = "fk5; text({0},{1}) # text={{{2}}}"
     mas_fmt = "image; line({1},{0},{3},{2}) #color = yellow"
@@ -580,7 +580,7 @@ def writeIslandBoxes(filename, catalog, fmt):
 
     catalog : list
         List of sources. Only those of type
-        :class:`AegeanTools.models.IslandSource` will have contours drawn.
+        :class:`treasure_island.models.IslandSource` will have contours drawn.
 
     fmt : str
         Output format type. Currently only 'reg' and 'ann' are supported.
@@ -592,7 +592,7 @@ def writeIslandBoxes(filename, catalog, fmt):
 
     See Also
     --------
-    :func:`AegeanTools.catalogs.writeIslandContours`
+    :func:`treasure_island.catalogs.writeIslandContours`
     """
     if fmt not in ["reg", "ann"]:
         log.warning(f"Format not supported for island boxes{fmt}")
@@ -629,10 +629,10 @@ def writeAnn(filename, catalog, fmt):
     Uses ra/dec from catalog. Draws ellipses if bmaj/bmin/pa are in catalog.
     Draws 30" circles otherwise.
 
-    Only :class:`AegeanTools.models.ComponentSource` will appear in the
+    Only :class:`treasure_island.models.ComponentSource` will appear in the
     annotation file unless there are none, in which case
-    :class:`AegeanTools.models.SimpleSource` (if present) will be written. If
-    any :class:`AegeanTools.models.IslandSource` objects are present then an
+    :class:`treasure_island.models.SimpleSource` (if present) will be written. If
+    any :class:`treasure_island.models.IslandSource` objects are present then an
     island contours file will be written.
 
     Parameters
@@ -652,7 +652,7 @@ def writeAnn(filename, catalog, fmt):
 
     See Also
     --------
-    AegeanTools.catalogs.writeIslandContours
+    treasure_island.catalogs.writeIslandContours
     """
     if fmt not in ["reg", "ann"]:
         log.warning(f"Format not supported for island boxes{fmt}")
@@ -755,9 +755,9 @@ def writeDB(filename, catalog, meta=None):
         Output filename
 
     catalog : list
-        List of sources of type :class:`AegeanTools.models.ComponentSource`,
-        :class:`AegeanTools.models.SimpleSource`, or
-        :class:`AegeanTools.models.IslandSource`.
+        List of sources of type :class:`treasure_island.models.ComponentSource`,
+        :class:`treasure_island.models.SimpleSource`, or
+        :class:`treasure_island.models.IslandSource`.
 
     meta : dict
         Meta data to be written to table `meta`

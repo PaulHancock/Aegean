@@ -81,12 +81,12 @@ def find_islands(
       The seed clip which is used to create islands, and flood clip which is
       used to grow islands. The units are in SNR.
 
-    region : :class:`AegeanTools.regions.Region` or None
+    region : :class:`treasure_island.regions.Region` or None
       Region over which to find islands. Islands must have at least 1 pixel
       overlap with the region in order to be returned.
       Default = None, no constraints. Region *requires* a wcs to be defined.
 
-    wcs : :class:`AegeanTools.wcs_helpers.WCSHelper` or None
+    wcs : :class:`treasure_island.wcs_helpers.WCSHelper` or None
       If a region is specified then this WCSHelper will be used to map sky->pix
       coordinates. Default = None.
 
@@ -95,7 +95,7 @@ def find_islands(
 
     Returns
     -------
-    islands : [:class:`AegeanTools.models.PixelIsland`, ...]
+    islands : [:class:`treasure_island.models.PixelIsland`, ...]
       a list of islands
     """
     if (region is not None) and (wcs is None):
@@ -171,13 +171,13 @@ def estimate_parinfo_image(islands, im, rms, wcshelper, max_summits=None, log=lo
 
     Parameters
     ----------
-    islands : [AegeanTools.models.IslandFittingData, ... ]
+    islands : [treasure_island.models.IslandFittingData, ... ]
       A list of islands which will be converted into groups of sources
 
     im, rms : :py:class:`numpy.ndarray`
       The image and noise maps
 
-    wcshelper : :py:class:`AegeanTools.wcs_helpers.WCSHelper`
+    wcshelper : :py:class:`treasure_island.wcs_helpers.WCSHelper`
       A wcshelper object valid for the image map
 
     max_summits : int or None
@@ -471,7 +471,7 @@ class SourceFinder:
 
     Attributes
     ----------
-    global_data : :class:`AegeanTools.models.GlobalFittingData`
+    global_data : :class:`treasure_island.models.GlobalFittingData`
       State holder for properties.
 
     sources : list
@@ -617,7 +617,7 @@ class SourceFinder:
         curve : 2d-array
           Image of curvature values [-1,0,+1]
 
-        beam : :class:`AegeanTools.fits_image.Beam`
+        beam : :class:`treasure_island.fits_image.Beam`
           The beam information for the image.
 
         innerclip, outerclip : float
@@ -894,7 +894,7 @@ class SourceFinder:
         model : lmfit.Parameters
           The model that was fit.
 
-        island_data : :class:`AegeanTools.models.IslandFittingData`
+        island_data : :class:`treasure_island.models.IslandFittingData`
           Data about the island that was fit.
 
         isflags : int
@@ -1170,7 +1170,7 @@ class SourceFinder:
         bkgin, rmsin : str or HDUList
           background and noise image filename or HDUList
 
-        beam : :class:`AegeanTools.fits_image.Beam`
+        beam : :class:`treasure_island.fits_image.Beam`
           Beam object representing the synthsized beam.
           Will replace what is in the FITS header.
 
@@ -1187,7 +1187,7 @@ class SourceFinder:
         do_curve : bool
           If True a curvature map will be created, default=True.
 
-        mask : str or :class:`AegeanTools.regions.Region`
+        mask : str or :class:`treasure_island.regions.Region`
           filename or Region object
 
         psf : str or HDUList
@@ -1331,7 +1331,7 @@ class SourceFinder:
         bkgin, rmsin : str or HDUList
           Background and noise image filename or HDUList
 
-        beam : :class:`AegeanTools.fits_image.Beam`
+        beam : :class:`treasure_island.fits_image.Beam`
           Beam object representing the synthsized beam.
           Will replace what is in the FITS header.
 
@@ -1835,7 +1835,7 @@ class SourceFinder:
 
         Parameters
         ----------
-        island_data : :class:`AegeanTools.models.IslandFittingData`
+        island_data : :class:`treasure_island.models.IslandFittingData`
           The island to be fit.
 
         Returns

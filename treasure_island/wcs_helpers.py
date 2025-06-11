@@ -46,7 +46,7 @@ class WCSHelper:
     wcs : :class:`astropy.wcs.WCS`
         WCS object
 
-    beam : :class:`AegeanTools.wcs_helpers.Beam`
+    beam : :class:`treasure_island.wcs_helpers.Beam`
         The synthesized beam as defined by the fits header (at the reference
         location).
 
@@ -73,7 +73,7 @@ class WCSHelper:
         wcs : :class:`astropy.wcs.WCS`
             WCS object
 
-        beam : :class:`AegeanTools.wcs_helpers.Beam`
+        beam : :class:`treasure_island.wcs_helpers.Beam`
             The synthesized beam.
 
         pixscale : (float, float)
@@ -150,7 +150,7 @@ class WCSHelper:
         header : `astropy.fits.HDUHeader` or string
             The header to be used to create the WCS helper
 
-        beam : :class:`AegeanTools.wcs_helpers.Beam` or None
+        beam : :class:`treasure_island.wcs_helpers.Beam` or None
             The synthesized beam. If the supplied beam is None then one is
             constructed form the header.
 
@@ -159,7 +159,7 @@ class WCSHelper:
 
         Returns
         -------
-        obj : :class:`AegeanTools.wcs_helpers.WCSHelper`
+        obj : :class:`treasure_island.wcs_helpers.WCSHelper`
             A helper object.
         """
         try:
@@ -189,7 +189,7 @@ class WCSHelper:
         filename : string
             The file to be read
 
-        beam : :class:`AegeanTools.wcs_helpers.Beam` or None
+        beam : :class:`treasure_island.wcs_helpers.Beam` or None
             The synthesized beam. If the supplied beam is None then one is
             constructed form the header.
 
@@ -198,7 +198,7 @@ class WCSHelper:
 
         Returns
         -------
-        obj : :class:`AegeanTools.wcs_helpers.WCSHelper`
+        obj : :class:`treasure_island.wcs_helpers.WCSHelper`
             A helper object
         """
         header = fits.getheader(filename)
@@ -519,7 +519,7 @@ class WCSHelper:
 
         Returns
         -------
-        beam : :class:`AegeanTools.wcs_helpers.Beam`
+        beam : :class:`treasure_island.wcs_helpers.Beam`
             A beam object, with a/b/pa in sky coordinates
         """
         # get the psf from the psf map
@@ -657,7 +657,7 @@ def get_pixinfo(header):
 
 def get_beam(header):
     """
-    Create a :class:`AegeanTools.wcs_helpers.Beam` object from a fits header.
+    Create a :class:`treasure_island.wcs_helpers.Beam` object from a fits header.
 
     BPA may be missing but will be assumed to be zero.
 
@@ -670,7 +670,7 @@ def get_beam(header):
 
     Returns
     -------
-    beam : :class:`AegeanTools.wcs_helpers.Beam`
+    beam : :class:`treasure_island.wcs_helpers.Beam`
         Beam object, with a, b, and pa in degrees.
     """
 
@@ -736,5 +736,5 @@ def fix_aips_header(header):
     header["BMAJ"] = bmaj
     header["BMIN"] = bmin
     header["BPA"] = bpa
-    header["HISTORY"] = "Beam information AIPS->fits by AegeanTools"
+    header["HISTORY"] = "Beam information AIPS->fits by treasure_island"
     return header

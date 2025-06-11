@@ -1,5 +1,5 @@
 #
-# AegeanTools documentation build configuration file, created by
+# treasure_island documentation build configuration file, created by
 # sphinx-quickstart on Wed Dec 27 14:54:34 2017.
 #
 # This file is execfile()d with the current directory set to its
@@ -56,7 +56,7 @@ source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
 master_doc = "index"
 
 # General information about the project.
-project = "AegeanTools"
+project = "treasure_island"
 copyright = "2022, PaulHancock"
 author = "PaulHancock"
 
@@ -136,8 +136,8 @@ latex_elements = {
 latex_documents = [
     (
         master_doc,
-        "AegeanTools.tex",
-        "AegeanTools Documentation",
+        "treasure_island.tex",
+        "treasure_island Documentation",
         "PaulHancock",
         "manual",
     ),
@@ -148,7 +148,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [(master_doc, "aegeantools", "AegeanTools Documentation", [author], 1)]
+man_pages = [(master_doc, "aegeantools", "treasure_island Documentation", [author], 1)]
 
 
 # -- Options for Texinfo output -------------------------------------------
@@ -159,10 +159,10 @@ man_pages = [(master_doc, "aegeantools", "AegeanTools Documentation", [author], 
 texinfo_documents = [
     (
         master_doc,
-        "AegeanTools",
-        "AegeanTools Documentation",
+        "treasure_island",
+        "treasure_island Documentation",
         author,
-        "AegeanTools",
+        "treasure_island",
         "One line description of project.",
         "Miscellaneous",
     ),

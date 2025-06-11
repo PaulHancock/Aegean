@@ -16,7 +16,7 @@ MIMAS was created with the following three goals in mind:
 
 ## Methodology
 
-MIMAS is a wrapper script that uses the regions module that is now part of AegeanTools. The regions module contains a suite of unit tests and a single class called Region. The Region class is built on top of the [HealPy](https://github.com/healpy/healpy) module, which is in turn a wrapper around the [HEALPix](http://adsabs.harvard.edu/cgi-bin/nph-bib_query?bibcode=2005ApJ...622..759G&db_key=AST&high=41069202cf02947) software.
+MIMAS is a wrapper script that uses the regions module that is now part of treasure_island. The regions module contains a suite of unit tests and a single class called Region. The Region class is built on top of the [HealPy](https://github.com/healpy/healpy) module, which is in turn a wrapper around the [HEALPix](http://adsabs.harvard.edu/cgi-bin/nph-bib_query?bibcode=2005ApJ...622..759G&db_key=AST&high=41069202cf02947) software.
 
 
 ## Usage

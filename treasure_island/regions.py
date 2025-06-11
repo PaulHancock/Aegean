@@ -54,7 +54,7 @@ class Region:
 
         Returns
         -------
-        region : `AegeanTools.regions.Region`
+        region : `treasure_island.regions.Region`
             A region object
         """
         return cPickle.load(open(mimfile, "rb"))
@@ -259,7 +259,7 @@ class Region:
 
         Parameters
         ----------
-        other : :class:`AegeanTools.regions.Region`
+        other : :class:`treasure_island.regions.Region`
             The region to be combined.
 
         renorm : bool
@@ -290,7 +290,7 @@ class Region:
 
         Parameters
         ----------
-        other : :class:`AegeanTools.regions.Region`
+        other : :class:`treasure_island.regions.Region`
             The region to be combined.
         """
         # work only on the lowest level
@@ -312,7 +312,7 @@ class Region:
 
         Parameters
         ----------
-        other : :class:`AegeanTools.regions.Region`
+        other : :class:`treasure_island.regions.Region`
             The region to be combined.
         """
         # work only on the lowest level
@@ -334,7 +334,7 @@ class Region:
 
         Parameters
         ----------
-        other : :class:`AegeanTools.regions.Region`
+        other : :class:`treasure_island.regions.Region`
             The region to be combined.
         """
         # work only on the lowest level
@@ -462,7 +462,7 @@ class Region:
         ----------
         sky : numpy.array
             Array of (ra,dec) coordinates.
-            See :func:`AegeanTools.regions.Region.radec2sky`
+            See :func:`treasure_island.regions.Region.radec2sky`
 
         Returns
         -------
@@ -498,7 +498,7 @@ class Region:
 
         See Also
         --------
-        :func:`AegeanTools.regions.Region.vec2sky`
+        :func:`treasure_island.regions.Region.vec2sky`
         """
         theta_phi = cls.sky2ang(sky)
         theta, phi = map(np.array, list(zip(*theta_phi, strict=False)))
@@ -525,7 +525,7 @@ class Region:
 
         See Also
         --------
-        :func:`AegeanTools.regions.Region.sky2vec`
+        :func:`treasure_island.regions.Region.sky2vec`
         """
         theta, phi = hp.vec2ang(vec)
         ra = phi

@@ -210,7 +210,7 @@ class MarchingSquares:
 
         See Also
         --------
-        :func:`AegeanTools.msq2.MarchingSquares.do_march`
+        :func:`treasure_island.msq2.MarchingSquares.do_march`
         """
         # copy the data since we are going to be modifying it
         data_copy = copy(self.data)

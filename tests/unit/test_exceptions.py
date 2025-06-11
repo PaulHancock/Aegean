@@ -15,7 +15,7 @@ def test_exceptions():
     try:
         from treasure_island.exceptions import AegeanError, AegeanNaNModelError
     except ImportError as e:
-        raise AssertionError("Cannot import AegeanTools.exceptions\n" + e.msg)
+        raise AssertionError("Cannot import treasure_island.exceptions\n" + e.msg)
 
     if not issubclass(AegeanError, Exception):
         msg = "AegeanError is not an Exception"

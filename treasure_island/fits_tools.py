@@ -61,7 +61,7 @@ def compress(datafile, factor, outfile=None):
 
     See Also
     --------
-    :func:`AegeanTools.fits_interp.expand`
+    :func:`treasure_island.fits_interp.expand`
     """
     if not (factor > 0 and isinstance(factor, int)):
         logging.error("factor must be a positive integer")
@@ -171,7 +171,7 @@ def expand(datafile, outfile=None):
 
     See Also
     --------
-    :func:`AegeanTools.fits_interp.compress`
+    :func:`treasure_island.fits_interp.compress`
 
     """
     hdulist = load_file_or_hdu(datafile)

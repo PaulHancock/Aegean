@@ -1,6 +1,6 @@
 [run]
 include =
-  AegeanTools/*.py
+  treasure_island/*.py
 concurrency =
   multiprocessing
 parallel = True

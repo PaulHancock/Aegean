@@ -93,7 +93,7 @@ def sky_dist(src1, src2):
 
     See Also
     --------
-    :func:`AegeanTools.angle_tools.gcd`
+    :func:`treasure_island.angle_tools.gcd`
     """
 
     if np.all(src1 == src2):
@@ -129,7 +129,7 @@ def pairwise_ellpitical_binary(sources, eps, far=None):
 
     See Also
     --------
-    :func:`AegeanTools.cluster.norm_dist`
+    :func:`treasure_island.cluster.norm_dist`
     """
     if far is None:
         far = max(a.a / 3600 for a in sources)
@@ -242,7 +242,7 @@ def regroup_vectorized(srccat, eps, far=None, dist=norm_dist):
     dist : func
         a function that calculates the distance between a source and each
         element of an array of sources.
-        Default = :func:`AegeanTools.cluster.norm_dist`
+        Default = :func:`treasure_island.cluster.norm_dist`
 
     Returns
     -------
@@ -316,7 +316,7 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
     dist : func
         a function that calculates the distance between two sources must accept
         two SimpleSource objects. Default =
-        :func:`AegeanTools.cluster.norm_dist`
+        :func:`treasure_island.cluster.norm_dist`
 
     Returns
     -------
@@ -325,7 +325,7 @@ def regroup(catalog, eps, far=None, dist=norm_dist):
 
     See Also
     --------
-    :func:`AegeanTools.cluster.norm_dist`
+    :func:`treasure_island.cluster.norm_dist`
     """
 
     if isinstance(catalog, str):
@@ -390,7 +390,7 @@ def resize(catalog, ratio=None, psfhelper=None):
     ratio : float, default=None
         Ratio for scaling the sources
 
-    psfhelper : :py:class:`AegeanTools.wcs_helpers.WCSHelper`, default=None
+    psfhelper : :py:class:`treasure_island.wcs_helpers.WCSHelper`, default=None
         A wcs helper object that contains psf information for the target
         image/projection
 
@@ -491,7 +491,7 @@ def check_attributes_for_regroup(catalog):
     ----------
     catalog : list
         List of python objects, ideally derived from
-        :py:class:`AegeanTools.models.SimpleSource`
+        :py:class:`treasure_island.models.SimpleSource`
 
     Returns
     -------

@@ -178,7 +178,7 @@ def jacobian(pars, x, y):
 
     See Also
     --------
-    :func:`AegeanTools.fitting.emp_jacobian`
+    :func:`treasure_island.fitting.emp_jacobian`
     """
 
     matrix = []
@@ -256,7 +256,7 @@ def emp_jacobian(pars, x, y):
 
     See Also
     --------
-    :func:`AegeanTools.fitting.jacobian`
+    :func:`treasure_island.fitting.jacobian`
     """
     eps = 1e-5
     matrix = []
@@ -274,8 +274,8 @@ def emp_jacobian(pars, x, y):
 
 def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
     r"""
-    Wrapper around `AegeanTools.fitting.jacobian` and
-    `AegeanTools.fitting.emp_jacobian` which gives the output in a format
+    Wrapper around `treasure_island.fitting.jacobian` and
+    `treasure_island.fitting.emp_jacobian` which gives the output in a format
     that is required for lmfit.
 
     Parameters
@@ -290,7 +290,7 @@ def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
         a vector of 1\sigma errors (optional). Default = None
 
     B : 2d-array
-        a B-matrix (optional) see `AegeanTools.fitting.Bmatrix`
+        a B-matrix (optional) see `treasure_island.fitting.Bmatrix`
 
     emp : bool
         If true the use empirical Jacobian, otherwise use analytical Default =
@@ -303,9 +303,9 @@ def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
 
     See Also
     --------
-    `AegeanTools.fitting.Bmatrix`
-    `AegeanTools.fitting.jacobian`
-    `AegeanTools.fitting.emp_jacobian`
+    `treasure_island.fitting.Bmatrix`
+    `treasure_island.fitting.jacobian`
+    `treasure_island.fitting.emp_jacobian`
 
     """
     matrix = emp_jacobian(pars, x, y) if emp else jacobian(pars, x, y)
@@ -343,7 +343,7 @@ def hessian(pars, x, y):
 
     See Also
     --------
-    :func:`AegeanTools.fitting.emp_hessian`
+    :func:`treasure_island.fitting.emp_hessian`
     """
     j = 0  # keeping track of the number of variable parameters
     # total number of variable parameters
@@ -656,12 +656,12 @@ def emp_hessian(pars, x, y):
 
     Notes
     -----
-    Uses :func:`AegeanTools.fitting.emp_jacobian` to calculate the first order
+    Uses :func:`treasure_island.fitting.emp_jacobian` to calculate the first order
     derivatives.
 
     See Also
     --------
-    :func:`AegeanTools.fitting.hessian`
+    :func:`treasure_island.fitting.hessian`
     """
     eps = 1e-5
     matrix = []
@@ -846,7 +846,7 @@ def bias_correct(params, data, acf=None):
 
     See Also
     --------
-    :func:`AegeanTools.fitting.RB_bias`
+    :func:`treasure_island.fitting.RB_bias`
     """
     bias = RB_bias(data, params, acf=acf)
     i = 0
@@ -864,18 +864,18 @@ def errors(source, model, wcshelper):
 
     Parameters
     ----------
-    source : :class:`AegeanTools.models.SimpleSource`
+    source : :class:`treasure_island.models.SimpleSource`
         The source which was fit.
 
     model : lmfit.Parameters
         The model which was fit.
 
-    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
+    wcshelper : :class:`treasure_island.wcs_helpers.WCSHelper`
         WCS information.
 
     Returns
     -------
-    source : :class:`AegeanTools.models.SimpleSource`
+    source : :class:`treasure_island.models.SimpleSource`
         The modified source obejct.
 
     """
@@ -1004,18 +1004,18 @@ def new_errors(source, model, wcshelper):  # pragma: no cover
 
     Parameters
     ----------
-    source : :class:`AegeanTools.models.SimpleSource`
+    source : :class:`treasure_island.models.SimpleSource`
         The source which was fit.
 
     model : lmfit.Parameters
         The model which was fit.
 
-    wcshelper : :class:`AegeanTools.wcs_helpers.WCSHelper`
+    wcshelper : :class:`treasure_island.wcs_helpers.WCSHelper`
         WCS information.
 
     Returns
     -------
-    source : :class:`AegeanTools.models.SimpleSource`
+    source : :class:`treasure_island.models.SimpleSource`
         The modified source obejct.
 
     """
@@ -1244,7 +1244,7 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
 
     See Also
     --------
-    :func:`AegeanTools.fitting.lmfit_jacobian`
+    :func:`treasure_island.fitting.lmfit_jacobian`
 
     """
     # copy the params so as not to change the initial conditions

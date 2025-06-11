@@ -389,7 +389,7 @@ def main(argv=()):
 
     if options.file_versions:
         log.info(
-            f"AegeanTools {treasure_island.__version__} from {treasure_island.__file__}"
+            f"treasure_island {treasure_island.__version__} from {treasure_island.__file__}"
         )
         log.info(f"Numpy {np.__version__} from {np.__file__} ")
         log.info(f"Scipy {scipy.__version__} from {scipy.__file__}")

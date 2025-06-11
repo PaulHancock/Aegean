@@ -20,7 +20,7 @@ __date__ = "2022-07-15"
 def main(argv=()):
     """
     A program to provide a command line interface to the
-    AegeanTools.fits_tools module
+    treasure_island.fits_tools module
     """
 
     epilog = ""

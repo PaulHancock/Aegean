@@ -9,7 +9,7 @@ if "%SPHINXBUILD%" == "" (
 )
 set SOURCEDIR=.
 set BUILDDIR=_build
-set SPHINXPROJ=AegeanTools
+set SPHINXPROJ=treasure_island
 
 if "%1" == "" goto help
 

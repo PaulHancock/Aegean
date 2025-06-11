@@ -37,10 +37,10 @@ class Dummy:
     Attributes
     ----------
     add_region : list
-        List of :class:`AegeanTools.MIMAS.Region` to be added.
+        List of :class:`treasure_island.MIMAS.Region` to be added.
 
     rem_region : list
-        List of :class:`AegeanTools.MIMAS.Region` to be subtracted.
+        List of :class:`treasure_island.MIMAS.Region` to be subtracted.
 
     include_circles : [[ra, dec, radius],...]
         List of circles to be added to the region, units are degrees.
@@ -105,7 +105,7 @@ def mask_plane(data, wcs, region, negate=False):
     wcs : astropy.wcs.WCS
         WCS for the image in question.
 
-    region : :class:`AegeanTools.regions.Region`
+    region : :class:`treasure_island.regions.Region`
         A region within which the image pixels will be masked.
 
     negate : bool
@@ -146,7 +146,7 @@ def mask_file(regionfile, infile, outfile, negate=False):
     Parameters
     ----------
     regionfile : str
-        A file which can be loaded as a :class:`AegeanTools.regions.Region`.
+        A file which can be loaded as a :class:`treasure_island.regions.Region`.
         The image will be masked according to this region.
 
     infile : str
@@ -161,7 +161,7 @@ def mask_file(regionfile, infile, outfile, negate=False):
 
     See Also
     --------
-    :func:`AegeanTools.MIMAS.mask_plane`
+    :func:`treasure_island.MIMAS.mask_plane`
     """
     # Check that the input file is accessible and then open it
     if not os.path.exists(infile):
@@ -200,7 +200,7 @@ def mask_table(region, table, negate=False, racol="ra", deccol="dec"):
 
     Parameters
     ----------
-    region : :class:`AegeanTools.regions.Region`
+    region : :class:`treasure_island.regions.Region`
         Region to mask.
 
     table : Astropy.table.Table
@@ -233,7 +233,7 @@ def mask_catalog(regionfile, infile, outfile, negate=False, racol="ra", deccol="
     Parameters
     ----------
     regionfile : str
-        A file which can be loaded as a :class:`AegeanTools.regions.Region`.
+        A file which can be loaded as a :class:`treasure_island.regions.Region`.
         The catalogue will be masked according to this region.
 
     infile : str
@@ -251,9 +251,9 @@ def mask_catalog(regionfile, infile, outfile, negate=False, racol="ra", deccol="
 
     See Also
     --------
-    :func:`AegeanTools.MIMAS.mask_table`
+    :func:`treasure_island.MIMAS.mask_table`
 
-    :func:`AegeanTools.catalogs.load_table`
+    :func:`treasure_island.catalogs.load_table`
     """
     logging.info(f"Loading region from {regionfile}")
     region = Region.load(regionfile)
@@ -475,12 +475,12 @@ def combine_regions(container):
 
     Parameters
     ----------
-    container : :class:`AegeanTools.MIMAS.Dummy`
+    container : :class:`treasure_island.MIMAS.Dummy`
         The regions to be combined.
 
     Returns
     -------
-    region : :class:`AegeanTools.regions.Region`
+    region : :class:`treasure_island.regions.Region`
         The constructed region.
     """
     # create empty region
@@ -552,7 +552,7 @@ def intersect_regions(flist):
 
     Returns
     -------
-    region : :class:`AegeanTools.regions.Region`
+    region : :class:`treasure_island.regions.Region`
         The intersection of all regions, possibly empty.
     """
     if len(flist) < 2:
@@ -570,7 +570,7 @@ def save_region(region, filename):
 
     Parameters
     ----------
-    region : :class:`AegeanTools.regions.Region`
+    region : :class:`treasure_island.regions.Region`
         A region.
 
     filename : str

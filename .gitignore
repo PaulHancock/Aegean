@@ -5,7 +5,7 @@
 *.reg
 *.fits
 .idea
-AegeanTools.egg-info
+treasure_island.egg-info
 .cache
 .eggs
 .pytest*
@@ -16,7 +16,7 @@ dist/
 wiki/
 doc/_build/
 .vscode
-AegeanTools/__pycache__
-AegeanTools/test.ipynb
+treasure_island/__pycache__
+treasure_island/test.ipynb
 test.ipynb
 treasure_island/_version.py
