@@ -24,11 +24,15 @@ def get_version():
 
 reqs = ['scipy>=0.16',
         'tqdm>=4',
-        'numpy>=1.16',
+        'numpy>=1.22,<2',
         'astropy>=2.0',
         'healpy >=1.10',
         'lmfit>=0.9.2',
-        'scikit-learn>=0.24.2']
+        'scikit-learn>=0.24.2',
+        'rocket-fft>=0.2.3',
+        'numba>=0.58',
+        'radio-beam'
+        ]
 
 data_dir = 'AegeanTools/data'
 
@@ -48,7 +52,7 @@ setup(
     install_requires=reqs,
     scripts=['scripts/aegean', 'scripts/BANE',
              'scripts/SR6', 'scripts/AeRes', 'scripts/MIMAS',
-             'scripts/AeReg', 'scripts/fix_beam.py'],
+             'scripts/AeReg', 'scripts/fix_beam.py', 'scripts/BANE_fft'],
     data_files=[('AegeanTools', [os.path.join(data_dir, 'MOC.fits')])],
     python_requires='>=3.8',
     setup_requires=['pytest-runner'],

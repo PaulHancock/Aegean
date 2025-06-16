@@ -16,3 +16,6 @@ dist/
 wiki/
 doc/_build/
 .vscode
+AegeanTools/__pycache__
+AegeanTools/test.ipynb
+test.ipynb
