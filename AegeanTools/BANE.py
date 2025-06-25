@@ -5,6 +5,8 @@ This module contains all of the BANE specific code
 The function filter_image should be imported from elsewhere and run as is.
 """
 
+from typing import Tuple, Union, TypeAlias, Dict, Any, Optional
+
 import copy
 import logging
 import multiprocessing
@@ -17,17 +19,30 @@ from time import gmtime, strftime
 import numpy as np
 from astropy.io import fits
 from scipy.interpolate import RegularGridInterpolator
+from scipy.stats import normaltest
 
-from .fits_tools import compress
+from .fits_tools import compress 
+from .sigma import (
+    FitGaussianCDF, FittedSigmaClip, SigmaClip, FitBkgRmsEstimate, FitGaussianCDF
+)
 
 __author__ = 'Paul Hancock'
 __version__ = 'v1.10.0'
 __date__ = '2022-08-17'
 
+BANE_MODE_MAPPINGS = dict(
+    sigmaclip=SigmaClip,
+    fitrmsbkgestimate=FitBkgRmsEstimate,
+    fittedsigmaclip=FittedSigmaClip,
+    fitgaussiancdf=FitGaussianCDF
+)
+AVAILABLE_MODES = tuple(BANE_MODE_MAPPINGS.keys())
+AVAILABLE_TYPES = tuple(BANE_MODE_MAPPINGS.values())
+ClippingModes: TypeAlias = Union[SigmaClip, FitBkgRmsEstimate, FittedSigmaClip, FitGaussianCDF]
+
 # global barrier for multiprocessing
 barrier = None
 memory_id = None
-
 
 def init(b, mem):
     """
@@ -36,66 +51,6 @@ def init(b, mem):
     global barrier, memory_id
     barrier = b
     memory_id = mem
-
-
-def sigmaclip(arr, lo, hi, reps=10):
-    """
-    Perform sigma clipping on an array, ignoring non finite values.
-
-    During each iteration return an array whose elements c obey:
-    mean -std*lo < c < mean + std*hi
-
-    where mean/std are the mean std of the input array.
-
-    Parameters
-    ----------
-    arr : iterable
-        An iterable array of numeric types.
-    lo : float
-        The negative clipping level.
-    hi : float
-        The positive clipping level.
-    reps : int
-        The number of iterations to perform. Default = 3.
-
-    Returns
-    -------
-    mean : float
-        The mean of the array, possibly nan
-    std : float
-        The std of the array, possibly nan
-
-    Notes
-    -----
-    Scipy v0.16 now contains a comparable method that will ignore nan/inf
-    values.
-    """
-    clipped = np.array(arr)[np.isfinite(arr)]
-
-    if len(clipped) < 1:
-        return np.nan, np.nan
-
-    std = np.std(clipped)
-    mean = np.mean(clipped)
-    prev_valid = len(clipped)
-    for count in range(int(reps)):
-        mask = (clipped > mean-std*lo) & (clipped < mean+std*hi)
-        clipped = clipped[mask]
-
-        curr_valid = len(clipped)
-        if curr_valid < 1:
-            break
-        # No change in statistics if no change is noted
-        if prev_valid == curr_valid:
-            break
-        std = np.std(clipped)
-        mean = np.mean(clipped)
-        prev_valid = curr_valid
-    else:
-        logging.debug(
-            "No stopping criteria was reached after {0} cycles".format(count))
-
-    return mean, std
 
 
 def _sf2(args):
@@ -121,8 +76,82 @@ def _sf2(args):
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
+def box(r, c, data_shape, box_size):
+    """
+    calculate the boundaries of the box centered at r,c
+    with size = box_size
+    """
+    r_min = max(0, r - box_size[0] // 2)
+    r_max = min(data_shape[0] - 1, r + box_size[0] // 2)
+    c_min = max(0, c - box_size[1] // 2)
+    c_max = min(data_shape[1] - 1, c + box_size[1] // 2)
+    
+    return r_min, r_max, c_min, c_max
+
+
+def adaptive_box_estimate(
+    data: np.ndarray, row: int, column: int, box_size, mode: ClippingModes, max_loop: int = 5
+) -> Tuple[float,float]:
+    """Estimate the background and RMS level within a data extract. Multiple
+    clipping and noise estimation modes are supported. 
+    
+    The adaptive behavour is only activated should the pixel statistics become
+    compromised. At the moment, this only is considered true if fewer than 80percent
+    of the pixels remain after clipping. 
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data that will be the source of the box extraction
+    row : int
+        Row to center extracted region at
+    column : int
+        Column to center extracted region at
+    box_size : Tuple[int,int]
+        Base size of the box to extract
+    mode : ClippingModes
+        Instance of a clipping and noise estiamtion mode to use. Should return a BANEResult and ahve a .perform method. 
+    max_loop : int, optional
+        Maximum number of adjustable boxes to use. Will increase in steps of 100 pixels. If 0 adative mode is disabled, by default 5
+
+    Returns
+    -------
+    Tuple[float,float]
+        Backgrounf and noise estimation
+    """
+    
+    
+    original_box = box_size
+    loop = 0
+    while True:
+        test_box_size = tuple([b+loop*100 for b in original_box])
+        r_min, r_max, c_min, c_max = box(
+            row, column, data_shape=data.shape, box_size=test_box_size
+        )
+        new = data[r_min:r_max, c_min:c_max]
+        new = new.flatten()
+        
+        result = mode.perform(data=new)
+    
+        if loop >= max_loop:
+            break
+        if all(np.isfinite(result))  and result.valid_pixels > 0.9 * len(new):
+            break
+        
+        loop += 1
+        print(f"increasing, {loop=} {row=} {column=}")
+        
+    
+    rms = result.rms
+    bkg = result.bkg 
+    
+    print(f"{row} {column}")
+    
+    return float(bkg), float(rms)
+        
+
 def sigma_filter(filename, region, step_size, box_size, shape, domask,
-                 cube_index):
+                 cube_index, mode, adaptive_loop=0):
     """
     Calculate the background and rms for a sub region of an image. The results
     are written to shared memory - irms and ibkg.
@@ -150,6 +179,13 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
 
     cube_index : int
         The index into the 3rd dimension (if present)
+
+    mode  : ClippingModes
+        Which of the clipping modes to use. 
+        
+    adaptive_loop  : int
+        The maximum number of resizes allowed should a box be resized. If 0 this is turned off.
+        Default = 0
 
     Returns
     -------
@@ -201,17 +237,7 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
     logging.debug('data size is {0}'.format(data.shape))
     logging.debug('data format is {0}'.format(data.dtype))
 
-    def box(r, c):
-        """
-        calculate the boundaries of the box centered at r,c
-        with size = box_size
-        """
-        r_min = max(0, r - box_size[0] // 2)
-        r_max = min(data.shape[0] - 1, r + box_size[0] // 2)
-        c_min = max(0, c - box_size[1] // 2)
-        c_max = min(data.shape[1] - 1, c + box_size[1] // 2)
-        return r_min, r_max, c_min, c_max
-
+    
     # set up a grid of rows/cols at which we will compute the bkg/rms
     rows = list(range(ymin-data_row_min, ymax-data_row_min, step_size[0]))
     rows.append(ymax-data_row_min)
@@ -220,14 +246,16 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
 
     # store the computed bkg/rms in this smaller array
     vals = np.zeros(shape=(len(rows), len(cols)))
-
+    
     for i, row in enumerate(rows):
         for j, col in enumerate(cols):
-            r_min, r_max, c_min, c_max = box(row, col)
-            new = data[r_min:r_max, c_min:c_max]
-            new = np.ravel(new)
-            bkg, _ = sigmaclip(new, 3, 3)
-            vals[i, j] = bkg
+            
+            bkg, rms = adaptive_box_estimate(
+                data=data, row=row, column=col, box_size=box_size, mode=mode, max_loop=adaptive_loop
+            )
+            
+            if np.isfinite(bkg):
+                vals[i, j] = bkg
 
     # indices of all the pixels within our region
     gr, gc = np.mgrid[ymin-data_row_min:ymax-data_row_min, 0:shape[1]]
@@ -260,11 +288,14 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
 
     for i, row in enumerate(rows):
         for j, col in enumerate(cols):
-            r_min, r_max, c_min, c_max = box(row, col)
-            new = data[r_min:r_max, c_min:c_max]
-            new = np.ravel(new)
-            _, rms = sigmaclip(new, 3, 3)
-            vals[i, j] = rms
+            rms = np.nan
+
+            bkg, rms = adaptive_box_estimate(
+                data=data, row=row, column=col, box_size=box_size, mode=mode, max_loop=adaptive_loop
+            )
+            
+            if np.isfinite(rms):
+                vals[i, j] = rms
 
     logging.debug("Interpolating rms to sharemem")
     ifunc = RegularGridInterpolator((rows, cols), vals)
@@ -293,7 +324,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask,
 
 def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
                        nslice=None, domask=True,
-                       cube_index=0):
+                       cube_index=0, mode: str='sigmaclip', mode_kwargs: Optional[Dict[str, Any]]=None,
+                       adaptive_box: bool=False):
     """
     Calculate the background and noise images corresponding to the input file.
     The calculation is done via a box-car approach and uses multiple cores and
@@ -326,11 +358,21 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
     cube_index : int
         For 3d data use this index into the third dimension. Default = 0
 
+    mode  : str
+        Which background and rms estimation mode to use. 
+        Default = 'sigmaclip', which is the original BANE mode. 
+        
+    adaptive_box  : bool
+         Resize the box-car should a position be deemed to have unreliable
+         statistics. Default = False. 
+
+
     Returns
     -------
     bkg, rms : numpy.ndarray
         The interpolated background and noise images.
     """
+    mode_kwargs = mode_kwargs if mode_kwargs else {}
 
     if cores is None:
         cores = multiprocessing.cpu_count()
@@ -356,16 +398,26 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
 
     logging.debug("ymins {0}".format(ymins))
     logging.debug("ymaxs {0}".format(ymaxs))
+    
+    
+    if mode.lower() not in AVAILABLE_MODES:
+        raise ValueError(f"Mode not recognised. Received {mode=}, available modes {AVAILABLE_MODES}")
+
+    logging.info(f"Using bane {mode=}")
+    mode: ClippingModes = BANE_MODE_MAPPINGS[mode.lower()](**mode_kwargs)
+
+    adaptive_loop = 5 if adaptive_box else 0
+    logging.info(f"Adaptive box resize loops: {adaptive_loop}")
 
     args = []
     for region in zip(ymins, ymaxs):
         args.append((filename, region, step_size, box_size,
-                    shape, domask, cube_index))
+                    shape, domask, cube_index, mode, adaptive_loop))
 
     exit = False
     try:
         global memory_id
-        memory_id = str(uuid.uuid4())
+        memory_id = str(uuid.uuid4())[:15]
         nbytes = np.prod(shape) * np.float64(1).nbytes
         ibkg = SharedMemory(name=f'ibkg_{memory_id}', create=True, size=nbytes)
         irms = SharedMemory(name=f'irms_{memory_id}', create=True, size=nbytes)
@@ -387,13 +439,18 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
             logging.error("Caught keyboard interrupt")
             pool.close()
             exit = True
+        except Exception as e:
+            logging.error(e)
         else:
             pool.close()
             pool.join()
             bkg = np.ndarray(shape, buffer=ibkg.buf,
                              dtype=np.float64).astype(np.float32)
             rms = np.ndarray(shape, buffer=irms.buf,
-                             dtype=np.float64).astype(np.float32)
+                           dtype=np.float64).astype(np.float32)
+    
+    except Exception as e:
+        print(e)
     finally:
         ibkg.close()
         ibkg.unlink()
@@ -407,7 +464,7 @@ def filter_mc_sharemem(filename, step_size, box_size, cores, shape,
 def filter_image(im_name, out_base, step_size=None, box_size=None,
                  twopass=False,  # Deprecated
                  cores=None, mask=True, compressed=False, nslice=None,
-                 cube_index=None):
+                 cube_index=None, mode='sigmaclip', adaptive_box: bool=False):
     """
     Create a background and noise image from an input image. Resulting images
     are written to `outbase_bkg.fits` and `outbase_rms.fits`
@@ -449,6 +506,14 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
     cube_index : int
         If the input data is 3d, then use this index for the 3rd dimension.
         Default = None, use the first index.
+
+    mode  : str
+        Which background and rms estimation mode to use. 
+        Default = 'sigmaclip', which is the original BANE mode. 
+        
+    adaptive_box  : bool
+         Resize the box-car should a position be deemed to have unreliable
+         statistics. Default = False. 
 
     Returns
     -------
@@ -492,7 +557,8 @@ def filter_image(im_name, out_base, step_size=None, box_size=None,
     bkg, rms = filter_mc_sharemem(im_name,
                                   step_size=step_size, box_size=box_size,
                                   cores=cores, shape=shape, nslice=nslice,
-                                  domask=mask, cube_index=cube_index)
+                                  domask=mask, cube_index=cube_index, mode=mode,
+                                  adaptive_box=adaptive_box)
     logging.info("done")
 
     if out_base is not None:
