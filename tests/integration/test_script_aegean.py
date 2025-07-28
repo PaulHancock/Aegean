@@ -61,7 +61,7 @@ def test_autoload():
 
 
 def test_aux_images():
-    for flag in ["--backgroun", "--noise", "--psf", "--catpsf", "--region"]:
+    for flag in ["--background", "--noise", "--psf", "--catpsf", "--region"]:
         sys.argv = ["", image_SIN, flag, "none", "--save"]
         aegean.main()
 
