@@ -4,10 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "AegeanTools"
-description = "README.md"
 license = {file = "LICENSE"}
 authors = [{name="Paul Hancock", email="Mr.Paul.Hancock@gmail.com"}]
-dynamic = ["version"]
+dynamic = ["version", "readme"]
 requires-python=">=3.10"
 dependencies = [
     "scipy>=1.11",
@@ -59,3 +58,6 @@ include = ["AegeanTools*"]
 
 [tool.setuptools.package-data]
 AegeanTools = ["MOC.fits"]
+
+[tool.setuptools.dynamic]
+readme = {file = "README.md", content-type = "text/markdown"}
