@@ -10,7 +10,7 @@ import numpy as np
 __author__ = "Paul Hancock"
 
 
-class MarchingSquares():
+class MarchingSquares:
     """
     Implementation of a marching squares algorithm. With reference to
     http://devblog.phillipspiess.com/2010/02/23/better-know-an-algorithm-1-marching-squares/
@@ -103,7 +103,7 @@ class MarchingSquares():
         solid : bool
             True if the pixel is not zero.
         """
-        if not(0 <= x < self.xsize) or not(0 <= y < self.ysize):
+        if not (0 <= x < self.xsize) or not (0 <= y < self.ysize):
             return False
         if self.data[x, y] == 0:
             return False
@@ -193,7 +193,7 @@ class MarchingSquares():
             self.data[p] = 0
 
             # blank until we reach the other perimeter
-            for i in range(p[1]+1, self.data.shape[1]):
+            for i in range(p[1] + 1, self.data.shape[1]):
                 q = p[0], i
                 # stop when we reach another part of the perimeter
                 if q in perimeter:

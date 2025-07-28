@@ -8,6 +8,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main, dev ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -16,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
     - uses: actions/checkout@v4
@@ -27,7 +28,7 @@ jobs:
         cache: "pip"
     - run: |
         python -m pip install --upgrade pip
-        python -m pip install flake8 pytest coveralls codacy-coverage
+        python -m pip install flake8 pytest
         python -m pip install .
         
     - name: Lint with flake8
@@ -36,27 +37,6 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test and coverage
+    - name: Test
       run: |
-        coverage run -m pytest
-        coverage combine
-        coverage html
-        coverage xml -o coverage_${{ matrix.python-version }}.xml
-        export CODACY_PROJECT_TOKEN=${{ secrets.CODACY_API_TOKEN }}
-        bash <(curl -Ls https://coverage.codacy.com/get.sh) report \
-        --partial -l python -r coverage_${{ matrix.python-version }}.xml
-    - name: Archive coverage results
-      uses: actions/upload-artifact@v4
-      with:
-        name: code-coverage-report
-        path: |
-          htmlcov/
-          coverage_${{ matrix.python-version }}.xml
-  finalise:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - name: Finish coverage report
-      run: |
-        export CODACY_PROJECT_TOKEN=${{ secrets.CODACY_API_TOKEN }}
-        bash <(curl -Ls https://coverage.codacy.com/get.sh) final
+        pytest

@@ -6,7 +6,7 @@ Will read beam info from HISTORY and put it into the correct fits keywords
 
 __author__ = ["Guo Shaoguang", "Paul Hancock"]
 __version__ = "v1.0"
-__date__ = "2016-09-29"
+__date__ = "2024-01-12"
 __institute__ = "Shanghai Astronomical Observatory"
 
 import sys

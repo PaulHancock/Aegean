@@ -1,3 +1,40 @@
+### July 28 2025
+
+General
+- Supported (tested) versions of python are now 3.10-3.13, python 3.8 and 3.9 are no longer supported (but may work)
+- Updated the minimum version of libraries required for AegeanTools this co-incides with the change in supported versions of python
+
+### Dec 09 2024
+
+General
+- numba and mpi4py are now optional dependencies which, if installed, will make things faster
+- use `pip install AegeanTools[fast]` to also install number or `pip install AegeanTools[faster]` for both numba and mpi4py
+
+Aegean
+- Fitting is now faster thanks to numba
+
+BANE
+- Background estimation is faster thanks to numba
+- Resolve issue [#212](https://github.com/PaulHancock/Aegean/issues/212)
+- Fix bug [#213](https://github.com/PaulHancock/Aegean/issues/213) by setting default values for cores/stripes
+
+### Jan 24 2024
+
+BANE
+- Fix bugs #200/#203 which stopped BANE from working on some OSX installs
+
+General
+- fix_beam.py updated to respect the deprecation of "clobber" keyword (and thus work with more recent versions of astropy)
+- refactored a lot of code to remove shims, confusing renaming of variables, and the passing of unused or not needed data.
+- Migrated build to use `pyproject.toml` instead of `setup.py`
+- Removed most files in `scripts/` as they are now created dynamically at install time.
+
+### Dec 19 2023
+
+General
+- Added AegeanTools.logger module
+- All AegeanTools modules and scripts now use this logger
+
 ### Nov 29 2022
 
 Aegean

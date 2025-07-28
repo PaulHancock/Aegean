@@ -5,17 +5,15 @@ part of the WCS toolkit, as well as some wrappers around the provided tools
 to make them a lot easier to use.
 """
 
-import logging
-
 import numpy as np
 from astropy.io import fits
 from astropy.wcs import WCS
 
+from AegeanTools.logging import logger
+
 from .angle_tools import bear, gcd, translate
 
 __author__ = "Paul Hancock"
-
-log = logging.getLogger("Aegean")
 
 
 class WCSHelper(object):
@@ -107,8 +105,9 @@ class WCSHelper(object):
         if self.psf_file is None:
             ra, dec = self.pix2sky([self.refpix[1], self.refpix[0]])
             pos = [ra, dec]
-            _, _, self._psf_a, self._psf_b, self._psf_theta = \
-              self.sky2pix_ellipse(pos, self.beam.a, self.beam.b, self.beam.pa)
+            _, _, self._psf_a, self._psf_b, self._psf_theta = self.sky2pix_ellipse(
+                pos, self.beam.a, self.beam.b, self.beam.pa
+            )
 
     # This construct gives us an attribute 'self.psf_map' which is only loaded
     # on demand
@@ -117,9 +116,10 @@ class WCSHelper(object):
         if self._psf_map is None:
             # use memory mapping to avoid loading large files, when only a
             # small subset of the pixels are actually needed
-            self._psf_map = fits.open(self.psf_file, memmap=True)[0].data
+            with fits.open(self.psf_file, memmap=True) as hdulist:
+                self._psf_map = hdulist[0].data
             if len(self._psf_map.shape) != 3:
-                log.critical(
+                logger.critical(
                     "PSF file needs to have 3 dimensions, found {0}".format(
                         len(self._psf_map.shape)
                     )
@@ -171,7 +171,7 @@ class WCSHelper(object):
             beam = beam
 
         if beam is None:
-            logging.critical("Cannot determine beam information")
+            logger.critical("Cannot determine beam information")
             raise AssertionError("Cannot determine beam information")
 
         _, pixscale = get_pixinfo(header)
@@ -221,8 +221,7 @@ class WCSHelper(object):
         """
         x, y = pixel
         # wcs and python have opposite ideas of x/y
-        return self.wcs.all_pix2world([[y, x]], 1, 
-                                      ra_dec_order=self.ra_dec_order)[0]
+        return self.wcs.all_pix2world([[y, x]], 1, ra_dec_order=self.ra_dec_order)[0]
 
     def sky2pix(self, pos):
         """
@@ -240,8 +239,7 @@ class WCSHelper(object):
             The (x,y) pixel coordinates
 
         """
-        pixel = self.wcs.all_world2pix(
-            [pos], 1, ra_dec_order=self.ra_dec_order)
+        pixel = self.wcs.all_world2pix([pos], 1, ra_dec_order=self.ra_dec_order)
         # wcs and python have opposite ideas of x/y
         return [pixel[0][1], pixel[0][0]]
 
@@ -263,8 +261,7 @@ class WCSHelper(object):
         """
         # wcs and python have opposite ideas of x/y
         if self.psf_wcs is not None:
-            pixel = self.psf_wcs.all_world2pix(
-                [pos], 1, ra_dec_order=self.ra_dec_order)
+            pixel = self.psf_wcs.all_world2pix([pos], 1, ra_dec_order=self.ra_dec_order)
             return [pixel[0][1], pixel[0][0]]
         return None
 
@@ -324,8 +321,7 @@ class WCSHelper(object):
         """
         ra1, dec1 = self.pix2sky(pixel)
         x, y = pixel
-        a = (x + r * np.cos(np.radians(theta)),
-             y + r * np.sin(np.radians(theta)))
+        a = (x + r * np.cos(np.radians(theta)), y + r * np.sin(np.radians(theta)))
         locations = self.pix2sky(a)
         ra2, dec2 = locations
         a = gcd(ra1, dec1, ra2, dec2)
@@ -401,8 +397,7 @@ class WCSHelper(object):
         """
         ra, dec = self.pix2sky(pixel)
         x, y = pixel
-        v_sx = (x + sx * np.cos(np.radians(theta)),
-                y + sx * np.sin(np.radians(theta)))
+        v_sx = (x + sx * np.cos(np.radians(theta)), y + sx * np.sin(np.radians(theta)))
         ra2, dec2 = self.pix2sky(v_sx)
         major = gcd(ra, dec, ra2, dec2)
         pa = bear(ra, dec, ra2, dec2)
@@ -455,7 +450,7 @@ class WCSHelper(object):
         # sense
         x, y = self.psf_sky2pix((ra, dec))
 
-        log.debug("sky2sky {0}, {1}, {2}, {3}".format(ra, dec, x, y))
+        logger.debug("sky2sky {0}, {1}, {2}, {3}".format(ra, dec, x, y))
 
         x = int(np.clip(x, 0, self.psf_map.shape[1] - 1))
         y = int(np.clip(y, 0, self.psf_map.shape[2] - 1))
@@ -644,20 +639,17 @@ def get_pixinfo(header):
         pixscale = (header["CDELT1"], header["CDELT2"])
     elif all(a in header for a in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]):
         pixarea = abs(
-            header["CD1_1"] * header["CD2_2"] -
-            header["CD1_2"] * header["CD2_1"]
+            header["CD1_1"] * header["CD2_2"] - header["CD1_2"] * header["CD2_1"]
         )
         pixscale = (header["CD1_1"], header["CD2_2"])
         if not (header["CD1_2"] == 0 and header["CD2_1"] == 0):
-            log.warning(
-                "Pixels don't appear to be square -> pixscale is wrong")
+            logger.warning("Pixels don't appear to be square -> pixscale is wrong")
     elif all(a in header for a in ["CD1_1", "CD2_2"]):
         pixarea = abs(header["CD1_1"] * header["CD2_2"])
         pixscale = (header["CD1_1"], header["CD2_2"])
     else:
-        log.critical(
-            "cannot determine pixel area" +
-            "using zero EVEN THOUGH THIS IS WRONG!"
+        logger.critical(
+            "cannot determine pixel area" + "using zero EVEN THOUGH THIS IS WRONG!"
         )
         pixarea = 0
         pixscale = (0, 0)
@@ -684,19 +676,19 @@ def get_beam(header):
     """
 
     if "BPA" not in header:
-        log.warning("BPA not present in fits header, using 0")
+        logger.warning("BPA not present in fits header, using 0")
         bpa = 0
     else:
         bpa = header["BPA"]
 
     if "BMAJ" not in header:
-        log.warning("BMAJ not present in fits header.")
+        logger.warning("BMAJ not present in fits header.")
         bmaj = None
     else:
         bmaj = header["BMAJ"]
 
     if "BMIN" not in header:
-        log.warning("BMIN not present in fits header.")
+        logger.warning("BMIN not present in fits header.")
         bmin = None
     else:
         bmin = header["BMIN"]
