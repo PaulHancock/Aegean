@@ -190,7 +190,7 @@ def jacobian(pars, x, y):
 
     matrix = []
 
-    for i in range(pars["components"].value):
+    for i in range(int(pars["components"].value)):
         prefix = "c{0}_".format(i)
         amp = pars[prefix + "amp"].value
         xo = pars[prefix + "xo"].value
@@ -1209,7 +1209,7 @@ def ntwodgaussian_lmfit(params):
             Model
         """
         result = None
-        for i in range(params["components"].value):
+        for i in range(int(params["components"].value)):
             prefix = "c{0}_".format(i)
             # I hope this doesn't kill our run time
             amp = np.nan_to_num(params[prefix + "amp"].value)
@@ -1361,7 +1361,7 @@ def covar_errors(params, data, errs, B, C=None):
         except (np.linalg.linalg.LinAlgError, ValueError):
             onesigma = [-2] * len(mask[0])
 
-    for i in range(params["components"].value):
+    for i in range(int(params["components"].value)):
         prefix = "c{0}_".format(i)
         j = 0
         for p in ["amp", "xo", "yo", "sx", "sy", "theta"]:
