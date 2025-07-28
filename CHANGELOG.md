@@ -1,3 +1,9 @@
+### July 28 2025
+
+General
+- Supported (tested) versions of python are now 3.10-3.13, python 3.8 and 3.9 are no longer supported (but may work)
+- Updated the minimum version of libraries required for AegeanTools this co-incides with the change in supported versions of python
+
 ### Dec 09 2024
 
 General
