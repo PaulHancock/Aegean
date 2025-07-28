@@ -412,9 +412,9 @@ class Region(object):
         hdulist[1].header["MOCTYPE"] = ("CATALOG", "Source type (IMAGE or CATALOG)")
         hdulist[1].header["MOCID"] = (" ", "Identifier of the collection")
         hdulist[1].header["ORIGIN"] = (" ", "MOC origin")
-        time = datetime.datetime.now(datetime.UTC)
+        time = datetime.datetime.utcnow()  # Eventually datetime.datetime.now(datetime.UTC)
         hdulist[1].header["DATE"] = (
-            datetime.datetime.strftime(time, format="%Y-%m-%dT%H:%m:%SZ"),
+            datetime.datetime.strftime(time, format="%Y-%m-%dT%H:%M:%SZ"),
             "MOC creation date",
         )
         hdulist.writeto(filename, overwrite=True)
