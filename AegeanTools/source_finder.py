@@ -656,7 +656,7 @@ class SourceFinder(object):
 
         sources = []
         j = 0
-        for j in range(model["components"].value):
+        for j in range(int(model["components"].value)):
             src_flags = is_flag
             source = ComponentSource()
             source.island = isle_num
@@ -669,7 +669,7 @@ class SourceFinder(object):
             sy = model[prefix + "sy"].value
             theta = model[prefix + "theta"].value
             amp = model[prefix + "amp"].value
-            src_flags |= model[prefix + "flags"].value
+            src_flags |= int(model[prefix + "flags"].value)
 
             # these are goodness of fit statistics for the entire island.
             source.residual_mean = residual[0]
@@ -1416,7 +1416,7 @@ class SourceFinder(object):
             # now we correct the xo/yo positions to be
             # relative to the sub-image
             logger.debug("xmxxymyx {0} {1} {2} {3}".format(xmin, xmax, ymin, ymax))
-            for i in range(params["components"].value):
+            for i in range(int(params["components"].value)):
                 prefix = "c{0}_".format(i)
                 # must update limits before the value as limits are
                 # enforced when the value is updated
@@ -1442,7 +1442,7 @@ class SourceFinder(object):
             # mask to include pixels that are withn the FWHM
             # of the sources being fit
             mask_params = copy.deepcopy(params)
-            for i in range(mask_params["components"].value):
+            for i in range(int(mask_params["components"].value)):
                 prefix = "c{0}_".format(i)
                 mask_params[prefix + "amp"].value = 1
             mask_model = ntwodgaussian_lmfit(mask_params)
@@ -1467,7 +1467,7 @@ class SourceFinder(object):
             # Check to see that each component has some data within
             # the central 3x3 pixels of it's location
             # If not then we don't fit that component
-            for i in range(params["components"].value):
+            for i in range(int(params["components"].value)):
                 prefix = "c{0}_".format(i)
                 # figure out a box around the center of this
                 cx, cy = (
