@@ -212,11 +212,12 @@ def load_catalog(filename):
 
     else:
         logger.info("Assuming ascii format, reading first two columns")
-        lines = [
-            a.strip().split()
-            for a in open(filename, "r").readlines()
-            if not a.startswith("#")
-        ]
+        with open(filename, "r") as f:
+            lines = [
+                a.strip().split()
+                for a in f.readlines()
+                if not a.startswith("#")
+            ]
         try:
             catalog = [(float(a[0]), float(a[1])) for a in lines]
         except ValueError as e:

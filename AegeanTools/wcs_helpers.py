@@ -116,7 +116,8 @@ class WCSHelper(object):
         if self._psf_map is None:
             # use memory mapping to avoid loading large files, when only a
             # small subset of the pixels are actually needed
-            self._psf_map = fits.open(self.psf_file, memmap=True)[0].data
+            with fits.open(self.psf_file, memmap=True) as hdulist:
+                self._psf_map = hdulist[0].data
             if len(self._psf_map.shape) != 3:
                 logger.critical(
                     "PSF file needs to have 3 dimensions, found {0}".format(

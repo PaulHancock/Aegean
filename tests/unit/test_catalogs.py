@@ -84,8 +84,9 @@ def test_load_save_catalog():
     fout = "a_comp.csv"
     if not os.path.exists(fout):
         raise AssertionError()
-    if "test_ra" not in open(fout).readlines()[0]:
-        raise AssertionError()
+    with open(fout, "r") as f:
+        if "test_ra" not in f.readlines()[0]:
+            raise AssertionError()
     os.remove(fout)
 
     for ext in ["reg", "ann", "bla"]:

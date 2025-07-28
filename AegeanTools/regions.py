@@ -57,7 +57,8 @@ class Region(object):
         region : `AegeanTools.regions.Region`
             A region object
         """
-        reg = cPickle.load(open(mimfile, "rb"))
+        with open(mimfile, "rb") as f:
+            reg = cPickle.load(f)
         return reg
 
     def save(self, mimfile):
@@ -69,7 +70,8 @@ class Region(object):
         mimfile : str
             File to write
         """
-        cPickle.dump(self, open(mimfile, "wb"), protocol=2)
+        with open(mimfile, "wb") as f:
+            cPickle.dump(self, f, protocol=2)
         return
 
     def __repr__(self):
@@ -252,7 +254,7 @@ class Region(object):
         theta, phi = theta_phi.transpose()
         pix = hp.ang2pix(2**self.maxdepth, theta, phi, nest=True)
         pixelset = self.get_demoted()
-        result = np.in1d(pix, list(pixelset))
+        result = np.isin(pix, list(pixelset))
         # apply the mask and set the shonky values to False
         result[mask] = False
         return result
@@ -410,7 +412,7 @@ class Region(object):
         hdulist[1].header["MOCTYPE"] = ("CATALOG", "Source type (IMAGE or CATALOG)")
         hdulist[1].header["MOCID"] = (" ", "Identifier of the collection")
         hdulist[1].header["ORIGIN"] = (" ", "MOC origin")
-        time = datetime.datetime.utcnow()
+        time = datetime.datetime.now(datetime.UTC)
         hdulist[1].header["DATE"] = (
             datetime.datetime.strftime(time, format="%Y-%m-%dT%H:%m:%SZ"),
             "MOC creation date",

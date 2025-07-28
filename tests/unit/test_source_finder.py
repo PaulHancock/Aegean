@@ -186,17 +186,18 @@ def test_find_and_prior_sources():
 
         # now with some options
         aux_files = sf.get_aux_files(filename)
-        found2 = sfinder.find_sources_in_image(
-            filename,
-            doislandflux=True,
-            outfile=open("dlme", "w"),
-            nonegative=False,
-            rmsin=aux_files["rms"],
-            bkgin=aux_files["bkg"],
-            mask=aux_files["mask"],
-            cores=1,
-            docov=False,
-        )
+        with open("dlme", "w") as outf:
+            found2 = sfinder.find_sources_in_image(
+                filename,
+                doislandflux=True,
+                outfile=outf,
+                nonegative=False,
+                rmsin=aux_files["rms"],
+                bkgin=aux_files["bkg"],
+                mask=aux_files["mask"],
+                cores=1,
+                docov=False,
+            )
         if not (len(found2) == ntot):
             raise AssertionError(
                 f"Fitting w aux files: wrong number of sources {len(found2)}, expecting {ntot}"
@@ -229,16 +230,17 @@ def test_find_and_prior_sources():
                 f"Multi cores: wrong number of sources {len(priorized)}, expecting {nsrc}"
             )
 
-        priorized = sfinder.priorized_fit_islands(
-            filename,
-            catalogue=found,
-            doregroup=True,
-            cores=1,
-            rmsin=aux_files["rms"],
-            bkgin=aux_files["bkg"],
-            outfile=open("dlme", "w"),
-            stage=1,
-        )
+        with open("dlme", "w") as outf:
+            priorized = sfinder.priorized_fit_islands(
+                filename,
+                catalogue=found,
+                doregroup=True,
+                cores=1,
+                rmsin=aux_files["rms"],
+                bkgin=aux_files["bkg"],
+                outfile=outf,
+                stage=1,
+            )
         if not (len(priorized) == (nsrc)):
             raise AssertionError(
                 f"Found the wrong number of sources {len(priorized)}, expecting {nsrc}"
