@@ -27,6 +27,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          mkdir -p src
           python3 -m pip install --upgrade pip
           pip install build
 
