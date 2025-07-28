@@ -10,7 +10,7 @@ classes and methods that would be useful more generally.
 
 """
 __author__ = "Paul Hancock"
-__version__ = "2.3.4"
+__version__ = "2.3.5"
 __date__ = "2024-07-28"
 __citation__ = r"""
 % If your work makes use of AegeanTools please cite the following papers as
