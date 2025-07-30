@@ -463,7 +463,8 @@ def reg2mim(regfile, mimfile, maxdepth):
 
     """
     logger.info("Reading regions from {0}".format(regfile))
-    lines = (ln for ln in open(regfile, 'r') if not ln.startswith('#'))
+    with open(regfile, 'r') as f:
+        lines = [ln for ln in f if not ln.startswith('#')]
     poly = []
     circles = []
     for line in lines:
