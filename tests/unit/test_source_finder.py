@@ -159,6 +159,22 @@ def test_load_globals():
         raise AssertionError()
 
 
+def test_load_globals_cube():
+    """Test load_globals"""
+    sfinder = sf.SourceFinder()
+    filename = "tests/test_files/synthetic_cube.fits"
+    # aux_files = sf.get_aux_files("tests/test_files/synthetic_cube.fits")
+    bkg = filename
+    rms = filename
+    sfinder.load_globals(filename, bkgin=bkg, rmsin=rms, as_cube=True)
+    if sfinder.img is None:
+        raise AssertionError()
+    if np.allclose(sfinder.img, 0):
+        print("True")
+    else:
+        raise AssertionError()
+
+
 def test_find_and_prior_sources():
     """Test find sources and prior sources"""
     try:
@@ -251,7 +267,8 @@ def test_find_and_prior_sources():
         if not (os.path.exists("dlme")):
             raise AssertionError("Failed to create output file")
     finally:
-        os.remove("dlme")
+        if os.path.exists("dlme"):
+            os.remove("dlme")
 
 
 def dont_test_find_and_prior_parallel():

@@ -63,7 +63,9 @@ class WCSHelper(object):
         The WCS object for the psf map
     """
 
-    def __init__(self, wcs, beam, pixscale, refpix, psf_file=None):
+    def __init__(
+        self, wcs, beam, pixscale, refpix, psf_file=None, freq_wcs=(None, None, None)
+    ):
         """
         Parameters
         ----------
@@ -83,6 +85,8 @@ class WCSHelper(object):
             Filename for a psf map
         """
         self.wcs = wcs
+        self.CDELT3, self.CRVAL3, self.CRPIX3 = freq_wcs
+        self.has_freq = self.CDELT3 is not None
         self.beam = (
             # the beam as per the fits header (at the reference coordiante)
             beam
@@ -176,7 +180,11 @@ class WCSHelper(object):
 
         _, pixscale = get_pixinfo(header)
         refpix = (header["CRPIX1"], header["CRPIX2"])
-        return cls(wcs, beam, pixscale, refpix, psf_file=psf_file)
+        if "CRVAL3" in header:
+            freq_wcs = (header["CDELT3"], header["CRVAL3"], header["CRPIX3"])
+        else:
+            freq_wcs = (None, None, None)
+        return cls(wcs, beam, pixscale, refpix, psf_file=psf_file, freq_wcs=freq_wcs)
 
     @classmethod
     def from_file(cls, filename, beam=None, psf_file=None):
@@ -242,6 +250,48 @@ class WCSHelper(object):
         pixel = self.wcs.all_world2pix([pos], 1, ra_dec_order=self.ra_dec_order)
         # wcs and python have opposite ideas of x/y
         return [pixel[0][1], pixel[0][0]]
+
+    def pix2freq(
+        self, pos_z
+    ):  #! Write a test case for this, afterwards create a pull request
+        """
+        Convert z coordinates into frequency.
+
+        Parameters
+        ----------
+        pos_z : float
+            The z axis pixel coordinates.
+
+        Returns
+        -------
+        frequency : float
+            The frequency in MHz
+
+        """
+
+        return (self.CDELT3 / 1_000_000) * (pos_z - self.CRPIX3) + (
+            self.CRVAL3 / 1_000_000
+        )
+
+    def freq2pix(self, freq):  #! Write a test case for this
+        """
+        Convert frequency into pixel coordinates.
+
+        Parameters
+        ----------
+        freq : float
+            The frequency in MHz.
+
+        Returns
+        -------
+        pixel : (float, float)
+            The (x,y) pixel coordinates
+
+        """
+
+        return (freq - (self.CRVAL3 / 1_000_000)) / (
+            self.CDELT3 / 1_000_000
+        ) + self.CRPIX3
 
     def psf_sky2pix(self, pos):
         """

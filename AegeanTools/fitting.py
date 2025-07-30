@@ -268,7 +268,7 @@ def emp_jacobian(pars, x, y):
     eps = 1e-5
     matrix = []
     model = ntwodgaussian_lmfit(pars)(x, y)
-    for i in range(pars["components"].value):
+    for i in range(int(pars["components"].value)):
         prefix = "c{0}_".format(i)
         for p in ["amp", "xo", "yo", "sx", "sy", "theta"]:
             if pars[prefix + p].vary:
@@ -333,544 +333,6 @@ def lmfit_jacobian(pars, x, y, errs=None, B=None, emp=False):
 
     matrix = np.transpose(matrix)
     return matrix
-
-
-def hessian(pars, x, y):
-    """
-    Create a hessian matrix corresponding to the source model 'pars'
-    Only parameters that vary will contribute to the hessian.
-    Thus there will be a total of nvar x nvar entries, each of which is a
-    len(x) x len(y) array.
-
-    Parameters
-    ----------
-    pars : lmfit.Parameters
-        The model
-    x, y : list
-        locations at which to evaluate the Hessian
-
-    Returns
-    -------
-    h : np.array
-        Hessian. Shape will be (nvar, nvar, len(x), len(y))
-
-    See Also
-    --------
-    :func:`AegeanTools.fitting.emp_hessian`
-    """
-    j = 0  # keeping track of the number of variable parameters
-    # total number of variable parameters
-    ntvar = np.sum([pars[k].vary for k in pars.keys() if k != "components"])
-    # construct an empty matrix of the correct size
-    hmat = np.zeros((ntvar, ntvar, x.shape[0], x.shape[1]))
-    npvar = 0
-
-    for i in range(pars["components"].value):
-        prefix = "c{0}_".format(i)
-        amp = pars[prefix + "amp"].value
-        xo = pars[prefix + "xo"].value
-        yo = pars[prefix + "yo"].value
-        sx = pars[prefix + "sx"].value
-        sy = pars[prefix + "sy"].value
-        theta = pars[prefix + "theta"].value
-
-        amp_var = pars[prefix + "amp"].vary
-        xo_var = pars[prefix + "xo"].vary
-        yo_var = pars[prefix + "yo"].vary
-        sx_var = pars[prefix + "sx"].vary
-        sy_var = pars[prefix + "sy"].vary
-        theta_var = pars[prefix + "theta"].vary
-
-        # precomputed for speed
-        model = elliptical_gaussian(x, y, amp, xo, yo, sx, sy, theta)
-        sint = np.sin(np.radians(theta))
-        sin2t = np.sin(np.radians(2 * theta))
-        cost = np.cos(np.radians(theta))
-        cos2t = np.cos(np.radians(2 * theta))
-        sx2 = sx**2
-        sy2 = sy**2
-        xxo = x - xo
-        yyo = y - yo
-        xcos, ycos = xxo * cost, yyo * cost
-        xsin, ysin = xxo * sint, yyo * sint
-
-        if amp_var:
-            k = npvar  # second round of keeping track of variable params
-            # H(amp,amp)/G =  0
-            hmat[j][k] = 0
-            k += 1
-
-            if xo_var:
-                # H(amp,xo)/G =  1.0*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t))/(amp*sx**2*sy**2)
-                hmat[j][k] = (xsin - ycos) * sint / sy2 + (xcos + ysin) * cost / sx2
-                hmat[j][k] *= model
-                k += 1
-
-            if yo_var:
-                # H(amp,yo)/G =  1.0*(-sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*cos(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*sin(t))/(amp*sx**2*sy**2)
-                hmat[j][k] = -(xsin - ycos) * cost / sy2 + (xcos + ysin) * sint / sx2
-                hmat[j][k] *= model / amp
-                k += 1
-
-            if sx_var:
-                # H(amp,sx)/G =  1.0*((x - xo)*cos(t) + (y - yo)*sin(t))**2/(amp*sx**3)
-                hmat[j][k] = (xcos + ysin) ** 2
-                hmat[j][k] *= model / (amp * sx**3)
-                k += 1
-
-            if sy_var:
-                # H(amp,sy) =  1.0*((x - xo)*sin(t) + (-y + yo)*cos(t))**2/(amp*sy**3)
-                hmat[j][k] = (xsin - ycos) ** 2
-                hmat[j][k] *= model / (amp * sy**3)
-                k += 1
-
-            if theta_var:
-                # H(amp,t) =  (-1.0*sx**2 + sy**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))*((x - xo)*cos(t) + (y - yo)*sin(t))/(amp*sx**2*sy**2)
-                hmat[j][k] = (xsin - ycos) * (xcos + ysin)
-                hmat[j][k] *= sy2 - sx2
-                hmat[j][k] *= model / (amp * sx2 * sy2)
-                # k += 1
-            j += 1
-
-        if xo_var:
-            k = npvar
-            if amp_var:
-                # H(xo,amp)/G = H(amp,xo)
-                hmat[j][k] = hmat[k][j]
-                k += 1
-
-            # if xo_var:
-            # H(xo,xo)/G =  1.0*(-sx**2*sy**2*(sx**2*sin(t)**2 + sy**2*cos(t)**2) + (sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t))**2)/(sx**4*sy**4)
-            hmat[j][k] = -sx2 * sy2 * (sx2 * sint**2 + sy2 * cost**2)
-            hmat[j][k] += (sx2 * (xsin - ycos) * sint + sy2 * (xcos + ysin) * cost) ** 2
-            hmat[j][k] *= model / (sx2**2 * sy2**2)
-            k += 1
-
-            if yo_var:
-                # H(xo,yo)/G =  1.0*(sx**2*sy**2*(sx**2 - sy**2)*sin(2*t)/2 - (sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t))*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*cos(t) - sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*sin(t)))/(sx**4*sy**4)
-                hmat[j][k] = sx2 * sy2 * (sx2 - sy2) * sin2t / 2
-                hmat[j][k] -= (
-                    sx2 * (xsin - ycos) * sint + sy2 * (xcos + ysin) * cost
-                ) * (sx2 * (xsin - ycos) * cost - sy2 * (xcos + ysin) * sint)
-                hmat[j][k] *= model / (sx**4 * sy**4)
-                k += 1
-
-            if sx_var:
-                # H(xo,sx) =  ((x - xo)*cos(t) + (y - yo)*sin(t))*(-2.0*sx**2*sy**2*cos(t) + 1.0*((x - xo)*cos(t) + (y - yo)*sin(t))*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t)))/(sx**5*sy**2)
-                hmat[j][k] = xcos + ysin
-                hmat[j][k] *= -2 * sx2 * sy2 * cost + (xcos + ysin) * (
-                    sx2 * (xsin - ycos) * sint + sy2 * (xcos + ysin) * cost
-                )
-                hmat[j][k] *= model / (sx**5 * sy2)
-                k += 1
-
-            if sy_var:
-                # H(xo,sy) =  ((x - xo)*sin(t) + (-y + yo)*cos(t))*(-2.0*sx**2*sy**2*sin(t) + 1.0*((x - xo)*sin(t) + (-y + yo)*cos(t))*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t)))/(sx2*sy**5)
-                hmat[j][k] = xsin - ycos
-                hmat[j][k] *= -2 * sx2 * sy2 * sint + (xsin - ycos) * (
-                    sx2 * (xsin - ycos) * sint + sy2 * (xcos + ysin) * cost
-                )
-                hmat[j][k] *= model / (sx2 * sy**5)
-                k += 1
-
-            if theta_var:
-                # H(xo,t) =  1.0*(sx**2*sy**2*(sx**2 - sy**2)*(x*sin(2*t) - xo*sin(2*t) - y*cos(2*t) + yo*cos(2*t)) + (-sx**2 + 1.0*sy**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))*((x - xo)*cos(t) + (y - yo)*sin(t))*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*sin(t) + sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*cos(t)))/(sx**4*sy**4)
-                # second part
-                hmat[j][k] = (sy2 - sx2) * (xsin - ycos) * (xcos + ysin)
-                hmat[j][k] *= sx2 * (xsin - ycos) * sint + sy2 * (xcos + ysin) * cost
-                # first part
-                hmat[j][k] += sx2 * sy2 * (sx2 - sy2) * (xxo * sin2t - yyo * cos2t)
-                hmat[j][k] *= model / (sx**4 * sy**4)
-                # k += 1
-            j += 1
-
-        if yo_var:
-            k = npvar
-            if amp_var:
-                # H(yo,amp)/G = H(amp,yo)
-                hmat[j][k] = hmat[0][2]
-                k += 1
-
-            if xo_var:
-                # H(yo,xo)/G = H(xo,yo)/G
-                hmat[j][k] = hmat[1][2]
-                k += 1
-
-            # if yo_var:
-            # H(yo,yo)/G = 1.0*(-sx**2*sy**2*(sx**2*cos(t)**2 + sy**2*sin(t)**2) + (sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*cos(t) - sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*sin(t))**2)/(sx**4*sy**4)
-            hmat[j][k] = (
-                sx2 * (xsin - ycos) * cost - sy2 * (xcos + ysin) * sint
-            ) ** 2 / (sx2**2 * sy2**2)
-            hmat[j][k] -= cost**2 / sy2 + sint**2 / sx2
-            hmat[j][k] *= model
-            k += 1
-
-            if sx_var:
-                # H(yo,sx)/G =  -((x - xo)*cos(t) + (y - yo)*sin(t))*(2.0*sx**2*sy**2*sin(t) + 1.0*((x - xo)*cos(t) + (y - yo)*sin(t))*(sx**2*((x - xo)*sin(t) - (y - yo)*cos(t))*cos(t) - sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*sin(t)))/(sx**5*sy**2)
-                hmat[j][k] = -1 * (xcos + ysin)
-                hmat[j][k] *= 2 * sx2 * sy2 * sint + (xcos + ysin) * (
-                    sx2 * (xsin - ycos) * cost - sy2 * (xcos + ysin) * sint
-                )
-                hmat[j][k] *= model / (sx**5 * sy2)
-                k += 1
-
-            if sy_var:
-                # H(yo,sy)/G =  ((x - xo)*sin(t) + (-y + yo)*cos(t))*(2.0*sx**2*sy**2*cos(t) - 1.0*((x - xo)*sin(t) + (-y + yo)*cos(t))*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*cos(t) - sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*sin(t)))/(sx**2*sy**5)
-                hmat[j][k] = xsin - ycos
-                hmat[j][k] *= 2 * sx2 * sy2 * cost - (xsin - ycos) * (
-                    sx2 * (xsin - ycos) * cost - sy2 * (xcos + ysin) * sint
-                )
-                hmat[j][k] *= model / (sx2 * sy**5)
-                k += 1
-
-            if theta_var:
-                # H(yo,t)/G =  1.0*(sx**2*sy**2*(sx**2*(-x*cos(2*t) + xo*cos(2*t) - y*sin(2*t) + yo*sin(2*t)) + sy**2*(x*cos(2*t) - xo*cos(2*t) + y*sin(2*t) - yo*sin(2*t))) + (1.0*sx**2 - sy**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))*((x - xo)*cos(t) + (y - yo)*sin(t))*(sx**2*((x - xo)*sin(t) + (-y + yo)*cos(t))*cos(t) - sy**2*((x - xo)*cos(t) + (y - yo)*sin(t))*sin(t)))/(sx**4*sy**4)
-                hmat[j][k] = (sx2 - sy2) * (xsin - ycos) * (xcos + ysin)
-                hmat[j][k] *= sx2 * (xsin - ycos) * cost - sy2 * (xcos + ysin) * sint
-                hmat[j][k] += (
-                    sx2
-                    * sy2
-                    * (sx2 - sy2)
-                    * (-x * cos2t + xo * cos2t - y * sin2t + yo * sin2t)
-                )
-                hmat[j][k] *= model / (sx**4 * sy**4)
-                # k += 1
-            j += 1
-
-        if sx_var:
-            k = npvar
-            if amp_var:
-                # H(sx,amp)/G = H(amp,sx)/G
-                hmat[j][k] = hmat[k][j]
-                k += 1
-
-            if xo_var:
-                # H(sx,xo)/G = H(xo,sx)/G
-                hmat[j][k] = hmat[k][j]
-                k += 1
-
-            if yo_var:
-                # H(sx,yo)/G = H(yo/sx)/G
-                hmat[j][k] = hmat[k][j]
-                k += 1
-
-            # if sx_var:
-            # H(sx,sx)/G =  (-3.0*sx**2 + 1.0*((x - xo)*cos(t) + (y - yo)*sin(t))**2)*((x - xo)*cos(t) + (y - yo)*sin(t))**2/sx**6
-            hmat[j][k] = -3 * sx2 + (xcos + ysin) ** 2
-            hmat[j][k] *= (xcos + ysin) ** 2
-            hmat[j][k] *= model / sx**6
-            k += 1
-
-            if sy_var:
-                # H(sx,sy)/G =  1.0*((x - xo)*sin(t) + (-y + yo)*cos(t))**2*((x - xo)*cos(t) + (y - yo)*sin(t))**2/(sx**3*sy**3)
-                hmat[j][k] = (xsin - ycos) ** 2 * (xcos + ysin) ** 2
-                hmat[j][k] *= model / (sx**3 * sy**3)
-                k += 1
-
-            if theta_var:
-                # H(sx,t)/G =  (-2.0*sx**2*sy**2 + 1.0*(-sx**2 + sy**2)*((x - xo)*cos(t) + (y - yo)*sin(t))**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))*((x - xo)*cos(t) + (y - yo)*sin(t))/(sx**5*sy**2)
-                hmat[j][k] = -2 * sx2 * sy2 + (sy2 - sx2) * (xcos + ysin) ** 2
-                hmat[j][k] *= (xsin - ycos) * (xcos + ysin)
-                hmat[j][k] *= model / (sx**5 * sy**2)
-                # k += 1
-            j += 1
-
-        if sy_var:
-            k = npvar
-            if amp_var:
-                # H(sy,amp)/G = H(amp,sy)/G
-                hmat[j][k] = hmat[k][j]
-                k += 1
-            if xo_var:
-                # H(sy,xo)/G = H(xo,sy)/G
-                hmat[j][k] = hmat[k][j]
-                k += 1
-            if yo_var:
-                # H(sy,yo)/G = H(yo/sy)/G
-                hmat[j][k] = hmat[k][j]
-                k += 1
-            if sx_var:
-                # H(sy,sx)/G = H(sx,sy)/G
-                hmat[j][k] = hmat[k][j]
-                k += 1
-
-            # if sy_var:
-            # H(sy,sy)/G =  (-3.0*sy**2 + 1.0*((x - xo)*sin(t) + (-y + yo)*cos(t))**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))**2/sy**6
-            hmat[j][k] = -3 * sy2 + (xsin - ycos) ** 2
-            hmat[j][k] *= (xsin - ycos) ** 2
-            hmat[j][k] *= model / sy**6
-            k += 1
-
-            if theta_var:
-                # H(sy,t)/G =  (2.0*sx**2*sy**2 + 1.0*(-sx**2 + sy**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))**2)*((x - xo)*sin(t) + (-y + yo)*cos(t))*((x - xo)*cos(t) + (y - yo)*sin(t))/(sx**2*sy**5)
-                hmat[j][k] = 2 * sx2 * sy2 + (sy2 - sx2) * (xsin - ycos) ** 2
-                hmat[j][k] *= (xsin - ycos) * (xcos + ysin)
-                hmat[j][k] *= model / (sx**2 * sy**5)
-                # k += 1
-            j += 1
-
-        if theta_var:
-            k = npvar
-            if amp_var:
-                # H(t,amp)/G = H(amp,t)/G
-                hmat[j][k] = hmat[k][j]
-                k += 1
-            if xo_var:
-                # H(t,xo)/G = H(xo,t)/G
-                hmat[j][k] = hmat[k][j]
-                k += 1
-            if yo_var:
-                # H(t,yo)/G = H(yo/t)/G
-                hmat[j][k] = hmat[k][j]
-                k += 1
-            if sx_var:
-                # H(t,sx)/G = H(sx,t)/G
-                hmat[j][k] = hmat[k][j]
-                k += 1
-            if sy_var:
-                # H(t,sy)/G = H(sy,t)/G
-                hmat[j][k] = hmat[k][j]
-                k += 1
-            # if theta_var:
-            # H(t,t)/G =  (sx**2*sy**2*(sx**2*(((x - xo)*sin(t) + (-y + yo)*cos(t))**2 - 1.0*((x - xo)*cos(t) + (y - yo)*sin(t))**2) + sy**2*(-1.0*((x - xo)*sin(t) + (-y + yo)*cos(t))**2 + ((x - xo)*cos(t) + (y - yo)*sin(t))**2)) + (sx**2 - 1.0*sy**2)**2*((x - xo)*sin(t) + (-y + yo)*cos(t))**2*((x - xo)*cos(t) + (y - yo)*sin(t))**2)/(sx**4*sy**4)
-            hmat[j][k] = sx2 * sy2
-            hmat[j][k] *= sx2 * ((xsin - ycos) ** 2 - (xcos + ysin) ** 2) + sy2 * (
-                (xcos + ysin) ** 2 - (xsin - ycos) ** 2
-            )
-            hmat[j][k] += (sx2 - sy2) ** 2 * (xsin - ycos) ** 2 * (xcos + ysin) ** 2
-            hmat[j][k] *= model / (sx**4 * sy**4)
-            # j += 1
-
-        # save the number of variables for the next iteration
-        # as we need to start our indexing at this number
-        npvar = k
-    return np.array(hmat)
-
-
-def emp_hessian(pars, x, y):
-    """
-    Calculate the hessian matrix empirically.
-    Create a hessian matrix corresponding to the source model 'pars'
-    Only parameters that vary will contribute to the hessian.
-    Thus there will be a total of nvar x nvar entries, each of which is a
-    len(x) x len(y) array.
-
-    Parameters
-    ----------
-    pars : lmfit.Parameters
-        The model
-    x, y : list
-        locations at which to evaluate the Hessian
-
-    Returns
-    -------
-    h : np.array
-        Hessian. Shape will be (nvar, nvar, len(x), len(y))
-
-    Notes
-    -----
-    Uses :func:`AegeanTools.fitting.emp_jacobian` to calculate the first order
-    derivatives.
-
-    See Also
-    --------
-    :func:`AegeanTools.fitting.hessian`
-    """
-    eps = 1e-5
-    matrix = []
-    for i in range(pars["components"].value):
-        model = emp_jacobian(pars, x, y)
-        prefix = "c{0}_".format(i)
-        for p in ["amp", "xo", "yo", "sx", "sy", "theta"]:
-            if pars[prefix + p].vary:
-                pars[prefix + p].value += eps
-                dm2didj = emp_jacobian(pars, x, y) - model
-                matrix.append(dm2didj / eps)
-                pars[prefix + p].value -= eps
-    matrix = np.array(matrix)
-    return matrix
-
-
-def nan_acf(noise):
-    """
-    Calculate the autocorrelation function of the noise
-    where the noise is a 2d array that may contain nans
-
-
-    Parameters
-    ----------
-    noise : 2d-array
-        Noise image.
-
-    Returns
-    -------
-    acf : 2d-array
-        The ACF.
-    """
-    corr = np.zeros(noise.shape)
-    ix, jx = noise.shape
-    for i in range(ix):
-        si_min = slice(i, None, None)
-        si_max = slice(None, ix - i, None)
-        for j in range(jx):
-            sj_min = slice(j, None, None)
-            sj_max = slice(None, jx - j, None)
-            if np.all(np.isnan(noise[si_min, sj_min])) or np.all(
-                np.isnan(noise[si_max, sj_max])
-            ):
-                corr[i, j] = np.nan
-            else:
-                corr[i, j] = np.nansum(noise[si_min, sj_min] * noise[si_max, sj_max])
-    # return the normalised acf
-    return corr / np.nanmax(corr)
-
-
-def make_ita(noise, acf=None):
-    """
-    Create the matrix ita of the noise where the noise may be a masked array
-    where ita(x,y) is the correlation between pixel pairs that have the same
-    separation as x and y.
-
-    Parameters
-    ----------
-    noise : 2d-array
-        The noise image
-
-    acf : 2d-array
-        The autocorrelation matrix. (None = calculate from data).
-        Default = None.
-
-    Returns
-    -------
-    ita : 2d-array
-        The matrix ita
-    """
-    if acf is None:
-        acf = nan_acf(noise)
-    # s should be the number of non-masked pixels
-    s = np.count_nonzero(np.isfinite(noise))
-    # the indices of the non-masked pixels
-    xm, ym = np.where(np.isfinite(noise))
-    ita = np.zeros((s, s))
-    # iterate over the pixels
-    for i, (x1, y1) in enumerate(zip(xm, ym)):
-        for j, (x2, y2) in enumerate(zip(xm, ym)):
-            k = abs(x1 - x2)
-            l = abs(y1 - y2)
-            ita[i, j] = acf[k, l]
-    return ita
-
-
-def RB_bias(data, pars, ita=None, acf=None):
-    """
-    Calculate the expected bias on each of the parameters in the model pars.
-    Only parameters that are allowed to vary will have a bias.
-    Calculation follows the description of Refrieger & Brown 1998 (cite).
-
-
-    Parameters
-    ----------
-    data : 2d-array
-        data that was fit
-
-    pars : lmfit.Parameters
-        The model
-
-    ita : 2d-array
-        The ita matrix (optional).
-
-    acf : 2d-array
-        The acf for the data.
-
-    Returns
-    -------
-    bias : array
-        The bias on each of the parameters
-    """
-    logger.info("data {0}".format(data.shape))
-    nparams = np.sum([pars[k].vary for k in pars.keys() if k != "components"])
-    # masked pixels
-    xm, ym = np.where(np.isfinite(data))
-    # all pixels
-    x, y = np.indices(data.shape)
-    # Create the jacobian as an AxN array accounting for the masked pixels
-    j = np.array(np.vsplit(lmfit_jacobian(pars, xm, ym).T, nparams)).reshape(
-        nparams, -1
-    )
-
-    h = hessian(pars, x, y)
-    # mask the hessian to be AxAxN array
-    h = h[:, :, xm, ym]
-    Hij = np.einsum("ik,jk", j, j)
-    Dij = np.linalg.inv(Hij)
-    Bijk = np.einsum("ip,jkp", j, h)
-    Eilkm = np.einsum("il,km", Dij, Dij)
-
-    Cimn_1 = -1 * np.einsum("krj,ir,km,jn", Bijk, Dij, Dij, Dij)
-    Cimn_2 = -1.0 / 2 * np.einsum("rkj,ir,km,jn", Bijk, Dij, Dij, Dij)
-    Cimn = Cimn_1 + Cimn_2
-
-    if ita is None:
-        # N is the noise (data-model)
-        N = data - ntwodgaussian_lmfit(pars)(x, y)
-        if acf is None:
-            acf = nan_acf(N)
-        ita = make_ita(N, acf=acf)
-        logger.info("acf.shape {0}".format(acf.shape))
-        logger.info("acf[0] {0}".format(acf[0]))
-        logger.info("ita.shape {0}".format(ita.shape))
-        logger.info("ita[0] {0}".format(ita[0]))
-
-    # Included for completeness but not required
-
-    # now mask/ravel the noise
-    # N = N[np.isfinite(N)].ravel()
-    # Pi = np.einsum('ip,p', j, N)
-    # Qij = np.einsum('ijp,p', h, N)
-
-    Vij = np.einsum("ip,jq,pq", j, j, ita)
-    Uijk = np.einsum("ip,jkq,pq", j, h, ita)
-
-    bias_1 = np.einsum("imn, mn", Cimn, Vij)
-    bias_2 = np.einsum("ilkm, mlk", Eilkm, Uijk)
-    bias = bias_1 + bias_2
-    logger.info("bias {0}".format(bias))
-    return bias
-
-
-def bias_correct(params, data, acf=None):
-    """
-    Calculate and apply a bias correction to the given fit parameters
-
-
-    Parameters
-    ----------
-    params : lmfit.Parameters
-        The model parameters. These will be modified.
-
-    data : 2d-array
-        The data which was used in the fitting
-
-    acf : 2d-array
-        ACF of the data. Default = None.
-
-    Returns
-    -------
-    None
-
-    See Also
-    --------
-    :func:`AegeanTools.fitting.RB_bias`
-    """
-    bias = RB_bias(data, params, acf=acf)
-    i = 0
-    for p in params:
-        if "theta" in p:
-            continue
-        if params[p].vary:
-            params[p].value -= bias[i]
-            i += 1
-    return
 
 
 def errors(source, model, wcshelper):
@@ -1227,7 +689,65 @@ def ntwodgaussian_lmfit(params):
     return rfunc
 
 
-def do_lmfit(data, params, B=None, errs=None, dojac=True):
+def nthreedgaussian_lmfit(params):
+    """
+    Convert an lmfit.Parameters object into a function which calculates the
+    model.
+
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        Model parameters, can have multiple components.
+
+    Returns
+    -------
+    model : func
+        A function f(x,y) that will compute the model.
+    """
+
+    def rfunc(v, x, y):  # TODO: Update the Doc string
+        #! v is not a pixel coordinate it should be actual frequency i.e. pix2freq
+        """
+        Compute the model given by params, at pixel coordinates x,y
+
+        Parameters
+        ----------
+        x, y : numpy.ndarray
+            The x/y pixel coordinates at which the model is being evaluated
+
+        Returns
+        -------
+        result : numpy.ndarray
+            Model
+        """
+        result = None
+
+        for i in range(int(params["components"].value)):
+            prefix = f"c{i}_"
+            # I hope this doesn't kill our run time
+            amp = np.nan_to_num(params[prefix + "amp"].value)
+            xo = params[prefix + "xo"].value
+            yo = params[prefix + "yo"].value
+            sx = params[prefix + "sx"].value
+            sy = params[prefix + "sy"].value
+            theta = params[prefix + "theta"].value
+            alpha = params[prefix + "alpha"].value
+            nu0 = params[prefix + "nu0"].value
+            if result is not None:
+                result += elliptical_gaussian_with_alpha(
+                    x, y, v, amp, xo, yo, nu0, sx, sy, theta, alpha
+                )  # TODO: Pass the frequency into this, which is the current frequency
+            else:
+                result = elliptical_gaussian_with_alpha(
+                    x, y, v, amp, xo, yo, nu0, sx, sy, theta, alpha
+                )
+        return result
+
+    return rfunc
+
+
+def do_lmfit(data, params, B=None, errs=None, dojac=False):
     """
     Fit the model to the data
     data may contain 'flagged' or 'masked' data with the value of np.nan
@@ -1310,6 +830,100 @@ def do_lmfit(data, params, B=None, errs=None, dojac=True):
     # Remake the residual so that it is once again (model - data)
     if B is not None:
         result.residual = result.residual.dot(inv(B))
+    return result, params
+
+
+def do_lmfit_3D(
+    data,
+    params,
+    freq_mapping=None,
+    B=None,
+    errs=None,
+    dojac=False,
+):  # TODO: Go through B matrix
+    """
+    Fit the model to the data
+    data may contain 'flagged' or 'masked' data with the value of np.NaN
+
+    Parameters
+    ----------
+    data : 2d-array
+        Image data
+
+    params : lmfit.Parameters
+        Initial model guess.
+
+    B : 2d-array
+        B matrix to be used in residual calculations.
+        Default = None.
+
+    errs : 1d-array
+
+    dojac : bool
+        If true then an analytic jacobian will be passed to the fitter
+
+    Returns
+    -------
+    result : ?
+        lmfit.minimize result.
+
+    params : lmfit.Params
+        Fitted model.
+
+    See Also
+    --------
+    :func:`AegeanTools.fitting.lmfit_jacobian`
+
+    """
+    # copy the params so as not to change the initial conditions
+    # in case we want to use them elsewhere
+    params = copy.deepcopy(params)
+    data = np.array(data)
+    mask = np.where(np.isfinite(data))
+    fmask = freq_mapping[mask[0]]
+
+    def residual(params, x, y, B=None, errs=None):
+        """
+        The residual function required by lmfit
+
+        Parameters
+        ----------
+        params: lmfit.Params
+            The parameters of the model being fit
+
+        Returns
+        -------
+        result : numpy.ndarray
+            Model - Data
+        """
+        f = nthreedgaussian_lmfit(params)  # A function describing the model
+        model = f(fmask, mask[1], mask[2])  # The actual model
+
+        if np.any(~np.isfinite(model)):
+            logger.debug(f"The parameters are  {params}")
+            raise AegeanNaNModelError(
+                "lmfit optimisation has return NaN in the parameter set. "
+            )
+
+        if B is None:
+            return model - data[mask]
+        else:
+            return (model - data[mask]).dot(B)
+
+    # if dojac:
+    #     result = lmfit.minimize(
+    #         residual,
+    #         params,
+    #         kws={"x": mask[0], "y": mask[1], "B": B, "errs": errs},
+    #         Dfun=lmfit_jacobian,
+    #    )
+    result = lmfit.minimize(
+        residual, params, kws={"x": mask[0], "y": mask[1], "B": B, "errs": errs}
+    )
+
+    # Remake the residual so that it is once again (model - data)
+    # if B is not None:
+    #     result.residual = result.residual.dot(inv(B))
     return result, params
 
 

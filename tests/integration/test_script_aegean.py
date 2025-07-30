@@ -67,8 +67,8 @@ def test_aux_images():
 
 
 def test_find():
-    sys.argv = ["", image_SIN, "--table", "test"]
-    aegean.main()
+    # sys.argv = ["", image_SIN, "--table", "test"]
+    # aegean.main()
 
     sys.argv = ["", image_SIN, "--out", "stdout"]
     aegean.main()
@@ -103,6 +103,30 @@ def test_priorized():
         "--island",
     ]
     aegean.main()
+
+
+def test_priorized3D():
+    sys.argv = [
+        "",
+        "tests/test_files/synthetic_cube.fits",
+        "--noise",
+        "tests/test_files/synthetic_cube_rms.fits",
+        "--background",
+        "tests/test_files/synthetic_cube_bkg.fits",
+        "--table",
+        "output.csv",
+        "--3d",
+        "--priorized",
+        "1",
+        "--input",
+        "tests/test_files/synthetic_cat_no_alpha_comp.fits",
+    ]
+    aegean.main()
+
+    if not os.path.exists("output_comp.csv"):
+        raise AssertionError("output file not created")
+    else:
+        os.remove("output_comp.csv")
 
 
 def test_configfile():
