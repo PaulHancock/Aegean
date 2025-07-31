@@ -14,19 +14,34 @@ __author__ = "Paul Hancock"
 
 def test_sigmaclip():
     """Test the sigmaclipping"""
-    # normal usage case
+    
     data = np.ones(100)
-    if not BANE.sigmaclip(data, 3, 4, reps=4)[0] == 1.0:
-        raise AssertionError()
+    bkg, rms = BANE.sigmaclip(data, 3, 4, reps=4)
+    if not np.isclose(bkg, 1.0):
+        raise AssertionError("BKG is not 1.0, it is {0}".format(bkg))
+    if not np.isclose(rms, 0.0):
+        raise AssertionError("RMS is not 0.0, it is {0}".format(rms))
 
     data[13] = np.nan
-    if not BANE.sigmaclip(data, 3, 4, reps=4)[0] == 1.0:
-        raise AssertionError()
-
+    bkg, rms = BANE.sigmaclip(data, 3, 4, reps=4)
+    if not np.isclose(bkg, 1.0):
+        raise AssertionError("BKG is not 1.0, it is {0}".format(bkg))
+    if not np.isclose(rms, 0.0):
+        raise AssertionError("RMS is not 0.0, it is {0}".format(rms))
+    
     # test empty list
     if not np.isnan(BANE.sigmaclip(np.array([]), 0, 3)[0]):
         raise AssertionError()
 
+    data =np.random.normal(3.5, 0.2, size=100)
+    data[0] = 11  # outlier to be clipped
+    data[-1] = -3  # outlier to be clipped
+    bkg, rms = BANE.sigmaclip(data, 3, 3, reps=4)
+    if not np.isclose(bkg, 3.5, atol=0.05):
+        raise AssertionError("BKG is not 3.5, it is {0}".format(bkg))
+    if not np.isclose(rms, 0.2, atol=0.05):
+        raise AssertionError("RMS is not 0.2, it is {0}".format(rms))
+    
 
 def test_filter_image():
     """Test filter image"""
@@ -154,13 +169,29 @@ def test_cube_as_cube():
     """
     Ensure that running BANE on a cube delivers a cube output
     """
+    # the _3d image is the same as the base image, but I have added a third axis
+    # the third axis values are the same as the base but I have added a slice number as an offset
     fname = "tests/test_files/1904-66_SIN_3d.fits"
-    # don't crash and die
-    try:
-        for index in [0, 1, 2]:
-            BANE.filter_image(fname, out_base=None, nslice=1, cube_index=None)
-    except Exception as e:
-        raise AssertionError("BANE failed to work on 3d image")
+    outbase = "dlme"
+    rms_file = outbase + "_rms.fits"
+    bkg_file = outbase + "_bkg.fits"
+    ref_rms_file = "tests/test_files/1904-66_SIN_rms.fits"
+    ref_bkg_file = "tests/test_files/1904-66_SIN_bkg.fits"
+
+    BANE.filter_image(fname, out_base=outbase, cores=3, cube_index=None)
+    rms = fits.getdata(rms_file)
+    ref_rms = fits.getdata(ref_rms_file)
+    bkg = fits.getdata(bkg_file)
+    ref_bkg = fits.getdata(ref_bkg_file)
+
+    os.remove(rms_file)
+    os.remove(bkg_file)
+    for slice in [0, 1, 2]:
+        if not np.allclose(rms[slice], ref_rms, atol=0.01, equal_nan=True):
+            raise AssertionError(f"rms is wrong on slice {slice} max diff is {np.nanmax(np.abs(rms[slice] - ref_rms))}")
+
+        if not np.allclose(bkg[slice]-slice, ref_bkg, atol=0.01, equal_nan=True):
+            raise AssertionError(f"bkg is wrong on slice {slice} max diff is {np.nanmax(np.abs(bkg[slice]-slice - ref_bkg))}")
     return
 
 
