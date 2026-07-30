@@ -262,10 +262,18 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
         gr, gc = np.mgrid[ymin - data_row_min : ymax - data_row_min, 0 : shape[2]]
         logger.debug(f"gr has shape {gr.shape}")
         logger.debug("Interpolating bkg to sharemem")
-        ifunc = RegularGridInterpolator((rows, cols), vals)
+
+        # Interpolate the bkg values to the full image size and write to shared memory
+        ifunc = RegularGridInterpolator(
+            (rows, cols), vals, bounds_error=False, fill_value=None
+        )
         interp_bkg = np.array(ifunc((gr, gc)), dtype=np.float64)
         ibkg[k, ymin:ymax, :] = interp_bkg
-        del ifunc, interp_bkg
+
+        gr_pad, gc_pad = np.mgrid[0 : data.shape[1], 0 : shape[2]]
+        full_bkg = np.array(ifunc((gr_pad, gc_pad)), dtype=np.float64)
+        del ifunc, interp_bkg, gr_pad, gc_pad
+
         logger.debug(" ... done writing bkg")
 
         # wait for all to complete
@@ -281,9 +289,8 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
         logger.debug(
             f"data slice is {0 + ymin - data_row_min}:{data.shape[1] - (data_row_max - ymax)}"
         )
-        data[
-            k, 0 + ymin - data_row_min : data.shape[1] - (data_row_max - ymax), :
-        ] -= ibkg[k, ymin:ymax, :]
+        data[k, :, :] -= full_bkg
+        del full_bkg
         logger.debug(".. done ")
 
         # reset/recycle the vals array
