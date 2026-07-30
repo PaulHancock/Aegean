@@ -6,7 +6,7 @@ import os
 
 import numpy as np
 from astropy.io import fits
-
+import AegeanTools
 from AegeanTools import BANE
 
 __author__ = "Paul Hancock"
@@ -33,6 +33,7 @@ def test_sigmaclip():
     if not np.isnan(BANE.sigmaclip(np.array([]), 0, 3)[0]):
         raise AssertionError()
 
+    np.random.seed(42)
     data =np.random.normal(3.5, 0.2, size=100)
     data[0] = 11  # outlier to be clipped
     data[-1] = -3  # outlier to be clipped
@@ -178,14 +179,15 @@ def test_cube_as_cube():
     ref_rms_file = "tests/test_files/1904-66_SIN_rms.fits"
     ref_bkg_file = "tests/test_files/1904-66_SIN_bkg.fits"
 
+    AegeanTools.logging.logger.setLevel("DEBUG")
     BANE.filter_image(fname, out_base=outbase, cores=3, cube_index=None)
     rms = fits.getdata(rms_file)
     ref_rms = fits.getdata(ref_rms_file)
     bkg = fits.getdata(bkg_file)
     ref_bkg = fits.getdata(ref_bkg_file)
 
-    os.remove(rms_file)
-    os.remove(bkg_file)
+    # os.remove(rms_file)
+    # os.remove(bkg_file)
     for slice in [0, 1, 2]:
         if not np.allclose(rms[slice], ref_rms, atol=0.01, equal_nan=True):
             raise AssertionError(f"rms is wrong on slice {slice} max diff is {np.nanmax(np.abs(rms[slice] - ref_rms))}")
