@@ -174,6 +174,37 @@ def test_load_globals_cube():
     else:
         raise AssertionError()
 
+def test_load_globals_cube_without_bkgin():
+    """
+    load_globals(as_cube=True) should be able to automatically compute
+    background/rms via BANE when the user hasn't supplied bkgin/rmsin,
+    exactly as it already does for as_cube=False (see test__make_bkg_rms).
+ 
+    Currently this crashes: the `if not as_cube:` branch is the only place
+    that calls self._make_bkg_rms(), so for as_cube=True, self.bkgimg and
+    self.rmsimg are never set and stay None (from __init__). The next lines
+    (`np.squeeze(self.bkgimg)` then `img -= self.bkgimg`) then fail with:
+        UFuncTypeError: Cannot cast ufunc 'subtract' output from dtype('O')
+        to dtype('>f4') with casting rule 'same_kind'
+    """
+    sfinder = sf.SourceFinder()
+    filename = "tests/test_files/synthetic_cube.fits"
+ 
+    # deliberately do NOT supply bkgin/rmsin, forcing load_globals to
+    # calculate them itself -- the same way it already does for 2D images.
+    sfinder.load_globals(filename, as_cube=True)
+ 
+    if sfinder.img is None:
+        raise AssertionError("Image was not loaded")
+    if sfinder.bkgimg is None:
+        raise AssertionError("bkgimg was never computed for a cube")
+    if sfinder.rmsimg is None:
+        raise AssertionError("rmsimg was never computed for a cube")
+    if not np.all(np.isfinite(sfinder.rmsimg)):
+        raise AssertionError("rmsimg contains non-finite values")
+    if not np.any(sfinder.rmsimg > 0):
+        raise AssertionError("rmsimg is not positive anywhere")
+
 
 def test_find_and_prior_sources():
     """Test find sources and prior sources"""
