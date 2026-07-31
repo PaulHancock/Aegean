@@ -983,7 +983,7 @@ class SourceFinder(object):
 
             self.wcshelper = WCSHelper.from_header(header, beam)
             self.beam = self.wcshelper.beam
-            
+
         if mask is not None:
             # allow users to supply an object instead of a filename
             if isinstance(mask, Region):
@@ -1334,16 +1334,21 @@ class SourceFinder(object):
                 x = int(round(source_x))
                 y = int(round(source_y))
 
+                # coordinates that are either 2d/3d, depending on the data
+                zxy = (0,) * (data.ndim - 2) + (x, y)
+
                 logger.debug(f"pixel location ({source_x:5.2f},{source_y:5.2f})")
                 # reject sources that are outside the image bounds,
                 # or which have nan data/rms values
                 if (
-                    not 0 <= x < shape[0]
-                    or not 0 <= y < shape[1]
-                    or not np.isfinite(data[x, y])
-                    or not np.isfinite(rmsimg[x, y])
+                    not 0 <= x < shape[-2]
+                    or not 0 <= y < shape[-1]
+                    or not np.isfinite(data[zxy])
+                    or not np.isfinite(rmsimg[zxy])
                     or pixbeam is None
                 ):
+                    logger.debug(f"x {x}, y {y} , shape {shape}")
+                    logger.debug(f"data {data[zxy]}, rms {rmsimg[zxy]}, pixbeam {pixbeam}")
                     logger.debug(
                         f"Source ({src.island},{src.source}) not within usable region: skipping"
                     )
@@ -1375,8 +1380,8 @@ class SourceFinder(object):
                 # adjust the size of the island to include this source
                 xmin = min(xmin, max(0, x - xwidth / 2))
                 ymin = min(ymin, max(0, y - ywidth / 2))
-                xmax = max(xmax, min(shape[0], x + xwidth / 2 + 1))
-                ymax = max(ymax, min(shape[1], y + ywidth / 2 + 1))
+                xmax = max(xmax, min(shape[-2], x + xwidth / 2 + 1))
+                ymax = max(ymax, min(shape[-1], y + ywidth / 2 + 1))
 
                 s_lims = [0.8 * min(sx, pixbeam.b * FWHM2CC), max(sy, sx) * 1.25]
 
