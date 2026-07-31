@@ -233,30 +233,38 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
 
     # store the computed bkg/rms in this smaller array
     vals = np.zeros(shape=(len(rows), len(cols)))
+    try:
+        for i, row in enumerate(rows):
+            for j, col in enumerate(cols):
+                r_min, r_max, c_min, c_max = box(row, col)
+                new = data[r_min:r_max, c_min:c_max]
+                new = np.ravel(new)
+                bkg, _ = sigmaclip(new, 3, 3)
+                vals[i, j] = bkg
 
-    for i, row in enumerate(rows):
-        for j, col in enumerate(cols):
-            r_min, r_max, c_min, c_max = box(row, col)
-            new = data[r_min:r_max, c_min:c_max]
-            new = np.ravel(new)
-            bkg, _ = sigmaclip(new, 3, 3)
-            vals[i, j] = bkg
+        # indices of all the pixels within our region
+        gr, gc = np.mgrid[ymin - data_row_min : ymax - data_row_min, 0 : shape[1]]
 
-    # indices of all the pixels within our region
-    gr, gc = np.mgrid[ymin - data_row_min : ymax - data_row_min, 0 : shape[1]]
+        # Find the shared memory and create a numpy array interface
+        ibkg_shm = SharedMemory(name=f"ibkg_{memory_id}", create=False)
+        ibkg = np.ndarray(shape, dtype=np.float64, buffer=ibkg_shm.buf)
+        irms_shm = SharedMemory(name=f"irms_{memory_id}", create=False)
+        irms = np.ndarray(shape, dtype=np.float64, buffer=irms_shm.buf)
 
-    # Find the shared memory and create a numpy array interface
-    ibkg_shm = SharedMemory(name=f"ibkg_{memory_id}", create=False)
-    ibkg = np.ndarray(shape, dtype=np.float64, buffer=ibkg_shm.buf)
-    irms_shm = SharedMemory(name=f"irms_{memory_id}", create=False)
-    irms = np.ndarray(shape, dtype=np.float64, buffer=irms_shm.buf)
+        logger.debug("Interpolating bkg to sharemem")
+        ifunc = RegularGridInterpolator((rows, cols), vals)
+        interp_bkg = np.array(ifunc((gr, gc)), dtype=np.float64)
+        ibkg[ymin:ymax, :] = interp_bkg
+        del ifunc, interp_bkg
+        logger.debug(" ... done writing bkg")
 
-    logger.debug("Interpolating bkg to sharemem")
-    ifunc = RegularGridInterpolator((rows, cols), vals)
-    interp_bkg = np.array(ifunc((gr, gc)), dtype=np.float64)
-    ibkg[ymin:ymax, :] = interp_bkg
-    del ifunc, interp_bkg
-    logger.debug(" ... done writing bkg")
+    except Exception:
+        logger.error(
+            f"sigma_filter failed on rows {ymin}-{ymax}; "
+            "aborting barrier so sibling workers are not stranded"
+        )
+        barrier.abort()
+        raise
 
     # wait for all to complete
     i = barrier.wait()
@@ -411,6 +419,11 @@ def filter_mc_sharemem(
             logger.error("Caught keyboard interrupt")
             pool.close()
             exit = True
+        except Exception:
+            logger.error("A worker process failed; terminating remaining workers")
+            pool.terminate()
+            pool.join()
+            raise
         else:
             pool.close()
             pool.join()
