@@ -251,7 +251,7 @@ def write_fits(data, header, file_name):
     return
 
 
-def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=False):
+def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=None):
     """
     Load a subset of an image from a given filename.
     The subset is controlled using the band, which is (this band, total bands)
@@ -270,9 +270,10 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=Fa
     cube_index : int
         The index of the cube to load from the fits file.
 
-    as_cube : boolean
-        This is a flag that determines whether the data to be processed is a cube
-        or a frequency slice, if the data is 3 dimensional and as_cube is True, then a 3-dimensional array will be returned.
+    as_cube : boolean or None
+        Default None: auto-detect from the file itself -- if cube_index is
+        not given and the file has more than one plane along its 3rd axis,
+        treat it as a cube; otherwise treat it as a single 2D slice.
 
     returns
     -------
@@ -303,6 +304,15 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=Fa
 
     # Figure out how many axes are in the datafile
     NAXIS = header["NAXIS"]
+    if as_cube is None:
+        # auto-detect: only treat this as a cube if the caller hasn't
+        # asked for one specific slice, and the file actually has more
+        # than one plane to offer.
+        as_cube = cube_index is None and NAXIS >= 3 and header["NAXIS3"] > 1
+    if not as_cube and cube_index is None:
+        # a single-plane cube (or a caller that didn't care which slice)
+        # -- just use the only slice there is, rather than crashing.
+        cube_index = 0   
     with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
         if NAXIS == 2:
             data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]

@@ -901,7 +901,7 @@ class SourceFinder(object):
         blank=False,
         docov=True,
         cube_index=None,
-        as_cube=False,
+        as_cube=None,
     ):
         """
         Populate the global_data object by loading or calculating
@@ -952,8 +952,10 @@ class SourceFinder(object):
         cube_index : int
           For an image cube, which slice to use.
 
-        as_cube : bool
+        as_cube : bool or None
           If the data is to be processed as a cube or not.
+          Default = None: auto-detect from the file (a cube if cube_index
+          is not given and the file has more than one plane).
         """
         # don't reload already loaded data
         if self.img is not None:
@@ -962,7 +964,12 @@ class SourceFinder(object):
         img, header = load_image_band(
             filename, hdu_index=hdu_index, cube_index=cube_index, as_cube=as_cube
         )
-
+        # load_image_band may have auto-detected as_cube itself (if it was
+        # None); resolve it here to the ground truth of what was actually
+        # loaded, so every use of as_cube below (aux image loading, docov)
+        # is consistent with the real shape of img rather than a possibly
+        # still-unresolved sentinel.
+        as_cube = img.ndim == 3
         debug = logger.isEnabledFor(logging.DEBUG)
 
         self.img = img
@@ -2279,236 +2286,6 @@ class SourceFinder(object):
         ) as pbar:
             for i, g in enumerate(island_groups):
                 srcs = self._refit_islands(g, stage, outerclip, istart=i)
-                # update bar as each individual island is fit
-                pbar.update(1)
-                sources.extend(srcs)
-
-        sources = sorted(sources)
-
-        # Write the output to the output file
-        if outfile:
-            print(
-                header.format("{0}-({1})".format(__version__, __date__), filename),
-                file=outfile,
-            )
-            print(ComponentSource.header, file=outfile)
-            for source in sources:
-                print(str(source), file=outfile)
-
-        logger.info("fit {0} components".format(len(sources)))
-        self.sources.extend(sources)
-        return sources
-
-    def priorized_fit_islands_3D(
-        self,
-        filename,
-        catalogue,
-        # hdu_index=0,
-        outfile=None,
-        bkgin=None,
-        rmsin=None,
-        cores=1,
-        # rms=None,
-        # bkg=None,
-        # beam=None,
-        # imgpsf=None,
-        # catpsf=None,
-        stage=3,
-        ratio=None,
-        outerclip=3,
-        doregroup=True,
-        regroup_eps=None,
-        docov=True,
-        # cube_index=None,
-        progress=True,
-    ):
-        """
-        Take an input catalog, image, and background/noise images
-        fit the flux and ra/dec for each of the given sources. #! Delete the parameters that are not used in the function
-
-        Parameters
-        ----------
-        filename : str or HDUList
-            Image filename or HDUList.
-
-        catalogue : str or list
-            Input catalogue file name or list of ComponentSource objects.
-
-        hdu_index : int
-            The index of the FITS HDU (extension).
-
-        outfile : str
-            file for printing catalog
-            (NOT a table, just a text file of my own design)
-
-        rmsin, bkgin : str or HDUList
-            Filename or HDUList for the noise and background images.
-            If either are None, then it will be calculated internally.
-
-        cores : int
-            Number of CPU cores to use. None means all cores.
-
-        rms : float
-            Use this rms for the entire image
-            (will also assume that background is 0)
-
-        beam : (float, float, float)
-            (major, minor, pa) representing the synthesised beam (degrees).
-            Replaces whatever is given in the FITS header.
-            If the FITS header has no BMAJ/BMIN then this is required.
-
-        imgpsf : str or HDUList
-            Filename or HDUList for a psf image.
-
-        catpsf : str or HDUList
-            Filename or HDUList for the catalogue psf image.
-
-        stage : int
-            Refitting stage
-
-        ratio : float
-            If not None - ratio of image psf to catalog psf,
-            otherwise interpret from catalogue or image if possible
-
-        outerclip : float
-            The flood (outer) clipping level (sigmas).
-
-        doregroup : bool, Default=True
-            Relabel all the islands/groups to ensure that nearby
-            components are jointly fit.
-
-        regroup_eps: float, Default=None
-            The linking parameter for regouping. Components that are
-            closer than this distance (in arcmin) will be jointly fit.
-            If NONE, then use 4x the average source major axis size (after
-            rescaling if required).
-
-        docov : bool, Default=True
-            If True then include covariance matrix in the fitting process.
-
-        cube_index : int, Default=None
-            For image cubes, slice determines which slice is used.
-
-        progress : bool, Default=True
-            Show a progress bar when fitting island groups
-
-        Returns
-        -------
-        sources : list
-            List of sources measured.
-
-        """
-
-        from AegeanTools.cluster import regroup_dbscan
-
-        self.load_globals(
-            filename,
-            # hdu_index=hdu_index,
-            bkgin=bkgin,
-            rmsin=rmsin,
-            # beam=beam,
-            verb=True,
-            # rms=rms,
-            # bkg=bkg,
-            cores=cores,
-            do_curve=False,
-            # psf=imgpsf,
-            docov=docov,
-            # cube_index=cube_index,
-            as_cube=True,
-        )
-
-        # load the table and convert to an input source list
-        if isinstance(catalogue, str):
-            input_table = load_table(catalogue)
-            input_sources = np.array(
-                table_to_source_list(input_table, src_type=ComponentSource3D)
-            )
-        else:
-            input_sources = np.array(catalogue)  # Assumed to be a list of objects
-
-        nu0 = self.wcshelper.pix2freq(0)
-
-        for src in input_sources:
-            src.alpha = -1
-            src.nu0 = nu0
-
-        if len(input_sources) < 1:
-            logger.debug("No input sources for priorized fitting")
-            return []
-
-        # reject sources with missing params
-        ok = True
-        for param in [
-            "ra",
-            "dec",
-            "peak_flux",
-            "a",
-            "b",
-            "pa",
-            "alpha",
-            "nu0",
-        ]:  #! Added freq and alpha
-            if np.isnan(getattr(input_sources[0], param)):
-                logger.info("Source 0, is missing param '{0}'".format(param))
-                ok = False
-        if not ok:
-            logger.error("Missing parameters! Not fitting.")
-            logger.error("Maybe your table is missing or mis-labeled columns?")
-            return []
-        del ok
-
-        # Do the resizing
-        logger.info("{0} sources in catalog".format(len(input_sources)))
-        sources = cluster.resize(input_sources, ratio=ratio, wcshelper=self.wcshelper)
-        logger.info("{0} sources accepted".format(len(sources)))
-
-        if len(sources) < 1:
-            logger.debug("No sources accepted for priorized fitting")
-            return []
-
-        # compute eps if it's not defined
-        if regroup_eps is None:  #! How do we handle this as the elliptical beam is
-            #! not defined in the 3D case
-            # s.a is in arcsec but we assume regroup_eps is in arcmin
-            regroup_eps = 4 * np.mean([s.a / 60 for s in sources])
-        # convert regroup_eps into a value appropriate for a cartesian measure
-        regroup_eps = np.sin(np.radians(regroup_eps / 60))
-        input_sources = sources
-        # redo the grouping if required
-        if doregroup:
-            # TODO: scale eps in some appropriate manner
-            groups = regroup_dbscan(input_sources, eps=regroup_eps)
-        else:
-            groups = list(island_itergen(input_sources))
-
-        logger.info("Begin fitting")
-
-        island_groups = []  # will be a list of groups of islands
-        island_group = []  # will be a list of islands
-        group_size = 20
-
-        for island in groups:
-            island_group.append(island)
-            # If the island group is full queue it for the subprocesses to fit
-            if len(island_group) >= group_size:
-                island_groups.append(island_group)
-                island_group = []
-        # The last partially-filled island group also needs to
-        #  be queued for fitting
-        if len(island_group) > 0:
-            island_groups.append(island_group)
-
-        sources = []
-        with tqdm(
-            total=len(island_groups),
-            desc="Refitting Island Groups",
-            disable=not progress,
-        ) as pbar:
-            for i, g in enumerate(island_groups):
-                srcs = self._refit_islands(
-                    g, stage, outerclip, istart=i
-                )  #! <- Update it after the function is implemented
                 # update bar as each individual island is fit
                 pbar.update(1)
                 sources.extend(srcs)
