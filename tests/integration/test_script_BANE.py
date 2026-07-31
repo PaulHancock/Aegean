@@ -25,13 +25,24 @@ def test_invalid_file():
 
 
 def test_noclobber():
-    sys.argv = ["", "--noclobber", image_SIN]
-    BANE.main()
+    sys.argv = ["", "--noclobber", "--out", tempfile, image_SIN]
+    try:
+        BANE.main() # make the file
+        BANE.main() # don't make the file (already exists)
+    finally:
+        for f in (tempfile + "_bkg.fits", tempfile + "_rms.fits"):
+            if os.path.exists(f):
+                os.remove(f)
 
 
 def test_run_BANE():
-    sys.argv = ["", image_SIN]
-    BANE.main()
+    sys.argv = ["", image_SIN, "--out", tempfile]
+    try:
+        BANE.main()
+    finally:
+        for f in (tempfile + "_bkg.fits", tempfile + "_rms.fits"):
+            if os.path.exists(f):
+                os.remove(f)
 
 
 def test_configfile():
