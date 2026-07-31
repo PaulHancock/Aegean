@@ -965,10 +965,12 @@ class SourceFinder(object):
 
         debug = logger.isEnabledFor(logging.DEBUG)
 
+        self.img = img
+        self.header = header
+        self.dtype = self.img.dtype
+
+
         if not as_cube:
-            self.img = img
-            self.header = header
-            self.dtype = type(self.img[0][0])
             self.bkgimg = np.zeros(self.img.shape, dtype=self.dtype)
             self.rmsimg = np.zeros(self.img.shape, dtype=self.dtype)
 
@@ -977,49 +979,45 @@ class SourceFinder(object):
             self.wcshelper = WCSHelper.from_header(header, beam, psf_file=psf)
             self.beam = self.wcshelper.beam
 
-            if mask is not None:
-                # allow users to supply an object instead of a filename
-                if isinstance(mask, Region):
-                    self.region = mask
-                elif os.path.exists(mask):
-                    logger.info("Loading mask from {0}".format(mask))
-                    self.region = Region.load(mask)
-                else:
-                    logger.error("File {0} not found for loading".format(mask))
-                    self.region = None
-
-            if do_curve:
-                logger.info("Calculating curvature")
-                # calculate curvature but store it as -1,0,+1
-                dcurve = np.zeros(self.img.shape, dtype=np.int8)
-                peaks = maximum_filter(self.img, size=3)
-                troughs = minimum_filter(self.img, size=3)
-                pmask = np.where(self.img == peaks)
-                tmask = np.where(self.img == troughs)
-                dcurve[pmask] = -1
-                dcurve[tmask] = 1
-                self.dcurve = dcurve
-
-                # if either of rms or bkg images are not supplied
-                # then calculate them both
-            if not (rmsin and bkgin):
-                if verb:
-                    logger.info("Calculating background and rms data")
-                self._make_bkg_rms(
-                    filename=filename,
-                    forced_rms=rms,
-                    forced_bkg=bkg,
-                    cores=cores,
-                )
-
         else:
-            self.img = img
-            self.header = header
-            self.dtype = type(self.img[0][0])
 
             self.wcshelper = WCSHelper.from_header(header, beam)
             self.beam = self.wcshelper.beam
+            
+        if mask is not None:
+            # allow users to supply an object instead of a filename
+            if isinstance(mask, Region):
+                self.region = mask
+            elif os.path.exists(mask):
+                logger.info("Loading mask from {0}".format(mask))
+                self.region = Region.load(mask)
+            else:
+                logger.error("File {0} not found for loading".format(mask))
+                self.region = None
 
+        if do_curve:
+            logger.info("Calculating curvature")
+            # calculate curvature but store it as -1,0,+1
+            dcurve = np.zeros(self.img.shape, dtype=np.int8)
+            peaks = maximum_filter(self.img, size=3)
+            troughs = minimum_filter(self.img, size=3)
+            pmask = np.where(self.img == peaks)
+            tmask = np.where(self.img == troughs)
+            dcurve[pmask] = -1
+            dcurve[tmask] = 1
+            self.dcurve = dcurve
+
+            # if either of rms or bkg images are not supplied
+            # then calculate them both
+        if not (rmsin and bkgin):
+            if verb:
+                logger.info("Calculating background and rms data")
+            self._make_bkg_rms(
+                filename=filename,
+                forced_rms=rms,
+                forced_bkg=bkg,
+                cores=cores,
+            )
         # replace the calculated images with input versions,
         # if the user has supplied them.
         if bkgin:
