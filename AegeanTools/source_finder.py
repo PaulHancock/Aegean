@@ -1041,7 +1041,7 @@ class SourceFinder(object):
             logger.debug("Data max is {0}".format(np.nanmax(img)))
 
         self.blank = blank
-        self.docov = docov
+        self.docov = docov and not as_cube  # covariance matrix is not used for cubes (yet)
 
         # check if the WCS is galactic
         if "lon" in self.header["CTYPE1"].lower():
@@ -1558,8 +1558,8 @@ class SourceFinder(object):
                     else:
                         logger.critical("Cannot determine pixel beam")
                 fac = 1 / np.sqrt(2)
-                # TODO, determine Cmatrix for the case of an image cube
-                if self.docov and not is_cube:
+
+                if self.docov:
                     C = Cmatrix(
                         mx,
                         my,
@@ -2193,20 +2193,33 @@ class SourceFinder(object):
             cube_index=cube_index,
         )
 
+        # Determine if we are using a cube or not
+        is_cube = self.img.ndim == 3
+
         # load the table and convert to an input source list
         if isinstance(catalogue, str):
             input_table = load_table(catalogue)
-            input_sources = np.array(table_to_source_list(input_table))
+            src_type = ComponentSource3D if is_cube else ComponentSource
+            input_sources = np.array(table_to_source_list(input_table, src_type=src_type))
         else:
             input_sources = np.array(catalogue)
+
+        if is_cube:
+            nu0 = self.wcshelper.pix2freq(0)
+            for src in input_sources:
+                src.alpha = -1
+                src.nu0 = nu0
 
         if len(input_sources) < 1:
             logger.debug("No input sources for priorized fitting")
             return []
 
         # reject sources with missing params
+        required = ["ra", "dec", "peak_flux", "a", "b", "pa"]
+        if is_cube:
+            required += ["alpha", "nu0"]
         ok = True
-        for param in ["ra", "dec", "peak_flux", "a", "b", "pa"]:
+        for param in required:
             if np.isnan(getattr(input_sources[0], param)):
                 logger.info(f"Source 0, is missing param '{param}'")
                 ok = False
@@ -2305,7 +2318,7 @@ class SourceFinder(object):
         outerclip=3,
         doregroup=True,
         regroup_eps=None,
-        docov=False,
+        docov=True,
         # cube_index=None,
         progress=True,
     ):
@@ -2396,7 +2409,7 @@ class SourceFinder(object):
             # beam=beam,
             verb=True,
             # rms=rms,
-            bkg=bkgin,
+            # bkg=bkg,
             cores=cores,
             do_curve=False,
             # psf=imgpsf,
