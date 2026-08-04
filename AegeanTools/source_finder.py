@@ -2092,7 +2092,6 @@ class SourceFinder(object):
         bkg=None,
         beam=None,
         imgpsf=None,
-        catpsf=None,
         stage=3,
         ratio=None,
         outerclip=3,

@@ -187,13 +187,6 @@ def main():
         "region, and psf files using the input filename "
         "as a hint. [default: don't do this]",
     )
-    group2.add_argument(
-        "--3d",
-        dest="threeD",
-        action="store_true",
-        default=False,
-        help="Treat the input image as a 3D cube. "
-    )
 
     # Output
     group3 = parser.add_argument_group("Output Options")
@@ -338,15 +331,6 @@ def main():
         help="If --priorized is used, this gives the filename "
         "for a catalog of locations at which "
         "fluxes will be measured.",
-    )
-    group5.add_argument(
-        "--catpsf",
-        dest="catpsf",
-        type=str,
-        default=None,
-        help="A psf map corresponding to the input catalog. "
-        "This will allow for the correct resizing of"
-        " sources when the catalog and image psfs differ",
     )
     group5.add_argument(
         "--regroup-eps",
@@ -527,9 +511,6 @@ def main():
     if options.imgpsf and not os.path.exists(options.imgpsf):
         logger.error("{0} not found".format(options.imgpsf))
         return 1
-    if options.catpsf and not os.path.exists(options.catpsf):
-        logger.error("{0} not found".format(options.catpsf))
-        return 1
 
     if options.region is not None:
         if not os.path.exists(options.region):
@@ -633,7 +614,6 @@ def main():
             rmsin=options.noiseimg,
             beam=options.beam,
             imgpsf=options.imgpsf,
-            catpsf=options.catpsf,
             stage=options.priorized,
             ratio=options.ratio,
             outerclip=options.outerclip,
