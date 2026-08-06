@@ -4,6 +4,7 @@
 A module for fits file utility functions.
 """
 import numpy as np
+import contextlib
 from astropy.io import fits
 from scipy.interpolate import RegularGridInterpolator
 
@@ -12,7 +13,7 @@ from AegeanTools.logging import logger
 from .exceptions import AegeanError
 
 __author__ = "Paul Hancock"
-__date__ = "2022-11-29"
+__date__ = "2026-08-06"
 
 
 def load_file_or_hdu(filename):
@@ -258,7 +259,8 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=None, as_cube
 
     parameters
     ----------
-    filename : str
+    filename : str or HDUList
+        The filename or HDUList to load the data from.
 
     band : (int, int)
         (this band, total bands)
@@ -271,6 +273,8 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=None, as_cube
         The index of the cube to load from the fits file.
 
     as_cube : boolean or None
+        This is a flag that determines whether the data to be processed is a cube
+        or a frequency slice, if the data is 3 dimensional and as_cube is True, then a 3-dimensional array will be returned.
         Default None: auto-detect from the file itself -- if cube_index is
         not given and the file has more than one plane along its 3rd axis,
         treat it as a cube; otherwise treat it as a single 2D slice.
@@ -288,7 +292,10 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=None, as_cube
     elif band[0] < 0:
         raise AegeanError("band[0] number {0} not valid".format(band[0]))
 
-    header = fits.getheader(filename, ext=hdu_index)
+    if isinstance(filename, fits.HDUList):
+        header = filename[hdu_index].header
+    else:
+        header = fits.getheader(filename, ext=hdu_index)
 
     compressed = is_compressed(header)
 
@@ -304,6 +311,17 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=None, as_cube
 
     # Figure out how many axes are in the datafile
     NAXIS = header["NAXIS"]
+
+    if as_cube is None:
+        # auto-detect: only treat this as a cube if the caller hasn't
+        # asked for one specific slice, and the file actually has more
+        # than one plane to offer.
+        as_cube = cube_index is None and NAXIS >= 3 and header["NAXIS3"] > 1
+    if not as_cube and cube_index is None:
+        # a single-plane cube (or a caller that didn't care which slice)
+        # -- just use the only slice there is, rather than crashing.
+        cube_index = 0
+
     logger.debug(f"as_cube={as_cube}, cube_index={cube_index}, NAXIS={NAXIS}, header[NAXIS3]={header.get('NAXIS3', 'N/A')}")
     if as_cube is None:
         # auto-detect: only treat this as a cube if the caller hasn't
@@ -316,25 +334,32 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=None, as_cube
         cube_index = 0   
     logger.debug(f"image has {NAXIS} axes: {[header[f'NAXIS{i}'] for i in range(1, NAXIS+1)]}")
     logger.debug(f"loading rows {row_min}:{row_max} of HDU {hdu_index}, cube_index {cube_index}, as_cube={as_cube}")
-    with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
+
+    if isinstance(filename, fits.HDUList):
+        cm = contextlib.nullcontext(filename)
+    else:
+        cm = fits.open(filename, memmap=True, do_not_scale_image_data=True)
+
+    with cm as a:
+        # .section is a lazy, memory-mapped reader that requires a real
+        # on-disk file offset; a purely in-memory HDU has none, so fall
+        # back to plain (already fully-resident) .data indexing for that
+        # case instead.
+        sect = a[hdu_index].data if isinstance(filename, fits.HDUList) else a[hdu_index].section
         if NAXIS == 2:
-            data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
+            data = sect[row_min:row_max, 0 : header["NAXIS1"]]
             if as_cube:
                 data = np.expand_dims(data, axis=0)
         elif NAXIS == 3:
             if not as_cube:
-                data = a[hdu_index].section[
-                    cube_index, row_min:row_max, 0 : header["NAXIS1"]
-                ]
+                data = sect[cube_index, row_min:row_max, 0 : header["NAXIS1"]]
             else:
-                data = a[hdu_index].section[:, row_min:row_max, 0 : header["NAXIS1"]]
+                data = sect[:, row_min:row_max, 0 : header["NAXIS1"]]
         elif NAXIS == 4:
             if not as_cube:
-                data = a[hdu_index].section[
-                    0, cube_index, row_min:row_max, 0 : header["NAXIS1"]
-                ]
+                data = sect[0, cube_index, row_min:row_max, 0 : header["NAXIS1"]]
             else:
-                data = a[hdu_index].section[0, :, row_min:row_max, 0 : header["NAXIS1"]]
+                data = sect[0, :, row_min:row_max, 0 : header["NAXIS1"]]
         else:
             raise Exception(f"Too many NAXIS: {NAXIS}>4")
     if "BSCALE" in header:
