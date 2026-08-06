@@ -251,7 +251,7 @@ def write_fits(data, header, file_name):
     return
 
 
-def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=None):
+def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=None, as_cube=None):
     """
     Load a subset of an image from a given filename.
     The subset is controlled using the band, which is (this band, total bands)
@@ -304,6 +304,7 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=No
 
     # Figure out how many axes are in the datafile
     NAXIS = header["NAXIS"]
+    logger.debug(f"as_cube={as_cube}, cube_index={cube_index}, NAXIS={NAXIS}, header[NAXIS3]={header.get('NAXIS3', 'N/A')}")
     if as_cube is None:
         # auto-detect: only treat this as a cube if the caller hasn't
         # asked for one specific slice, and the file actually has more
@@ -313,6 +314,8 @@ def load_image_band(filename, band=(0, 1), hdu_index=0, cube_index=0, as_cube=No
         # a single-plane cube (or a caller that didn't care which slice)
         # -- just use the only slice there is, rather than crashing.
         cube_index = 0   
+    logger.debug(f"image has {NAXIS} axes: {[header[f'NAXIS{i}'] for i in range(1, NAXIS+1)]}")
+    logger.debug(f"loading rows {row_min}:{row_max} of HDU {hdu_index}, cube_index {cube_index}, as_cube={as_cube}")
     with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
         if NAXIS == 2:
             data = a[hdu_index].section[row_min:row_max, 0 : header["NAXIS1"]]
