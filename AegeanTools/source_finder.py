@@ -2292,12 +2292,12 @@ class SourceFinder(object):
         sources = sorted(sources)
 
         # Write the output to the output file
-        if outfile:
+        if outfile and len(sources) > 0:
             print(
                 header.format("{0}-({1})".format(__version__, __date__), filename),
                 file=outfile,
             )
-            print(ComponentSource.header, file=outfile)
+            print(sources[0].header, file=outfile)
             for source in sources:
                 print(str(source), file=outfile)
 
