@@ -3,6 +3,8 @@
 Test BANE.py
 """
 import os
+import signal
+import multiprocessing as mp
 
 import numpy as np
 from astropy.io import fits
@@ -10,6 +12,75 @@ import AegeanTools
 from AegeanTools import BANE
 
 __author__ = "Paul Hancock"
+import os
+import signal
+import multiprocessing as mp
+from AegeanTools import BANE
+
+
+def _flaky_worker_entrypoint(queue):
+    """
+    Run BANE.filter_image with exactly one worker rigged to fail partway
+    through its computation, and report back what happened. Runs in its
+    own process group so a stuck run (and all of its grandchild pool
+    workers) can be cleaned up reliably from the test if needed.
+    """
+    os.setsid()
+
+    counter = mp.Value("i", 0)
+    orig_sigmaclip = BANE.sigmaclip
+
+    def flaky_sigmaclip(arr, lo, hi, reps=10):
+        with counter.get_lock():
+            counter.value += 1
+            should_fail = counter.value == 1
+        if should_fail:
+            raise RuntimeError("TEST: simulated failure in one BANE worker")
+        return orig_sigmaclip(arr, lo, hi, reps)
+
+    BANE.sigmaclip = flaky_sigmaclip
+    try:
+        BANE.filter_image(
+            "tests/test_files/1904-66_SIN_3d.fits",
+            out_base=None,
+            cores=3,
+            cube_index=None,
+        )
+        queue.put(("no_exception", None))
+    except Exception as e:
+        queue.put(("exception", f"{type(e).__name__}: {e}"))
+
+
+def test_barrier_abort_on_worker_failure():
+    TIMEOUT = 15
+    ctx = mp.get_context("fork")
+    queue = ctx.Queue()
+    proc = ctx.Process(target=_flaky_worker_entrypoint, args=(queue,))
+    proc.start()
+    proc.join(timeout=TIMEOUT)
+
+    if proc.is_alive():
+        # kill the whole process group, not just proc itself, since
+        # filter_image spawns its own grandchild pool workers that
+        # proc.terminate() alone would leave orphaned and still stuck.
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.join()
+        raise AssertionError(
+            f"filter_image did not return within {TIMEOUT}s after a "
+            "simulated worker failure -- sibling workers are likely stuck "
+            "at a Barrier that was never aborted."
+        )
+
+    if queue.empty():
+        raise AssertionError("worker process exited without reporting a result")
+
+    kind, detail = queue.get()
+    print("RESULT:", kind, detail)
+    if kind != "exception":
+        raise AssertionError(f"expected filter_image to raise, but got: {kind}")
 
 
 def test_sigmaclip():

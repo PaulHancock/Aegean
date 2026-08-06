@@ -33,8 +33,8 @@ except ImportError:
 
 
 __author__ = "Paul Hancock"
-__version__ = "v1.10.1"
-__date__ = "2024-12-09"
+__version__ = "v1.11.0"
+__date__ = "2026-08-06"
 
 # global barrier for multiprocessing
 barrier = None
@@ -234,7 +234,6 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
     # set up a grid of rows/cols at which we will compute the bkg/rms
     rows = list(range(ymin - data_row_min, ymax - data_row_min, step_size[0]))
     rows.append(ymax - data_row_min)
-
     cols = list(range(0, shape[2], step_size[1]))
     cols.append(shape[2])
 
@@ -245,36 +244,44 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
     irms = np.ndarray(shape, dtype=np.float64, buffer=irms_shm.buf)
 
     for k in slices:
-        logger.debug(f"Working on slice {k}")
-        # store the computed bkg/rms in this smaller array
-        vals = np.zeros(shape=(len(rows), len(cols)))
+        try:
+            logger.debug(f"Working on slice {k}")
+            # store the computed bkg/rms in this smaller array
+            vals = np.zeros(shape=(len(rows), len(cols)))
 
-        # loop over
-        for i, row in enumerate(rows):
-            for j, col in enumerate(cols):
-                r_min, r_max, c_min, c_max = box(row, col)
-                new = data[k, r_min:r_max, c_min:c_max]
-                new = np.ravel(new)
-                bkg, _ = sigmaclip(new, 3, 3)
-                vals[i, j] = bkg
+            # loop over
+            for i, row in enumerate(rows):
+                for j, col in enumerate(cols):
+                    r_min, r_max, c_min, c_max = box(row, col)
+                    new = data[k, r_min:r_max, c_min:c_max]
+                    new = np.ravel(new)
+                    bkg, _ = sigmaclip(new, 3, 3)
+                    vals[i, j] = bkg
 
-        # indices of all the pixels within our region
-        gr, gc = np.mgrid[ymin - data_row_min : ymax - data_row_min, 0 : shape[2]]
-        logger.debug(f"gr has shape {gr.shape}")
-        logger.debug("Interpolating bkg to sharemem")
+            # indices of all the pixels within our region
+            gr, gc = np.mgrid[ymin - data_row_min : ymax - data_row_min, 0 : shape[2]]
+            logger.debug(f"gr has shape {gr.shape}")
+            logger.debug("Interpolating bkg to sharemem")
 
-        # Interpolate the bkg values to the full image size and write to shared memory
-        ifunc = RegularGridInterpolator(
-            (rows, cols), vals, bounds_error=False, fill_value=None
-        )
-        interp_bkg = np.array(ifunc((gr, gc)), dtype=np.float64)
-        ibkg[k, ymin:ymax, :] = interp_bkg
+            # Interpolate the bkg values to the full image size and write to shared memory
+            ifunc = RegularGridInterpolator(
+                (rows, cols), vals, bounds_error=False, fill_value=None
+            )
+            interp_bkg = np.array(ifunc((gr, gc)), dtype=np.float64)
+            ibkg[k, ymin:ymax, :] = interp_bkg
 
-        gr_pad, gc_pad = np.mgrid[0 : data.shape[1], 0 : shape[2]]
-        full_bkg = np.array(ifunc((gr_pad, gc_pad)), dtype=np.float64)
-        del ifunc, interp_bkg, gr_pad, gc_pad
+            gr_pad, gc_pad = np.mgrid[0 : data.shape[1], 0 : shape[2]]
+            full_bkg = np.array(ifunc((gr_pad, gc_pad)), dtype=np.float64)
+            del ifunc, interp_bkg, gr_pad, gc_pad
 
-        logger.debug(" ... done writing bkg")
+            logger.debug(" ... done writing bkg")
+        except Exception:
+            logger.error(
+                f"sigma_filter failed during bkg calculation on rows {ymin}-{ymax}; "
+                "aborting barrier so sibling workers are not stranded"
+            )
+            barrier.abort()
+            raise    
 
         # wait for all to complete
         i = barrier.wait()
@@ -293,23 +300,32 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
         del full_bkg
         logger.debug(".. done ")
 
-        # reset/recycle the vals array
-        vals[:] = 0
+        try: 
+            # reset/recycle the vals array
+            vals[:] = 0
 
-        for i, row in enumerate(rows):
-            for j, col in enumerate(cols):
-                r_min, r_max, c_min, c_max = box(row, col)
-                new = data[k, r_min:r_max, c_min:c_max]
-                new = np.ravel(new)
-                _, rms = sigmaclip(new, 3, 3)
-                vals[i, j] = rms
+            for i, row in enumerate(rows):
+                for j, col in enumerate(cols):
+                    r_min, r_max, c_min, c_max = box(row, col)
+                    new = data[k, r_min:r_max, c_min:c_max]
+                    new = np.ravel(new)
+                    _, rms = sigmaclip(new, 3, 3)
+                    vals[i, j] = rms
 
-        logger.debug("Interpolating rms to sharemem")
-        ifunc = RegularGridInterpolator((rows, cols), vals)
-        interp_rms = np.array(ifunc((gr, gc)), dtype=np.float64)
-        irms[k, ymin:ymax, :] = interp_rms
-        del ifunc, interp_rms
-        logger.debug(" .. done writing rms")
+            logger.debug("Interpolating rms to sharemem")
+            ifunc = RegularGridInterpolator((rows, cols), vals)
+            interp_rms = np.array(ifunc((gr, gc)), dtype=np.float64)
+            irms[k, ymin:ymax, :] = interp_rms
+            del ifunc, interp_rms
+            logger.debug(" .. done writing rms")
+
+        except Exception:
+            logger.error(
+                f"sigma_filter failed during rms calculation on rows {ymin}-{ymax}; "
+                "aborting barrier so sibling workers are not stranded"
+            )
+            barrier.abort()
+            raise    
 
         if domask:
             # wait for all to complete
@@ -450,6 +466,11 @@ def filter_mc_sharemem(
             logger.error("Caught keyboard interrupt")
             pool.close()
             exit = True
+        except Exception:
+            logger.error("A worker process failed; terminating remaining workers")
+            pool.terminate()
+            pool.join()
+            raise
         else:
             pool.close()
             pool.join()
