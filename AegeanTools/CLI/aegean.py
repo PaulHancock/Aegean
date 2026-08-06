@@ -117,10 +117,11 @@ def main():
         "--slice",
         dest="slice",
         type=int,
-        default=0,
+        default=None,
         help="If the input data is a cube, then this slice "
         "will determine the array index of the image "
-        "which will be processed by aegean",
+        "which will be processed by aegean."
+        "Default = None, which means that the entire cube will be processed.",
     )
     group1.add_argument(
         "--progress",
