@@ -1990,6 +1990,7 @@ class SourceFinder(object):
             temp_img = np.average(self.img, axis=0)
             temp_rms = np.average(self.rmsimg, axis=0)
             temp_bkg = np.average(self.bkgimg, axis=0)
+            # temp_bkg = np.zeros_like(temp_img)
             # Create HDUList for the averaged image to pass to SourceFinder
             temp_img_hdu = fits.PrimaryHDU(data=temp_img, header=self.header)
             temp_rms_hdu = fits.ImageHDU(data=temp_rms, header=self.header)
@@ -2259,7 +2260,6 @@ class SourceFinder(object):
             logger.info("Input sources are being treated as 3D")
             nu0 = self.wcshelper.pix2freq(0)
             # Convert the input sources to 3D if they are not already
-            logger.info(f"First source is {type(input_sources[0])}")
             for src in input_sources:
                 src.alpha = -1
                 src.nu0 = nu0
