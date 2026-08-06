@@ -8,6 +8,7 @@ import math
 import multiprocessing
 import os
 
+from astropy.io import fits
 import lmfit
 import numpy as np
 from scipy.ndimage import find_objects, label, maximum_filter, minimum_filter
@@ -977,17 +978,15 @@ class SourceFinder(object):
         self.dtype = self.img.dtype
 
 
+        self.bkgimg = np.zeros(self.img.shape, dtype=self.dtype)
+        self.rmsimg = np.zeros(self.img.shape, dtype=self.dtype)
         if not as_cube:
-            self.bkgimg = np.zeros(self.img.shape, dtype=self.dtype)
-            self.rmsimg = np.zeros(self.img.shape, dtype=self.dtype)
-
             self.cube_index = cube_index
-
             self.wcshelper = WCSHelper.from_header(header, beam, psf_file=psf)
             self.beam = self.wcshelper.beam
 
         else:
-
+            self.cube_index = None
             self.wcshelper = WCSHelper.from_header(header, beam)
             self.beam = self.wcshelper.beam
 
@@ -1042,6 +1041,7 @@ class SourceFinder(object):
         if verb and debug:
             logger.debug("Data max is {0}".format(np.nanmax(img)))
             logger.debug("Doing background subtraction")
+            logger.debug(f"bkgimg shape: {self.bkgimg.shape}, img shape: {img.shape}")
         img -= self.bkgimg
         self.img = img
         if verb and debug:
@@ -1872,7 +1872,7 @@ class SourceFinder(object):
         docov=True,
         cube_index=None,
         progress=True,
-        threeD=False,
+        threeD=None,
     ):
         """
         Run the Aegean source finder.
@@ -1983,7 +1983,52 @@ class SourceFinder(object):
             outerclip = innerclip
         logger.info(f"seedclip={innerclip}")
         logger.info(f"floodclip={outerclip}")
-
+        logger.info(f"image dimensions = {self.img.shape}")
+        is_cube = self.img.ndim == 3
+        if is_cube:
+            logger.info(f"Image is a cube with {self.img.shape[0]} channels")
+            temp_img = np.average(self.img, axis=0)
+            temp_rms = np.average(self.rmsimg, axis=0)
+            temp_bkg = np.average(self.bkgimg, axis=0)
+            # Create HDUList for the averaged image to pass to SourceFinder
+            temp_img_hdu = fits.PrimaryHDU(data=temp_img, header=self.header)
+            temp_rms_hdu = fits.ImageHDU(data=temp_rms, header=self.header)
+            temp_bkg_hdu = fits.ImageHDU(data=temp_bkg, header=self.header)
+            temp_img_hdulist = fits.HDUList([temp_img_hdu])
+            temp_rms_hdulist = fits.HDUList([temp_rms_hdu])
+            temp_bkg_hdulist = fits.HDUList([temp_bkg_hdu])
+            sf = SourceFinder()
+            seed_islands = sf.find_sources_in_image(
+                filename=temp_img_hdulist,
+                bkgin=temp_bkg_hdulist,
+                rmsin=temp_rms_hdulist,
+                innerclip=innerclip,
+                outerclip=outerclip,
+                mask=mask,
+                progress=False
+            )
+            seed_islands = [ComponentSource3D.from_component_source(s) for s in seed_islands]
+            logger.info(f"Found {len(seed_islands)} seed islands in the averaged image")
+            del sf
+            return self.priorized_fit_islands(
+                filename=filename,
+                catalogue=seed_islands,
+                hdu_index=hdu_index,
+                outfile=outfile,
+                bkgin=bkgin,
+                rmsin=rmsin,
+                cores=cores,
+                rms=rms,
+                bkg=bkg,
+                beam=beam,
+                imgpsf=imgpsf,
+                stage=3,
+                ratio=None,
+                outerclip=outerclip,
+                doregroup=False,
+                regroup_eps=None,
+                docov=docov,
+                progress=progress,)
         islands = find_islands(
             im=self.img,
             bkg=np.zeros_like(self.img),
@@ -2201,17 +2246,20 @@ class SourceFinder(object):
 
         # Determine if we are using a cube or not
         is_cube = self.img.ndim == 3
-
+        src_type = ComponentSource3D if is_cube else ComponentSource
+        logger.info(f"Input sources are being treated as {'3D' if is_cube else '2D'}")
         # load the table and convert to an input source list
         if isinstance(catalogue, str):
             input_table = load_table(catalogue)
-            src_type = ComponentSource3D if is_cube else ComponentSource
             input_sources = np.array(table_to_source_list(input_table, src_type=src_type))
         else:
             input_sources = np.array(catalogue)
 
         if is_cube:
+            logger.info("Input sources are being treated as 3D")
             nu0 = self.wcshelper.pix2freq(0)
+            # Convert the input sources to 3D if they are not already
+            logger.info(f"First source is {type(input_sources[0])}")
             for src in input_sources:
                 src.alpha = -1
                 src.nu0 = nu0
@@ -2264,8 +2312,6 @@ class SourceFinder(object):
         island_group = []  # will be a list of islands
         group_size = 20
 
-        # ? Why split the islands into groups if we are going to append them all
-        # ? to the island_groups list?
         for island in groups:
             island_group.append(island)
             # If the island group is full queue it for the subprocesses to fit
