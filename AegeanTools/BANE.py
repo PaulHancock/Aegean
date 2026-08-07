@@ -129,7 +129,9 @@ def _sf2(args):
     except Exception as e:
         import traceback
         logger.warning(f"Caught exception in worker process: {e}")
-        raise Exception("".join(traceback.format_exception(*sys.exc_info())))
+        tb = "".join(traceback.format_exception(*sys.exc_info()))
+        tb.replace("\n", "\n--> ")
+        raise Exception(tb)
 
 
 def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_index=None):
