@@ -18,6 +18,7 @@ import numpy as np
 from astropy.io import fits
 from scipy.interpolate import RegularGridInterpolator
 
+from AegeanTools.exceptions import AegeanError
 from AegeanTools.logging import logger
 
 from .fits_tools import compress
@@ -127,8 +128,7 @@ def _sf2(args):
         return sigma_filter(*args)
     except Exception as e:
         import traceback
-
-        logger.warning(e)
+        logger.warning(f"Caught exception in worker process: {e}")
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
 
@@ -245,12 +245,11 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
         irms_shm = SharedMemory(name=f"irms_{memory_id}", create=False)
         irms = np.ndarray(shape, dtype=np.float64, buffer=irms_shm.buf)
     except Exception:
-        logger.error(
-            f"sigma_filter failed on rows {ymin}-{ymax} during setup; "
-            "aborting barrier so sibling workers are not stranded"
-        )
+        msg = f"sigma_filter failed on rows {ymin}-{ymax} during setup;"
+        msg += "aborting barrier so sibling workers are not stranded"
+        logger.error(msg)
         barrier.abort()
-        raise
+        raise AegeanError(msg)
 
     for k in slices:
         try:
@@ -285,12 +284,11 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
 
             logger.debug(" ... done writing bkg")
         except Exception:
-            logger.error(
-                f"sigma_filter failed during bkg calculation on rows {ymin}-{ymax}; "
-                "aborting barrier so sibling workers are not stranded"
-            )
+            msg = f"sigma_filter failed during bkg calculation on rows {ymin}-{ymax}; "
+            msg += "aborting barrier so sibling workers are not stranded"
+            logger.error(msg)
             barrier.abort()
-            raise    
+            raise AegeanError(msg)    
 
         # wait for all to complete
         i = barrier.wait()
@@ -329,12 +327,11 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
             logger.debug(" .. done writing rms")
 
         except Exception:
-            logger.error(
-                f"sigma_filter failed during rms calculation on rows {ymin}-{ymax}; "
-                "aborting barrier so sibling workers are not stranded"
-            )
+            msg = f"sigma_filter failed during rms calculation on rows {ymin}-{ymax}; "
+            msg += "aborting barrier so sibling workers are not stranded"
+            logger.error(msg)
             barrier.abort()
-            raise    
+            raise AegeanError(msg)   
 
         if domask:
             # wait for all to complete
@@ -477,11 +474,12 @@ def filter_mc_sharemem(
             logger.error("Caught keyboard interrupt")
             pool.close()
             exit = True
-        except Exception:
+        except Exception as e:
             logger.error("A worker process failed; terminating remaining workers")
+            logger.error(f"Error is: {e}")
             pool.terminate()
             pool.join()
-            raise
+            raise AegeanError(f"A worker process failed: {e}")
         else:
             pool.close()
             pool.join()
