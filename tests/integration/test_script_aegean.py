@@ -6,6 +6,7 @@ import sys
 
 image_SIN = "tests/test_files/1904-66_SIN.fits"
 image_AIT = "tests/test_files/1904-66_AIT.fits"
+input_cat = "tests/test_files/1904_comp.fits"
 tempfile = "dlme"
 
 
@@ -71,37 +72,60 @@ def test_find():
     # aegean.main()
 
     sys.argv = ["", image_SIN, "--out", "stdout"]
+    print(f"Running aegean {' ' .join(sys.argv)}")
     aegean.main()
 
     sys.argv = ["", image_SIN, "--out", tempfile, "--blank"]
+    print(f"Running aegean {' ' .join(sys.argv)}")
     aegean.main()
     os.remove(tempfile)
 
 
-def test_priorized():
-    sys.argv = ["", image_SIN, "--table", tempfile + ".fits"]
-    aegean.main()
-
+def test_priorized_fail_on_negative_ratio():
     sys.argv = ["", image_SIN, "--priorized", "1", "--ratio", "-1"]
-    aegean.main()
+    print(f"Running aegean {' ' .join(sys.argv)}")
+    try:
+        aegean.main()
+    except SystemExit as e:
+        if e.code != 1:
+            raise AssertionError("aegean did not exit with code 1 on negative ratio")
 
-    sys.argv = ["", image_SIN, "--priorized", "3", "--ratio", "0.8"]
-    aegean.main()
 
-    sys.argv = ["", image_SIN, "--priorized", "2", "--input", "none"]
-    aegean.main()
+def test_priorized_warning_on_fractional_ratio():
+    sys.argv = ["", image_SIN, "--priorized", "1", "--ratio", "0.5"]
+    print(f"Running aegean {' ' .join(sys.argv)}")
+    try:
+        aegean.main()
+    except SystemExit as e:
+        if e.code != 0:
+            raise AssertionError("aegean did not exit with code 0 on fractional ratio")
 
+
+def test_priorized_fail_on_nonexistent_input():
+    sys.argv = ["", image_SIN, "--priorized", "1", "--input", "none"]
+    print(f"Running aegean {' ' .join(sys.argv)}")
+    try:
+        aegean.main()
+    except SystemExit as e:
+        if e.code != 1:
+            raise AssertionError(
+                "aegean did not exit with code 1 on nonexistent input"
+            )
+
+
+def test_priorized_normal():
     sys.argv = [
         "",
         image_SIN,
         "--priorized",
         "1",
         "--input",
-        tempfile + "_comp.fits",
+        input_cat,
         "--out",
         "stdout",
         "--island",
     ]
+    print(f"Running aegean {' ' .join(sys.argv)}")
     aegean.main()
 
 
