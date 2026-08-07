@@ -174,74 +174,83 @@ def sigma_filter(filename, region, step_size, box_size, shape, domask, cube_inde
         )
     )
 
-    # cut out the region of interest plus 1/2 the box size
-    # and clip to the image size
-    data_row_min = max(0, ymin - box_size[0] // 2)
-    data_row_max = min(shape[1], ymax + box_size[0] // 2)
 
-    # Figure out how many axes are in the datafile
-    NAXIS = fits.getheader(filename)["NAXIS"]
+    try:
+        # cut out the region of interest plus 1/2 the box size
+        # and clip to the image size
+        data_row_min = max(0, ymin - box_size[0] // 2)
+        data_row_max = min(shape[1], ymax + box_size[0] // 2)
 
-    sz = slice(None)
-    sy = slice(data_row_min, data_row_max)
-    sx = slice(None)
-    slices = range(shape[0])
-    # if the cube_index is not none, then only
-    # load/process one slice of the cube
-    if cube_index is not None:
-        sz = slice(cube_index, cube_index + 1)
-        slices = [0]
+        # Figure out how many axes are in the datafile
+        NAXIS = fits.getheader(filename)["NAXIS"]
 
-    # For some reason we can't memmap a file with BSCALE not 1.0
-    # so we ignore it now and scale it later
-    with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
-        if NAXIS == 2:
-            data = a[0].section[sy, sx]
-            # ensure that we always end up with a 3d image
-            data = data[None, :, :]
-        elif NAXIS == 3:
-            data = a[0].section[sz, sy, sx]
-        elif NAXIS == 4:
-            data = a[0].section[0, sz, sy, sx]
-        else:
-            logger.error(f"Too many NAXIS for me {NAXIS}")
-            logger.error("fix your file to be more sane")
-            raise Exception("Too many NAXIS")
+        sz = slice(None)
+        sy = slice(data_row_min, data_row_max)
+        sx = slice(None)
+        slices = range(shape[0])
+        # if the cube_index is not none, then only
+        # load/process one slice of the cube
+        if cube_index is not None:
+            sz = slice(cube_index, cube_index + 1)
+            slices = [0]
 
-    logger.debug(f"loaded data shape {data.shape}")
-    # Manually scale the data if BSCALE is not 1.0
-    header = fits.getheader(filename)
-    if "BSCALE" in header:
-        data *= header["BSCALE"]
+        # For some reason we can't memmap a file with BSCALE not 1.0
+        # so we ignore it now and scale it later
+        with fits.open(filename, memmap=True, do_not_scale_image_data=True) as a:
+            if NAXIS == 2:
+                data = a[0].section[sy, sx]
+                # ensure that we always end up with a 3d image
+                data = data[None, :, :]
+            elif NAXIS == 3:
+                data = a[0].section[sz, sy, sx]
+            elif NAXIS == 4:
+                data = a[0].section[0, sz, sy, sx]
+            else:
+                logger.error(f"Too many NAXIS for me {NAXIS}")
+                logger.error("fix your file to be more sane")
+                raise Exception("Too many NAXIS")
 
-    # force float64 for consistency
-    data = data.astype(np.float64)
+        logger.debug(f"loaded data shape {data.shape}")
+        # Manually scale the data if BSCALE is not 1.0
+        header = fits.getheader(filename)
+        if "BSCALE" in header:
+            data *= header["BSCALE"]
 
-    logger.debug(f"data size is {data.shape}")
-    logger.debug(f"data format is {data.dtype}")
+        # force float64 for consistency
+        data = data.astype(np.float64)
 
-    def box(r, c):
-        """
-        calculate the boundaries of the box centered at r,c
-        with size = box_size
-        """
-        r_min = max(0, r - box_size[0] // 2)
-        r_max = min(data.shape[1] - 1, r + box_size[0] // 2)
-        c_min = max(0, c - box_size[1] // 2)
-        c_max = min(data.shape[2] - 1, c + box_size[1] // 2)
-        return r_min, r_max, c_min, c_max
+        logger.debug(f"data size is {data.shape}")
+        logger.debug(f"data format is {data.dtype}")
 
-    # set up a grid of rows/cols at which we will compute the bkg/rms
-    rows = list(range(ymin - data_row_min, ymax - data_row_min, step_size[0]))
-    rows.append(ymax - data_row_min)
-    cols = list(range(0, shape[2], step_size[1]))
-    cols.append(shape[2])
+        def box(r, c):
+            """
+            calculate the boundaries of the box centered at r,c
+            with size = box_size
+            """
+            r_min = max(0, r - box_size[0] // 2)
+            r_max = min(data.shape[1] - 1, r + box_size[0] // 2)
+            c_min = max(0, c - box_size[1] // 2)
+            c_max = min(data.shape[2] - 1, c + box_size[1] // 2)
+            return r_min, r_max, c_min, c_max
 
-    # Find the shared memory and create a numpy array interface
-    ibkg_shm = SharedMemory(name=f"ibkg_{memory_id}", create=False)
-    ibkg = np.ndarray(shape, dtype=np.float64, buffer=ibkg_shm.buf)
-    irms_shm = SharedMemory(name=f"irms_{memory_id}", create=False)
-    irms = np.ndarray(shape, dtype=np.float64, buffer=irms_shm.buf)
+        # set up a grid of rows/cols at which we will compute the bkg/rms
+        rows = list(range(ymin - data_row_min, ymax - data_row_min, step_size[0]))
+        rows.append(ymax - data_row_min)
+        cols = list(range(0, shape[2], step_size[1]))
+        cols.append(shape[2])
+
+        # Find the shared memory and create a numpy array interface
+        ibkg_shm = SharedMemory(name=f"ibkg_{memory_id}", create=False)
+        ibkg = np.ndarray(shape, dtype=np.float64, buffer=ibkg_shm.buf)
+        irms_shm = SharedMemory(name=f"irms_{memory_id}", create=False)
+        irms = np.ndarray(shape, dtype=np.float64, buffer=irms_shm.buf)
+    except Exception:
+        logger.error(
+            f"sigma_filter failed on rows {ymin}-{ymax} during setup; "
+            "aborting barrier so sibling workers are not stranded"
+        )
+        barrier.abort()
+        raise
 
     for k in slices:
         try:
@@ -448,8 +457,10 @@ def filter_mc_sharemem(
         # start a new process for each task, hopefully to reduce residual
         # memory use
         method = "spawn"
-        if sys.platform.startswith("linux"):
-            method = "fork"
+        # There is lots of talk about the use of "fork" on linux, but it seems to be a bad idea for python3.8+  
+        # So I'm switching to spawn for all platforms.  It is slower, but more stable.
+        # if sys.platform.startswith("linux"):
+        #     method = "fork"
         ctx = multiprocessing.get_context(method)
         barrier = ctx.Barrier(parties=len(ymaxs))
         pool = ctx.Pool(
