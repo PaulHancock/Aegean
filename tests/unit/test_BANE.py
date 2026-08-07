@@ -17,28 +17,65 @@ import signal
 import multiprocessing as mp
 from AegeanTools import BANE
 
-
 def _flaky_worker_entrypoint(queue):
     """
-    Run BANE.filter_image with exactly one worker rigged to fail partway
-    through its computation, and report back what happened. Runs in its
-    own process group so a stuck run (and all of its grandchild pool
-    workers) can be cleaned up reliably from the test if needed.
+    Run BANE.filter_image with one worker's task rigged to fail for real,
+    and report back what happened. Runs in its own process group so a
+    stuck run (and all of its grandchild pool workers) can be cleaned up
+    reliably from the test if needed.
+ 
+    The failure is injected by corrupting one task's *arguments* (giving
+    it a nonexistent filename) rather than by monkeypatching a function
+    that runs inside the worker. That distinction matters: BANE.py can
+    use either the "fork" or "spawn" multiprocessing start method, and
+    a monkeypatch of a module-level function only survives into worker
+    processes under "fork" (which inherits the parent's patched memory).
+    Under "spawn", each worker re-imports everything fresh and would
+    never see the patch at all -- silently turning the test into a
+    no-op rather than a real regression check.
+ 
+    Corrupting the task's arguments instead is safe under both start
+    methods, because arguments are always explicitly pickled and sent
+    to the worker as real data -- that's the fundamental mechanism
+    Pool.map_async uses regardless of how the worker process itself was
+    created. The worker then fails "for real" running completely
+    unmodified production code, it's just been handed bad input.
+ 
+    The interception point (Pool.map_async) always runs in the parent
+    process, so patching it doesn't need to survive a fork/spawn
+    boundary either -- it only ever needs to affect code that's
+    already running here.
+
+    Created by Claude Sonnet 5.
     """
+    import multiprocessing.pool
+ 
     os.setsid()
-
-    counter = mp.Value("i", 0)
-    orig_sigmaclip = BANE.sigmaclip
-
-    def flaky_sigmaclip(arr, lo, hi, reps=10):
-        with counter.get_lock():
-            counter.value += 1
-            should_fail = counter.value == 1
-        if should_fail:
-            raise RuntimeError("TEST: simulated failure in one BANE worker")
-        return orig_sigmaclip(arr, lo, hi, reps)
-
-    BANE.sigmaclip = flaky_sigmaclip
+ 
+    orig_map_async = multiprocessing.pool.Pool.map_async
+ 
+    def corrupting_map_async(self, func, iterable, *args, **kwargs):
+        if getattr(func, "__name__", None) == "_sf2":
+            iterable = list(iterable)
+            # give the last task a filename that doesn't exist, so that
+            # task's (otherwise completely normal) sigma_filter call
+            # fails for real -- reliably and immediately -- when it
+            # actually runs.
+            _, region, step_size, box_size, shape, domask, cube_index = (
+                iterable[-1]
+            )
+            iterable[-1] = (
+                "tests/test_files/this_file_does_not_exist.fits",
+                region,
+                step_size,
+                box_size,
+                shape,
+                domask,
+                cube_index,
+            )
+        return orig_map_async(self, func, iterable, *args, **kwargs)
+ 
+    multiprocessing.pool.Pool.map_async = corrupting_map_async
     try:
         BANE.filter_image(
             "tests/test_files/1904-66_SIN_3d.fits",
@@ -49,16 +86,22 @@ def _flaky_worker_entrypoint(queue):
         queue.put(("no_exception", None))
     except Exception as e:
         queue.put(("exception", f"{type(e).__name__}: {e}"))
-
-
+    finally:
+        multiprocessing.pool.Pool.map_async = orig_map_async
+ 
+ 
 def test_barrier_abort_on_worker_failure():
-    TIMEOUT = 15
-    ctx = mp.get_context("fork")
+    """
+    Test that a worker failure in filter_image aborts the Barrier so that
+    sibling workers don't get stuck waiting for a Barrier that will never be released.
+    """
+    TIMEOUT = 60
+    ctx = mp.get_context("spawn")
     queue = ctx.Queue()
     proc = ctx.Process(target=_flaky_worker_entrypoint, args=(queue,))
     proc.start()
     proc.join(timeout=TIMEOUT)
-
+ 
     if proc.is_alive():
         # kill the whole process group, not just proc itself, since
         # filter_image spawns its own grandchild pool workers that
@@ -73,15 +116,14 @@ def test_barrier_abort_on_worker_failure():
             "simulated worker failure -- sibling workers are likely stuck "
             "at a Barrier that was never aborted."
         )
-
+ 
     if queue.empty():
         raise AssertionError("worker process exited without reporting a result")
-
+ 
     kind, detail = queue.get()
     print("RESULT:", kind, detail)
     if kind != "exception":
         raise AssertionError(f"expected filter_image to raise, but got: {kind}")
-
 
 def test_sigmaclip():
     """Test the sigmaclipping"""
