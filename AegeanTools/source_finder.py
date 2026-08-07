@@ -1989,8 +1989,7 @@ class SourceFinder(object):
             logger.info(f"Image is a cube with {self.img.shape[0]} channels")
             temp_img = np.average(self.img, axis=0)
             temp_rms = np.average(self.rmsimg, axis=0)
-            temp_bkg = np.average(self.bkgimg, axis=0)
-            # temp_bkg = np.zeros_like(temp_img)
+            temp_bkg = np.zeros_like(temp_img)
             # Create HDUList for the averaged image to pass to SourceFinder
             temp_img_hdu = fits.PrimaryHDU(data=temp_img, header=self.header)
             temp_rms_hdu = fits.ImageHDU(data=temp_rms, header=self.header)
