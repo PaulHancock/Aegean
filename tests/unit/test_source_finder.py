@@ -159,6 +159,53 @@ def test_load_globals():
         raise AssertionError()
 
 
+def test_load_globals_cube():
+    """Test load_globals"""
+    sfinder = sf.SourceFinder()
+    filename = "tests/test_files/synthetic_cube.fits"
+    # aux_files = sf.get_aux_files("tests/test_files/synthetic_cube.fits")
+    bkg = filename
+    rms = filename
+    sfinder.load_globals(filename, bkgin=bkg, rmsin=rms, as_cube=True)
+    if sfinder.img is None:
+        raise AssertionError()
+    if np.allclose(sfinder.img, 0):
+        print("True")
+    else:
+        raise AssertionError()
+
+def test_load_globals_cube_without_bkgin():
+    """
+    load_globals(as_cube=True) should be able to automatically compute
+    background/rms via BANE when the user hasn't supplied bkgin/rmsin,
+    exactly as it already does for as_cube=False (see test__make_bkg_rms).
+ 
+    Currently this crashes: the `if not as_cube:` branch is the only place
+    that calls self._make_bkg_rms(), so for as_cube=True, self.bkgimg and
+    self.rmsimg are never set and stay None (from __init__). The next lines
+    (`np.squeeze(self.bkgimg)` then `img -= self.bkgimg`) then fail with:
+        UFuncTypeError: Cannot cast ufunc 'subtract' output from dtype('O')
+        to dtype('>f4') with casting rule 'same_kind'
+    """
+    sfinder = sf.SourceFinder()
+    filename = "tests/test_files/synthetic_cube.fits"
+ 
+    # deliberately do NOT supply bkgin/rmsin, forcing load_globals to
+    # calculate them itself -- the same way it already does for 2D images.
+    sfinder.load_globals(filename, as_cube=True)
+ 
+    if sfinder.img is None:
+        raise AssertionError("Image was not loaded")
+    if sfinder.bkgimg is None:
+        raise AssertionError("bkgimg was never computed for a cube")
+    if sfinder.rmsimg is None:
+        raise AssertionError("rmsimg was never computed for a cube")
+    if not np.all(np.isfinite(sfinder.rmsimg)):
+        raise AssertionError("rmsimg contains non-finite values")
+    if not np.any(sfinder.rmsimg > 0):
+        raise AssertionError("rmsimg is not positive anywhere")
+
+
 def test_find_and_prior_sources():
     """Test find sources and prior sources"""
     try:
@@ -251,7 +298,8 @@ def test_find_and_prior_sources():
         if not (os.path.exists("dlme")):
             raise AssertionError("Failed to create output file")
     finally:
-        os.remove("dlme")
+        if os.path.exists("dlme"):
+            os.remove("dlme")
 
 
 def dont_test_find_and_prior_parallel():
@@ -501,6 +549,65 @@ def test_load_compressed_aux_files():
     except AegeanError as ae:
         raise AssertionError(ae)
     return
+
+
+def test_find_sources_in_cube_bkg_not_double_subtracted():
+    """
+    Check against a bug found in the image cube implementation
+    of blind source finding - subtracting the background twice.
+
+    Only a small region of the cube is used (rather than the whole
+    image) so the test runs quickly -- fitting is the expensive part,
+    and a small crop containing a handful of real sources is enough to
+    demonstrate the effect.
+    """
+    OFFSET = 1.0
+
+    cube = fits.getdata("tests/test_files/synthetic_cube.fits")
+    bkg = fits.getdata("tests/test_files/synthetic_cube_bkg.fits")
+    rms = fits.getdata("tests/test_files/synthetic_cube_rms.fits")
+    header = fits.getheader("tests/test_files/synthetic_cube.fits")
+
+    # a small crop known to contain several real sources
+    sub_cube = cube[:, 30:110, 0:240].copy()
+    sub_bkg = bkg[:, 30:110, 0:240].copy()
+    sub_rms = rms[:, 30:110, 0:240].copy()
+
+    def find_sources(offset):
+        img_hdu = fits.HDUList([fits.PrimaryHDU(data=sub_cube + offset, header=header)])
+        bkg_hdu = fits.HDUList([fits.PrimaryHDU(data=sub_bkg + offset, header=header)])
+        rms_hdu = fits.HDUList([fits.PrimaryHDU(data=sub_rms, header=header)])
+        sfinder = sf.SourceFinder()
+        sources = sfinder.find_sources_in_image(
+            img_hdu, bkgin=bkg_hdu, rmsin=rms_hdu, progress=False
+        )
+        return sorted(sources, key=lambda s: (s.island, s.source))
+
+    sources_baseline = find_sources(0.0)
+    sources_shifted = find_sources(OFFSET)
+
+    if len(sources_baseline) != len(sources_shifted):
+        raise AssertionError(
+            "adding the same offset to both the cube and its background "
+            f"changed the number of detected sources: "
+            f"{len(sources_baseline)} -> {len(sources_shifted)}. This "
+            "points at background subtraction not being shift-invariant "
+            "(e.g. it is being applied more than once)."
+        )
+
+    max_flux_diff = max(
+        abs(a.peak_flux - b.peak_flux)
+        for a, b in zip(sources_baseline, sources_shifted)
+    )
+    if max_flux_diff > 1e-3:
+        raise AssertionError(
+            f"peak_flux differs by up to {max_flux_diff} after adding an "
+            "identical offset to both the cube and its background -- the "
+            "background is likely being subtracted more than once."
+        )
+    return
+
+
 
 
 if __name__ == "__main__":

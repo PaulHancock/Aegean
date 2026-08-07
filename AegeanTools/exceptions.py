@@ -10,3 +10,9 @@ class AegeanNaNModelError(AegeanError):
     be NaNs in the data. It is a little
     misleading.
     """
+
+class AegeanSuffixError(AegeanError):
+    """
+    This is a child class of AegeanError that is raised when an incorrect suffix is provided
+    """
+    pass

@@ -198,7 +198,7 @@ def load_catalog(filename):
     """
     supported = get_table_formats()
 
-    fmt = os.path.splitext(filename)[-1][1:].lower()  # extension sans '.'
+    fmt = os.path.splitext(filename)[-1][1:].lower()  # extension sans '.' #!There is a pythonic built in function to do this, it is in the os.system library
 
     if fmt in ["csv", "tab", "tex"] and fmt in supported:
         logger.info("Reading file {0}".format(filename))
@@ -247,7 +247,7 @@ def load_table(filename):
     """
     supported = get_table_formats()
 
-    fmt = os.path.splitext(filename)[-1][1:].lower()  # extension sans '.'
+    fmt = os.path.splitext(filename)[-1][1:].lower()  # extension sans '.' #!Ditto here look up ^
 
     if fmt in ["csv", "tab", "tex"] and fmt in supported:
         logger.info("Reading file {0}".format(filename))
@@ -300,7 +300,8 @@ def table_to_source_list(table, src_type=ComponentSource):
     A single table must have consistent source types given by src_type.
     src_type should be one of :class:`AegeanTools.models.ComponentSource`,
     :class:`AegeanTools.models.SimpleSource`, or
-    :class:`AegeanTools.models.IslandSource`.
+    :class:`AegeanTools.models.IslandSource` or
+    :class:`AegeanTools.models.ComponentSource3D`.
 
 
     Parameters
@@ -311,7 +312,8 @@ def table_to_source_list(table, src_type=ComponentSource):
     src_type : class
         Sources must be of type :class:`AegeanTools.models.ComponentSource`,
         :class:`AegeanTools.models.SimpleSource`, or
-        :class:`AegeanTools.models.IslandSource`.
+        :class:`AegeanTools.models.IslandSource`or
+    :class:`AegeanTools.models.ComponentSource3D`.
 
     Returns
     -------
@@ -357,6 +359,7 @@ def write_catalog(filename, catalog, fmt=None, meta=None, prefix=None):
     catalog : list
         A list of source objects. Sources must be of type
         :class:`AegeanTools.models.ComponentSource`,
+        :class:`AegeanTools.models.ComponentSource3D`,
         :class:`AegeanTools.models.SimpleSource`, or
         :class:`AegeanTools.models.IslandSource`.
 

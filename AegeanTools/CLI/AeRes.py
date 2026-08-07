@@ -6,8 +6,8 @@ from AegeanTools.AeRes import make_residual
 from AegeanTools.logging import logger, logging
 
 __author__ = "Paul Hancock"
-__version__ = "v0.2.7"
-__date__ = "2025-01-14"
+__version__ = "v0.3"
+__date__ = "2025-02-03"
 
 
 def main():
@@ -92,6 +92,16 @@ def main():
     group3.add_argument(
         "--pacol", dest="pa_col", default="pa", help="Position angle column name"
     )
+    group3.add_argument(
+        "--alphacol", dest="alpha_col", default="alpha", help="Alpha column name"
+    )
+
+    group3.add_argument(
+        "--nu0col",
+        dest="nu0_col",
+        default="nu0",
+        help="Reference frequency column name",
+    )
 
     group4 = parser.add_argument_group("Extra options")
     group4.add_argument(
@@ -136,6 +146,8 @@ def main():
         "a_col": options.a_col,
         "b_col": options.b_col,
         "pa_col": options.pa_col,
+        "alpha_col": options.alpha_col,
+        "nu0_col": options.nu0_col,
     }
 
     make_residual(

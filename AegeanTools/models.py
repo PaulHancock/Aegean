@@ -49,16 +49,32 @@ class SimpleSource(object):
     --------
     :mod:`AegeanTools.flags`
     """
-    header = "#RA           DEC          Flux      err     a     b         pa     flags\n" + \
-             "#                        Jy/beam   Jy/beam   ''    ''        deg  ZWNCPES\n" + \
-             "#========================================================================"
 
-    formatter = "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} " + \
-                "{0.err_peak_flux: 8.6f} {0.a:5.2f} {0.b:5.2f} " + \
-                "{0.pa:6.1f} {0.flags:07b}"
-    names = ['background', 'local_rms', 'ra', 'dec', 'peak_flux',
-             'err_peak_flux', 'flags', 'peak_pixel', 'a', 'b',
-             'pa', 'uuid']
+    header = (
+        "#RA           DEC          Flux      err     a     b         pa     flags\n"
+        + "#                        Jy/beam   Jy/beam   ''    ''        deg  ZWNCPES\n"
+        + "#========================================================================"
+    )
+
+    formatter = (
+        "{0.ra:11.7f} {0.dec:11.7f} {0.peak_flux: 8.6f} "
+        + "{0.err_peak_flux: 8.6f} {0.a:5.2f} {0.b:5.2f} "
+        + "{0.pa:6.1f} {0.flags:07b}"
+    )
+    names = [
+        "background",
+        "local_rms",
+        "ra",
+        "dec",
+        "peak_flux",
+        "err_peak_flux",
+        "flags",
+        "peak_pixel",
+        "a",
+        "b",
+        "pa",
+        "uuid",
+    ]
     galactic = False
 
     def __init__(self):
@@ -184,18 +200,38 @@ class IslandSource(SimpleSource):
     :mod:`AegeanTools.flags`
 
     """
-    names = ['island', 'components', 'background', 'local_rms', 'ra_str',
-             'dec_str', 'ra', 'dec', 'peak_flux', 'int_flux', 'err_int_flux',
-             'eta', 'x_width', 'y_width', 'max_angular_size', 'pa',
-             'pixels', 'area', 'beam_area', 'flags', 'uuid']
+
+    names = [
+        "island",
+        "components",
+        "background",
+        "local_rms",
+        "ra_str",
+        "dec_str",
+        "ra",
+        "dec",
+        "peak_flux",
+        "int_flux",
+        "err_int_flux",
+        "eta",
+        "x_width",
+        "y_width",
+        "max_angular_size",
+        "pa",
+        "pixels",
+        "area",
+        "beam_area",
+        "flags",
+        "uuid",
+    ]
 
     def __init__(self):
         SimpleSource.__init__(self)
         self.island = 0  # island number
         # background = None # local background zero point
         # local_rms= None #local image rms
-        self.ra_str = ''  # str
-        self.dec_str = ''  # str
+        self.ra_str = ""  # str
+        self.dec_str = ""  # str
         # ra = None # degrees
         # dec = None # degrees
         # peak_flux = None # Jy/beam
@@ -221,19 +257,19 @@ class IslandSource(SimpleSource):
         return "({0:d})".format(self.island)
 
     def __eq__(self, other):
-        if hasattr(other, 'island'):
+        if hasattr(other, "island"):
             return self.island == other.island
         else:
             return False
 
     def __ne__(self, other):
-        if hasattr(other, 'island'):
+        if hasattr(other, "island"):
             return self.island != other.island
         else:
             return True
 
     def __lt__(self, other):
-        if hasattr(other, 'island'):
+        if hasattr(other, "island"):
             return self.island < other.island
         else:
             return True
@@ -242,7 +278,7 @@ class IslandSource(SimpleSource):
         return self.__lt__(other) or self.__eq__(other)
 
     def __gt__(self, other):
-        if hasattr(other, 'island'):
+        if hasattr(other, "island"):
             return self.island > other.island
         else:
             return False
@@ -251,7 +287,7 @@ class IslandSource(SimpleSource):
         return self.__gt__(other) or self.__eq__(other)
 
 
-class ComponentSource(SimpleSource):
+class ComponentSource(SimpleSource):  #! <- This is the entry point
     """
     A Gaussian component, aka a source, that was measured by Aegean.
 
@@ -308,26 +344,57 @@ class ComponentSource(SimpleSource):
     :mod:`AegeanTools.flags`
 
     """
+
     # header for the output
-    header = "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err    flags\n" + \
-             "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   ZWNCPES\n" + \
-             "#============================================================================================================================================================================================"
+    header = (
+        "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err    flags\n"
+        + "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   ZWNCPES\n"
+        + "#============================================================================================================================================================================================"
+    )
 
     # formatting strings for making nice output
-    formatter = "({0.island:04d},{0.source:02d}) {0.background: 8.6f} " + \
-                "{0.local_rms: 8.6f} {0.ra_str:12s} {0.dec_str:12s} " + \
-                "{0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} " + \
-                "{0.err_dec: 9.7f} {0.peak_flux: 8.6f} " + \
-                "{0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} " + \
-                "{0.err_int_flux: 8.6f} {0.a:5.2f} {0.err_a:5.2f} " + \
-                "{0.b:5.2f} {0.err_b:5.2f} {0.pa:6.1f} {0.err_pa:5.1f}   " + \
-                "{0.flags:07b}"
-    names = ['island', 'source', 'background', 'local_rms',
-             'ra_str', 'dec_str', 'ra', 'err_ra', 'dec', 'err_dec',
-             'peak_flux', 'err_peak_flux', 'int_flux', 'err_int_flux',
-             'a', 'err_a', 'b', 'err_b', 'pa', 'err_pa',
-             'flags', 'residual_mean', 'residual_std',
-             'uuid', 'psf_a', 'psf_b', 'psf_pa']
+    formatter = (
+        "({0.island:04d},{0.source:02d}) {0.background: 8.6f} "
+        + "{0.local_rms: 8.6f} {0.ra_str:12s} {0.dec_str:12s} "
+        + "{0.ra:11.7f} {0.err_ra: 9.7f} {0.dec:11.7f} "
+        + "{0.err_dec: 9.7f} {0.peak_flux: 8.6f} "
+        + "{0.err_peak_flux: 8.6f} {0.int_flux: 8.6f} "
+        + "{0.err_int_flux: 8.6f} {0.a:5.2f} {0.err_a:5.2f} "
+        + "{0.b:5.2f} {0.err_b:5.2f} {0.pa:6.1f} {0.err_pa:5.1f}   "
+        + "{0.flags:07b}"
+    )  # TODO: Update these in the new class, try to inherit it and add to it, alpha is either positive or negative single digit
+    # TODO : 2 decimal places e.g. 1.04 +- would be good if they have + infront of them
+    # TODO: formatter is +4.2f for the alpha
+    # TODO: For nu0 unsure if megahertz or gighertz, for now assume megahertz between 100Mhz and a few 10s of GHz, within 0.5 Mhz resolution
+    names = [
+        "island",
+        "source",
+        "background",
+        "local_rms",
+        "ra_str",
+        "dec_str",
+        "ra",
+        "err_ra",
+        "dec",
+        "err_dec",
+        "peak_flux",
+        "err_peak_flux",
+        "int_flux",
+        "err_int_flux",
+        "a",
+        "err_a",
+        "b",
+        "err_b",
+        "pa",
+        "err_pa",
+        "flags",
+        "residual_mean",
+        "residual_std",
+        "uuid",
+        "psf_a",
+        "psf_b",
+        "psf_pa",
+    ]  # TODO: Ditto for this, add alpha and nu0 to the names
 
     def __init__(self):
         SimpleSource.__init__(self)
@@ -335,8 +402,8 @@ class ComponentSource(SimpleSource):
         self.source = 0  # source number
         # background = None # local background zero point
         # local_rms= None #local image rms
-        self.ra_str = ''  # str
-        self.dec_str = ''  # str
+        self.ra_str = ""  # str
+        self.dec_str = ""  # str
         # ra = None # degrees
         self.err_ra = np.nan  # degrees
         # dec = None # degrees
@@ -369,22 +436,22 @@ class ComponentSource(SimpleSource):
     def __eq__(self, other):
         if self.island != other.island:
             return False
-        if not hasattr(other, 'source'):
+        if not hasattr(other, "source"):
             return False
         return self.source == other.source
 
     def __ne__(self, other):
         if self.island != other.island:
             return True
-        if not hasattr(other, 'source'):
+        if not hasattr(other, "source"):
             return True
         return self.source != other.source
 
     def __lt__(self, other):
-        if not hasattr(other, 'island'):
+        if not hasattr(other, "island"):
             return True
         # Islands are always less than components
-        if not hasattr(other, 'source'):
+        if not hasattr(other, "source"):
             return True
         if self.island < other.island:
             return True
@@ -392,10 +459,10 @@ class ComponentSource(SimpleSource):
             return self.source < other.source
 
     def __le__(self, other):
-        if not hasattr(other, 'island'):
+        if not hasattr(other, "island"):
             return True
         # Islands are always less than components
-        if not hasattr(other, 'source'):
+        if not hasattr(other, "source"):
             return True
         if self.island < other.island:
             return True
@@ -403,10 +470,10 @@ class ComponentSource(SimpleSource):
             return self.source <= other.source
 
     def __gt__(self, other):
-        if not hasattr(other, 'island'):
+        if not hasattr(other, "island"):
             return False
         # Islands are always less than components
-        if not hasattr(other, 'source'):
+        if not hasattr(other, "source"):
             return False
         if self.island > other.island:
             return True
@@ -414,15 +481,126 @@ class ComponentSource(SimpleSource):
             return self.source > other.source
 
     def __ge__(self, other):
-        if not hasattr(other, 'island'):
+        if not hasattr(other, "island"):
             return False
         # Islands are always less than components
-        if not hasattr(other, 'source'):
+        if not hasattr(other, "source"):
             return False
         if self.island > other.island:
             return True
         if self.island == other.island:
             return self.source >= other.source
+
+
+class ComponentSource3D(ComponentSource):
+    """
+    A 3-D Gaussian component, aka a source, that was measured by Aegean,
+    with additional attributes for spectral index and frequency.
+
+    Inherits from the ComponentSource Class.
+
+    Attributes
+    ----------
+    alpha : float
+        Spectral index of the source, showing how flux varies with frequency.
+        Typically a small positive or negative value.
+
+    nu0 : float
+        The reference frequency (in MHz) at which the source was measured.
+
+    Other attributes are inherited from ParentClass:
+
+    island : int
+        The island which this component is part of.
+
+    source : int
+        The source number within the island.
+
+    background, local_rms : float
+        Background and local noise level in the image at the location
+        of this source.
+
+    ra, err_ra, dec, err_dec : float
+        Sky location of the source including uncertainties. Decimal degrees.
+
+    ra_str, dec_str : str
+        Sky location in HH:MM:SS.SS +DD:MM:SS.SS format.
+
+    galactic : bool
+        If true then ra,dec are interpreted as glat,glon instead.
+        Default = False.
+        This is a class attribute, not an instance attribute.
+
+    peak_flux, err_peak_flux : float
+        The peak flux and associated uncertainty.
+
+    int_flux, err_int_flux : float
+        Integrated flux and associated uncertainty.
+
+    a, err_a, b, err_b, pa, err_pa: float
+        Shape parameters for this source and associated uncertainties.
+        a/b are in arcsec, pa is in degrees East of North.
+
+    residual_mean, residual_std : float
+        The mean and standard deviation of the model-data for this island
+        of pixels.
+
+    psf_a, psf_b, psf_pa : float
+        The shape parameters for the point spread function
+        (degrees).
+
+    flags : int
+        Flags. See :mod:`AegeanTools.flags`.
+
+    uuid : str
+        Unique ID for this source. This is random and not dependent on the
+        source properties.
+
+    See Also
+    --------
+    :mod:`AegeanTools.flags`
+
+    """
+
+    header = (
+        "#isl,src   bkg       rms         RA           DEC         RA         err         DEC        err         Peak      err     S_int     err        a    err    b    err     pa   err    flags     alpha   nu0\n"
+        + "#         Jy/beam   Jy/beam                               deg        deg         deg        deg       Jy/beam   Jy/beam    Jy       Jy         ''    ''    ''    ''    deg   deg   ZWNCPES       ''      Mhz\n"
+        + "#============================================================================================================================================================================================================="
+    )
+    formatter = (
+        ComponentSource.formatter + " {0.alpha: 4.2f} {0.nu0: 4.2f}"
+    )  # Add the alpha and nu0 attributes to the formatter
+    names = ComponentSource.names + [
+        "alpha",
+        "nu0",
+    ]  # Add the alpha and nu0 attributes to the names
+
+    def __init__(self):
+        super().__init__()  # Call the parent class constructor
+        self.alpha = 0  # Add the alpha attribute
+        self.nu0 = 0  # Add the nu0 attribute
+
+    @staticmethod
+    def from_component_source(component_source):
+        """
+        Create a new ComponentSource3D object from a ComponentSource object.
+
+        Parameters
+        ----------
+        component_source : ComponentSource
+            The ComponentSource object to convert to a ComponentSource3D object.
+
+        Returns
+        -------
+        ComponentSource3D
+            The new ComponentSource3D object.
+        """
+        component_source_3d = ComponentSource3D()
+        for name in component_source.names:
+            # Set the attribute of the ComponentSource3D object to the
+            # attribute of the ComponentSource object
+            setattr(component_source_3d, name, getattr(component_source, name))
+        return component_source_3d
 
 
 class PixelIsland(object):
@@ -458,9 +636,10 @@ class PixelIsland(object):
         """
         if len(data.shape) != self.dim:
             raise AssertionError(
-                ("mask shape {0} is of the wrong dimension. " +
-                 "Expecting {1}").format(data.shape, self.dim)
+                ("mask shape {0} is of the wrong dimension. " + "Expecting {1}").format(
+                    data.shape, self.dim
                 )
+            )
         self.mask = data
         return
 
@@ -482,8 +661,9 @@ class PixelIsland(object):
         if len(offsets) != self.dim:
             raise AssertionError(
                 "{0} offsets were passed but {1} are required".format(
-                    len(offsets), self.dim)
-                    )
+                    len(offsets), self.dim
+                )
+            )
         # TODO: Figure out 3d boxes
         # set the bounding box one dimension at a time
         ndrow = np.any(data, axis=0)
@@ -494,7 +674,7 @@ class PixelIsland(object):
         cmin, cmax = np.where(ndcol)[0][[0, -1]]
         self.bounding_box[0][0] = offsets[0] + cmin
         self.bounding_box[0][1] = offsets[0] + cmax + 1
-        self.set_mask(data[rmin:rmax+1, cmin:cmax+1])
+        self.set_mask(data[rmin : rmax + 1, cmin : cmax + 1])
         return
 
 
@@ -523,9 +703,9 @@ class IslandFittingData(object):
         If true then also measure properties of the island.
     """
 
-    def __init__(self, isle_num=0, i=None,
-                 scalars=None, offsets=(0, 0, 1, 1),
-                 doislandflux=False):
+    def __init__(
+        self, isle_num=0, i=None, scalars=None, offsets=(0, 0, 1, 1), doislandflux=False
+    ):
         self.isle_num = isle_num
         self.i = i
         self.scalars = scalars
@@ -577,7 +757,9 @@ def classify_catalog(catalog):
     islands = []
     simples = []
     for source in catalog:
-        if isinstance(source, ComponentSource):
+        if isinstance(source, ComponentSource) or isinstance(
+            source, ComponentSource3D
+        ):  # TODO This needs to be split up down the line
             components.append(source)
         elif isinstance(source, IslandSource):
             islands.append(source)

@@ -166,12 +166,189 @@ def test_load_image_band_multi_bands():
     return
 
 
+def test_load_image_band_data_header_check():
+    """Load an image to test if it is of type np.ndarray object
+    and that the header is a fits.hdu.Header object"""
+    try:
+        data, header = fits_tools.load_image_band(
+            "tests/test_files/synthetic_cube.fits", as_cube=True
+        )
+    except Exception as e:
+        raise e
+    if not isinstance(data, np.ndarray):
+        raise AssertionError("Loaded data is not an np.ndarray object")
+    if not isinstance(header, fits.Header):
+        raise AssertionError("header is not a fits.hdu.Header object")
+    return
+
+
+def test_load_image_band_cube_as_cube_true():
+    """Load an image of a cube with as_cube = True"""
+    try:
+        data, header = fits_tools.load_image_band(
+            "tests/test_files/synthetic_cube.fits", as_cube=True
+        )
+    except Exception as e:
+        raise e
+    if len(data.shape) < 3:
+        raise AssertionError("Loaded data is not 3-Dimensional")
+    return
+
+
+def test_load_image_band_cube_as_cube_false():
+    """Load an image of a cube with as_cube = False"""
+    try:
+        data, header = fits_tools.load_image_band(
+            "tests/test_files/synthetic_cube.fits", as_cube=False
+        )
+    except Exception as e:
+        raise e
+
+    if len(data.shape) < 2:
+        raise AssertionError("Loaded data is not 2-Dimensional")
+    return
+
+
+def no_test_load_image_band_2d_as_cube_true():
+    """Load an image of a band with as_cube = True"""
+    try:
+        data, header = fits_tools.load_image_band(
+            "tests/test_files/1904-66_AIT.fits", as_cube=True
+        )
+    except AegeanError as e:
+        return
+    else:
+        raise AssertionError("Data passed as a cube but only 2 axes were provided")
+
+
+def test_load_image_band_2d_as_cube_false():
+    """Load an image using default values"""
+    try:
+        data, header = fits_tools.load_image_band(
+            "tests/test_files/1904-66_AIT.fits", as_cube=False
+        )
+    except Exception as e:
+        raise e
+    if not isinstance(data, np.ndarray):
+        raise AssertionError("Loaded data is not an np.ndarray object")
+    if not isinstance(header, fits.Header):
+        raise AssertionError("header is not a fits.hdu.Header object")
+    return
+
+# TODO: Complete this test
 def test_load_image_band_cube_index():
     return
 
-
+# TODO: Complete this test
 def test_load_image_band_hdu_index():
     return
+
+
+def _fully_in_memory_hdulist(fname):
+    """
+    Build an HDUList that has never been associated with a real file on
+    disk.
+    """
+    with fits.open(fname) as hdulist:
+        data = hdulist[0].data.copy()
+        header = hdulist[0].header.copy()
+    return fits.HDUList([fits.PrimaryHDU(data=data, header=header)])
+ 
+ 
+def test_load_image_band_hdulist_2d_matches_path():
+    """
+    A plain 2D image loaded via an in-memory HDUList should give the same
+    data and header as loading the same file via its path.
+    """
+    fname = "tests/test_files/1904-66_SIN.fits"
+    data_path, header_path = fits_tools.load_image_band(fname)
+ 
+    hdulist = _fully_in_memory_hdulist(fname)
+    data_mem, header_mem = fits_tools.load_image_band(hdulist)
+ 
+    if not isinstance(data_mem, np.ndarray):
+        raise AssertionError("Loaded data is not an np.ndarray object")
+    if data_mem.shape != data_path.shape:
+        raise AssertionError(
+            f"shape mismatch: hdulist gave {data_mem.shape}, path gave {data_path.shape}"
+        )
+    if not np.allclose(data_mem, data_path, equal_nan=True):
+        raise AssertionError("data loaded from an in-memory HDUList doesn't match data loaded from a path")
+ 
+ 
+def test_load_image_band_hdulist_cube_as_cube_true_matches_path():
+    """
+    as_cube=True on an in-memory HDUList should give the same 3D result
+    as as_cube=True on the same file loaded via its path.
+    """
+    fname = "tests/test_files/synthetic_cube.fits"
+    data_path, _ = fits_tools.load_image_band(fname, as_cube=True)
+ 
+    hdulist = _fully_in_memory_hdulist(fname)
+    data_mem, header_mem = fits_tools.load_image_band(hdulist, as_cube=True)
+ 
+    if data_mem.ndim != 3:
+        raise AssertionError("Loaded data is not 3-Dimensional")
+    if not np.allclose(data_mem, data_path, equal_nan=True):
+        raise AssertionError("cube data loaded from an in-memory HDUList doesn't match data loaded from a path")
+ 
+ 
+def test_load_image_band_hdulist_cube_index_matches_path():
+    """
+    as_cube=False with an explicit cube_index on an in-memory HDUList
+    should give the same 2D slice as the equivalent path-based call.
+    """
+    fname = "tests/test_files/synthetic_cube.fits"
+    data_path, _ = fits_tools.load_image_band(fname, as_cube=False, cube_index=2)
+ 
+    hdulist = _fully_in_memory_hdulist(fname)
+    data_mem, header_mem = fits_tools.load_image_band(hdulist, as_cube=False, cube_index=2)
+ 
+    if data_mem.ndim != 2:
+        raise AssertionError("Loaded data is not 2-Dimensional")
+    if not np.allclose(data_mem, data_path, equal_nan=True):
+        raise AssertionError("sliced data loaded from an in-memory HDUList doesn't match data loaded from a path")
+ 
+ 
+def test_load_image_band_hdulist_auto_detect():
+    """
+    as_cube=None (the default) on an in-memory HDUList of a genuine cube
+    should still auto-detect as a cube, the same way a path-based load
+    does.
+    """
+    fname = "tests/test_files/synthetic_cube.fits"
+    hdulist = _fully_in_memory_hdulist(fname)
+    data_mem, header_mem = fits_tools.load_image_band(hdulist, cube_index=None)
+ 
+    if data_mem.ndim != 3:
+        raise AssertionError(
+            "in-memory HDUList of a multi-plane cube did not auto-detect as a cube"
+        )
+ 
+ 
+def test_load_image_band_hdulist_single_plane_defaults_to_2d():
+    """
+    as_cube=None (the default) on an in-memory HDUList with only one
+    plane should not be treated as a cube -- it should default to that
+    one plane, rather than crashing or returning a spurious 3D array.
+    """
+    fname = "tests/test_files/synthetic_cube.fits"
+    with fits.open(fname) as hdulist:
+        # keep the leading axis as a genuine size-1 dimension (NAXIS=3,
+        # NAXIS3=1), rather than squeezing it away -- that's what
+        # actually exercises the NAXIS3==1 auto-detect branch.
+        data = hdulist[0].data[0:1].copy()
+        header = hdulist[0].header.copy()
+    single_plane = fits.HDUList([fits.PrimaryHDU(data=data, header=header)])
+    if single_plane[0].header["NAXIS3"] != 1:
+        raise AssertionError("test setup is wrong: NAXIS3 should be 1")
+ 
+    data_mem, header_mem = fits_tools.load_image_band(single_plane, cube_index=None)
+    if data_mem.ndim != 2:
+        raise AssertionError(
+            "single-plane in-memory HDUList should default to 2D, not be treated as a cube"
+        )
+ 
 
 
 if __name__ == "__main__":

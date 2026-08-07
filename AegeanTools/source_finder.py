@@ -8,6 +8,7 @@ import math
 import multiprocessing
 import os
 
+from astropy.io import fits
 import lmfit
 import numpy as np
 from scipy.ndimage import find_objects, label, maximum_filter, minimum_filter
@@ -24,16 +25,18 @@ from .fits_tools import load_image_band, write_fits
 from .fitting import (
     Bmatrix,
     Cmatrix,
-    bias_correct,
     covar_errors,
     do_lmfit,
+    do_lmfit_3D,
     elliptical_gaussian,
     errors,
     ntwodgaussian_lmfit,
+    nthreedgaussian_lmfit,
 )
 from .logging import logger, logging
 from .models import (
     ComponentSource,
+    ComponentSource3D,
     DummyLM,
     IslandFittingData,
     IslandSource,
@@ -44,6 +47,8 @@ from .models import (
 from .msq2 import MarchingSquares
 from .regions import Region
 from .wcs_helpers import Beam, WCSHelper
+
+from .mpi import MPI_AVAIL, MPI
 
 __author__ = "Paul Hancock"
 
@@ -109,7 +114,7 @@ def find_islands(
     l, n = label(a, structure=np.ones((3, 3)))
     f = find_objects(l)
 
-    logger.debug("{1} Found {0} islands total above flood limit".format(n, im.shape))
+    logger.debug(f"{n} Found {im.shape} islands total above flood limit")
 
     islands = []
     for i in range(n):
@@ -187,9 +192,6 @@ class SourceFinder(object):
     docov : bool
         If True, then fitting will be done using the covariance matrix.
 
-    dobais: bool
-        Not yet implemented. Default = False
-
     sources : [ComponentSource|IslandSource|SimpleSource]
       List of sources that have been found/measured.
     """
@@ -207,7 +209,6 @@ class SourceFinder(object):
         self.wcshelper = None
         self.blank = False
         self.docov = True
-        self.dobias = False
         self.cube_index = 0
 
         self.sources = []
@@ -642,23 +643,33 @@ class SourceFinder(object):
         sources : list
           A list of components, and islands if requested.
         """
-
+        threeD = len(self.img.shape) == 3
         # island data
         isle_num = island_data.isle_num
         idata = island_data.i
         xmin, xmax, ymin, ymax = island_data.offsets
 
-        box = slice(int(xmin), int(xmax)), slice(int(ymin), int(ymax))
-        rms = self.rmsimg[box]
-        bkg = self.bkgimg[box]
+        if threeD:
+            box = slice(0, -1), slice(int(xmin), int(xmax)), slice(int(ymin), int(ymax))
+            logger.debug(f"THIS IS THE 3-D BOX: {box}")
+
+            rms = np.mean(self.rmsimg[box], axis=0)
+            bkg = np.mean(self.bkgimg[box], axis=0)
+
+        else:
+            box = slice(int(xmin), int(xmax)), slice(int(ymin), int(ymax))
+            logger.debug(f"THIS IS THE 2-D BOX: {box}")
+
+            rms = self.rmsimg[box]
+            bkg = self.bkgimg[box]
+
         residual = np.median(result.residual), np.std(result.residual)
         is_flag = isflags
-
         sources = []
         j = 0
         for j in range(int(model["components"].value)):
             src_flags = is_flag
-            source = ComponentSource()
+            source = ComponentSource3D() if threeD else ComponentSource()
             source.island = isle_num
             source.source = j
             logger.debug(" component {0}".format(j))
@@ -670,6 +681,10 @@ class SourceFinder(object):
             theta = model[prefix + "theta"].value
             amp = model[prefix + "amp"].value
             src_flags |= int(model[prefix + "flags"].value)
+
+            if threeD:
+                source.alpha = model[prefix + "alpha"].value
+                source.nu0 = model[prefix + "nu0"].value
 
             # these are goodness of fit statistics for the entire island.
             source.residual_mean = residual[0]
@@ -887,6 +902,7 @@ class SourceFinder(object):
         blank=False,
         docov=True,
         cube_index=None,
+        as_cube=None,
     ):
         """
         Populate the global_data object by loading or calculating
@@ -937,19 +953,45 @@ class SourceFinder(object):
         cube_index : int
           For an image cube, which slice to use.
 
+        as_cube : bool or None
+          If the data is to be processed as a cube or not.
+          Default = None: auto-detect from the file (a cube if cube_index
+          is not given and the file has more than one plane).
         """
         # don't reload already loaded data
         if self.img is not None:
             return
 
         img, header = load_image_band(
-            filename, hdu_index=hdu_index, cube_index=cube_index
+            filename, hdu_index=hdu_index, cube_index=cube_index, as_cube=as_cube
         )
-
+        # load_image_band may have auto-detected as_cube itself (if it was
+        # None); resolve it here to the ground truth of what was actually
+        # loaded, so every use of as_cube below (aux image loading, docov)
+        # is consistent with the real shape of img rather than a possibly
+        # still-unresolved sentinel.
+        as_cube = img.ndim == 3
         debug = logger.isEnabledFor(logging.DEBUG)
 
+        self.img = img
+        self.header = header
+        self.dtype = self.img.dtype
+
+
+        self.bkgimg = np.zeros(self.img.shape, dtype=self.dtype)
+        self.rmsimg = np.zeros(self.img.shape, dtype=self.dtype)
+        if not as_cube:
+            self.cube_index = cube_index
+            self.wcshelper = WCSHelper.from_header(header, beam, psf_file=psf)
+            self.beam = self.wcshelper.beam
+
+        else:
+            self.cube_index = None
+            self.wcshelper = WCSHelper.from_header(header, beam)
+            self.beam = self.wcshelper.beam
+
         if mask is not None:
-            # allow users to supply and object instead of a filename
+            # allow users to supply an object instead of a filename
             if isinstance(mask, Region):
                 self.region = mask
             elif os.path.exists(mask):
@@ -958,17 +1000,6 @@ class SourceFinder(object):
             else:
                 logger.error("File {0} not found for loading".format(mask))
                 self.region = None
-
-        self.wcshelper = WCSHelper.from_header(header, beam, psf_file=psf)
-        self.beam = self.wcshelper.beam
-
-        self.img = img
-        self.header = header
-        self.dtype = type(self.img[0][0])
-        self.bkgimg = np.zeros(self.img.shape, dtype=self.dtype)
-        self.rmsimg = np.zeros(self.img.shape, dtype=self.dtype)
-
-        self.cube_index = cube_index
 
         if do_curve:
             logger.info("Calculating curvature")
@@ -982,8 +1013,8 @@ class SourceFinder(object):
             dcurve[tmask] = 1
             self.dcurve = dcurve
 
-        # if either of rms or bkg images are not supplied
-        # then calculate them both
+            # if either of rms or bkg images are not supplied
+            # then calculate them both
         if not (rmsin and bkgin):
             if verb:
                 logger.info("Calculating background and rms data")
@@ -993,32 +1024,31 @@ class SourceFinder(object):
                 forced_bkg=bkg,
                 cores=cores,
             )
-
         # replace the calculated images with input versions,
         # if the user has supplied them.
         if bkgin:
             if verb:
                 logger.info("Loading background data from file {0}".format(bkgin))
-            self.bkgimg = self._load_aux_image(img, bkgin)
+            self.bkgimg = self._load_aux_image(img, bkgin, as_cube=as_cube)
         if rmsin:
             if verb:
                 logger.info("Loading rms data from file {0}".format(rmsin))
-            self.rmsimg = self._load_aux_image(img, rmsin)
+            self.rmsimg = self._load_aux_image(img, rmsin, as_cube=as_cube)
 
+        self.bkgimg = np.squeeze(self.bkgimg)
+        self.rmsimg = np.squeeze(self.rmsimg)
         # subtract the background image from the data image and save
         if verb and debug:
             logger.debug("Data max is {0}".format(np.nanmax(img)))
             logger.debug("Doing background subtraction")
+            logger.debug(f"bkgimg shape: {self.bkgimg.shape}, img shape: {img.shape}")
         img -= self.bkgimg
         self.img = img
         if verb and debug:
             logger.debug("Data max is {0}".format(np.nanmax(img)))
 
         self.blank = blank
-        self.docov = docov
-
-        # Default to false until I can verify that this is working
-        self.dobias = False
+        self.docov = docov and not as_cube  # covariance matrix is not used for cubes (yet)
 
         # check if the WCS is galactic
         if "lon" in self.header["CTYPE1"].lower():
@@ -1219,7 +1249,7 @@ class SourceFinder(object):
 
         return
 
-    def _load_aux_image(self, image, auxfile):
+    def _load_aux_image(self, image, auxfile, as_cube=False):
         """
         Load a fits file (bkg/rms/curve) and make sure that
         it is the same shape as the main image.
@@ -1238,7 +1268,7 @@ class SourceFinder(object):
           The loaded image.
         """
 
-        auximg, _ = load_image_band(auxfile)
+        auximg, _ = load_image_band(auxfile, as_cube=as_cube)
 
         if auximg.shape != image.shape:
             logger.error(
@@ -1283,18 +1313,17 @@ class SourceFinder(object):
 
         data = self.img
         rmsimg = self.rmsimg
+        is_cube = self.img.ndim == 3
 
         for inum, isle in enumerate(group, start=istart):
             logger.debug("-=-")
-            logger.debug(
-                "input island = {0}, {1} components".format(isle[0].island, len(isle))
-            )
+            logger.debug(f"input island = {isle[0].island}, {len(isle)} components")
 
             # set up the parameters for each of the sources within the island
             i = 0
             params = lmfit.Parameters()
             shape = data.shape
-            xmin, ymin = shape
+            xmin, ymin = shape[-2:] # spatial dimesion only
             xmax = ymax = 0
 
             # island_mask = []
@@ -1303,6 +1332,7 @@ class SourceFinder(object):
             # this may be a subset of all sources in the island
             included_sources = []
             for src in isle:
+                # get the beam for this source
                 pixbeam = Beam(*self.wcshelper.get_psf_sky2pix(src.ra, src.dec))
                 # find the right pixels from the ra/dec
                 source_x, source_y = self.wcshelper.sky2pix([src.ra, src.dec])
@@ -1311,22 +1341,23 @@ class SourceFinder(object):
                 x = int(round(source_x))
                 y = int(round(source_y))
 
-                logger.debug(
-                    "pixel location ({0:5.2f},{1:5.2f})".format(source_x, source_y)
-                )
+                # coordinates that are either 2d/3d, depending on the data
+                zxy = (0,) * (data.ndim - 2) + (x, y)
+
+                logger.debug(f"pixel location ({source_x:5.2f},{source_y:5.2f})")
                 # reject sources that are outside the image bounds,
                 # or which have nan data/rms values
                 if (
-                    not 0 <= x < shape[0]
-                    or not 0 <= y < shape[1]
-                    or not np.isfinite(data[x, y])
-                    or not np.isfinite(rmsimg[x, y])
+                    not 0 <= x < shape[-2]
+                    or not 0 <= y < shape[-1]
+                    or not np.isfinite(data[zxy])
+                    or not np.isfinite(rmsimg[zxy])
                     or pixbeam is None
                 ):
+                    logger.debug(f"x {x}, y {y} , shape {shape}")
+                    logger.debug(f"data {data[zxy]}, rms {rmsimg[zxy]}, pixbeam {pixbeam}")
                     logger.debug(
-                        "Source ({0},{1}) not within usable region: skipping".format(
-                            src.island, src.source
-                        )
+                        f"Source ({src.island},{src.source}) not within usable region: skipping"
                     )
                     continue
                 else:
@@ -1341,14 +1372,10 @@ class SourceFinder(object):
                 sy *= FWHM2CC
 
                 logger.debug(
-                    "Source shape [sky coords]  {0:5.2f}x{1:5.2f}@{2:05.2f}".format(
-                        src.a, src.b, src.pa
-                    )
+                    f"Source shape [sky coords]  {src.a:5.2f}x{src.b:5.2f}@{src.pa:05.2f}"
                 )
                 logger.debug(
-                    "Source shape [pixel coords] {0:4.2f}x{1:4.2f}@{2:05.2f}".format(
-                        sx, sy, theta
-                    )
+                    f"Source shape [pixel coords] {sx:4.2f}x{sy:4.2f}@{theta:05.2f}"
                 )
 
                 # choose a region that is 2x the major axis of the source,
@@ -1360,13 +1387,13 @@ class SourceFinder(object):
                 # adjust the size of the island to include this source
                 xmin = min(xmin, max(0, x - xwidth / 2))
                 ymin = min(ymin, max(0, y - ywidth / 2))
-                xmax = max(xmax, min(shape[0], x + xwidth / 2 + 1))
-                ymax = max(ymax, min(shape[1], y + ywidth / 2 + 1))
+                xmax = max(xmax, min(shape[-2], x + xwidth / 2 + 1))
+                ymax = max(ymax, min(shape[-1], y + ywidth / 2 + 1))
 
                 s_lims = [0.8 * min(sx, pixbeam.b * FWHM2CC), max(sy, sx) * 1.25]
 
                 # Set up the parameters for the fit, including constraints
-                prefix = "c{0}_".format(i)
+                prefix = f"c{i}_"
                 params.add(prefix + "amp", value=src.peak_flux, vary=True)
                 # for now the xo/yo are locations within the main image,
                 # we correct this later
@@ -1398,9 +1425,12 @@ class SourceFinder(object):
                     max=s_lims[1],
                     vary=stage >= 3,
                 )
+                if is_cube:
+                    params.add(prefix + "alpha", value=-1, min=-2, max=1)
                 params.add(prefix + "theta", value=theta, vary=stage >= 3)
                 params.add(prefix + "flags", value=0, vary=False)
-                # this source is being refit so add it to the list
+                if is_cube:
+                    params.add(prefix + "nu0", value=src.nu0, vary=False)
                 included_sources.append(src)
                 i += 1
 
@@ -1408,18 +1438,20 @@ class SourceFinder(object):
                 # the FWHM mask that is defined further on
 
             if i == 0:
-                logger.debug("No sources found in island {0}".format(src.island))
+                logger.debug(f"No sources found in island {src.island}")
                 continue
             params.add("components", value=i, vary=False)
             # params.components = i
-            logger.debug(" {0} components being fit".format(i))
+            logger.debug(f" {i} components being fit")
             # now we correct the xo/yo positions to be
             # relative to the sub-image
-            logger.debug("xmxxymyx {0} {1} {2} {3}".format(xmin, xmax, ymin, ymax))
+            logger.debug(f"xmxxymyx {xmin} {xmax} {ymin} {ymax}")
             for i in range(int(params["components"].value)):
-                prefix = "c{0}_".format(i)
+                prefix = f"c{i}_"
+
                 # must update limits before the value as limits are
                 # enforced when the value is updated
+                # ? From my understanding this ensures the sources are within the sub-image
                 params[prefix + "xo"].min -= xmin
                 params[prefix + "xo"].max -= xmin
                 params[prefix + "xo"].value -= xmin
@@ -1429,32 +1461,38 @@ class SourceFinder(object):
             # logger.debug(params)
             # don't fit if there are no sources
             if params["components"].value < 1:
-                logger.info("Island {0} has no components".format(src.island))
+                logger.info(f"Island {src.island} has no components")
                 continue
 
             # this .copy() will stop us from modifying the parent region when
             # we later apply our mask.
-            idata = data[int(xmin) : int(xmax), int(ymin) : int(ymax)].copy()
+
+            if is_cube:
+                idata = data[:, int(xmin) : int(xmax), int(ymin) : int(ymax)].copy()
+            else:
+                idata = data[int(xmin) : int(xmax), int(ymin) : int(ymax)].copy()
+            idx = np.indices(idata.shape)
+
             # now convert these back to indices within the idata region
             # island_mask = np.array([(x-xmin, y-ymin) for x,y in island_mask])
 
-            allx, ally = np.indices(idata.shape)
+            
             # mask to include pixels that are withn the FWHM
             # of the sources being fit
             mask_params = copy.deepcopy(params)
             for i in range(int(mask_params["components"].value)):
-                prefix = "c{0}_".format(i)
+                prefix = f"c{i}_"
                 mask_params[prefix + "amp"].value = 1
-            mask_model = ntwodgaussian_lmfit(mask_params)
-            mask = np.where(mask_model(allx.ravel(), ally.ravel()) <= 0.1)
-            mask = allx.ravel()[mask], ally.ravel()[mask]
-            del mask_params
-
+            mask_model = (nthreedgaussian_lmfit if is_cube else ntwodgaussian_lmfit)(mask_params)
+            mask = (mask_model(*[a.ravel() for a in idx]) <= 0.1).reshape(idata.shape)
             idata[mask] = np.nan
 
-            mx, my = np.where(np.isfinite(idata))
+            del mask_params
+            
+
+            mx, my = np.where(np.isfinite(idata))[-2:]
             non_nan_pix = len(mx)
-            total_pix = len(allx.ravel())
+            total_pix = idata[-1].size # len(allx.ravel())
             logger.debug("island extracted:")
             logger.debug(" x[{0}:{1}] y[{2}:{3}]".format(xmin, xmax, ymin, ymax))
             logger.debug(" max = {0}".format(np.nanmax(idata)))
@@ -1468,14 +1506,14 @@ class SourceFinder(object):
             # the central 3x3 pixels of it's location
             # If not then we don't fit that component
             for i in range(int(params["components"].value)):
-                prefix = "c{0}_".format(i)
+                prefix = f"c{i}_"
                 # figure out a box around the center of this
                 cx, cy = (
                     params[prefix + "xo"].value,
                     params[prefix + "yo"].value,
                 )  # central pixel coords
-                logger.debug(" comp {0}".format(i))
-                logger.debug("  x0, y0 {0} {1}".format(cx, cy))
+                logger.debug(f" comp {i}")
+                logger.debug(f"  x0, y0 {cx} {cy}")
                 xmx = int(round(np.clip(cx + 2, 0, idata.shape[0])))
                 xmn = int(round(np.clip(cx - 1, 0, idata.shape[0])))
                 ymx = int(round(np.clip(cy + 2, 0, idata.shape[1])))
@@ -1484,11 +1522,12 @@ class SourceFinder(object):
                 # if there are no not-nan pixels in this region
                 # then don't vary any parameters
                 if not np.any(np.isfinite(square)):
-                    logger.debug(" not fitting component {0}".format(i))
+                    logger.debug(f" not fitting component {i}")
                     params[prefix + "amp"].value = np.nan
-                    for p in ["amp", "xo", "yo", "sx", "sy", "theta"]:
-                        params[prefix + p].vary = False
-                        params[prefix + p].stderr = np.nan
+                    for p in ["amp", "xo", "yo", "sx", "sy", "theta", "alpha", "nu0"]:
+                        if prefix + p in params:
+                            params[prefix + p].vary = False
+                            params[prefix + p].stderr = np.nan
                         # the above results in an error of -1 later on
                     params[prefix + "flags"].value |= flags.NOTFIT
 
@@ -1503,9 +1542,7 @@ class SourceFinder(object):
             else:
                 if non_nan_pix < nfree:
                     logger.debug(
-                        "More free parameters {0} than available pixels {1}".format(
-                            nfree, non_nan_pix
-                        )
+                        f"More free parameters {nfree} than available pixels {non_nan_pix}"
                     )
                     if non_nan_pix >= params["components"].value:
                         logger.debug("Fixing all parameters except amplitudes")
@@ -1519,6 +1556,7 @@ class SourceFinder(object):
                 # do the fit
                 # if the pixel beam is not valid, then recalculate using
                 # the location of the last source to have a valid psf
+                #! If we don't use the psf, then we don't need to recalculate the pixel beam
                 if pixbeam is None:
                     if src_valid_psf is not None:
                         pixbeam = self.wcshelper.get_pixbeam(
@@ -1527,6 +1565,7 @@ class SourceFinder(object):
                     else:
                         logger.critical("Cannot determine pixel beam")
                 fac = 1 / np.sqrt(2)
+
                 if self.docov:
                     C = Cmatrix(
                         mx,
@@ -1538,8 +1577,20 @@ class SourceFinder(object):
                     B = Bmatrix(C)
                 else:
                     C = B = None
-                errs = np.nanmax(rmsimg[int(xmin) : int(xmax), int(ymin) : int(ymax)])
-                result, _ = do_lmfit(idata, params, B=B)
+
+                if is_cube:
+                    errs = np.nanmax(
+                                        rmsimg[:, int(xmin) : int(xmax), int(ymin) : int(ymax)]
+                                    )
+                    freq_mapping = np.array(
+                                        [self.wcshelper.pix2freq(f) for f in range(idata.shape[0])]
+                                    )
+                    logger.debug(f"Freq mapping: {freq_mapping}")
+                    result, _ = do_lmfit_3D(idata, params, B=B, freq_mapping=freq_mapping)
+                else:
+                    errs = np.nanmax(rmsimg[int(xmin) : int(xmax), int(ymin) : int(ymax)])
+                    result, _ = do_lmfit(idata, params, B=B)
+            
                 model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
 
             # convert the results to a source object
@@ -1573,6 +1624,7 @@ class SourceFinder(object):
                     ns.err_pa = s.err_pa
             sources.extend(new_src)
         return sources
+
 
     def _fit_island(self, island_data):
         """
@@ -1775,20 +1827,6 @@ class SourceFinder(object):
                 # get the real (sky) parameter errors
                 model = covar_errors(result.params, idata, errs=errs, B=B, C=C)
 
-                if self.dobias and self.docov:
-                    x, y = np.indices(idata.shape)
-                    acf = elliptical_gaussian(
-                        x,
-                        y,
-                        1,
-                        0,
-                        0,
-                        pixbeam.a * FWHM2CC * fac,
-                        pixbeam.b * FWHM2CC * fac,
-                        pixbeam.pa,
-                    )
-                    bias_correct(model, idata, acf=acf * errs**2)
-
                 if not result.success:
                     is_flag |= flags.FITERR
 
@@ -1834,6 +1872,7 @@ class SourceFinder(object):
         docov=True,
         cube_index=None,
         progress=True,
+        threeD=None,
     ):
         """
         Run the Aegean source finder.
@@ -1930,8 +1969,8 @@ class SourceFinder(object):
             blank=blank,
             docov=docov,
             cube_index=cube_index,
+            as_cube=threeD,
         )
-
         logger.info(
             "beam = {0:5.2f}'' x {1:5.2f}'' at {2:5.2f}deg".format(
                 self.beam.a * 3600,
@@ -1942,9 +1981,54 @@ class SourceFinder(object):
         # stop people from doing silly things.
         if outerclip > innerclip:
             outerclip = innerclip
-        logger.info("seedclip={0}".format(innerclip))
-        logger.info("floodclip={0}".format(outerclip))
-
+        logger.info(f"seedclip={innerclip}")
+        logger.info(f"floodclip={outerclip}")
+        logger.info(f"image dimensions = {self.img.shape}")
+        is_cube = self.img.ndim == 3
+        if is_cube:
+            logger.info(f"Image is a cube with {self.img.shape[0]} channels")
+            temp_img = np.average(self.img, axis=0)
+            temp_rms = np.average(self.rmsimg, axis=0)
+            temp_bkg = np.zeros_like(temp_img)
+            # Create HDUList for the averaged image to pass to SourceFinder
+            temp_img_hdu = fits.PrimaryHDU(data=temp_img, header=self.header)
+            temp_rms_hdu = fits.ImageHDU(data=temp_rms, header=self.header)
+            temp_bkg_hdu = fits.ImageHDU(data=temp_bkg, header=self.header)
+            temp_img_hdulist = fits.HDUList([temp_img_hdu])
+            temp_rms_hdulist = fits.HDUList([temp_rms_hdu])
+            temp_bkg_hdulist = fits.HDUList([temp_bkg_hdu])
+            sf = SourceFinder()
+            seed_islands = sf.find_sources_in_image(
+                filename=temp_img_hdulist,
+                bkgin=temp_bkg_hdulist,
+                rmsin=temp_rms_hdulist,
+                innerclip=innerclip,
+                outerclip=outerclip,
+                mask=mask,
+                progress=False
+            )
+            seed_islands = [ComponentSource3D.from_component_source(s) for s in seed_islands]
+            logger.info(f"Found {len(seed_islands)} seed islands in the averaged image")
+            del sf
+            return self.priorized_fit_islands(
+                filename=filename,
+                catalogue=seed_islands,
+                hdu_index=hdu_index,
+                outfile=outfile,
+                bkgin=bkgin,
+                rmsin=rmsin,
+                cores=cores,
+                rms=rms,
+                bkg=bkg,
+                beam=beam,
+                imgpsf=imgpsf,
+                stage=3,
+                ratio=None,
+                outerclip=outerclip,
+                doregroup=False,
+                regroup_eps=None,
+                docov=docov,
+                progress=progress,)
         islands = find_islands(
             im=self.img,
             bkg=np.zeros_like(self.img),
@@ -1954,7 +2038,7 @@ class SourceFinder(object):
             region=self.region,
             wcs=self.wcshelper,
         )
-        logger.info("Found {0} islands".format(len(islands)))
+        logger.info(f"Found {len(islands)} islands")
         logger.info("Begin fitting")
 
         island_group = []
@@ -1969,7 +2053,7 @@ class SourceFinder(object):
             # ignore empty islands
             # This should now be impossible to trigger
             if not np.any(np.isfinite(i)):
-                logger.warning("Empty island detected, this should be imposisble.")
+                logger.warning("Empty island detected, this should be impossible.")
                 continue
             isle_num += 1
             scalars = (innerclip, outerclip, max_summits)
@@ -1979,12 +2063,22 @@ class SourceFinder(object):
 
         # now fit all the islands
         sources = []
-        with tqdm(
-            total=isle_num, desc="Fitting Islands:", disable=not progress
-        ) as pbar:
-            for i in island_group:
+        if MPI_AVAIL:
+
+            size = MPI.COMM_WORLD.Get_size()
+            rank = MPI.COMM_WORLD.Get_rank()
+
+            block_size = len(island_group) // size
+
+            start = block_size * rank
+            end = block_size * (rank + 1)
+
+            # highest rank will deal with the remainder (which is < size)
+            if rank == size:
+                end = None
+
+            for i in island_group[start:end]:
                 try:
-                    pbar.update(1)
                     srcs = self._fit_island(i)
                 except AegeanNaNModelError:
                     continue
@@ -1996,6 +2090,25 @@ class SourceFinder(object):
                     ):
                         continue
                     sources.append(src)
+
+        else:
+            with tqdm(
+                total=isle_num, desc="Fitting Islands:", disable=not progress
+            ) as pbar:
+                for i in island_group:
+                    try:
+                        pbar.update(1)
+                        srcs = self._fit_island(i)
+                    except AegeanNaNModelError:
+                        continue
+                    # update bar as each individual island is fit
+                    for src in srcs:
+                        # ignore sources that we have been told to ignore
+                        if (src.peak_flux > 0 and nopositive) or (
+                            src.peak_flux < 0 and nonegative
+                        ):
+                            continue
+                        sources.append(src)
 
         # Write the output to the output file
         if outfile:
@@ -2024,7 +2137,6 @@ class SourceFinder(object):
         bkg=None,
         beam=None,
         imgpsf=None,
-        catpsf=None,
         stage=3,
         ratio=None,
         outerclip=3,
@@ -2132,22 +2244,37 @@ class SourceFinder(object):
             cube_index=cube_index,
         )
 
+        # Determine if we are using a cube or not
+        is_cube = self.img.ndim == 3
+        src_type = ComponentSource3D if is_cube else ComponentSource
+        logger.info(f"Input sources are being treated as {'3D' if is_cube else '2D'}")
         # load the table and convert to an input source list
         if isinstance(catalogue, str):
             input_table = load_table(catalogue)
-            input_sources = np.array(table_to_source_list(input_table))
+            input_sources = np.array(table_to_source_list(input_table, src_type=src_type))
         else:
             input_sources = np.array(catalogue)
+
+        if is_cube:
+            logger.info("Input sources are being treated as 3D")
+            nu0 = self.wcshelper.pix2freq(0)
+            # Convert the input sources to 3D if they are not already
+            for src in input_sources:
+                src.alpha = -1
+                src.nu0 = nu0
 
         if len(input_sources) < 1:
             logger.debug("No input sources for priorized fitting")
             return []
 
         # reject sources with missing params
+        required = ["ra", "dec", "peak_flux", "a", "b", "pa"]
+        if is_cube:
+            required += ["alpha", "nu0"]
         ok = True
-        for param in ["ra", "dec", "peak_flux", "a", "b", "pa"]:
+        for param in required:
             if np.isnan(getattr(input_sources[0], param)):
-                logger.info("Source 0, is missing param '{0}'".format(param))
+                logger.info(f"Source 0, is missing param '{param}'")
                 ok = False
         if not ok:
             logger.error("Missing parameters! Not fitting.")
@@ -2156,9 +2283,9 @@ class SourceFinder(object):
         del ok
 
         # Do the resizing
-        logger.info("{0} sources in catalog".format(len(input_sources)))
+        logger.info(f"{len(input_sources)} sources in catalog")
         sources = cluster.resize(input_sources, ratio=ratio, wcshelper=self.wcshelper)
-        logger.info("{0} sources accepted".format(len(sources)))
+        logger.info(f"{len(sources)} sources accepted")
 
         if len(sources) < 1:
             logger.debug("No sources accepted for priorized fitting")
@@ -2210,12 +2337,12 @@ class SourceFinder(object):
         sources = sorted(sources)
 
         # Write the output to the output file
-        if outfile:
+        if outfile and len(sources) > 0:
             print(
                 header.format("{0}-({1})".format(__version__, __date__), filename),
                 file=outfile,
             )
-            print(ComponentSource.header, file=outfile)
+            print(sources[0].header, file=outfile)
             for source in sources:
                 print(str(source), file=outfile)
 
